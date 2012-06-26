@@ -1,0 +1,935 @@
+##-- Non-package imports  --
+from __future__ import division
+from CoolProp.CoolProp import Props
+from CoolProp.State import State
+import numpy as np
+from math import pi
+import textwrap
+from PDSim.misc.scipylike import trapz
+from scipy.optimize import newton
+
+##--  Package imports  --
+from PDSim.flow._sumterms import setcol, getcol
+from PDSim.flow import _flow
+from PDSim.flow.flow import FlowPathCollection, FlowPath
+from containers import ControlVolumeCollection
+from PDSim.plot.plots import debug_plots
+from PDSim.misc._listmath import listm 
+from PDSim.misc.solvers import Broyden,MultiDimNewtRaph
+
+#An empty class for storage
+class struct():
+    pass    
+        
+class TubeCollection(list):
+    
+    def _Nodes(self):
+        """
+        Nodes is a dictionary of flow states for any tubes that exist
+        """
+        list1=[(Tube.key1,Tube.State1) for Tube in self if Tube.exists==True]
+        list2=[(Tube.key2,Tube.State2) for Tube in self if Tube.exists==True]
+        return dict(list1+list2)
+    Nodes=property(_Nodes)
+    
+class Tube():
+    """
+    A tube is a component of the model that allows for heat transfer and pressure drop.
+    
+    With this class, the state of at least one of the points is fixed.  For instance, at the inlet of the compressor, the state well upstream is quasi-steady.
+    """
+    def __init__(self,key1,key2,L,ID,OD=None,State1=None,State2=None,fixed=-1,TubeFcn=None,mdot=-1,exists=True):
+        self.key1=key1
+        self.key2=key2
+        self.fixed=fixed
+        self.exists=exists
+        if fixed<0:
+            raise AttributeError(textwrap.dedent("""You must provide an integer 
+            value for fixed, either 1 for Node 1 fixed, or 2 for Node 2 fixed.  
+            You provided None (or didn\'t include the parameter"""))
+        if fixed==1 and isinstance(State1,State) and State2==None:
+            #Everything good
+            self.State1=State1
+            self.State2=State(self.State1.Fluid,{'T':self.State1.T,'D':self.State1.rho})
+        elif fixed==2 and isinstance(State2,State) and State1==None:
+            #Everything good
+            self.State2=State2
+            self.State1=State(self.State2.Fluid,{'T':self.State2.T,'D':self.State2.rho})
+        else:
+            raise AttributeError('Incompatibility between the value for fixed and the states provided')
+            
+        self.TubeFcn=TubeFcn
+        if mdot<0:
+            self.mdot=0.010
+            print('Warning: mdot not provided to Tube class contructor, guess value of '+str(self.mdot)+' kg/s used')
+        else:
+            self.mdot=mdot
+        self.L=L
+        self.ID=ID
+        self.OD=OD
+
+    
+class PDSimCore(object):
+    """
+    This is the main driver class for the model
+    
+    This class is not intended to be run on its own.  It must be subclassed and extended to provide functions for mass flow, etc. 
+    """
+    def __init__(self,stateVariables=None):
+        """
+        Initialization of the PD Core
+        """
+        #Initialize the containers to be empty
+        self.Valves=[]
+        self.CVs=ControlVolumeCollection()
+        self.Flows=FlowPathCollection()
+        self.FlowStorage=[]
+        self.Tubes=TubeCollection()
+        self.Tlumps=np.zeros((1,1))
+        self.steps=[]
+        self.__hasValves__=False
+        if isinstance(stateVariables,list):
+            self.stateVariables=stateVariables
+        else:
+            self.stateVariables=['T','D']
+    
+    def __vals2array(self,i):
+        """
+        Get values back from the matrices
+        """
+        
+        if self.__hasLiquid__==True:
+            raise NotImplementedError
+            #return np.hstack([self.T[:,i],self.m[:,i],self.xL[:,i]])
+        else:
+            VarList=[]
+            exists_indices = self.CVs.exists_indices
+            for s in self.stateVariables:
+                if s=='T':
+                    #VarList+=list(self.T[exists_indices,i])
+                    VarList+=getcol(self.T,i,exists_indices)
+                elif s=='D':
+                    #VarList+=list(self.rho[exists_indices,i])
+                    VarList+=getcol(self.rho,i,exists_indices)
+                elif s=='M':
+                    #VarList+=list(self.rho[exists_indices,i]*self.V_)
+                    VarList+=list(getcol(self.rho,i,exists_indices)*self.V_)
+                else:
+                    raise KeyError
+            if self.__hasValves__==True:
+                VarList+=list(self.xValves[:,i])
+            return listm(VarList)
+        
+    def __array2vals(self,x,i):
+        """
+        Take a stacked set of T,rho,xL or T,rho and put back in numpy arrays
+        """
+        exists_indices=self.CVs.exists_indices
+        Nexist = self.CVs.Nexist
+        if self.__hasLiquid__==True:
+            raise ValueError
+            self.T[:,i]=x[0:self.NCV]
+            self.m[:,i]=x[self.NCV:2*self.NCV]
+            self.xL[:,i]=x[2*self.NCV:3*self.NCV]
+        else: #(self.__hasLiquid__==False)
+            for iS,s in enumerate(self.stateVariables):
+                x_=listm(x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)])
+                if s=='T':
+                    setcol(self.T, i, exists_indices, x_)
+                elif s=='D':
+                    setcol(self.rho, i, exists_indices, x_)
+                elif s=='M':
+                    setcol(self.m, i, exists_indices, x_)
+            #Left over terms are for the valves
+            if self.__hasValves__:
+                setcol(self.xValves,i,range(len(self.Valves)*2),listm(x[iS*Nexist+2::]))
+                    
+        setcol(self.V, i, exists_indices, self.V_)
+        setcol(self.dV, i, exists_indices, self.dV_)
+        setcol(self.p, i, exists_indices, self.p_)
+        setcol(self.Q, i, exists_indices, self.Q_)
+    
+    def __postprocess_flows(self):
+        """
+        In this private method, the flows from each of the flow nodes are summed for 
+        each step of the revolution, and then averaged flow rates are calculated.
+        """
+        
+        def sum_flows(key,Flows):
+            """
+            Sum all the terms for a given flow key.  
+            
+            Flows "into" the node are positive, flows out of the 
+            node are negative
+            """
+            return _flow.sum_flows(key,Flows)
+            
+        def collect_keys(Tubes,Flows):
+            """
+            Get all the keys for a given collection of flow elements
+            """
+            keys=[]
+            for Tube in Tubes:
+                if Tube.key1 not in keys:
+                    keys.append(Tube.key1)
+                if Tube.key2 not in keys:
+                    keys.append(Tube.key2)
+            for Flow in Flows:
+                if Flow.key1 not in keys:
+                    keys.append(Flow.key1)
+                if Flow.key2 not in keys:
+                    keys.append(Flow.key2)
+            return keys
+        
+        #Get all the nodes that can exist for tubes and CVs
+        keys=collect_keys(self.Tubes,self.Flows)
+        
+
+        
+        #Get the instantaneous net flow through each node
+        #   and the averaged mass flow rate through each node
+        self.FlowsProcessed=struct()
+        self.FlowsProcessed.summed_mdot={}
+        self.FlowsProcessed.summed_mdoth={}
+        self.FlowsProcessed.mean_mdot={}
+        self.FlowsProcessed.integrated_mdoth={}
+        self.FlowsProcessed.integrated_mdot={}
+        self.FlowsProcessed.t=self.t[0:(self.Itheta+1)]
+        for key in keys:
+            # Empty container numpy arrays
+            self.FlowsProcessed.summed_mdot[key]=np.zeros((self.Itheta+1,))
+            self.FlowsProcessed.summed_mdoth[key]=np.zeros((self.Itheta+1,))
+            for i in range(self.Itheta+1):
+                mdot,mdoth=sum_flows(key,self.FlowStorage[i])
+                self.FlowsProcessed.summed_mdot[key][i]=mdot
+                self.FlowsProcessed.summed_mdoth[key][i]=mdoth
+            
+            self.FlowsProcessed.integrated_mdoth[key]=trapz(self.FlowsProcessed.summed_mdoth[key],self.t[0:(self.Itheta+1)])
+            self.FlowsProcessed.integrated_mdot[key]=trapz(self.FlowsProcessed.summed_mdot[key],self.t[0:(self.Itheta+1)])
+            self.FlowsProcessed.mean_mdot[key]=self.FlowsProcessed.integrated_mdot[key]/(self.t[self.Itheta]-self.t[0])
+            
+        
+        # Special-case the tubes.  Only one of the nodes can have flow.  
+        #   The other one is invariant because it is quasi-steady.
+        for Tube in self.Tubes:
+            mdot1 = self.FlowsProcessed.mean_mdot[Tube.key1]
+            mdot2 = self.FlowsProcessed.mean_mdot[Tube.key2]
+            mdot_i1 = self.FlowsProcessed.integrated_mdot[Tube.key1]
+            mdot_i2 = self.FlowsProcessed.integrated_mdot[Tube.key2]
+            mdoth_i1 = self.FlowsProcessed.integrated_mdoth[Tube.key1]
+            mdoth_i2 = self.FlowsProcessed.integrated_mdoth[Tube.key2]
+            #Swap the sign so the sum of the mass flow rates is zero
+            self.FlowsProcessed.mean_mdot[Tube.key1]-=mdot2
+            self.FlowsProcessed.mean_mdot[Tube.key2]-=mdot1
+            self.FlowsProcessed.integrated_mdot[Tube.key1]-=mdot_i2
+            self.FlowsProcessed.integrated_mdot[Tube.key2]-=mdot_i1
+            self.FlowsProcessed.integrated_mdoth[Tube.key1]-=mdoth_i2
+            self.FlowsProcessed.integrated_mdoth[Tube.key2]-=mdoth_i1
+            
+    def add_flow(self,FlowPath):
+        #Add FlowPath instance to the list of flow paths
+        self.Flows.append(FlowPath)
+        
+    def add_CV(self,CV):
+        """
+        Add a control volume to the model
+        
+        Parameters
+        ----------
+        CV : Control Volume instance
+            An initialized control volume.  See :class:`PDSim.core.containers.ControlVolume`
+            
+        """
+        if CV.key in self.CVs:
+            raise KeyError('Sorry but the key for your Control Volume ['+CV.key+'] is already in use')
+        
+        #Add the CV to the collection
+        self.CVs[CV.key]=CV
+        
+    def add_tube(self,Tube):
+        """
+        Add a tube to the model.  Alternatively call PDSimCore.Tubes.append(Tube)
+        
+        Parameters
+        ----------
+        Tube : Tube instance
+            An initialized Tube.  See :class:`PDSim.core.Core.Tube`
+        """
+        #Add it to the list
+        self.Tubes.append(Tube)
+        
+    def add_valve(self,Valve):
+        """
+        Add a valve to the model.  Alternatively call PDSimCore.Valve.append(Tube)
+        
+        Parameters
+        ----------
+        Valve : ValveModel instance
+            An initialized Tube.  See :class:`PDSim.flow.FlowModels.ValveModel`
+        """
+        #Add it to the list
+        self.Valves.append(Valve)
+        self.__hasValves__=True
+        
+    def __pre_run(self):
+        #Build the full numpy arrays for temperature, volume, etc.
+        self.t=np.zeros((50000,))
+        self.T=np.zeros((self.CVs.N,50000))
+        self.T.fill(np.nan)
+        self.p=self.T.copy()
+        self.m=self.T.copy()
+        self.V=self.T.copy()
+        self.dV=self.T.copy()
+        self.rho=self.T.copy()
+        self.Q=self.T.copy()
+        self.xL=self.T.copy()
+        self.xValves=np.zeros((2*len(self.Valves),50000))
+        
+        self.CVs.rebuild_exists()
+        
+    def __pre_cycle(self):
+        self.temp_vectors_list=[]
+        def add_thing(name,item):
+            #Actually create the array
+            setattr(self,name,item)
+            #Add the name of the vector to the list (for easy removal)
+            self.temp_vectors_list.append(name)
+            
+        #Build temporary arrays to avoid constantly creating numpy arrays
+        add_thing('T_',listm([0.0]*self.CVs.Nexist))
+        add_thing('p_',listm([0.0]*self.CVs.Nexist))
+        add_thing('V_',listm([0.0]*self.CVs.Nexist))
+        add_thing('dV_',listm([0.0]*self.CVs.Nexist))
+        add_thing('rho_',listm([0.0]*self.CVs.Nexist))
+        add_thing('Q_',listm([0.0]*self.CVs.Nexist))
+        
+        self.t.fill(np.nan)
+        self.T.fill(np.nan)
+        self.p.fill(np.nan)
+        self.m.fill(np.nan)
+        self.V.fill(np.nan)
+        self.dV.fill(np.nan)
+        self.rho.fill(np.nan)
+        self.Q.fill(np.nan)
+        self.xL.fill(np.nan)
+        
+        self.FlowStorage=[]
+        
+        #Get the volumes at theta=0
+        #Note: needs to occur in this function because V needed to calculate mass a few lines below
+        V,dV=self.CVs.volumes(0)
+        self.t[0]=0
+        
+        #Initialize the control volumes
+        self.__hasLiquid__=False
+        
+        # self.CVs.exists_indices is a list of indices of the CV with the same order of entries
+        # as the entries in self.CVs.T
+        self.T[self.CVs.exists_indices,0]=self.CVs.T
+        self.p[self.CVs.exists_indices,0]=self.CVs.p
+        self.m[self.CVs.exists_indices,0]=self.CVs.rho*V
+        self.rho[self.CVs.exists_indices,0]=self.CVs.rho
+        
+        # Assume all the valves to be fully closed and stationary at the beginning 
+        self.xValves[:,0]=0
+        
+    def cycle_SimpleEuler(self,N,tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
+        """
+        
+        Parameters
+        ----------
+        N : integer
+            Number of steps
+        tmin : float
+            Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
+        tmax : float
+            Ending value for the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``] 
+        step_callback : function, optional 
+            A pointer to a function that is called at the beginning of the step.  This function must be of the form:: 
+            
+                step_callback(t,h,Itheta)
+                
+            where ``h`` is the step size that the solver wants to use, ``t`` is the current value of the independent variable, and ``Itheta`` is the index in the container variables.  The return values are ignored, so the same callback can be used as for the ``cycle_RK45`` solver 
+                
+        heat_transfer_callback : function, optional
+            If provided, the heat_transfer_callback function should have a format like::
+            
+                Q_listm=heat_transfer_callback(t)
+            
+            It should return a ``listm`` instance with the same length as the number of CV in existence.  The entry in the ``listm`` is positive if the heat transfer is TO the fluid in the CV in order to maintain the sign convention that energy (or mass) input is positive.  Will raise an error otherwise
+        
+        """
+        #Do some initialization - create arrays, etc.
+        self.__pre_cycle()
+        
+        #Start at an index of 0
+        Itheta=0
+        t0=tmin
+        h=(tmax-tmin)/(N-1)
+        
+        #One call to build the flows at start
+        xold=self.__vals2array(0)
+        self.theta=t0
+        self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+        self.FlowStorage.append(self.Flows.get_deepcopy())
+        self.__array2vals(xold,0)
+        
+        for Itheta in range(N):
+            if step_callback!=None:
+                step_callback(t0,h,Itheta)
+                
+            xold=self.__vals2array(Itheta)
+                        
+            # Step 1: derivatives evaluated at old values
+            f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+            xnew=xold+h*f1
+            
+            self.t[Itheta+1]=t0+h
+            self.__array2vals(xnew,Itheta+1)
+            t0+=h
+            Itheta+=1
+            self.FlowStorage.append(self.Flows.get_deepcopy())
+            #print self.FlowStorage[-1]
+            
+            #Some debugging information
+            #print t0,h
+            
+        #Run this at the end
+        V,dV=self.CVs.volumes(t0)
+        self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+        
+        # last index is Itheta, number of steps is Itheta+1
+        print 'Itheta steps taken',Itheta+1
+        self.Itheta=Itheta
+        self.__post_cycle()
+        
+    def cycle_RK45(self,hmin=1e-4,tmin=0,tmax=2.0*pi,eps_allowed=1e-10,step_relax=0.9,
+              step_callback=None,heat_transfer_callback=None,valves_callback = None,**kwargs):
+        """
+        
+        This function implements an adaptive Runge-Kutta-Feldberg 4th/5th order
+        solver for the system of equations
+        
+        Parameters
+        ----------
+        hmin : float
+            Minimum step size, something like 1e-5 usually is good.  Don't make this too big or you may not be able to get a stable solution
+        tmin : float
+            Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
+        tmax : float
+            Ending value for the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
+        eps_allowed : float
+            Maximum absolute error of any CV per step allowed.  Don't make this parameter too big or you may not be able to get a stable solution.  Also don't make it too small because then you are going to run into truncation error.
+        step_relax : float, optional
+            The relaxation factor that is used in the step resizing algorithm.  Should be less than 1.0; you can play with this parameter to improve the adaptive resizing, but should not be necessary.
+        step_callback : function, optional 
+            A pointer to a function that is called at the beginning of the step.  This function must be of the form:: 
+            
+                disableAdaptive,h=step_callback(t,h,Itheta)
+                
+            where ``h`` is the step size that the adaptive solver wants to use, ``t`` is the current value of the independent variable, and ``Itheta`` is the index in the container variables.  The return value ``disableAdaptive`` is a boolean value that describes whether the adaptive method should be turned off for this step ( ``False`` : use the adaptive method), and ``h`` is the step size you want to use.  If you don't want to disable the adaptive method and use the given step size, just::
+                
+                return False,h
+            
+            in your code.
+        heat_transfer_callback : function, optional
+            If provided, the heat_transfer_callback function should have a format like::
+            
+                Q_listm=heat_transfer_callback(t)
+            
+            It should return a ``listm`` instance with the same length as the number of CV in existence.  The entry in the ``listm`` is positive if the heat transfer is TO the fluid in the CV in order to maintain the sign convention that energy (or mass) input is positive.  Will raise an error otherwise
+        
+        Notes
+        -----
+        
+        Mathematically the adaptive solver can be expressed as::
+        
+            k1=h*dy(xn                                                                   ,t)
+            k2=h*dy(xn+1.0/4.0*k1                                                        ,t+1.0/4.0*h)
+            k3=h*dy(xn+3.0/32.0*k1+9.0/32.0*k2                                           ,t+3.0/8.0*h)
+            k4=h*dy(xn+1932.0/2197.0*k1-7200.0/2197.0*k2+7296.0/2197.0*k3                ,t+12.0/13.0*h)
+            k5=h*dy(xn+439.0/216.0*k1-8.0*k2+3680.0/513.0*k3-845.0/4104.0*k4             ,t+h)
+            k6=h*dy(xn-8.0/27.0*k1+2.0*k2-3544.0/2565.0*k3+1859.0/4104.0*k4-11.0/40.0*k5 ,t+1.0/2.0*h)
+
+        where the function dy(y,t) returns a vector of the ODE expressions.
+        The new value is calculated from::
+        
+            xnplus=xn+gamma1*k1+gamma2*k2+gamma3*k3+gamma4*k4+gamma5*k5+gamma6*k6
+
+        In the adaptive solver, the errors for a given step can be calculated from::
+
+            error=1.0/360.0*k1-128.0/4275.0*k3-2197.0/75240.0*k4+1.0/50.0*k5+2.0/55.0*k6
+
+        If the maximum absolute error is above allowed error, the step size is decreased and the step is 
+        tried again until the error is below tolerance.  If the error is better than required, the step
+        size is increased to minimize the number of steps required.
+        
+        Before the step is run, a callback the ``step_callback`` method of this class is called.  In the ``step_callback`` callback function you can do anything you want, but you must return 
+        """
+        
+        #Do some initialization - create arrays, etc.
+        self.__pre_cycle()
+        
+        #Start at an index of 0
+        Itheta=0
+        t0=tmin
+        h=hmin
+        
+        #One call to build the flows at theta=
+        xold=self.__vals2array(0)
+        self.theta=t0
+        self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+        self.FlowStorage.append(self.Flows.get_deepcopy())
+        
+        #t is the independent variable here, where t takes on values in the bounded range [tmin,tmax]
+        while (t0<tmax):
+            
+            stepAccepted=False
+            
+            while not stepAccepted:
+                
+                #Reset the flag
+                disableAdaptive=False
+                
+                if t0+h>tmax:
+                    disableAdaptive=True
+                    h=tmax-t0
+            
+                if step_callback!=None and disableAdaptive==False:
+                    #The user has provided a disabling function for the adaptive method
+                    #Call it to figure out whether to use the adaptive method or not
+                    #Pass it a copy of the compressor class and the current step size
+                    #The function can modify anything in the class to change flags, existence, merge, etc.
+                    disableAdaptive,h=step_callback(t0,h,Itheta)
+                else:
+                    disableAdaptive=False
+                    
+                if h<hmin and disableAdaptive==False:
+                    #Step is too small, just use the minimum step size
+                    h=1.0*hmin
+                    disableAdaptive=True
+                    
+                xold=self.__vals2array(Itheta)
+                    
+                # Step 1: derivatives evaluated at old values
+                f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+                xnew1=xold+h*(+1.0/4.0*f1)
+                
+                f2=self.derivs(t0+1.0/4.0*h,xnew1,heat_transfer_callback,valves_callback)
+                xnew2=xold+h*(+3.0/32.0*f1+9.0/32.0*f2)
+
+                f3=self.derivs(t0+3.0/8.0*h,xnew2,heat_transfer_callback,valves_callback)
+                xnew3=xold+h*(+1932.0/2197.0*f1-7200.0/2197.0*f2+7296.0/2197.0*f3)
+
+                f4=self.derivs(t0+12.0/13.0*h,xnew3,heat_transfer_callback,valves_callback)
+                xnew4=xold+h*(+439.0/216.0*f1-8.0*f2+3680.0/513.0*f3-845.0/4104.0*f4)
+                
+                f5=self.derivs(t0+h,xnew4,heat_transfer_callback,valves_callback);
+                xnew5=xold+h*(-8.0/27.0*f1+2.0*f2-3544.0/2565.0*f3+1859.0/4104.0*f4-11.0/40.0*f5)
+                
+                gamma1=16.0/135.0
+                gamma2=0.0
+                gamma3=6656.0/12825.0
+                gamma4=28561.0/56430.0
+                gamma5=-9.0/50.0
+                gamma6=2.0/55.0
+                
+                #Updated values at the next step
+                f6=self.derivs(t0+1/2*h,xnew5,heat_transfer_callback,valves_callback)
+                
+                xnew=xold+h*(gamma1*f1 + gamma2*f2 + gamma3*f3 + gamma4*f4 + gamma5*f5 + gamma6*f6)
+                    
+                error=h*(1.0/360.0*f1-128.0/4275.0*f3-2197.0/75240.0*f4+1.0/50.0*f5+2.0/55.0*f6)
+                
+                max_error=np.max(np.abs(error))
+                
+                # If the error is too large
+                if (max_error > eps_allowed):
+                    if disableAdaptive==False:
+                        # Take a smaller step next time, try again on this step
+                        # But only if adaptive mode is on
+                        h*=step_relax*(eps_allowed/max_error)**(0.25)
+                        stepAccepted=False
+                    else:
+                        #Accept the step regardless of whether the error is too large or not
+                        stepAccepted=True
+                else:
+                    stepAccepted=True
+            
+            # Step has been accepted (or adaptive disabled), write values back to arrays
+            self.t[Itheta+1]=t0+h
+            self.__array2vals(xnew,Itheta+1)
+            t0+=h
+            Itheta+=1
+            self.FlowStorage.append(self.Flows.get_deepcopy())
+            
+            #Some debugging information
+            #print t0,h,hmin
+            
+            #The error is already below the threshold
+            if (max_error<eps_allowed and disableAdaptive == False):
+                #Take a bigger step next time, since eps_allowed>max_error
+                h *= step_relax*(eps_allowed/max_error)**(0.2)
+        
+        #Run this at the end
+        V,dV=self.CVs.volumes(t0)
+        self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+        
+        # last index is Itheta, number of steps is Itheta+1
+        print 'Itheta steps taken',Itheta+1
+        self.Itheta=Itheta
+        self.__post_cycle()
+        
+    def __post_cycle(self):
+        """
+        This stuff all happens at the end of the cycle.  It is a private method not meant to be called externally
+        """
+        for name in self.temp_vectors_list:
+            delattr(self,name)
+            
+        self.__postprocess_flows()
+    
+    def solve(self,
+              key_inlet = None,
+              key_outlet = None,
+              step_callback = None,
+              endcycle_callback = None,
+              heat_transfer_callback = None,
+              lump_energy_balance_callback = None,
+              valves_callback = None,
+              solver_method = 'Euler',
+              OneCycle = False,
+              Abort = None,
+              **kwargs):
+        """
+        This is the driving function for the PDSim model.  It can be extended through the 
+        use of the callback functions
+        
+        Parameters
+        ----------
+        key_inlet : string
+            The key for the flow node that represents the upstream quasi-steady point
+        key_outlet : string
+            The key for the flow node that represents the upstream quasi-steady point
+        step_callback : function
+            This callback is passed on to the cycle() function. 
+            See :func:`PDSim.core.Core.PDSimCore.cycle` for a description of the callback
+        endcycle_callback : function
+            This callback gets called at the end of the cycle to determine whether the cycle 
+            should be run again.  It returns a flag(``redo`` that is ``True`` if the cycle 
+            should be run again, or ``False`` if the cycle iterations have reached convergence.).  
+            This callback does not take any inputs
+        """
+        
+        #This runs before the model starts at all
+        self.__pre_run()
+        
+        #Both inlet and outlet keys must be connected to invariant nodes - 
+        # that is they must be part of the tubes which are all quasi-steady
+        if not key_inlet == None and not key_inlet in self.Tubes.Nodes:
+            raise KeyError('key_inlet must be a Tube node')
+        if not key_outlet == None and not key_outlet in self.Tubes.Nodes:
+            raise KeyError('key_outlet must be a Tube node')
+        
+        self.key_inlet = key_inlet
+        self.key_outlet = key_outlet
+                
+        def OBJECTIVE(Td_Tlumps):
+            print Td_Tlumps,'Td,Tlumps'
+            # Td_Tlumps is a list (or listm or np.ndarray)
+            Td_Tlumps = list(Td_Tlumps)
+            # Consume the first element as the discharge temp 
+            self.Td = float(Td_Tlumps.pop(0))
+            # The rest are the lumps in order
+            self.Tlumps = Td_Tlumps
+            
+            # (0) Update the discharge temperature
+            p = self.Tubes.Nodes[key_outlet].p
+            self.Tubes.Nodes[key_outlet].update({'T':self.Td,'P':p})
+            # (1) First, run all the tubes
+            for tube in self.Tubes:
+                tube.TubeFcn(tube)
+            redo=True
+            while redo:
+                
+                # (2) Run a cycle with the given values for the temperatures
+                if solver_method == 'Euler':
+                    N=kwargs.get('Euler_N',7000)
+                    self.cycle_SimpleEuler(N=N,step_callback=step_callback,
+                                           heat_transfer_callback=heat_transfer_callback,
+                                           valves_callback=valves_callback)
+                elif solver_method=='RK45':
+                    self.cycle_RK45(step_callback=step_callback,
+                                    heat_transfer_callback=heat_transfer_callback,
+                                    valves_callback=valves_callback,
+                                    **kwargs)
+                else:
+                    raise AttributeError
+                
+                if (key_inlet in self.FlowsProcessed.mean_mdot and 
+                    key_outlet in self.FlowsProcessed.mean_mdot):
+                    
+#                    debug_plots(self)
+                    
+                    mdot_out = self.FlowsProcessed.mean_mdot[key_outlet]
+                    mdot_in = self.FlowsProcessed.mean_mdot[key_inlet]
+                    print 'Mass flow difference',(mdot_out+mdot_in)/mdot_out*100,' %'
+                    
+                    h_outlet = (self.FlowsProcessed.integrated_mdoth[key_outlet]
+                                /self.FlowsProcessed.integrated_mdot[key_outlet])
+                    p = self.Tubes.Nodes[key_outlet].p
+                    Fluid = self.Tubes.Nodes[key_outlet].Fluid
+                    # Multimply the residual on the discharge temperature by the capacitance rate
+                    # to get all the residuals in units of kW
+                    C_outlet = self.Tubes.Nodes[key_outlet].cp*mdot_out
+                    resid_Td = C_outlet*(Props('T','H',h_outlet,'P',p,Fluid) - self.Td)
+                else:
+                    raise KeyError
+                                
+                if endcycle_callback is None:
+                    redo=False
+                else:
+                    redo=endcycle_callback()
+                
+                #If the abort function returns true, quit this loop
+                if Abort is not None and Abort():
+                    redo=False
+                    
+                if OneCycle:
+                    redo=False
+                    
+            # (3) After convergence of the inner loop, check the energy balance on the lumps
+            if lump_energy_balance_callback is not None:
+                resid_HT = lump_energy_balance_callback()
+                
+            #If the abort function returns true, quit this loop
+            if Abort is not None and Abort():
+                return None
+            if OneCycle:
+                return None
+        
+            print [resid_Td]+[resid_HT],'resids'
+            return [resid_Td]+[resid_HT]
+        
+        print 'Solution is',Broyden(OBJECTIVE,[315.0,325.0],dx=0.2,ytol=0.001,itermax=20)
+        self.__post_solve()
+        
+    def __post_solve(self):
+        """
+        Do some post-processing to calculate flow rates, efficiencies, etc.  
+        """
+        #The total mass flow rate
+        self.mdot = self.FlowsProcessed.mean_mdot[self.key_inlet]
+        
+        for key, State in self.Tubes.Nodes.iteritems():
+            if key == self.key_inlet:
+                 inletState = State
+            if key == self.key_outlet:
+                 outletState = State
+        
+        self.eta_v = self.mdot / (self.omega/(2*pi)*self.Vdisp()*inletState.rho)
+        h1 = inletState.h
+        h2 = outletState.h
+        s1 = inletState.s
+        T2s = newton(lambda T: Props('S','T',T,'P',outletState.p,outletState.Fluid)-s1,inletState.T+30)
+        h2s = Props('H','T',T2s,'P',outletState.p,outletState.Fluid)
+        self.eta_a = (h2s-h1)/(h2-h1)
+        self.Wdot = self.mdot*(h2-h1)-self.Qamb
+        
+        #Resize all the matrices to keep only the real data
+        self.t = self.t[0:self.Itheta+1]
+        self.T = self.T[:,0:self.Itheta+1]
+        self.p = self.p[:,0:self.Itheta+1]
+        self.m = self.m[:,0:self.Itheta+1]
+        self.rho = self.rho[:,0:self.Itheta+1]
+        self.V = self.V[:,0:self.Itheta+1]
+        self.dV = self.dV[:,0:self.Itheta+1]
+        
+        self.Wdot_pv = 0.0
+        for CVindex in range(self.p.shape[0]):
+            self.Wdot_pv += -trapz(self.p[CVindex,:], self.V[CVindex,:])*self.omega/(2*pi)
+        
+        print 'mdot*(h2-h1),P-v,Qamb', self.Wdot*1000, self.Wdot_pv*1000, self.Qamb
+        
+        print 'Mass flow rate is',self.mdot*1000,'g/s'
+        print 'Volumetric efficiency is',self.eta_v*100,'%'
+        print 'Adiabatic efficiency is',self.eta_a*100,'%'
+        
+        
+    def derivs(self,theta,x,heat_transfer_callback=None,valves_callback=None):
+        """
+        derivs() is an internal function that should (probably) not actually be called by
+        any user-provided code, but is documented here for completeness.
+        
+        Parameters
+        ----------
+        theta : float
+            The value of the independent variable
+        x : ``listm`` instance
+            The array of the state variables (plus valve parameters) 
+        heat_transfer_callback : ``None`` or function
+            A function that has the form::
+            
+                Q=heat_transfer_callback(theta)
+            
+            where ``Q`` is the ``listm`` instance of heat transfer rates to the control 
+            volume.  If an entry of ``Q`` is positive, heat is being transferred 
+            TO the fluid contained in the control volume
+            
+            If ``None``, no heat transfer is used
+                
+        Returns
+        -------
+        dfdt : ``listm`` instance
+        
+        """
+        #Call the Cython method
+        #return self._derivs(theta,x,heat_transfer_callback)
+        
+        #1. Calculate the volume and derivative of volume of each control volumes
+        #    Return two lists, one for the volumes, second for the derivatives of volumes 
+        V,dV=self.CVs.volumes(theta)
+
+        if self.__hasLiquid__==True:
+            raise NotImplementedError
+        else:
+            self.CVs.updateStates('T',x[0:self.CVs.Nexist],'D',x[self.CVs.Nexist:2*self.CVs.Nexist])
+            
+        #Run the valves model if it is provided in order to calculate the new valve positions
+        if self.__hasValves__==True:
+            for iV,Valve in enumerate(self.Valves):
+                Valve.set_xv(x[2*self.CVs.Nexist+iV*2:2*self.CVs.Nexist+(iV+1)*2])
+            f_valves=valves_callback()
+            
+#        if self.CVs['A'].State.p<self.Tubes[0].State2.p:
+#            print 'Suction valves open'
+#        if self.CVs['A'].State.p>self.Tubes[1].State1.p:
+#            print 'Discharge valves open'
+        #2. Calculate the mass flow terms between the model components
+        self.Flows.calculate(self)
+        summerdT,summerdm=self.Flows.sumterms(self)
+        
+        #3. Calculate the heat transfer terms
+        if heat_transfer_callback is not None:
+            Q=heat_transfer_callback(theta)
+            if not len(Q) == self.CVs.Nexist:
+                raise ValueError('Length of Q is not equal to length of number of CV')
+        else:
+            Q=0.0
+        
+        ## Calculate properties and property derivatives
+        ## needed for differential equations
+        rho = listm(self.CVs.rho)
+        v = 1.0/rho
+        m = V*rho
+        T = listm(self.CVs.T)
+        h = listm(self.CVs.h)
+        cv = listm(self.CVs.cv)
+        dpdT = listm(self.CVs.dpdT)
+        p = listm(self.CVs.p)
+        
+        self.V_=V
+        self.dV_=dV
+        self.rho_=rho
+        self.m_=m
+        self.p_=p
+        self.T_=T
+        self.Q_=Q
+                
+        dudxL=0.0
+        summerdxL=0.0
+        xL=0.0
+        
+        dmdtheta=summerdm
+        dxLdtheta=1.0/m*(summerdxL-xL*dmdtheta)
+        dTdtheta=1/(m*cv)*(-1.0*T*dpdT*(dV-v*dmdtheta)-m*dudxL*dxLdtheta-h*dmdtheta+Q/self.omega+summerdT)
+        drhodtheta = 1.0/V*(dmdtheta-rho*dV)
+        
+        if self.__hasLiquid__==True:
+            f=np.zeros((3*self.NCV,))
+            f[0:self.NCV]=dTdtheta
+            f[self.NCV:2*self.NCV]=dmdtheta
+            f[2*self.NCV:3*self.NCV]=dxLdtheta
+            return f
+        else:
+            f=list(dTdtheta)+list(drhodtheta)
+            if self.__hasValves__==True:
+                f+=f_valves
+            return listm(f)
+    
+    def valves_callback(self):
+        """
+        This is the default valves_callback function that builds the list of 
+        derivatives of position and velocity with respect to the crank angle
+        
+        It returns a ``list`` instance with the valve return values in order 
+        """
+        #Run each valve model in turn to calculate the derivatives of the valve parameters
+        # for each valve
+        f=[]
+        for Valve in self.Valves:
+            f+=Valve.derivs(self)
+        return f
+        
+    def endcycle_callback(self,eps_wrap_allowed=0.0001):
+        """
+        This function can be called at the end of the cycle if so desired.
+        Its primary use is to determine whether the cycle has converged for a 
+        given set of discharge temperatures and lump temperatures.
+        
+        Parameters
+        ----------
+        eps_wrap_allowed : float
+            Maximum error allowed, in absolute value
+        
+        Returns 
+        -------
+        redo : boolean
+            ``True`` if cycle should be run again with updated inputs, ``False`` otherwise.
+            A return value of ``True`` means that convergence of the cycle has been achieved
+        """
+        
+        #debug_plots(self)
+        
+        #old and new CV keys
+        LHS,RHS=[],[]
+        errorT,errorp=[],[]
+        
+        for key in self.CVs.exists_keys:
+            # Get the 'becomes' field.  If a list, parse each fork of list. If a single key convert 
+            # into a list so you can use the same code  
+            if not isinstance(self.CVs[key].becomes,list):
+                becomes=[self.CVs[key].becomes]
+            else:
+                becomes=self.CVs[key].becomes
+            Iold = self.CVs.index(key)
+
+            for newkey in becomes:
+                Inew = self.CVs.index(newkey)
+                newCV = self.CVs[newkey]
+                errorT.append(abs((self.T[Iold,self.Itheta]-self.T[Inew,0])/self.T[Inew,0]))
+                errorp.append(abs((self.p[Iold,self.Itheta]-self.p[Inew,0])/self.p[Inew,0]))
+                #Update the list of keys for setting the exist flags
+                LHS.append(key)
+                RHS.append(newkey)
+                #Update the CV with the new value - use the copy of the CVs from before
+                newCV.State.update({'T':self.T[Iold,self.Itheta],'D':self.rho[Iold,self.Itheta]})
+                
+        #Reset the exist flags for the CV - this should handle all the possibilities
+        #Turn off the LHS CV
+        for key in LHS:
+            self.CVs[key].exists=False
+        #Turn on the RHS CV
+        for key in RHS:
+            self.CVs[key].exists=True
+            
+        self.CVs.rebuild_exists()
+        
+        print max(errorT),max(errorp),'errs'
+        if max(max(errorT),max(errorp))<eps_wrap_allowed:
+            return False
+        else:
+            return True
+    
+if __name__=='__main__':
+    print 'This is the base class that is inherited by other compressor types.  Running this file doesn\'t do anything'

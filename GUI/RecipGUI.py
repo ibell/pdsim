@@ -1,0 +1,1091 @@
+# -*- coding: latin-1 -*-
+
+import wx,os,sys
+from wx.lib.mixins.listctrl import CheckListCtrlMixin, ColumnSorterMixin, ListCtrlAutoWidthMixin
+from wx.lib.embeddedimage import PyEmbeddedImage
+import numpy as np
+import CoolProp.State as CPState
+from PDSim.recip.core import Recip
+from operator import itemgetter
+import pdsim_panels
+import recip_panels
+from math import pi
+from multiprocessing import Queue, Process, Pipe, freeze_support, cpu_count
+from Queue import Empty
+from threading import Thread
+from PDSimLoader import RecipBuilder
+from PDSim.plot.plots import PlotNotebook
+import PDSim
+import time
+import cPickle
+
+# Button definitions
+ID_START = wx.NewId()
+ID_STOP = wx.NewId()
+
+# Define notification event for thread completion
+EVT_RESULT_ID = wx.NewId()
+
+def EVT_RESULT(win, func):
+    """Define Result Event."""
+    win.Connect(-1, -1, EVT_RESULT_ID, func)
+
+class ResultEvent(wx.PyEvent):
+    """Simple event to carry arbitrary result data."""
+    def __init__(self, data):
+        """Init Result Event."""
+        wx.PyEvent.__init__(self)
+        self.SetEventType(EVT_RESULT_ID)
+        self.data = data
+                
+def stupid(pipe_inlet):
+    redir = RedirectText2Pipe(pipe_inlet)
+    sys.stdout = redir
+    sys.stderr = redir
+    for i in range(100):
+        time.sleep(0.1)
+        print int(i),'Hi'
+    return
+   
+class RedirectText2Pipe(object):
+    def __init__(self, pipe_inlet):
+        self.pipe_inlet = pipe_inlet
+    def write(self, string):
+        self.pipe_inlet.send(string)
+    def flush(self):
+        return None
+
+class Run1RecipAborter(object):
+    """
+    A small wrapper class that allows for the local variable 
+    """ 
+    def __init__(self):
+        self._want_abort = False
+    def get(self):
+        """
+        Get status of the aborter 
+        """
+        return self._want_abort
+    def set(self, flag):
+        """ 
+        Set status of aborter
+        """
+        self._want_abort = True
+          
+def run_1recip(pipe_std, pipe_abort, pipe_results, recip):
+    """
+    The pipe_std is the pipe that takes all the display output
+    back to the calling thread
+    
+    The pipe_abort is waiting for a True to be sent down the 
+    pipes from the calling thread, at which point it 
+    """
+    redir = RedirectText2Pipe(pipe_std)
+    sys.stdout = redir
+    sys.stderr = redir
+    aborter = Run1RecipAborter()
+    
+    def abort_callback():
+        #If there is a True value waiting in the pipe, abort the run
+        if (pipe_abort.poll() and pipe_abort.recv() == True) or aborter.get() == True:
+            aborter.set(True)
+            return True
+        else:
+            return False
+        
+    recip.solve(key_inlet='inlet.1',key_outlet='outlet.2',
+            eps_allowed=1e-10, #Only used with RK45 solver
+            endcycle_callback=recip.endcycle_callback,
+            heat_transfer_callback=recip.heat_transfer_callback,
+            lump_energy_balance_callback = recip.lump_energy_balance_callback,
+            valves_callback =recip.valves_callback, OneCycle=False,
+            Abort = abort_callback
+    )
+    
+    if not aborter.get():
+        print 'About to send recip back to calling thread'
+        pipe_results.send(recip)
+        print 'Sent results back to calling thread'
+    else:
+        print 'Aborted completion'
+    
+    return 1
+
+class InfiniteList(object):
+    """
+    Creates a special list where removing an element just puts it back at the end of the list
+    """
+    def __init__(self, values):
+        self.values = values
+        
+    def pop(self):
+        """
+        Return the first element, then put the first element back at the end of the list
+        """
+        val1 = self.values[0]
+        self.values.pop(0)
+        self.values.append(val1)
+        return val1
+        
+class WorkerThreadManager(Thread):
+    """
+    This manager thread creates all the threads that run.  It checks how many processors are available and runs Ncore-1 processes
+    
+    Runs are consumed from the 
+    """
+    def __init__(self, target, simulations, stdout_targets, args = None, done_callback = None, 
+                 add_results = None, Ncores = None):
+        Thread.__init__(self)
+        self.target = target
+        self.args = args if args is not None else tuple()
+        self.done_callback = done_callback
+        self.add_results = add_results
+        self.simulations = simulations
+        self.stdout_targets = stdout_targets
+        self.threadsList = []
+        self.stdout_list = InfiniteList(stdout_targets)
+        if Ncores is None:
+            self.Ncores = cpu_count()-1
+        else:
+            self.Ncores = Ncores
+        if self.Ncores<1:
+            self.Ncores = 1
+        print "Want to run",len(self.simulations),"simulations in batch mode;",
+        print self.Ncores, 'cores available for computation'
+            
+    def run(self):
+        #While simulations left to be run or computation is not finished
+        while self.simulations or self.threadsList:
+            #Add a new thread if possible (leave one core for main GUI)
+            if len(self.threadsList) < self.Ncores and self.simulations:
+                #Get the next simulation to be run as a tuple
+                simulation = (self.simulations.pop(0),)
+                #Start the worker thread
+                t = RedirectedWorkerThread(self.target, self.stdout_list.pop(), 
+                                          args = simulation+self.args, 
+                                          done_callback = self.done_callback, 
+                                          add_results = self.add_results)
+                t.setDaemon(True)
+                t.start()
+                self.threadsList.append(t)
+                print 'Adding thread;', len(self.threadsList),'threads active' 
+            #Remove dead (completed) threads
+            #alive_threads = [thread_.is_alive() for thread_ in self.threadsList]
+            
+            for i, thread_ in enumerate(reversed(self.threadsList)):
+                if not thread_.is_alive():
+                    self.threadsList.pop(i)
+                    print 'Thread finished; now', len(self.threadsList),'threads active'
+    
+    def abort(self):
+        """
+        Pass the message to quit to all the threads; don't run any that are queued
+        """
+        self.simulations = []
+        for thread_ in self.threadsList:
+            #Send the abort signal
+            thread_.abort()
+#            thread_.join()
+#            if thread_.is_alive():
+#                print 'thread still alive, waiting for abort'
+                
+            
+        
+class RedirectedWorkerThread(Thread):
+    """Worker Thread Class."""
+    def __init__(self, target, stdout_target = None,  args = None, kwargs = None, done_callback = None, add_results = None):
+        """Init Worker Thread Class."""
+        Thread.__init__(self)
+        self.target_ = target
+        self.stdout_target_ = stdout_target
+        self.args_ = args if args is not None else tuple()
+        self._want_abort = False
+        self.done_callback = done_callback
+        self.add_results = add_results
+        
+    def run(self):
+        """
+        In this function, actually run the process and pull any output from the 
+        pipe while the process runs
+        """
+        pipe_outlet, pipe_inlet = Pipe(duplex = False)
+        pipe_abort_outlet, pipe_abort_inlet = Pipe(duplex = False)
+        pipe_results_outlet, pipe_results_inlet = Pipe(duplex = False)
+        p = Process(target = self.target_, args=(pipe_inlet, pipe_abort_outlet, pipe_results_inlet)+self.args_)
+        p.daemon = True
+        p.start()
+        while p.is_alive():
+            #If it wants to be killed
+            if self._want_abort == True:
+                #Send an abort command to the process
+                pipe_abort_inlet.send(True)
+            #Get back the results from the simulation process
+            if pipe_results_outlet.poll():
+                sim = pipe_results_outlet.recv()
+            else:
+                sim = None
+            #Collect all display output from process always
+            while pipe_outlet.poll():
+                wx.CallAfter(self.stdout_target_.WriteText, pipe_outlet.recv())
+            if sim is not None:
+                break
+        wx.CallAfter(self.stdout_target_.WriteText, 'Process finished')
+        if self._want_abort == True:
+            wx.CallAfter(self.stdout_target_.WriteText, "Thread aborted")
+            wx.CallAfter(self.done_callback)
+        else:
+            wx.CallAfter(self.stdout_target_.WriteText, "Thread done")
+            if sim is not None:
+                #Get a unique identifier for the model run for pickling
+                identifier = 'PDSim recip ' + time.strftime('%Y-%m-%d-%H-%M-%S')+'_t'+self.name.split('-')[1]
+                print 'Trying to write to', identifier + '.mdl'
+                if not os.path.exists(identifier + '.mdl'):
+                    fName = identifier+'.mdl'
+                else:
+                    i = 65
+                    if os.path.exists(identifier + str(chr(i)) + '.mdl'):    
+                        while os.path.exists(identifier + str(chr(i)) + '.mdl'):
+                            i += 1
+                        i -= 1
+                    fName = identifier + str(chr(i)) + '.mdl'
+                
+                #Write it to a binary pickled file for safekeeping
+                fp = open(fName, 'wb')
+                del sim.FlowStorage
+                print "Warning: removing FlowStorage since it doesn't pickle properly"
+                cPickle.dump(sim, fp, protocol = -1)
+                fp.close()
+                "Send the data back to the GUI"
+                wx.CallAfter(self.done_callback,sim)
+            else:
+                print 'Didnt get any simulation data'
+        return 1
+        
+    def abort(self):
+        """abort worker thread."""
+        print 'Thread readying for abort'
+        # Method for use by main thread to signal an abort
+        self._want_abort = True
+    
+class InputsToolBook(wx.Toolbook):
+    """
+    The toolbook that contains the pages with input values
+    """
+    def __init__(self,parent,configfile,id=-1):
+        wx.Toolbook.__init__(self, parent, -1, style=wx.BK_LEFT)
+        il = wx.ImageList(32, 32)
+        indices=[]
+        for imgfile in ['Geometry.png','MassFlow.png','MechanicalLosses.png','StatePoint.png']:
+            ico_path = os.path.join('ico',imgfile)
+            indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
+        self.AssignImageList(il)
+        
+        #Make the recip panels.  Name should be consistent with configuration file
+        self.panels=(recip_panels.GeometryPanel(self,configfile,name='GeometryPanel'),
+                     recip_panels.MassFlowPanel(self,configfile,name='MassFlowPanel'),
+                     recip_panels.MechanicalLossesPanel(self,configfile,name='MechanicalLossesPanel'),
+                     recip_panels.StatePanel(self,configfile,name='StatePanel')
+                     )
+        
+        for Name,index,panel in zip(['Geometry','Mass Flow && Valves','Mechanical','State Points'],indices,self.panels):
+            self.AddPage(panel,Name,imageId=index)
+            
+    def calculate(self, simulation):
+        """
+        Pull all the values out of the child panels, using the values in 
+        self.items and the function post_calculate if the panel implements
+        it
+        """
+        for panel in self.panels:
+            panel.calculate(simulation)
+            if hasattr(panel,'post_calculate'):
+                panel.post_calculate(simulation)
+                
+    def collect_parametric_terms(self):
+        items = [] 
+        for panel in self.panels:
+            items += panel.items
+        return items
+            
+class SolverToolBook(wx.Toolbook):
+    def __init__(self,parent,configfile,id=-1):
+        wx.Toolbook.__init__(self, parent, -1, style=wx.BK_LEFT)
+        il = wx.ImageList(32, 32)
+        indices=[]
+        for imgfile in ['Geometry.png','MassFlow.png']:
+            ico_path = os.path.join('ico',imgfile)
+            indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
+        self.AssignImageList(il)
+        
+        items = self.Parent.InputsTB.collect_parametric_terms()
+        #Make the recip panels.  Name should be consistent with configuration file
+        pane1=pdsim_panels.PDPanel(self)
+        pane2=pdsim_panels.ParametricPanel(self, configfile, items, name='ParametricPanel')
+        self.panels=(pane1,pane2)
+        
+        for Name,index,panel in zip(['Params','Parametric'],indices,self.panels):
+            self.AddPage(panel,Name,imageId=index)
+            
+    def calculate(self,simulat):
+        for panel in self.panels:
+            panel.calculate(simulat)
+            if hasattr(panel,'post_calculate'):
+                panel.post_calculate(simulat)            
+
+class WriteOutputsPanel(wx.Panel):
+    def __init__(self,parent):
+        wx.Panel.__init__(self,parent)
+        
+        file_list = ['Temperature', 'Pressure', 'Volume', 'Density','Mass']
+        #Create the box
+        self.file_list = wx.CheckListBox(self, -1, choices = file_list)
+        #Make them all checked
+        self.file_list.SetCheckedStrings(file_list)
+        
+        btn = wx.Button(self,label='Select directory')
+        btn.Bind(wx.EVT_BUTTON,self.OnWrite)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.file_list)
+        sizer.Add(btn)
+        self.SetSizer(sizer)
+        
+        self.Simulation = None
+    
+    def set_data(self,Simulation):
+        """
+        Set the internal simulation data for saving to file
+        """
+        self.Simulation=Simulation
+        
+    def OnWrite(self,event):
+        """
+        Event handler for selection of output folder for writing of files
+        """
+        dlg = wx.DirDialog(self, "Choose a directory:",
+                          style=wx.DD_DEFAULT_STYLE|wx.DD_DIR_MUST_EXIST,
+                           #| wx.DD_CHANGE_DIR
+                           defaultPath=os.path.abspath(os.curdir)
+                           )
+
+        if dlg.ShowModal() == wx.ID_OK:
+            self.WriteToFiles(dlg.GetPath())
+
+        # Only destroy a dialog after you're done with it.
+        dlg.Destroy()
+    
+    def WriteToFiles(self,dir_path):
+        """
+        Write the selected data to files in the folder given by dir_path
+        """
+        if self.Simulation is None:
+            raise ValueError('Simulation data must be provied to WriteOutputsPanel')
+        
+        outputlist = self.file_list.GetCheckedStrings()
+        #List of files that will be over-written
+        OWList = [file+'.csv' for file in outputlist if os.path.exists(os.path.join(dir_path,file+'.csv'))]
+
+        if OWList: #if there are any files that might get over-written
+            
+            dlg = wx.MessageDialog(None,message="The following files will be over-written:\n\n"+'\n'.join(OWList),caption="Confirm Overwrite",style=wx.OK|wx.CANCEL)
+            if not dlg.ShowModal() == wx.ID_OK:
+                #Don't do anything and return
+                return
+            
+        for file in outputlist:
+            if file == 'Pressure':
+                xmat = self.Simulation.t
+                ymat = self.Simulation.p
+                pre = 'p'
+            elif file == 'Temperature':
+                xmat = self.Simulation.t
+                ymat = self.Simulation.T
+                pre = 'T'
+            elif file == 'Volume':
+                xmat = self.Simulation.t
+                ymat = self.Simulation.V
+                pre = 'V'
+            elif file == 'Density':
+                xmat = self.Simulation.t
+                ymat = self.Simulation.rho
+                pre = 'rho'
+            elif file == 'Mass':
+                xmat = self.Simulation.t
+                ymat = self.Simulation.m
+                pre = 'm'
+            else:
+                raise KeyError
+            
+            #Format for writing (first column is crank angle, following are data)
+            joined = np.vstack([xmat,ymat]).T
+            
+            data_heads = [pre+'['+key+']' for key in self.Simulation.CVs.keys()]
+            headers = 'theta [rad],'+ ','.join(data_heads)
+            
+            def row2string(array):
+                return  ','.join([str(dummy) for dummy in array])
+            
+            rows = [row2string(joined[i,:]) for i in range(joined.shape[0])]
+            s = '\n'.join(rows)
+            
+            #Actually write to file
+            print 'writing data to ',os.path.join(dir_path,file+'.csv')
+            fp = open(os.path.join(dir_path,file+'.csv'),'w')
+            fp.write(headers+'\n')
+            fp.write(s)
+            fp.close()
+            
+        print 'You selected: %s\n' % dir_path
+
+class RunToolBook(wx.Panel):
+    def __init__(self,parent):
+        wx.Panel.__init__(self, parent)
+        
+        # The running page of the main toolbook
+        self.log_ctrl = wx.TextCtrl(self, wx.ID_ANY,
+                                    style = wx.TE_MULTILINE|wx.TE_READONLY)
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        self.Outputtext = wx.StaticText(self,-1,'Temporary text')
+        self.cmdAbort = wx.Button(self,-1,'Stop\nAll\nRuns')
+        self.cmdAbort.Bind(wx.EVT_BUTTON, self.GetGrandParent().OnStop)
+        hsizer = wx.BoxSizer(wx.HORIZONTAL)
+        hsizer.Add(self.Outputtext,1)
+        hsizer.Add(self.cmdAbort,0)
+        sizer.Add(hsizer)
+        sizer.Add(wx.StaticText(self,-1,"Output Log:"))
+        sizer.Add(self.log_ctrl,1,wx.EXPAND)
+        
+        nb = wx.Notebook(self)
+        self.log_ctrl_thread1 = wx.TextCtrl(nb, wx.ID_ANY,
+                                            style = wx.TE_MULTILINE|wx.TE_READONLY)
+        self.log_ctrl_thread2 = wx.TextCtrl(nb, wx.ID_ANY,
+                                            style = wx.TE_MULTILINE|wx.TE_READONLY)
+        self.log_ctrl_thread3 = wx.TextCtrl(nb, wx.ID_ANY,
+                                            style = wx.TE_MULTILINE|wx.TE_READONLY)
+        
+        nb.AddPage(self.log_ctrl_thread1,"Thread #1")
+        nb.AddPage(self.log_ctrl_thread2,"Thread #2")
+        nb.AddPage(self.log_ctrl_thread3,"Thread #3")
+        sizer.Add(nb,1,wx.EXPAND)
+        self.write_log_button = wx.Button(self,-1,"Write Log to File")
+        
+        def WriteLog(event=None):
+            FD = wx.FileDialog(None,"Log File Name",defaultDir=os.curdir,
+                               style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
+            if wx.ID_OK==FD.ShowModal():
+                fp=open(FD.GetPath(),'w')
+                fp.write(self.log_ctrl.GetValue())
+                fp.close()
+            FD.Destroy()
+            
+        self.write_log_button.Bind(wx.EVT_BUTTON,WriteLog)
+        sizer.Add(self.write_log_button,0)
+        self.SetSizer(sizer)
+        sizer.Layout()
+        
+class AutoWidthListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
+    def __init__(self, parent, ID = wx.ID_ANY, pos=wx.DefaultPosition,
+                 size=wx.DefaultSize, style=0):
+        wx.ListCtrl.__init__(self, parent, ID, pos, size, style)
+        ListCtrlAutoWidthMixin.__init__(self)
+        
+class ResultsList(wx.Panel, ColumnSorterMixin):
+    def __init__(self, parent, headers, values):
+        """
+        values: a list of list of values.  Each entry should be as long as the number of headers
+        """
+        wx.Panel.__init__(self, parent)
+        
+        self.headers = headers
+        self.values = values
+        
+        self.list = AutoWidthListCtrl(self, 
+                                      style=wx.LC_REPORT
+                                      | wx.BORDER_NONE
+                                      | wx.LC_SORT_ASCENDING
+                                      )
+        #Build the headers
+        for i, header in enumerate(headers):
+            self.list.InsertColumn(i, header)
+        
+        self.data = values
+        
+        #Add the values one row at a time
+        for i, row in enumerate(self.data):
+            index = self.list.InsertStringItem(sys.maxint,str(row[0]))
+            self.list.SetItemData(index,i)
+            for j in range(1,len(row)):
+                val = row[j]
+                self.list.SetStringItem(index,j,str(val))
+            
+        #Build the itemDataMap needed for the Sorter mixin
+        self.itemDataMap = {}
+        for i, row in enumerate(self.data):
+            Data = []
+            for val in row:
+                Data.append(str(val))
+            self.itemDataMap[i] = tuple(Data)
+        
+        total_width = 0    
+        for i in range(len(headers)):
+            self.list.SetColumnWidth(i, wx.LIST_AUTOSIZE_USEHEADER)
+            total_width+=self.list.GetColumnWidth(i)
+            
+        width_available = self.Parent.GetSize()[0]
+        self.list.SetMinSize((width_available,200))
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.list,1,wx.EXPAND)
+        
+        self.il = wx.ImageList(16, 16)
+        SmallUpArrow = PyEmbeddedImage(
+            "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAADxJ"
+            "REFUOI1jZGRiZqAEMFGke2gY8P/f3/9kGwDTjM8QnAaga8JlCG3CAJdt2MQxDCAUaOjyjKMp"
+            "cRAYAABS2CPsss3BWQAAAABJRU5ErkJggg==")
+        SmallDnArrow = PyEmbeddedImage(
+            "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAEhJ"
+            "REFUOI1jZGRiZqAEMFGke9QABgYGBgYWdIH///7+J6SJkYmZEacLkCUJacZqAD5DsInTLhDR"
+            "bcPlKrwugGnCFy6Mo3mBAQChDgRlP4RC7wAAAABJRU5ErkJggg==")
+        
+        self.sm_up = self.il.Add(SmallUpArrow.GetBitmap())
+        self.sm_dn = self.il.Add(SmallDnArrow.GetBitmap())
+        self.list.SetImageList(self.il, wx.IMAGE_LIST_SMALL)
+
+        ColumnSorterMixin.__init__(self,len(headers)+1)
+        
+        self.SetSizer(sizer)
+        self.SetAutoLayout(True)
+        
+    # Used by the ColumnSorterMixin, see wx/lib/mixins/listctrl.py
+    def GetListCtrl(self):
+        return self.list
+    
+    # Used by the ColumnSorterMixin, see wx/lib/mixins/listctrl.py
+    def GetSortImages(self):
+        return (self.sm_dn, self.sm_up)
+    
+    def AsString(self):
+        #Sort the output csv table in the same way as the listctrl
+        iCol, direction = self.GetSortState()
+        
+        #Get a sorted version of self.values sorted by the column used in list
+        self.values = sorted(self.values, key=itemgetter(iCol))
+        
+        header_string = [','.join(self.headers)]
+        def tostr(row):
+            return [str(r) for r in row]
+        rows_string = [','.join(tostr(row)) for row in self.values]
+        return '\n'.join(header_string+rows_string)
+
+class ColumnSelectionList(AutoWidthListCtrl, CheckListCtrlMixin):
+    def __init__(self, parent, col_options, selected):
+        """
+        values: a list of list of values.  Each entry should be as long as the number of headers
+        """
+        AutoWidthListCtrl.__init__(self, parent, style=wx.LC_REPORT)
+        CheckListCtrlMixin.__init__(self)
+        
+        #Set local variables
+        self.col_options = col_options
+        self.selected = selected
+        
+        self.InsertColumn(0, 'Name')
+        
+        #Add the values one row at a time
+        for i,key in enumerate(self.col_options):            
+            self.InsertStringItem(i,self.col_options[key])
+            if key in self.selected:
+                self.CheckItem(i)
+            
+        self.SetColumnWidth(0, wx.LIST_AUTOSIZE)
+        
+        width_available = self.Parent.GetSize()[0]
+        self.SetMinSize((width_available,-1))
+        
+        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnItemActivated)
+
+    def OnItemActivated(self, event): 
+        self.ToggleItem(event.m_itemIndex)
+    
+    def GetSelections(self):
+        """
+        Return a list of attributes that should be included in table
+        """
+        selected = []
+        for i in range(self.GetItemCount()):
+            if self.IsChecked(i):
+                value = self.GetItemText(i)
+                for k,v in self.col_options.iteritems():
+                    if v == value:
+                        selected.append(k)
+                        break
+        return selected
+        
+class ColumnSelectionDialog(wx.Dialog):
+    def __init__(self, parent, col_options, cols_selected):
+        wx.Dialog.__init__(self,parent)
+
+        self.ColList = ColumnSelectionList(self,col_options,cols_selected)
+        self.OK = wx.Button(self, label = 'Ok')
+        self.CANCEL = wx.Button(self, label = 'Cancel')
+        self.CheckAll = wx.Button(self, label = 'Check All')
+        self.CheckNone = wx.Button(self, label = 'Check None')
+        hsizer1 = wx.BoxSizer(wx.HORIZONTAL)
+        hsizer1.Add(self.CheckAll)
+        hsizer1.Add(self.CheckNone)
+        
+        hsizer2 = wx.BoxSizer(wx.HORIZONTAL)
+        hsizer2.Add(self.OK)
+        hsizer2.AddStretchSpacer(1)
+        hsizer2.Add(self.CANCEL)
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(hsizer1,0,wx.EXPAND)
+        sizer.Add(self.ColList,1,wx.EXPAND)
+        sizer.Add(hsizer2,0,wx.EXPAND)
+        self.SetSizer(sizer)
+        
+        self.CheckAll.Bind(wx.EVT_BUTTON,self.OnAll)
+        self.CheckNone.Bind(wx.EVT_BUTTON,self.OnNone)
+        self.Bind(wx.EVT_CLOSE,self.OnClose)
+        self.OK.Bind(wx.EVT_BUTTON, self.OnAccept)
+        self.CANCEL.Bind(wx.EVT_BUTTON, self.OnClose)
+        #Bind a key-press event to all objects to get Esc 
+        children = self.GetChildren()
+        for child in children:
+            child.Bind(wx.EVT_KEY_UP,  self.OnKeyPress) 
+        
+    def OnNone(self,event):
+        for i in range(self.ColList.GetItemCount()):
+            self.ColList.CheckItem(i, False)
+    
+    def OnAll(self,event):
+        for i in range(self.ColList.GetItemCount()):
+            self.ColList.CheckItem(i, True)
+                    
+    def OnAccept(self, event):
+        self.EndModal(wx.ID_OK)
+        
+    def OnKeyPress(self,event):
+        """ cancel if Escape key is pressed """
+        event.Skip()
+        if event.GetKeyCode() == wx.WXK_ESCAPE:
+            self.EndModal(wx.ID_CANCEL)
+        
+    def OnClose(self,event):
+        self.EndModal(wx.ID_CANCEL)
+        
+    def GetSelections(self):
+        return self.ColList.GetSelections()
+        
+class OutputDataPanel(wx.Panel):
+    def __init__(self, parent, variables):
+        wx.Panel.__init__(self, parent)
+        
+        self.results = []
+        
+        self.variables = variables
+        #Make the items
+        cmdLoad = wx.Button(self, label = "Add Runs...")
+        cmdRefresh = wx.Button(self, label = "Refresh")
+        cmdSelect = wx.Button(self, label = "Select Columns...")
+        #Make the sizers
+        hsizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        #Put the things into sizers
+        hsizer.Add(cmdLoad)
+        hsizer.Add(cmdSelect)
+        hsizer.Add(cmdRefresh)
+        sizer.Add(hsizer)
+        #Bind events
+        cmdLoad.Bind(wx.EVT_BUTTON, self.OnLoadRuns)
+        cmdSelect.Bind(wx.EVT_BUTTON, self.OnSelectCols)
+        cmdRefresh.Bind(wx.EVT_BUTTON, self.OnRefresh)
+        
+        self.SetSizer(sizer)
+        self.ResultsList = None
+        self.WriteButton = None
+        
+        #Create a list of possible columns
+        self.column_options = {'mdot': 'Mass flow rate [kg/s]',
+                               'eta_v': 'Volumetric efficiency [-]',
+                               'eta_a': 'Adiabatic efficiency [-]',
+                               'Td': 'Discharge temperature [K]',
+                               'Wdot': 'Shaft power [kW]',
+                               'Wdot_motor': 'Motor losses [kW]',
+                               'Wdot_electrical': 'Electrical power [kW]',
+                               'Qamb': 'Ambient heat transfer [kW]',
+                               'run_index': 'Run Index'
+                               }
+        
+        for var in self.variables:
+            key = var['attr']
+            value = var['text']
+            self.column_options[key] = value
+        
+        self.columns_selected = ['mdot','eta_v','eta_a','Td']
+        sizer.Layout()
+        
+        self.Bind(wx.EVT_SIZE, self.OnRefresh)
+        
+    def rebuild(self):
+        
+        if self.results: #as long as it isn't empty
+            
+            if self.ResultsList is not None:
+                print 'Removing button and list'
+                self.WriteButton.Destroy()
+                self.ResultsList.Destroy()
+                self.GetSizer().Layout()
+                
+            rows = []
+            for sim in self.results: #loop over the results
+                row = []
+                for attr in self.columns_selected:
+                    if hasattr(sim, attr):
+                        value = getattr(sim,attr)
+                        row.append(value)
+                    else:
+                        raise KeyError(attr + 'is an invalid header attribute')
+                rows.append(row)
+            headers = [self.column_options[attr] for attr in self.columns_selected]
+            
+            #The items being created
+            self.ResultsList = ResultsList(self, headers, rows)
+            self.WriteButton = wx.Button(self, label = 'Write to file...')
+            self.WriteButton.Bind(wx.EVT_BUTTON, self.OnWriteFiles)
+            
+            #Do the layout of the panel
+            sizer = self.GetSizer()
+            hsizer = wx.BoxSizer(wx.HORIZONTAL)
+            hsizer.Add(self.ResultsList,1,wx.EXPAND)
+            sizer.Add(hsizer)
+            sizer.Add(self.WriteButton)
+            sizer.Layout()
+            self.Refresh()
+            print 'rebuilt the OutputDataPanel'
+    
+    def add_runs(self, results, rebuild = False):
+        self.results += results
+        if rebuild:
+            self.rebuild()
+        
+    def OnLoadRuns(self, event = None):
+        FD = wx.FileDialog(None,"Load Runs",defaultDir='.',
+                           wildcard = 'PDSim Runs (*.mdl)|*.mdl',
+                           style=wx.FD_OPEN|wx.FD_MULTIPLE|wx.FD_FILE_MUST_EXIST)
+        if wx.ID_OK == FD.ShowModal():
+            file_paths = FD.GetPaths()
+            for file in file_paths:
+                sim = cPickle.load(open(file,'rb'))
+                self.add_runs([sim])
+            self.rebuild()
+        FD.Destroy()
+    
+    def OnWriteFiles(self, event):
+        """
+        Event that fires when the button is clicked to write table to files
+        """
+        FD = wx.FileDialog(None,"Save results file",
+                           style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
+        if wx.ID_OK == FD.ShowModal():
+            file_path=FD.GetPath() 
+            fp = open(file_path,'w')
+            fp.write(self.ResultsList.AsString())
+            fp.close()
+        FD.Destroy()
+        
+    def OnRefresh(self, event):
+        self.rebuild()
+        
+    def OnSelectCols(self, event = None):
+        dlg = ColumnSelectionDialog(None,self.column_options,self.columns_selected)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.columns_selected = dlg.GetSelections() 
+        dlg.Destroy()
+        self.rebuild()
+        
+class OutputsToolBook(wx.Toolbook):
+    def __init__(self,parent,id=-1):
+        wx.Toolbook.__init__(self, parent, -1, style=wx.BK_LEFT)
+        il = wx.ImageList(32, 32)
+        indices=[]
+        for imgfile in ['Geometry.png','MassFlow.png','MechanicalLosses.png','StatePoint.png']:
+            ico_path = os.path.join('ico',imgfile)
+            indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
+        self.AssignImageList(il)
+        
+        variables = self.Parent.InputsTB.collect_parametric_terms()
+        self.PlotsPanel = wx.Panel(self)
+        self.DataPanel = OutputDataPanel(self, variables = variables)
+        self.WriteOutputsPanel = WriteOutputsPanel(self)
+        
+        #Make a Recip instance
+        self.panels=(self.DataPanel,self.PlotsPanel,self.WriteOutputsPanel,wx.Panel(self,-1))
+        for Name,index,panel in zip(['Data','Plots','None','None'],indices,self.panels):
+            self.AddPage(panel,Name,imageId=index)
+            
+        self.PN = None
+        #self.Bind(wx.EVT_TOOLBOOK_PAGE_CHANGED, self.OnPageChange)
+    
+#    def OnPageChange(self, event):
+#        if event is not None:
+#            print event
+            
+    def plot_outputs(self, recip=None):
+        self.WriteOutputsPanel.set_data(recip)
+        parent = self.PlotsPanel
+        # First call there is no plot notebook in existence
+        if self.PN is None:
+            self.PN = PlotNotebook(recip,parent)
+            sizer = wx.BoxSizer(wx.VERTICAL)
+            sizer.Add(self.PN,1,wx.EXPAND)
+            parent.SetSizer(sizer)
+            parent.Fit() ##THIS IS VERY IMPORTANT!!!!!!!!!!! :)
+        else:
+            self.PN.update(recip)
+            
+class MainToolBook(wx.Toolbook):
+    def __init__(self,parent,configfile):
+        wx.Toolbook.__init__(self, parent, -1, style=wx.BK_TOP)
+        il = wx.ImageList(32, 32)
+        indices=[]
+        for imgfile in ['Inputs.png','Solver.png','Solver.png','Outputs.png']:
+            ico_path = os.path.join('ico',imgfile)
+            indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
+        self.AssignImageList(il)
+        
+        self.InputsTB = InputsToolBook(self, configfile)
+        self.SolverTB = SolverToolBook(self, configfile)
+        self.RunTB = RunToolBook(self)
+        self.OutputsTB = OutputsToolBook(self)
+        
+        self.panels=(self.InputsTB,self.SolverTB,self.RunTB,self.OutputsTB)
+        for Name,index,panel in zip(['Inputs','Solver','Run','Output'],indices,self.panels):
+            self.AddPage(panel,Name,imageId=index)
+
+class MainFrame(wx.Frame):
+    def __init__(self,configfile=None, position=None, size=None):
+        wx.Frame.__init__(self, None, -1, "Recip GUI", size=(700, 700))
+        
+        #The default configuration file
+        if configfile is None: #No file name passed in
+            configfile = os.path.join('configs','default.cfg')
+            
+        #The position and size are needed when the frame is rebuilt, but not otherwise
+        if position is None:
+            position = (-1,-1)
+        if size is None:
+            size = (-1,-1)
+        
+        #Use the builder function to rebuild using the default configuration file
+        self.build(configfile)
+        
+        # Set up redirection of input and output to logging wx.TextCtrl
+        # Taken literally from http://www.blog.pythonlibrary.org/2009/01/01/wxpython-redirecting-stdout-stderr/
+        class RedirectText(object):
+            def __init__(self,aWxTextCtrl):
+                self.out=aWxTextCtrl
+            def write(self, string):
+                wx.CallAfter(self.out.WriteText, string)
+                
+        redir=RedirectText(self.MTB.RunTB.log_ctrl)
+        sys.stdout=redir
+        sys.stderr=redir
+        
+        self.SetPosition(position)
+        self.SetSize(size)
+    
+        #Temporary code
+        self.MTB.SetSelection(1)
+        self.MTB.SolverTB.SetSelection(1)
+        
+        self.worker = None
+        self.workers = None
+        self.WTM = None
+        
+    def get_logctrls(self):
+        return [self.MTB.RunTB.log_ctrl_thread1,
+                self.MTB.RunTB.log_ctrl_thread2,
+                self.MTB.RunTB.log_ctrl_thread3]
+    
+    def rebuild(self,configfile):
+        """
+        Destroy everything in the main frame and recreate 
+        the contents based on parsing the config file
+        """
+        # Create a new instance of the MainFrame class using the 
+        # new configuration file name and the current location of
+        # the frame
+        position = self.GetPosition()
+        size = self.GetSize()
+        frame = MainFrame(configfile, position=position, size=size)
+        frame.Show()
+        
+        #Destroy the current MainFrame
+        self.Destroy()
+        
+    def build(self,configfile):
+        self.make_menu_bar()
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        self.MTB=MainToolBook(self,configfile)
+        sizer.Add(self.MTB, 1, wx.EXPAND)
+        self.SetSizer(sizer)
+        sizer.Layout()
+        
+        self.worker=None
+        self.Layout() 
+        
+    def build_recip(self):
+        #Instantiate the recip class
+        recip=Recip()
+        #Pull things from the GUI as much as possible
+        self.MTB.InputsTB.calculate(recip)
+        #Build the model the rest of the way
+        RecipBuilder(recip)
+        return recip
+    
+    def run_simulation(self, sim):
+        if self.worker is None:
+            print 'Starting computation thread for primary run'
+            self.worker = RedirectedWorkerThread(run_1recip, self.MTB.RunTB.log_ctrl,args = (sim,),done_callback = self.OnRunFinish)
+            self.worker.daemon = True
+            self.worker.start()
+    
+    def run_batch(self, sims):
+        
+        if self.WTM is None:
+            self.MTB.SetSelection(2)
+            self.WTM = WorkerThreadManager(run_1recip,sims,self.get_logctrls(),args = tuple(), done_callback = self.OnRunFinish)
+            self.WTM.setDaemon(True)
+            self.WTM.start()
+        else:
+            dlg = wx.MessageDialog(None,"Batch has already started.  Wait until completion or kill the batch","")
+            dlg.ShowModal()
+            dlg.Destroy()
+    
+    ################################
+    #         Event handlers       #
+    ################################
+       
+    def OnConfigOpen(self,event):
+        FD = wx.FileDialog(None,"Load Configuration file",defaultDir='configs',
+                           style=wx.FD_OPEN)
+        if wx.ID_OK==FD.ShowModal():
+            file_path=FD.GetPath()
+            #Now rebuild the GUI using the desired configuration file
+            self.rebuild(file_path)
+        FD.Destroy()
+        
+    def OnConfigSave(self,event):
+        FD = wx.FileDialog(None,"Save Configuration file",defaultDir='configs',
+                           style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
+        if wx.ID_OK==FD.ShowModal():
+            file_path=FD.GetPath()
+            print 'Writing configuration file to ',file_path   
+            #Build the config file entry
+            string_list = [panel.prep_for_configfile() for panel in self.MTB.InputsTB.panels+self.MTB.SolverTB.panels] 
+            fp = open(file_path,'w')
+            fp.write('\n'.join(string_list))
+            fp.close()
+        FD.Destroy()
+        
+    def OnStart(self, event):
+        """
+        Runs the primary inputs without applying the parametric table inputs
+        """
+        print "Running.."
+        self.MTB.SetSelection(2)
+        self.recip = self.build_recip()
+        self.run_simulation(self.recip)
+            
+    def OnStop(self, event):
+        """Stop Computation."""
+        # Flag the single worker thread to stop if running
+        if self.worker is not None:
+            print 'Killing computation thread'
+            self.worker.abort()
+            self.worker.join(0.01)
+        if self.WTM is not None:
+            self.WTM.abort()
+        
+    def OnQuit(self, event):
+        self.Close()
+        
+    def OnRunFinish(self, sim = None):
+        #Collect the runs
+        wx.CallAfter(sys.stdout.write,'called OnRunFinish') 
+        if sim is not None:
+            self.MTB.OutputsTB.plot_outputs(sim)
+            self.MTB.OutputsTB.DataPanel.add_runs([sim])
+            self.MTB.OutputsTB.DataPanel.rebuild()
+        
+        """
+        Each time a run completes, if the list of running threads is empty,
+        remove the thread manager 
+        """
+        if not self.WTM.threadsList:
+            print 'Empty'
+            self.WTM = None
+        else:
+            print 'Not empty yet'
+            
+        
+    def make_menu_bar(self):
+        #################################
+        ####       Menu Bar         #####
+        #################################
+        
+        # Menu Bar
+        self.MenuBar = wx.MenuBar()
+        
+        self.File = wx.Menu()
+        self.menuFileOpen = wx.MenuItem(self.File, -1, "Open Config from file...\tCtrl+O", "", wx.ITEM_NORMAL)
+        self.menuFileSave = wx.MenuItem(self.File, -1, "Save config to file...\tCtrl+S", "", wx.ITEM_NORMAL)
+        self.menuFileQuit = wx.MenuItem(self.File, -1, "Quit\tCtrl+Q", "", wx.ITEM_NORMAL)
+        self.File.AppendItem(self.menuFileOpen)
+        self.File.AppendItem(self.menuFileSave)
+        self.File.AppendItem(self.menuFileQuit)
+        self.MenuBar.Append(self.File, "File")
+        self.Bind(wx.EVT_MENU,self.OnConfigOpen,self.menuFileOpen)
+        self.Bind(wx.EVT_MENU,self.OnConfigSave,self.menuFileSave)
+        self.Bind(wx.EVT_MENU,self.OnQuit,self.menuFileQuit)
+        
+        self.Type = wx.Menu()
+        self.TypeRecip = wx.MenuItem(self.Type, -1, "Recip", "", wx.ITEM_RADIO)
+        self.TypeScroll = wx.MenuItem(self.Type, -1, "Scroll", "", wx.ITEM_RADIO)
+        self.Type.AppendItem(self.TypeRecip)
+        self.Type.AppendItem(self.TypeScroll)
+        self.MenuBar.Append(self.Type, "Type")
+        def f1(event):  print 'Scroll-type compressor'
+        def f2(event):  print 'Recip-type compressor'
+        self.Bind(wx.EVT_MENU,f1,self.TypeScroll)
+        self.Bind(wx.EVT_MENU,f2,self.TypeRecip)
+        
+        self.Solve = wx.Menu()
+        self.SolveSolve = wx.MenuItem(self.Solve, -1, "Solve\tF5", "", wx.ITEM_NORMAL)
+        self.Solve.AppendItem(self.SolveSolve)
+        self.MenuBar.Append(self.Solve, "Solve")
+        self.Bind(wx.EVT_MENU, self.OnStart, self.SolveSolve)
+        
+        self.Help = wx.Menu()
+        self.HelpHelp = wx.MenuItem(self.Help, -1, "Help...\tCtrl+H", "", wx.ITEM_NORMAL)
+        self.HelpWeb = wx.MenuItem(self.Help, -1, "Go to online documentation", "", wx.ITEM_NORMAL)
+        self.Help.AppendItem(self.HelpHelp)
+        self.Help.AppendItem(self.HelpWeb)
+        self.MenuBar.Append(self.Help, "Help")
+        self.Bind(wx.EVT_MENU, lambda event: self.Destroy(), self.HelpHelp)
+        self.Bind(wx.EVT_MENU, lambda event: os.startfile('http://pdsim.sf.net/'),self.HelpWeb)
+        
+        #Actually set it
+        self.SetMenuBar(self.MenuBar)
+            
+if __name__ == '__main__':
+    # The following line is required to allow cx_Freeze 
+    # to package multiprocessing properly 
+    freeze_support()
+    app = wx.App(False)
+    frame = MainFrame() 
+    frame.Show(True) 
+    app.MainLoop()
