@@ -41,7 +41,7 @@ def Compressor():
     recip.d_suction=recip.d_discharge; #suction diameter in meters
     recip.A_suction=pi*recip.d_suction**2/4
     
-    recip.V_backchamber = 50e-6 #Back chamber volume [m3]
+    recip.V_backchamber = 1e-6 #Back chamber volume [m3]
         
     #These are parameters needed for the ambient heat transfer model
     recip.h_shell = 0.010 #[kW/m2/K]
@@ -49,7 +49,7 @@ def Compressor():
     recip.Tamb = 298 #[K]
     
     recip.mu_oil = 0.0086
-    recip.delta_gap = 20e-6
+    recip.delta_gap = 2e-6
     recip.eta_motor = 0.95
     
     Ref='R404A'
@@ -67,10 +67,10 @@ def Compressor():
                                initialState=outletState.copy(),
                                VdVFcn=recip.V_dV,
                                becomes='A') )
-#    recip.add_CV( ControlVolume(key='B',
-#                               initialState=outletState.copy(),
-#                               VdVFcn=recip.V_dV_backchamber,
-#                               becomes='B') )
+    recip.add_CV( ControlVolume(key='B',
+                               initialState=outletState.copy(),
+                               VdVFcn=recip.V_dV_backchamber,
+                               becomes='B') )
     
     recip.add_tube( Tube(key1='inlet.1',key2='inlet.2',L=0.03,ID=0.02,
                              mdot=mdot_guess, State1=inletState.copy(),
@@ -81,7 +81,7 @@ def Compressor():
     
     recip.add_flow(FlowPath(key1='inlet.2',key2='A',MdotFcn=recip.Suction))
     recip.add_flow(FlowPath(key1='outlet.1',key2='A',MdotFcn=recip.Discharge))
-#    recip.add_flow(FlowPath(key1='B',key2='A',MdotFcn=recip.PistonLeakage))
+    recip.add_flow(FlowPath(key1='B',key2='A',MdotFcn=recip.PistonLeakage))
 
     E = 1.93e11             #Youngs Modulus, [Pa]
     h_valve = 0.0001532     #Valve thickness, [m]
