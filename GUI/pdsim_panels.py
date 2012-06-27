@@ -355,8 +355,9 @@ class ParametricPanel(PDPanel):
                 for Icol in range(self.ParaList.GetColumnCount()-1):
                     val = self.ParaList.GetStringItem(Irow, Icol)
                     Name = self.ParaList.GetColumn(Icol+1).Text
-                    print 'Setting', self._get_attr(Name), 'to', float(val)
                     setattr(recip,self._get_attr(Name),float(val))
+                    #Run the post_calculate for all the panels
+                    Main.MTB.InputsTB.post_calculate(recip)
             #Add an index for the run so that it can be sorted properly
             recip.run_index = Irow+1
             recips.append(recip)

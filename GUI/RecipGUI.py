@@ -291,6 +291,11 @@ class InputsToolBook(wx.Toolbook):
             panel.calculate(simulation)
             if hasattr(panel,'post_calculate'):
                 panel.post_calculate(simulation)
+    
+    def post_calculate(self, simulation):
+        for panel in self.panels:
+            if hasattr(panel,'post_calculate'):
+                panel.post_calculate(simulation)
                 
     def collect_parametric_terms(self):
         items = [] 
@@ -970,7 +975,8 @@ class MainFrame(wx.Frame):
         if sim is not None:
 #            print 'Queueing a result for further processing'
             self.results_list.put(sim)
-            print 'Result queued'
+            print 'Result queued' 
+        
     ################################
     #         Event handlers       #
     ################################
