@@ -3,6 +3,7 @@
 import wx,os,sys
 from wx.lib.mixins.listctrl import CheckListCtrlMixin, ColumnSorterMixin, ListCtrlAutoWidthMixin
 from wx.lib.embeddedimage import PyEmbeddedImage
+import wx.lib.agw.pybusyinfo as PBI
 import numpy as np
 import CoolProp.State as CPState
 from PDSim.recip.core import Recip
@@ -159,12 +160,15 @@ class WorkerThreadManager(Thread):
         """
         dlg = wx.MessageDialog(None,"Are you sure you want to kill the current runs?",caption ="Kill Batch?",style = wx.OK|wx.CANCEL)
         if dlg.ShowModal() == wx.ID_OK:
+            message = "Aborting in progress, please wait..."
+            busy = PBI.PyBusyInfo(message, parent=None, title="Aborting")
             self.simulations = []
             for thread_ in self.threadsList:
                 #Send the abort signal
                 thread_.abort()
                 #Wait for it to finish up
                 thread_.join()
+            del busy
         dlg.Destroy()
         
 class RedirectedWorkerThread(Thread):
@@ -583,13 +587,15 @@ class ColumnSelectionList(AutoWidthListCtrl, CheckListCtrlMixin):
         
         #Set local variables
         self.col_options = col_options
+        from operator import itemgetter
+        self.col_options_sorted = sorted(col_options.items(), key=lambda x: x[1])
         self.selected = selected
         
         self.InsertColumn(0, 'Name')
         
         #Add the values one row at a time
-        for i,key in enumerate(self.col_options):            
-            self.InsertStringItem(i,self.col_options[key])
+        for i,(key,val) in enumerate(self.col_options_sorted):            
+            self.InsertStringItem(i, self.col_options[key])
             if key in self.selected:
                 self.CheckItem(i)
             
@@ -673,7 +679,149 @@ class ColumnSelectionDialog(wx.Dialog):
         
     def GetSelections(self):
         return self.ColList.GetSelections()
+
+class FileOutputDialog(wx.Dialog):
+    def __init__(self,Simulations, table_string):
+        wx.Dialog.__init__(self,None)
+        self.Simulations = Simulations
+        self.table_string = table_string
         
+        #The root directory selector
+        hsizer = wx.BoxSizer(wx.HORIZONTAL)
+        hsizer.Add(wx.StaticText(self,label="Output Directory:"))
+        self.txtDir = wx.TextCtrl(self,value ='.')
+        hsizer.Add(self.txtDir, 1, wx.EXPAND)
+        self.cmdDirSelect = wx.Button(self,label="Select...")
+        self.cmdDirSelect.Bind(wx.EVT_BUTTON,self.OnDirSelect)
+        hsizer.Add(self.cmdDirSelect)
+        
+        #The CSV selections
+        file_list = ['Temperature', 'Pressure', 'Volume', 'Density','Mass']
+        #Create the box
+        self.file_list = wx.CheckListBox(self, choices = file_list)
+        #Make them all checked
+        self.file_list.SetCheckedStrings(file_list)
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(hsizer,1,wx.EXPAND)
+        sizer.AddSpacer(10)
+        sizer.Add(wx.StaticText(self,label='CSV files:'))
+        sizer.Add(self.file_list)
+        
+        sizer.AddSpacer(10)
+        self.chkPickled = wx.CheckBox(self,label='Pickled data files (Warning! Can be quite large)')
+        self.chkPickled.SetValue(True)
+        sizer.Add(self.chkPickled)
+        
+        sizer.AddSpacer(10)
+        self.chkTable = wx.CheckBox(self,label='Tabular data')
+        self.chkTable.SetValue(True)
+        sizer.Add(self.chkTable)
+        
+        self.cmdWrite = wx.Button(self, label = 'Write!')
+        self.cmdWrite.Bind(wx.EVT_BUTTON, self.OnWrite)
+        sizer.AddSpacer(10)
+        sizer.Add(self.cmdWrite)
+        self.SetSizer(sizer)
+        
+    def OnDirSelect(self,event):
+        #
+        os.chdir(os.curdir)
+        dlg = wx.DirDialog(None, "Choose a directory:",
+                           defaultPath = os.path.abspath(os.curdir),
+                           style=wx.DD_DEFAULT_STYLE | wx.DD_NEW_DIR_BUTTON
+                           )
+        if dlg.ShowModal() == wx.ID_OK:
+            self.txtDir.SetValue(dlg.GetPath())
+        dlg.Destroy()
+        
+    def OnWrite(self, event):
+        """
+        
+        """
+        dir_path = self.txtDir.GetValue()
+        if not os.path.exists(dir_path):
+            dlg = wx.MessageDialog(None, message = 'Selected output directory does not exist.  Please select a folder then try again')
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
+        
+        for i, sim in enumerate(self.Simulations):
+            run_path = 'RunNumber{0:04d}'.format(i+1)
+            if not os.path.exists(os.path.join(dir_path, run_path)):
+                os.mkdir(os.path.join(dir_path, run_path))
+            self.write_csv_files(os.path.join(dir_path, run_path), sim)
+            self.write_pickle(os.path.join(dir_path, run_path), sim)
+            if self.chkTable.GetValue():
+                fp = open(os.path.join(dir_path,'ResultsTable.csv'),'w')
+                fp.write(self.table_string)
+                fp.close()
+    
+    def write_pickle(self, dir_path, sim):
+        fp = open(os.path.join(dir_path,'PickledSimulation.mdl'),'wb')
+        cPickle.dump(sim, fp)
+        fp.close()
+        
+    def write_csv_files(self, dir_path, sim):
+        """
+        Write the selected data to files in the folder given by dir_path
+        """
+        
+        outputlist = self.file_list.GetCheckedStrings()
+            
+        #List of files that will be over-written
+        OWList = [file+'.csv' for file in outputlist if os.path.exists(os.path.join(dir_path, file+'.csv'))]
+
+        if OWList: #if there are any files that might get over-written
+            
+            dlg = wx.MessageDialog(None, message="The following files will be over-written:\n\n"+'\n'.join(OWList),caption="Confirm Overwrite",style=wx.OK|wx.CANCEL)
+            if not dlg.ShowModal() == wx.ID_OK:
+                #Don't do anything and return
+                return wx.ID_CANCEL
+
+        for file in outputlist:
+            if file == 'Pressure':
+                xmat = sim.t
+                ymat = sim.p
+                pre = 'p'
+            elif file == 'Temperature':
+                xmat = sim.t
+                ymat = sim.T
+                pre = 'T'
+            elif file == 'Volume':
+                xmat = sim.t
+                ymat = sim.V
+                pre = 'V'
+            elif file == 'Density':
+                xmat = sim.t
+                ymat = sim.rho
+                pre = 'rho'
+            elif file == 'Mass':
+                xmat = sim.t
+                ymat = sim.m
+                pre = 'm'
+            else:
+                raise KeyError
+            
+            #Format for writing (first column is crank angle, following are data)
+            joined = np.vstack([xmat,ymat]).T
+            
+            data_heads = [pre+'['+key+']' for key in sim.CVs.keys()]
+            headers = 'theta [rad],'+ ','.join(data_heads)
+            
+            def row2string(array):
+                return  ','.join([str(dummy) for dummy in array])
+            
+            rows = [row2string(joined[i,:]) for i in range(joined.shape[0])]
+            s = '\n'.join(rows)
+            
+            #Actually write to file
+            print 'writing data to ',os.path.join(dir_path,file+'.csv')
+            fp = open(os.path.join(dir_path,file+'.csv'),'w')
+            fp.write(headers+'\n')
+            fp.write(s)
+            fp.close()
+    
 class OutputDataPanel(wx.Panel):
     def __init__(self, parent, variables):
         wx.Panel.__init__(self, parent)
@@ -719,7 +867,7 @@ class OutputDataPanel(wx.Panel):
             value = var['text']
             self.column_options[key] = value
         
-        self.columns_selected = ['mdot','eta_v','eta_a','Td']
+        self.columns_selected = ['run_index','mdot','eta_v','eta_a','Td']
         sizer.Layout()
         
         self.Bind(wx.EVT_SIZE, self.OnRefresh)
@@ -780,14 +928,19 @@ class OutputDataPanel(wx.Panel):
         """
         Event that fires when the button is clicked to write table to files
         """
-        FD = wx.FileDialog(None,"Save results file",
-                           style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
-        if wx.ID_OK == FD.ShowModal():
-            file_path=FD.GetPath() 
-            fp = open(file_path,'w')
-            fp.write(self.ResultsList.AsString())
-            fp.close()
-        FD.Destroy()
+        table_string = self.ResultsList.AsString()
+        dlg = FileOutputDialog(self.results, table_string = table_string)
+        dlg.ShowModal()
+        dlg.Destroy()
+        
+#        FD = wx.FileDialog(None,"Save results file",
+#                           style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
+#        if wx.ID_OK == FD.ShowModal():
+#            file_path=FD.GetPath() 
+#            fp = open(file_path,'w')
+#            fp.write(self.ResultsList.AsString())
+#            fp.close()
+#        FD.Destroy()
         
     def OnRefresh(self, event):
         self.rebuild()
