@@ -592,7 +592,7 @@ class PDSimCore(object):
     
     def check_abort(self):
         #If you received an abort request, set a flag
-        if self.abort_pipe.poll() and self.abort_pipe.recv():
+        if self.pipe_abort.poll() and self.pipe_abort.recv():
             print 'received an abort request'
             self._want_abort = True
             
@@ -609,7 +609,7 @@ class PDSimCore(object):
               solver_method = 'Euler',
               OneCycle = False,
               Abort = None,
-              abort_pipe = None,
+              pipe_abort = None,
               **kwargs):
         """
         This is the driving function for the PDSim model.  It can be extended through the 
@@ -633,7 +633,7 @@ class PDSimCore(object):
         
         # Set up a pipe for accepting a value of True which will abort the run
         # Typically used from the GUI
-        self.abort_pipe = abort_pipe
+        self.pipe_abort = pipe_abort
         
         #This runs before the model starts at all
         self.__pre_run()
@@ -648,7 +648,7 @@ class PDSimCore(object):
         self.key_inlet = key_inlet
         self.key_outlet = key_outlet
         
-        if Abort is None and abort_pipe is not None:
+        if Abort is None and pipe_abort is not None:
             Abort = self.check_abort
         
         def OBJECTIVE(Td_Tlumps):

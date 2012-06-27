@@ -10,7 +10,8 @@ from operator import itemgetter
 import pdsim_panels
 import recip_panels
 from math import pi
-from multiprocessing import Queue, Process, Pipe, freeze_support, cpu_count
+from Queue import Queue
+from multiprocessing import Process, Pipe, freeze_support, cpu_count, allow_connection_pickling
 from Queue import Empty
 from threading import Thread
 from PDSimLoader import RecipBuilder
@@ -18,81 +19,15 @@ from PDSim.plot.plots import PlotNotebook
 import PDSim
 import time
 import cPickle
-
-# Button definitions
-ID_START = wx.NewId()
-ID_STOP = wx.NewId()
-
-# Define notification event for thread completion
-EVT_RESULT_ID = wx.NewId()
-
-def EVT_RESULT(win, func):
-    """Define Result Event."""
-    win.Connect(-1, -1, EVT_RESULT_ID, func)
-
-class ResultEvent(wx.PyEvent):
-    """Simple event to carry arbitrary result data."""
-    def __init__(self, data):
-        """Init Result Event."""
-        wx.PyEvent.__init__(self)
-        self.SetEventType(EVT_RESULT_ID)
-        self.data = data
                 
-def stupid(pipe_inlet):
-    redir = RedirectText2Pipe(pipe_inlet)
-    sys.stdout = redir
-    sys.stderr = redir
-    for i in range(100):
-        time.sleep(0.1)
-        print int(i),'Hi'
-    return
-   
-class RedirectText2Pipe(object):
-    def __init__(self, pipe_inlet):
-        self.pipe_inlet = pipe_inlet
-    def write(self, string):
-        self.pipe_inlet.send(string)
-    def flush(self):
-        return None
-
-class Run1Recip(Process):
-    def __init__(self,pipe_std, pipe_abort, pipe_results, recip):
-        Process.__init__(self)
-        self.pipe_std = pipe_std
-        self.pipe_abort = pipe_abort
-        self.pipe_results = pipe_results
-        self.recip = recip
-        self._want_abort = False
-
-    def run(self):
-        redir = RedirectText2Pipe(self.pipe_std)
-        sys.stdout = redir
-        sys.stderr = redir
-        
-        self.recip.solve(key_inlet='inlet.1',key_outlet='outlet.2',
-            eps_allowed=1e-10, #Only used with RK45 solver
-            endcycle_callback=self.recip.endcycle_callback,
-            heat_transfer_callback=self.recip.heat_transfer_callback,
-            lump_energy_balance_callback = self.recip.lump_energy_balance_callback,
-            valves_callback =self.recip.valves_callback, OneCycle=False, 
-            abort_pipe = self.pipe_abort
-            )
-        
-        if not self.recip._want_abort:
-            #Send simulation result back to calling thread
-            print 'About to send recip back to calling thread'
-            self.pipe_results.send(self.recip)
-            #Wait for an acknowledgement of receipt
-            while not self.pipe_results.poll():
-                time.sleep(0.1)
-                #Check that you got the right acknowledgement key back
-                ack_key = self.pipe_results.recv()
-                if not ack_key == 'ACK':
-                    raise KeyError
-            print 'Sent results back to calling thread'
-        else:
-            print 'Acknowledging completion of abort'
-            self.pipe_abort.send('ACK')
+#def stupid(pipe_inlet):
+#    redir = RedirectText2Pipe(pipe_inlet)
+#    sys.stdout = redir
+#    sys.stderr = redir
+#    for i in range(100):
+#        time.sleep(0.1)
+#        print int(i),'Hi'
+#    return
 
 class InfiniteList(object):
     """
@@ -109,6 +44,64 @@ class InfiniteList(object):
         self.values.pop(0)
         self.values.append(val1)
         return val1
+       
+class RedirectText2Pipe(object):
+    def __init__(self, pipe_inlet):
+        self.pipe_inlet = pipe_inlet
+    def write(self, string):
+        self.pipe_inlet.send(string)
+    def flush(self):
+        return None
+
+class Run1Recip(Process):
+    def __init__(self,pipe_std, pipe_abort, pipe_results, recip, pipe2):
+        Process.__init__(self)
+        self.pipe_std = pipe_std
+        self.pipe_abort = pipe_abort
+        self.pipe_results = pipe_results
+        self.recip = recip
+        self._want_abort = False
+        self.pipe2 = pipe2
+
+    def run(self):
+        redir = RedirectText2Pipe(self.pipe_std)
+        sys.stdout = redir
+        sys.stderr = redir
+        
+        self.recip.solve(key_inlet='inlet.1',key_outlet='outlet.2',
+            eps_allowed=1e-10, #Only used with RK45 solver
+            endcycle_callback=self.recip.endcycle_callback,
+            heat_transfer_callback=self.recip.heat_transfer_callback,
+            lump_energy_balance_callback = self.recip.lump_energy_balance_callback,
+            valves_callback =self.recip.valves_callback, 
+            OneCycle=False, 
+            pipe_abort = self.pipe_abort
+            )
+        
+        if hasattr(self.recip,'pipe_abort'):
+            del self.recip.pipe_abort
+            del self.recip.FlowStorage
+            
+        if not self.recip._want_abort:
+            #Send simulation result back to calling thread
+            print 'About to send recip back to calling thread'
+            self.pipe_results.send(self.recip)
+            print 'Sent recip back to calling thread'
+            #Wait for an acknowledgement of receipt
+            while not self.pipe_results.poll():
+                print 'Waiting for ack of recipt'
+                time.sleep(0.1)
+                #Check that you got the right acknowledgement key back
+                ack_key = self.pipe_results.recv()
+                if not ack_key == 'ACK':
+                    raise KeyError
+                else:
+                    print 'Ack accepted'
+                    break
+            print 'Sent results back to calling thread'
+        else:
+            print 'Acknowledging completion of abort'
+            self.pipe_abort.send('ACK')
         
 class WorkerThreadManager(Thread):
     """
@@ -153,9 +146,11 @@ class WorkerThreadManager(Thread):
                 self.threadsList.append(t)
                 print 'Adding thread;', len(self.threadsList),'threads active' 
             
-            for i, thread_ in enumerate(reversed(self.threadsList)):
+            for thread_ in reversed(self.threadsList):
                 if not thread_.is_alive():
-                    th = self.threadsList.pop(i)
+                    print 'Joining zombie thread'
+                    thread_.join()
+                    self.threadsList.remove(thread_)
                     print 'Thread finished; now', len(self.threadsList),'threads active'
     
     def abort(self):
@@ -168,10 +163,9 @@ class WorkerThreadManager(Thread):
             for thread_ in self.threadsList:
                 #Send the abort signal
                 thread_.abort()
-#                #Wait for it to finish up
-#                thread_.join()
+                #Wait for it to finish up
+                thread_.join()
         dlg.Destroy()
-        self.done_callback()
         
 class RedirectedWorkerThread(Thread):
     """Worker Thread Class."""
@@ -194,27 +188,22 @@ class RedirectedWorkerThread(Thread):
         pipe_outlet, pipe_inlet = Pipe(duplex = False)
         pipe_abort_outlet, pipe_abort_inlet = Pipe(duplex = True)
         pipe_results_outlet, pipe_results_inlet = Pipe(duplex = True)
-        
-        #p = Process(target = self.target_, args=(pipe_inlet, pipe_abort_outlet, pipe_results_inlet)+self.args_)
-        p = Run1Recip(pipe_inlet, pipe_abort_outlet, pipe_results_inlet,self.args_[0])
+        pipe_results_outlet2, pipe_results_inlet2 = Pipe(duplex = True)
+
+        p = Run1Recip(pipe_inlet, pipe_abort_outlet, pipe_results_inlet, self.args_[0],pipe_results_inlet2)
         p.daemon = True
         p.start()
+        
         while p.is_alive():
-            
-            #Get back the results from the simulation process if they are waiting
-            if pipe_results_outlet.poll():
-                sim = pipe_results_outlet.recv()
-                pipe_results_outlet.send('ACK')
                 
             #If the manager is asked to quit
             if self._want_abort == True:
                 #Tell the process to abort, passes message to simulation run
-                p.abort()
                 pipe_abort_inlet.send(True)
                 #Wait until it acknowledges the kill by sending back 'ACK'
                 while not pipe_abort_inlet.poll():
-                    time.sleep(0.1)
-#                    #Collect all display output from process while you wait
+                    time.sleep(0.5)
+#                   #Collect all display output from process while you wait
                     while pipe_outlet.poll():
                         wx.CallAfter(self.stdout_target_.WriteText, pipe_outlet.recv())
                     print 'Waiting for abort'
@@ -228,12 +217,17 @@ class RedirectedWorkerThread(Thread):
             while pipe_outlet.poll():
                 wx.CallAfter(self.stdout_target_.WriteText, pipe_outlet.recv())
                 
+            #Get back the results from the simulation process if they are waiting
+            if pipe_results_outlet.poll():
+                sim = pipe_results_outlet.recv()
+                pipe_results_outlet.send('ACK')
+                
         if self._want_abort == True:
             print self.name+": Process has aborted successfully"
         else:
             wx.CallAfter(self.stdout_target_.WriteText, self.name+": Process is done")
             if sim is not None:
-                #Get a unique identifier for the model run for pickling
+                #Get a unique identifier for the model run for pickling purposes
                 identifier = 'PDSim recip ' + time.strftime('%Y-%m-%d-%H-%M-%S')+'_t'+self.name.split('-')[1]
                 print 'Trying to write to', identifier + '.mdl'
                 if not os.path.exists(identifier + '.mdl'):
@@ -248,12 +242,12 @@ class RedirectedWorkerThread(Thread):
                 
                 #Write it to a binary pickled file for safekeeping
                 fp = open(fName, 'wb')
-                del sim.FlowStorage
+                #del sim.FlowStorage
                 print "Warning: removing FlowStorage since it doesn't pickle properly"
                 cPickle.dump(sim, fp, protocol = -1)
                 fp.close()
                 "Send the data back to the GUI"
-                wx.CallAfter(self.done_callback,sim)
+                wx.CallAfter(self.done_callback, sim)
             else:
                 print 'Didnt get any simulation data'
         return 1
@@ -730,7 +724,6 @@ class OutputDataPanel(wx.Panel):
         if self.results: #as long as it isn't empty
             
             if self.ResultsList is not None:
-                print 'Removing button and list'
                 self.WriteButton.Destroy()
                 self.ResultsList.Destroy()
                 self.GetSizer().Layout()
@@ -760,7 +753,6 @@ class OutputDataPanel(wx.Panel):
             sizer.Add(self.WriteButton)
             sizer.Layout()
             self.Refresh()
-            print 'rebuilt the OutputDataPanel'
     
     def add_runs(self, results, rebuild = False):
         self.results += results
@@ -885,6 +877,8 @@ class MainFrame(wx.Frame):
                 self.out=aWxTextCtrl
             def write(self, string):
                 wx.CallAfter(self.out.WriteText, string)
+            def flush(self):
+                return None
                 
         redir=RedirectText(self.MTB.RunTB.log_ctrl)
         sys.stdout=redir
@@ -900,6 +894,14 @@ class MainFrame(wx.Frame):
         self.worker = None
         self.workers = None
         self.WTM = None
+        
+        #A thread-safe queue for the processing of the results 
+        self.results_list = Queue()
+        
+        #Bind the idle event handler that will always run and deal with the results
+        self.timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.OnIdle, self.timer)
+        self.timer.Start(1000) #1000 ms between checking the queue
         
     def get_logctrls(self):
         return [self.MTB.RunTB.log_ctrl_thread1,
@@ -944,24 +946,31 @@ class MainFrame(wx.Frame):
         return recip
     
     def run_simulation(self, sim):
-        if self.worker is None:
-            print 'Starting computation thread for primary run'
-            self.worker = RedirectedWorkerThread(run_1recip, self.MTB.RunTB.log_ctrl,args = (sim,),done_callback = self.OnRunFinish)
-            self.worker.daemon = True
-            self.worker.start()
+        """
+        Run a single simulation
+        """
+        #Make single-run into a list in order to use the code
+        self.run_batch([sim])
     
     def run_batch(self, sims):
-        
+        """
+        Run a list of simulations
+        """
         if self.WTM is None:
             self.MTB.SetSelection(2)
-            self.WTM = WorkerThreadManager(Run1Recip,sims,self.get_logctrls(),args = tuple(), done_callback = self.OnRunFinish)
+            self.WTM = WorkerThreadManager(Run1Recip,sims,self.get_logctrls(),args = tuple(), done_callback = self.deliver_result)
             self.WTM.setDaemon(True)
             self.WTM.start()
         else:
             dlg = wx.MessageDialog(None,"Batch has already started.  Wait until completion or kill the batch","")
             dlg.ShowModal()
             dlg.Destroy()
-    
+            
+    def deliver_result(self, sim = None):
+        if sim is not None:
+#            print 'Queueing a result for further processing'
+            self.results_list.put(sim)
+            print 'Result queued'
     ################################
     #         Event handlers       #
     ################################
@@ -1005,7 +1014,26 @@ class MainFrame(wx.Frame):
     def OnQuit(self, event):
         self.Close()
         
-    
+    def OnIdle(self, event):
+        """
+        Do the things that are needed when the GUI goes idle
+        
+        This is only run every once in a while (see __init__) for performance-sake 
+        """
+        
+        #Add results from the pipe to the GUI
+        if not self.results_list.empty():
+            print 'readying to get simulation'
+            sim = self.results_list.get()
+            print 'got a simulation'
+            self.MTB.OutputsTB.plot_outputs(sim)
+            self.MTB.OutputsTB.DataPanel.add_runs([sim])
+            self.MTB.OutputsTB.DataPanel.rebuild()
+            #Check whether there are no more results to be processed and threads list is empty
+            #This means the manager has completed its work - reset it
+            if self.results_list.empty() and not self.WTM.threadsList:
+                self.WTM = None
+        
     def OnRunFinish(self, sim = None):
         #Collect the runs
         
@@ -1020,12 +1048,12 @@ class MainFrame(wx.Frame):
         Each time a run completes, if the list of running threads is empty,
         remove the thread manager 
         """
-        if not self.WTM.threadsList:
-            wx.CallAfter(sys.stdout.write,'Empty\n')
-            self.WTM = None
-        else:
-            wx.CallAfter(sys.stdout.write,'Not Empty Yet\n')
-            
+        if self.WTM is not None:
+            if not self.WTM.threadsList:
+                wx.CallAfter(sys.stdout.write,'Empty\n')
+                self.WTM = None
+            else:
+                wx.CallAfter(sys.stdout.write,'Not Empty Yet\n')
         
     def make_menu_bar(self):
         #################################
