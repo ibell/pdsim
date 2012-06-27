@@ -359,7 +359,8 @@ class ParametricPanel(PDPanel):
                     #Run the post_calculate for all the panels
                     Main.MTB.InputsTB.post_calculate(recip)
             #Add an index for the run so that it can be sorted properly
-            recip.run_index = Irow+1
+            recip.run_index = Irow + 1
+            print 'Run index is',recip.run_index
             recips.append(recip)
         Main.run_batch(recips)
         
