@@ -350,8 +350,8 @@ class ParametricPanel(PDPanel):
         #Column index 1 is the list of parameters
         self.ParaList.GetColumn(1)
         for Irow in range(self.ParaList.GetItemCount()):
-            recip = Main.build_recip()
             if self.ParaList.IsChecked(Irow):
+                recip = Main.build_recip()
                 for Icol in range(self.ParaList.GetColumnCount()-1):
                     val = self.ParaList.GetStringItem(Irow, Icol)
                     Name = self.ParaList.GetColumn(Icol+1).Text

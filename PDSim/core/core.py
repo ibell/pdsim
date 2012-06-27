@@ -92,6 +92,7 @@ class PDSimCore(object):
             self.stateVariables=stateVariables
         else:
             self.stateVariables=['T','D']
+        self._want_abort = False
     
     def __vals2array(self,i):
         """
@@ -589,6 +590,14 @@ class PDSimCore(object):
             
         self.__postprocess_flows()
     
+    def check_abort(self):
+        #If you received an abort request, set a flag
+        if self.abort_pipe.poll() and self.abort_pipe.recv():
+            print 'received an abort request'
+            self._want_abort = True
+            
+        return self._want_abort
+        
     def solve(self,
               key_inlet = None,
               key_outlet = None,
@@ -600,6 +609,7 @@ class PDSimCore(object):
               solver_method = 'Euler',
               OneCycle = False,
               Abort = None,
+              abort_pipe = None,
               **kwargs):
         """
         This is the driving function for the PDSim model.  It can be extended through the 
@@ -621,6 +631,10 @@ class PDSimCore(object):
             This callback does not take any inputs
         """
         
+        # Set up a pipe for accepting a value of True which will abort the run
+        # Typically used from the GUI
+        self.abort_pipe = abort_pipe
+        
         #This runs before the model starts at all
         self.__pre_run()
         
@@ -633,9 +647,12 @@ class PDSimCore(object):
         
         self.key_inlet = key_inlet
         self.key_outlet = key_outlet
-                
+        
+        if Abort is None and abort_pipe is not None:
+            Abort = self.check_abort
+        
         def OBJECTIVE(Td_Tlumps):
-            print Td_Tlumps,'Td,Tlumps'
+            print Td_Tlumps,'Td,Tlumps inputs'
             # Td_Tlumps is a list (or listm or np.ndarray)
             Td_Tlumps = list(Td_Tlumps)
             # Consume the first element as the discharge temp 
@@ -669,8 +686,6 @@ class PDSimCore(object):
                 if (key_inlet in self.FlowsProcessed.mean_mdot and 
                     key_outlet in self.FlowsProcessed.mean_mdot):
                     
-#                    debug_plots(self)
-                    
                     mdot_out = self.FlowsProcessed.mean_mdot[key_outlet]
                     mdot_in = self.FlowsProcessed.mean_mdot[key_inlet]
                     print 'Mass flow difference',(mdot_out+mdot_in)/mdot_out*100,' %'
@@ -692,27 +707,31 @@ class PDSimCore(object):
                     redo=endcycle_callback()
                 
                 #If the abort function returns true, quit this loop
-                if Abort is not None and Abort():
+                if (Abort is not None and Abort()) or OneCycle:
+                    print 'Quitting redo loop in core.solve'
                     redo=False
-                    
-                if OneCycle:
-                    redo=False
+            
+            #end of while redo:
                     
             # (3) After convergence of the inner loop, check the energy balance on the lumps
             if lump_energy_balance_callback is not None:
                 resid_HT = lump_energy_balance_callback()
                 
             #If the abort function returns true, quit this loop
-            if Abort is not None and Abort():
+            if (Abort is not None and Abort()) or OneCycle:
+                print 'Quitting OBJECTIVE function in core.solve'
                 return None
-            if OneCycle:
-                return None
-        
+                
             print [resid_Td]+[resid_HT],'resids'
             return [resid_Td]+[resid_HT]
         
-        print 'Solution is',Broyden(OBJECTIVE,[315.0,325.0],dx=0.2,ytol=0.001,itermax=20)
-        self.__post_solve()
+        #end of OJECTIVE
+        
+        x_soln = Broyden(OBJECTIVE,[315.0,325.0],dx=0.2,ytol=0.001,itermax=20)
+        print 'Solution is', x_soln,'Td, Tlumps'
+        
+        if Abort is None or not Abort():
+            self.__post_solve()
         
     def __post_solve(self):
         """
@@ -750,7 +769,6 @@ class PDSimCore(object):
             self.Wdot_pv += -trapz(self.p[CVindex,:], self.V[CVindex,:])*self.omega/(2*pi)
         
         print 'mdot*(h2-h1),P-v,Qamb', self.Wdot*1000, self.Wdot_pv*1000, self.Qamb
-        
         print 'Mass flow rate is',self.mdot*1000,'g/s'
         print 'Volumetric efficiency is',self.eta_v*100,'%'
         print 'Adiabatic efficiency is',self.eta_a*100,'%'

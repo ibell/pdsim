@@ -38,6 +38,8 @@ def MultiDimNewtRaph(f,x0,dx=1e-6,args=(),ytol=1e-5,w=1.0,JustOneStep=False):
 def Broyden(f,x0,dx=1e-5,args=(),ytol=1e-5,w=1.0,itermax=10,JustOneStep=False):
     """
     Broyden's method
+    
+    If f returns ``None``, then the computation is stopped, and a list the size of x0 is returned with all ``None`` values
     """
     x0=np.array(x0,dtype=np.float)
     x1=x0.copy()

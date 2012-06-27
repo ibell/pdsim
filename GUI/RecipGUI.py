@@ -55,61 +55,44 @@ class RedirectText2Pipe(object):
     def flush(self):
         return None
 
-class Run1RecipAborter(object):
-    """
-    A small wrapper class that allows for the local variable 
-    """ 
-    def __init__(self):
+class Run1Recip(Process):
+    def __init__(self,pipe_std, pipe_abort, pipe_results, recip):
+        Process.__init__(self)
+        self.pipe_std = pipe_std
+        self.pipe_abort = pipe_abort
+        self.pipe_results = pipe_results
+        self.recip = recip
         self._want_abort = False
-    def get(self):
-        """
-        Get status of the aborter 
-        """
-        return self._want_abort
-    def set(self, flag):
-        """ 
-        Set status of aborter
-        """
-        self._want_abort = True
-          
-def run_1recip(pipe_std, pipe_abort, pipe_results, recip):
-    """
-    The pipe_std is the pipe that takes all the display output
-    back to the calling thread
-    
-    The pipe_abort is waiting for a True to be sent down the 
-    pipes from the calling thread, at which point it 
-    """
-    redir = RedirectText2Pipe(pipe_std)
-    sys.stdout = redir
-    sys.stderr = redir
-    aborter = Run1RecipAborter()
-    
-    def abort_callback():
-        #If there is a True value waiting in the pipe, abort the run
-        if (pipe_abort.poll() and pipe_abort.recv() == True) or aborter.get() == True:
-            aborter.set(True)
-            return True
-        else:
-            return False
+
+    def run(self):
+        redir = RedirectText2Pipe(self.pipe_std)
+        sys.stdout = redir
+        sys.stderr = redir
         
-    recip.solve(key_inlet='inlet.1',key_outlet='outlet.2',
+        self.recip.solve(key_inlet='inlet.1',key_outlet='outlet.2',
             eps_allowed=1e-10, #Only used with RK45 solver
-            endcycle_callback=recip.endcycle_callback,
-            heat_transfer_callback=recip.heat_transfer_callback,
-            lump_energy_balance_callback = recip.lump_energy_balance_callback,
-            valves_callback =recip.valves_callback, OneCycle=False,
-            Abort = abort_callback
-    )
-    
-    if not aborter.get():
-        print 'About to send recip back to calling thread'
-        pipe_results.send(recip)
-        print 'Sent results back to calling thread'
-    else:
-        print 'Aborted completion'
-    
-    return 1
+            endcycle_callback=self.recip.endcycle_callback,
+            heat_transfer_callback=self.recip.heat_transfer_callback,
+            lump_energy_balance_callback = self.recip.lump_energy_balance_callback,
+            valves_callback =self.recip.valves_callback, OneCycle=False, 
+            abort_pipe = self.pipe_abort
+            )
+        
+        if not self.recip._want_abort:
+            #Send simulation result back to calling thread
+            print 'About to send recip back to calling thread'
+            self.pipe_results.send(self.recip)
+            #Wait for an acknowledgement of receipt
+            while not self.pipe_results.poll():
+                time.sleep(0.1)
+                #Check that you got the right acknowledgement key back
+                ack_key = self.pipe_results.recv()
+                if not ack_key == 'ACK':
+                    raise KeyError
+            print 'Sent results back to calling thread'
+        else:
+            print 'Acknowledging completion of abort'
+            self.pipe_abort.send('ACK')
 
 class InfiniteList(object):
     """
@@ -165,31 +148,30 @@ class WorkerThreadManager(Thread):
                                           args = simulation+self.args, 
                                           done_callback = self.done_callback, 
                                           add_results = self.add_results)
-                t.setDaemon(True)
+                t.daemon = True
                 t.start()
                 self.threadsList.append(t)
                 print 'Adding thread;', len(self.threadsList),'threads active' 
-            #Remove dead (completed) threads
-            #alive_threads = [thread_.is_alive() for thread_ in self.threadsList]
             
             for i, thread_ in enumerate(reversed(self.threadsList)):
                 if not thread_.is_alive():
-                    self.threadsList.pop(i)
+                    th = self.threadsList.pop(i)
                     print 'Thread finished; now', len(self.threadsList),'threads active'
     
     def abort(self):
         """
         Pass the message to quit to all the threads; don't run any that are queued
         """
-        self.simulations = []
-        for thread_ in self.threadsList:
-            #Send the abort signal
-            thread_.abort()
-#            thread_.join()
-#            if thread_.is_alive():
-#                print 'thread still alive, waiting for abort'
-                
-            
+        dlg = wx.MessageDialog(None,"Are you sure you want to kill the current runs?",caption ="Kill Batch?",style = wx.OK|wx.CANCEL)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.simulations = []
+            for thread_ in self.threadsList:
+                #Send the abort signal
+                thread_.abort()
+#                #Wait for it to finish up
+#                thread_.join()
+        dlg.Destroy()
+        self.done_callback()
         
 class RedirectedWorkerThread(Thread):
     """Worker Thread Class."""
@@ -206,41 +188,56 @@ class RedirectedWorkerThread(Thread):
     def run(self):
         """
         In this function, actually run the process and pull any output from the 
-        pipe while the process runs
+        pipes while the process runs
         """
+        sim = None
         pipe_outlet, pipe_inlet = Pipe(duplex = False)
-        pipe_abort_outlet, pipe_abort_inlet = Pipe(duplex = False)
-        pipe_results_outlet, pipe_results_inlet = Pipe(duplex = False)
-        p = Process(target = self.target_, args=(pipe_inlet, pipe_abort_outlet, pipe_results_inlet)+self.args_)
+        pipe_abort_outlet, pipe_abort_inlet = Pipe(duplex = True)
+        pipe_results_outlet, pipe_results_inlet = Pipe(duplex = True)
+        
+        #p = Process(target = self.target_, args=(pipe_inlet, pipe_abort_outlet, pipe_results_inlet)+self.args_)
+        p = Run1Recip(pipe_inlet, pipe_abort_outlet, pipe_results_inlet,self.args_[0])
         p.daemon = True
         p.start()
         while p.is_alive():
-            #If it wants to be killed
-            if self._want_abort == True:
-                #Send an abort command to the process
-                pipe_abort_inlet.send(True)
-            #Get back the results from the simulation process
+            
+            #Get back the results from the simulation process if they are waiting
             if pipe_results_outlet.poll():
                 sim = pipe_results_outlet.recv()
-            else:
-                sim = None
-            #Collect all display output from process always
+                pipe_results_outlet.send('ACK')
+                
+            #If the manager is asked to quit
+            if self._want_abort == True:
+                #Tell the process to abort, passes message to simulation run
+                p.abort()
+                pipe_abort_inlet.send(True)
+                #Wait until it acknowledges the kill by sending back 'ACK'
+                while not pipe_abort_inlet.poll():
+                    time.sleep(0.1)
+#                    #Collect all display output from process while you wait
+                    while pipe_outlet.poll():
+                        wx.CallAfter(self.stdout_target_.WriteText, pipe_outlet.recv())
+                    print 'Waiting for abort'
+                abort_flag = pipe_abort_inlet.recv()
+                if abort_flag == 'ACK':
+                    break
+                else:
+                    raise ValueError('abort pipe should have received a value of "ACK"')
+                
+            #Collect all display output from process
             while pipe_outlet.poll():
                 wx.CallAfter(self.stdout_target_.WriteText, pipe_outlet.recv())
-            if sim is not None:
-                break
-        wx.CallAfter(self.stdout_target_.WriteText, 'Process finished')
+                
         if self._want_abort == True:
-            wx.CallAfter(self.stdout_target_.WriteText, "Thread aborted")
-            wx.CallAfter(self.done_callback)
+            print self.name+": Process has aborted successfully"
         else:
-            wx.CallAfter(self.stdout_target_.WriteText, "Thread done")
+            wx.CallAfter(self.stdout_target_.WriteText, self.name+": Process is done")
             if sim is not None:
                 #Get a unique identifier for the model run for pickling
                 identifier = 'PDSim recip ' + time.strftime('%Y-%m-%d-%H-%M-%S')+'_t'+self.name.split('-')[1]
                 print 'Trying to write to', identifier + '.mdl'
                 if not os.path.exists(identifier + '.mdl'):
-                    fName = identifier+'.mdl'
+                    fName = identifier + '.mdl'
                 else:
                     i = 65
                     if os.path.exists(identifier + str(chr(i)) + '.mdl'):    
@@ -263,7 +260,7 @@ class RedirectedWorkerThread(Thread):
         
     def abort(self):
         """abort worker thread."""
-        print 'Thread readying for abort'
+        print self.name + ' Thread readying for abort'
         # Method for use by main thread to signal an abort
         self._want_abort = True
     
@@ -957,7 +954,7 @@ class MainFrame(wx.Frame):
         
         if self.WTM is None:
             self.MTB.SetSelection(2)
-            self.WTM = WorkerThreadManager(run_1recip,sims,self.get_logctrls(),args = tuple(), done_callback = self.OnRunFinish)
+            self.WTM = WorkerThreadManager(Run1Recip,sims,self.get_logctrls(),args = tuple(), done_callback = self.OnRunFinish)
             self.WTM.setDaemon(True)
             self.WTM.start()
         else:
@@ -1002,34 +999,32 @@ class MainFrame(wx.Frame):
             
     def OnStop(self, event):
         """Stop Computation."""
-        # Flag the single worker thread to stop if running
-        if self.worker is not None:
-            print 'Killing computation thread'
-            self.worker.abort()
-            self.worker.join(0.01)
         if self.WTM is not None:
             self.WTM.abort()
         
     def OnQuit(self, event):
         self.Close()
         
+    
     def OnRunFinish(self, sim = None):
         #Collect the runs
-        wx.CallAfter(sys.stdout.write,'called OnRunFinish') 
+        
         if sim is not None:
+            wx.CallAfter(sys.stdout.write,'called OnRunFinish with sim data\n')
             self.MTB.OutputsTB.plot_outputs(sim)
             self.MTB.OutputsTB.DataPanel.add_runs([sim])
             self.MTB.OutputsTB.DataPanel.rebuild()
-        
+        else:
+            wx.CallAfter(sys.stdout.write,'called OnRunFinish without sim data\n')
         """
         Each time a run completes, if the list of running threads is empty,
         remove the thread manager 
         """
         if not self.WTM.threadsList:
-            print 'Empty'
+            wx.CallAfter(sys.stdout.write,'Empty\n')
             self.WTM = None
         else:
-            print 'Not empty yet'
+            wx.CallAfter(sys.stdout.write,'Not Empty Yet\n')
             
         
     def make_menu_bar(self):
