@@ -17,7 +17,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         dict(attr='piston_length'),
         dict(attr='crank_length'),
         dict(attr='connecting_rod_length'),
-        dict(attr='dead_volume_perc'),
+        dict(attr='x_TDC', tooltip='The distance from the top of the cylinder to the piston head at top dead center'),
         dict(attr='V_backchamber'),
         ]
         
@@ -33,7 +33,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         Other calculations that are an indirect result of the inputs on the panel
         """
         recip.A_piston = pi*(recip.piston_diameter)**2/4
-        recip.V_dead=recip.dead_volume_perc/100*(2*recip.piston_length*recip.A_piston)
+        recip.V_dead=recip.A_piston*recip.x_TDC
         
 class MassFlowPanel(pdsim_panels.PDPanel):
     
