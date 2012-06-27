@@ -4,6 +4,8 @@ import wx,os,sys
 from wx.lib.mixins.listctrl import CheckListCtrlMixin, ColumnSorterMixin, ListCtrlAutoWidthMixin
 from wx.lib.embeddedimage import PyEmbeddedImage
 import wx.lib.agw.pybusyinfo as PBI
+from wx.lib.wordwrap import wordwrap
+
 import numpy as np
 import CoolProp.State as CPState
 from PDSim.recip.core import Recip
@@ -889,7 +891,7 @@ class OutputDataPanel(wx.Panel):
                         value = getattr(sim,attr)
                         row.append(value)
                     else:
-                        raise KeyError(attr + 'is an invalid header attribute')
+                        raise KeyError(attr + ' is an invalid header attribute')
                 rows.append(row)
             headers = [self.column_options[attr] for attr in self.columns_selected]
             
@@ -1163,6 +1165,7 @@ class MainFrame(wx.Frame):
         print "Running.."
         self.MTB.SetSelection(2)
         self.recip = self.build_recip()
+        self.recip.run_index = 1
         self.run_simulation(self.recip)
             
     def OnStop(self, event):
@@ -1185,6 +1188,7 @@ class MainFrame(wx.Frame):
             print 'readying to get simulation'
             sim = self.results_list.get()
             print 'got a simulation'
+
             self.MTB.OutputsTB.plot_outputs(sim)
             self.MTB.OutputsTB.DataPanel.add_runs([sim])
             self.MTB.OutputsTB.DataPanel.rebuild()
@@ -1216,6 +1220,23 @@ class MainFrame(wx.Frame):
                 self.WTM = None
             else:
                 wx.CallAfter(sys.stdout.write,'Not Empty Yet\n')
+    
+    def OnAbout(self, event = None):
+        import CoolProp
+        info = wx.AboutDialogInfo()
+        info.Name = "PDSim GUI"
+        info.Version = PDSim.__version__
+        info.Copyright = "(C) 2012 Ian Bell"
+        info.Description = wordwrap(
+            "A graphical user interface for the PDSim model\n\nwx version: "
+            +wx.__version__+
+            "\nCoolProp version: "+CoolProp.__version__,
+            350, wx.ClientDC(self))
+        info.WebSite = ("http://pdsim.sourceforge.net", "PDSim home page")
+        info.Developers = [ "Ian Bell", "Craig Bradshaw"]
+
+        # Then we call wx.AboutBox giving it that info object
+        wx.AboutBox(info)
         
     def make_menu_bar(self):
         #################################
@@ -1256,12 +1277,12 @@ class MainFrame(wx.Frame):
         
         self.Help = wx.Menu()
         self.HelpHelp = wx.MenuItem(self.Help, -1, "Help...\tCtrl+H", "", wx.ITEM_NORMAL)
-        self.HelpWeb = wx.MenuItem(self.Help, -1, "Go to online documentation", "", wx.ITEM_NORMAL)
+        self.HelpAbout = wx.MenuItem(self.Help, -1, "About", "", wx.ITEM_NORMAL)
         self.Help.AppendItem(self.HelpHelp)
-        self.Help.AppendItem(self.HelpWeb)
+        self.Help.AppendItem(self.HelpAbout)
         self.MenuBar.Append(self.Help, "Help")
         self.Bind(wx.EVT_MENU, lambda event: self.Destroy(), self.HelpHelp)
-        self.Bind(wx.EVT_MENU, lambda event: os.startfile('http://pdsim.sf.net/'),self.HelpWeb)
+        self.Bind(wx.EVT_MENU, self.OnAbout, self.HelpAbout)
         
         #Actually set it
         self.SetMenuBar(self.MenuBar)
