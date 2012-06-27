@@ -976,7 +976,6 @@ class OutputsToolBook(wx.Toolbook):
         self.PN = None
             
     def plot_outputs(self, recip=None):
-        self.WriteOutputsPanel.set_data(recip)
         parent = self.PlotsPanel
         # First call there is no plot notebook in existence
         if self.PN is None:
