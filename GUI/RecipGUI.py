@@ -1034,6 +1034,9 @@ class MainFrame(wx.Frame):
             if self.results_list.empty() and not self.WTM.threadsList:
                 self.WTM = None
         
+        if self.results_list.empty() and self.WTM is not None and not self.WTM.threadsList:
+            self.WTM = None
+        
     def OnRunFinish(self, sim = None):
         #Collect the runs
         

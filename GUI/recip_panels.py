@@ -18,6 +18,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         dict(attr='crank_length'),
         dict(attr='connecting_rod_length'),
         dict(attr='dead_volume_perc'),
+        dict(attr='V_backchamber'),
         ]
         
         sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
