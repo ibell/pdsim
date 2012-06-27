@@ -761,7 +761,7 @@ class FileOutputDialog(wx.Dialog):
     
     def write_pickle(self, dir_path, sim):
         fp = open(os.path.join(dir_path,'PickledSimulation.mdl'),'wb')
-        cPickle.dump(sim, fp)
+        cPickle.dump(sim, fp, -1)
         fp.close()
         
     def write_csv_files(self, dir_path, sim):
@@ -959,7 +959,7 @@ class OutputsToolBook(wx.Toolbook):
         wx.Toolbook.__init__(self, parent, -1, style=wx.BK_LEFT)
         il = wx.ImageList(32, 32)
         indices=[]
-        for imgfile in ['Geometry.png','MassFlow.png','MechanicalLosses.png','StatePoint.png']:
+        for imgfile in ['Geometry.png','MassFlow.png']:
             ico_path = os.path.join('ico',imgfile)
             indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
         self.AssignImageList(il)
@@ -967,19 +967,13 @@ class OutputsToolBook(wx.Toolbook):
         variables = self.Parent.InputsTB.collect_parametric_terms()
         self.PlotsPanel = wx.Panel(self)
         self.DataPanel = OutputDataPanel(self, variables = variables)
-        self.WriteOutputsPanel = WriteOutputsPanel(self)
         
         #Make a Recip instance
-        self.panels=(self.DataPanel,self.PlotsPanel,self.WriteOutputsPanel,wx.Panel(self,-1))
-        for Name,index,panel in zip(['Data','Plots','None','None'],indices,self.panels):
+        self.panels=(self.DataPanel,self.PlotsPanel)
+        for Name,index,panel in zip(['Data','Plots'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
             
         self.PN = None
-        #self.Bind(wx.EVT_TOOLBOOK_PAGE_CHANGED, self.OnPageChange)
-    
-#    def OnPageChange(self, event):
-#        if event is not None:
-#            print event
             
     def plot_outputs(self, recip=None):
         self.WriteOutputsPanel.set_data(recip)
@@ -1222,15 +1216,20 @@ class MainFrame(wx.Frame):
                 wx.CallAfter(sys.stdout.write,'Not Empty Yet\n')
     
     def OnAbout(self, event = None):
+        if "unicode" in wx.PlatformInfo:
+            wx_unicode = '\nwx Unicode support: True\n'
+        else:
+            wx_unicode = '\nwx Unicode support: False\n'
         import CoolProp
         info = wx.AboutDialogInfo()
         info.Name = "PDSim GUI"
         info.Version = PDSim.__version__
         info.Copyright = "(C) 2012 Ian Bell"
         info.Description = wordwrap(
-            "A graphical user interface for the PDSim model\n\nwx version: "
-            +wx.__version__+
-            "\nCoolProp version: "+CoolProp.__version__,
+            "A graphical user interface for the PDSim model\n\n"+
+            "wx version: "+wx.__version__+
+            wx_unicode+
+            "CoolProp version: "+CoolProp.__version__,
             350, wx.ClientDC(self))
         info.WebSite = ("http://pdsim.sourceforge.net", "PDSim home page")
         info.Developers = [ "Ian Bell", "Craig Bradshaw"]
