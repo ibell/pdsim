@@ -1,3 +1,4 @@
+# -*- coding: latin-1 -*-
 from math import pi
 from CoolProp import State as CPState
 from PDSim.core.containers import ControlVolume,ControlVolumeCollection

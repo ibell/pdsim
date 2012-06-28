@@ -1,3 +1,4 @@
+# -*- coding: latin-1 -*-
 import pdsim_panels
 import wx
 from math import pi
