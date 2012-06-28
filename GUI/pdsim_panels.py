@@ -88,7 +88,7 @@ class PDPanel(wx.Panel):
                     type_='float'
                 except ValueError:
                     type_='string'
-            s+=item['attr']+' = '+type_+','+item['textbox'].GetValue()+','+item['text']+'\n'
+            s+=item['attr']+' = '+type_+','+item['textbox'].GetValue().encode('latin-1')+','+item['text']+'\n'
             
         if hasattr(self,'post_prep_for_configfile'):
             s+=self.post_prep_for_configfile()

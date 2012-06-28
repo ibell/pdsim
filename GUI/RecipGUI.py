@@ -1149,7 +1149,7 @@ class MainFrame(wx.Frame):
             file_path=FD.GetPath()
             print 'Writing configuration file to ',file_path   
             #Build the config file entry
-            string_list = [panel.prep_for_configfile() for panel in self.MTB.InputsTB.panels+self.MTB.SolverTB.panels] 
+            string_list = [panel.prep_for_configfile().encode('latin-1') for panel in self.MTB.InputsTB.panels+self.MTB.SolverTB.panels] 
             fp = open(file_path,'w')
             fp.write('\n'.join(string_list))
             fp.close()
