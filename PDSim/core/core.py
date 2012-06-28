@@ -7,6 +7,7 @@ from math import pi
 import textwrap
 from PDSim.misc.scipylike import trapz
 from scipy.optimize import newton
+import copy
 
 ##--  Package imports  --
 from PDSim.flow._sumterms import setcol, getcol
@@ -94,7 +95,7 @@ class PDSimCore(object):
             self.stateVariables=['T','D']
         self._want_abort = False
     
-    def __vals2array(self,i):
+    def __get_from_matrices(self,i):
         """
         Get values back from the matrices
         """
@@ -121,7 +122,7 @@ class PDSimCore(object):
                 VarList+=list(self.xValves[:,i])
             return listm(VarList)
         
-    def __array2vals(self,x,i):
+    def __put_to_matrices(self,x,i):
         """
         Take a stacked set of T,rho,xL or T,rho and put back in numpy arrays
         """
@@ -288,7 +289,10 @@ class PDSimCore(object):
         
         self.CVs.rebuild_exists()
         
-    def __pre_cycle(self):
+        #Initialize the control volumes
+        self.__hasLiquid__=False
+        
+    def __pre_cycle(self, x0 = None):
         self.temp_vectors_list=[]
         def add_thing(name,item):
             #Actually create the array
@@ -321,20 +325,24 @@ class PDSimCore(object):
         V,dV=self.CVs.volumes(0)
         self.t[0]=0
         
-        #Initialize the control volumes
-        self.__hasLiquid__=False
+        # if x0 is provided, use its values to initialize the chamber states
+        if x0 is None:
+            # self.CVs.exists_indices is a list of indices of the CV with the same order of entries
+            # as the entries in self.CVs.T
+            self.T[self.CVs.exists_indices, 0] = self.CVs.T
+            self.p[self.CVs.exists_indices, 0] = self.CVs.p
+            self.rho[self.CVs.exists_indices, 0] = self.CVs.rho
+        else:
+            #x0 is provided
+            if self.__hasValves__:
+                x0_ = copy.copy(x0)
+                x0_.extend([0]*len(self.Valves)*2)
+            self.__put_to_matrices(x0_, 0)
         
-        # self.CVs.exists_indices is a list of indices of the CV with the same order of entries
-        # as the entries in self.CVs.T
-        self.T[self.CVs.exists_indices,0]=self.CVs.T
-        self.p[self.CVs.exists_indices,0]=self.CVs.p
-        self.m[self.CVs.exists_indices,0]=self.CVs.rho*V
-        self.rho[self.CVs.exists_indices,0]=self.CVs.rho
-        
-        # Assume all the valves to be fully closed and stationary at the beginning 
+        # Assume all the valves to be fully closed and stationary at the beginning of cycle
         self.xValves[:,0]=0
         
-    def cycle_SimpleEuler(self,N,x0,tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
+    def cycle_SimpleEuler(self,N,x_state,tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
         """
         
         Parameters
@@ -342,7 +350,7 @@ class PDSimCore(object):
         N : integer
             Number of steps
         x0 : listm
-            The initial values of the variables (state variables + valves)
+            The initial values of the variables (only the state variables)
         tmin : float
             Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
         tmax : float
@@ -363,7 +371,7 @@ class PDSimCore(object):
         
         """
         #Do some initialization - create arrays, etc.
-        self.__pre_cycle()
+        self.__pre_cycle(x_state)
         
         #Start at an index of 0
         Itheta=0
@@ -371,23 +379,25 @@ class PDSimCore(object):
         h=(tmax-tmin)/(N-1)
         
         #One call to build the flows at start
+        x_state.extend([0.0]*len(self.Valves)*2)
+        xold = listm(x_state[:])
         self.theta=t0
-        self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+        self.derivs(t0, xold, heat_transfer_callback, valves_callback)
         self.FlowStorage.append(self.Flows.get_deepcopy())
-        self.__array2vals(xold,0)
+        self.__put_to_matrices(xold, 0)
     
         for Itheta in range(N):
             if step_callback!=None:
-                step_callback(t0,h,Itheta)
+                step_callback(t0, h, Itheta)
                 
-            xold=self.__vals2array(Itheta)
+            xold = self.__get_from_matrices(Itheta)
                         
             # Step 1: derivatives evaluated at old values
-            f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
-            xnew=xold+h*f1
+            f1 = self.derivs(t0, xold, heat_transfer_callback, valves_callback)
+            xnew = xold+h*f1
             
-            self.t[Itheta+1]=t0+h
-            self.__array2vals(xnew,Itheta+1)
+            self.t[Itheta+1] = t0 + h
+            self.__put_to_matrices(xnew, Itheta + 1)
             t0+=h
             Itheta+=1
             self.FlowStorage.append(self.Flows.get_deepcopy())
@@ -404,7 +414,7 @@ class PDSimCore(object):
         self.Itheta=Itheta
         self.__post_cycle()
         
-    def cycle_Heun(self,N,tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
+    def cycle_Heun(self,N,xold,tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
         """
         Use the Heun method (modified Euler method)
         
@@ -440,17 +450,16 @@ class PDSimCore(object):
         h=(tmax-tmin)/(N-1)
         
         #One call to build the flows at start
-        xold=self.__vals2array(0)
         self.theta=t0
         self.derivs(t0,xold,heat_transfer_callback,valves_callback)
         self.FlowStorage.append(self.Flows.get_deepcopy())
-        self.__array2vals(xold,0)
+        self.__put_to_matrices(xold,0)
     
         for Itheta in range(N):
             if step_callback!=None:
                 step_callback(t0,h,Itheta)
                 
-            xold=self.__vals2array(Itheta)
+            xold=self.__get_from_matrices(Itheta)
                         
             # Step 1: derivatives evaluated at old values
             f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
@@ -461,7 +470,7 @@ class PDSimCore(object):
             xnew = xold + h/2.0*(f1 + f2)
             
             self.t[Itheta+1]=t0+h
-            self.__array2vals(xnew,Itheta+1)
+            self.__put_to_matrices(xnew,Itheta+1)
             t0+=h
             Itheta+=1
             self.FlowStorage.append(self.Flows.get_deepcopy())
@@ -549,7 +558,7 @@ class PDSimCore(object):
         h=hmin
         
         #One call to build the flows at theta=
-        xold=self.__vals2array(0)
+        xold=self.__get_from_matrices(0)
         self.theta=t0
         self.derivs(t0,xold,heat_transfer_callback,valves_callback)
         self.FlowStorage.append(self.Flows.get_deepcopy())
@@ -582,7 +591,7 @@ class PDSimCore(object):
                     h=1.0*hmin
                     disableAdaptive=True
                     
-                xold=self.__vals2array(Itheta)
+                xold=self.__get_from_matrices(Itheta)
                     
                 # Step 1: derivatives evaluated at old values
                 f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
@@ -631,7 +640,7 @@ class PDSimCore(object):
             
             # Step has been accepted (or adaptive disabled), write values back to arrays
             self.t[Itheta+1]=t0+h
-            self.__array2vals(xnew,Itheta+1)
+            self.__put_to_matrices(xnew,Itheta+1)
             t0+=h
             Itheta+=1
             self.FlowStorage.append(self.Flows.get_deepcopy())
@@ -727,7 +736,13 @@ class PDSimCore(object):
         if Abort is None and pipe_abort is not None:
             Abort = self.check_abort
         
-        def OBJECTIVE(Td_Tlumps):
+        # (2) Run a cycle with the given values for the temperatures
+        self.__pre_cycle()
+        #x_state only includes the values for the chambers, the valves start closed
+        #Since indexed, yields a copy
+        self.x_state = self.__get_from_matrices(0)[0:len(self.stateVariables)*self.CVs.N]
+            
+        def OBJECTIVE_ENERGY_BALANCE(Td_Tlumps):
             print Td_Tlumps,'Td,Tlumps inputs'
             # Td_Tlumps is a list (or listm or np.ndarray)
             Td_Tlumps = list(Td_Tlumps)
@@ -739,26 +754,28 @@ class PDSimCore(object):
             # (0) Update the discharge temperature
             p = self.Tubes.Nodes[key_outlet].p
             self.Tubes.Nodes[key_outlet].update({'T':self.Td,'P':p})
+            
             # (1) First, run all the tubes
             for tube in self.Tubes:
                 tube.TubeFcn(tube)
-            redo=True
-            while redo:
+            
+            def OBJECTIVE_CYCLE(x_state):
+                #Convert numpy array to listm
+                x_state = listm(x_state)
+                print 'x_state is', x_state
                 
-                # (2) Run a cycle with the given values for the temperatures
-                x0 = self.__vals2array(0)                
                 if solver_method == 'Euler':
                     N=kwargs.get('Euler_N',7000)
-                    self.cycle_SimpleEuler(N,x0,step_callback=step_callback,
+                    self.cycle_SimpleEuler(N,x_state,step_callback=step_callback,
                                            heat_transfer_callback=heat_transfer_callback,
                                            valves_callback=valves_callback)
-                if solver_method == 'Heun':
+                elif solver_method == 'Heun':
                     N=kwargs.get('Heun_N',7000)
-                    self.cycle_SimpleEuler(N,x0,step_callback=step_callback,
+                    self.cycle_SimpleEuler(N,x_state,step_callback=step_callback,
                                            heat_transfer_callback=heat_transfer_callback,
                                            valves_callback=valves_callback)
                 elif solver_method=='RK45':
-                    self.cycle_RK45(x0,step_callback=step_callback,
+                    self.cycle_RK45(x_state,step_callback=step_callback,
                                     heat_transfer_callback=heat_transfer_callback,
                                     valves_callback=valves_callback,
                                     **kwargs)
@@ -779,26 +796,63 @@ class PDSimCore(object):
                     # Multimply the residual on the discharge temperature by the capacitance rate
                     # to get all the residuals in units of kW
                     C_outlet = self.Tubes.Nodes[key_outlet].cp*mdot_out
-                    resid_Td = C_outlet*(Props('T','H',h_outlet,'P',p,Fluid) - self.Td)
+                    self.resid_Td = C_outlet*(Props('T','H',h_outlet,'P',p,Fluid) - self.Td)
                 else:
                     raise KeyError
-                                
-                if endcycle_callback is None:
-                    redo = False
-                else:
-                    #endcycle_callback either returns the True for finished or the errors
-                    flag = endcycle_callback()
-                    if not flag == True: #Returned the errors since not within tolerance
-                        print flag
-                    else:
-                        redo = True
-                
+                      
                 #If the abort function returns true, quit this loop
                 if (Abort is not None and Abort()) or OneCycle:
-                    print 'Quitting redo loop in core.solve'
-                    redo=False
+                    print 'Quitting OBJECTIVE_CYCLE loop in core.solve'
+                    return None #Stop
+                        
+                if endcycle_callback is None:
+                    return None #Stop
+                else:
+                    #endcycle_callback returns the errors and new initial st
+                    errors, x_state_ = endcycle_callback()
+                    self.x_state = x_state_[:] #Make a copy
+                    return errors
+                
+            #! End of OBJECTIVE_CYCLE
             
-            #end of while redo:
+            UseNR = True #Change this to True to enable the use of the Newton-Raphson
+            if UseNR:
+                self.x_state = Broyden(OBJECTIVE_CYCLE, self.x_state, dx = 0.1, itermax = 30, ytol = 1e-4)
+                print self.x_state
+                if self.x_state[0] is None:
+                    return None
+            else:
+                diff_old = None
+                x_state_prior = None
+                
+                while True:
+                    x_state_old = listm(self.x_state).copy()
+                    OBJECTIVE_CYCLE(x_state_old)
+                    x_state_new = listm(self.x_state).copy()
+                        
+                    diff = (x_state_old - x_state_new) / x_state_old
+                    diff_abs = [abs(dx) for dx in (x_state_old - x_state_new)/x_state_old]
+                    def all_negative(yvec):
+                        for y in yvec:
+                            if y>0:
+                                return False
+                        return True
+                    
+                    print 'diff', diff
+                    if max(diff_abs) < 1e-5:
+                        break
+#                    elif diff_old is not None and all_negative(diff * diff_old):
+#                        #If the signs are opposite for all of the diffs, weight the next step
+#                        print 'Weighting old and new initial states'
+#                        print 'new', diff, x_state_old
+#                        print 'old', diff_old, x_state_prior
+#                        self.x_state = (x_state_prior + x_state_old)/2
+                    else:
+                        self.x_state = x_state_new
+                    
+#                    diff_old = diff.copy()
+#                    x_state_prior = x_state_old.copy()
+                        
                     
             # (3) After convergence of the inner loop, check the energy balance on the lumps
             if lump_energy_balance_callback is not None:
@@ -809,14 +863,15 @@ class PDSimCore(object):
                 print 'Quitting OBJECTIVE function in core.solve'
                 return None
                 
-            print [resid_Td]+[resid_HT],'resids'
-            return [resid_Td]+[resid_HT]
+            print [self.resid_Td]+[resid_HT],'resids'
+            return [self.resid_Td]+[resid_HT]
         
         #end of OJECTIVE
         
-        x_soln = Broyden(OBJECTIVE,[315.0,325.0],dx=0.2,ytol=0.001,itermax=20)
+        x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,[315.0,325.0],dx=0.2,ytol=0.001,itermax=30)
         print 'Solution is', x_soln,'Td, Tlumps'
         
+        del self.resid_Td, self.x_state
         if Abort is None or not Abort():
             self.__post_solve()
         
@@ -999,7 +1054,7 @@ class PDSimCore(object):
         
         #old and new CV keys
         LHS,RHS=[],[]
-        errorT,errorp,error_rho=[],[],[]
+        errorT,errorp,error_rho,newT,new_rho=[],[],[],[],[]
         
         for key in self.CVs.exists_keys:
             # Get the 'becomes' field.  If a list, parse each fork of list. If a single key convert 
@@ -1013,15 +1068,20 @@ class PDSimCore(object):
             for newkey in becomes:
                 Inew = self.CVs.index(newkey)
                 newCV = self.CVs[newkey]
-                errorT.append(abs((self.T[Iold,self.Itheta]-self.T[Inew,0])/self.T[Inew,0]))
-                errorp.append(abs((self.p[Iold,self.Itheta]-self.p[Inew,0])/self.p[Inew,0]))
-                error_rho.append(abs((self.rho[Iold,self.Itheta]-self.rho[Inew,0])/self.rho[Inew,0]))
+                newT.append(self.T[Iold,self.Itheta])
+                new_rho.append(self.rho[Iold,self.Itheta])
+                errorT.append((self.T[Iold,self.Itheta]-self.T[Inew,0])/self.T[Inew,0])
+                errorp.append((self.p[Iold,self.Itheta]-self.p[Inew,0])/self.p[Inew,0])
+                error_rho.append((self.rho[Iold,self.Itheta]-self.rho[Inew,0])/self.rho[Inew,0])
                 #Update the list of keys for setting the exist flags
                 LHS.append(key)
                 RHS.append(newkey)
                 #Update the CV with the new value - use the copy of the CVs from before
                 newCV.State.update({'T':self.T[Iold,self.Itheta],'D':self.rho[Iold,self.Itheta]})
                 
+        errorT_abs = [abs(err) for err in errorT]
+        error_rho_abs = [abs(err) for err in error_rho]
+        
         #Reset the exist flags for the CV - this should handle all the possibilities
         #Turn off the LHS CV
         for key in LHS:
@@ -1032,11 +1092,7 @@ class PDSimCore(object):
             
         self.CVs.rebuild_exists()
         
-        print max(errorT),max(errorp),'errs'
-        if max(max(errorT),max(errorp))<eps_wrap_allowed:
-            return errorT+error_rho
-        else:
-            return True
+        return errorT+error_rho, newT+new_rho
     
 if __name__=='__main__':
     print 'This is the base class that is inherited by other compressor types.  Running this file doesn\'t do anything'
