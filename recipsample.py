@@ -26,22 +26,16 @@ def Compressor():
 
     recip=Recip()
     
-    recip.piston_stroke = 0.02;   #Piston stroke, m
-    recip.piston_diameter = 0.02;   #Piston diameter, m
-    recip.piston_length = 0.02;   #Piston Length, m
-    recip.omega = 377;       #Frequency, rad/sec (60Hz)
-    recip.crank_length = 0.01;      #length of crank, m
-    recip.connecting_rod_length = 0.04;      #length of connecting rod, m
-    recip.V_dead = 0.38e-6
-    recip.A_piston = pi*(recip.piston_diameter)**2/4
-    
-    recip.d_discharge=0.0059;  #discharge port diameter in meters
-    recip.A_discharge=pi*recip.d_discharge**2/4
+    recip.piston_stroke = 0.02   #Piston stroke, m
+    recip.piston_diameter = 0.02   #Piston diameter, m
+    recip.piston_length = 0.02   #Piston Length, m
+    recip.omega = 377       #Frequency, rad/sec (60Hz)
+    recip.crank_length = 0.01      #length of crank, m
+    recip.connecting_rod_length = 0.04      #length of connecting rod, m
+    recip.x_TDC = 0.001 #Distance to the TDC position of the piston from the valve plate
 
+    recip.d_discharge=0.0059;  #discharge port diameter in meters
     recip.d_suction=recip.d_discharge; #suction diameter in meters
-    recip.A_suction=pi*recip.d_suction**2/4
-    
-    recip.V_backchamber = 50e-6 #Back chamber volume [m3]
         
     #These are parameters needed for the ambient heat transfer model
     recip.h_shell = 0.010 #[kW/m2/K]
@@ -52,9 +46,12 @@ def Compressor():
     recip.delta_gap = 20e-6
     recip.eta_motor = 0.95
     
-    Ref='R404A'
-    inletState=State.State(Ref,dict(T=283.15,D=5.75))
-    outletState=State.State(Ref,{'T':400,'P':inletState.p*2.5})
+    #Calculate Vdisp
+    recip.pre_solve()
+    
+    Ref='R410A'
+    inletState=State.State(Ref,dict(T=283.15, D=5.75))
+    outletState=State.State(Ref,{'T':400,'P':inletState.p*2.0})
     mdot_guess = inletState.rho*recip.Vdisp()*recip.omega/(2*pi)
     
 #    CP.set_1phase_LUT_params(Ref,40,40,inletState.T-50,outletState.T+50,inletState.p*0.8,outletState.p*1.8)
@@ -67,10 +64,6 @@ def Compressor():
                                initialState=outletState.copy(),
                                VdVFcn=recip.V_dV,
                                becomes='A') )
-#    recip.add_CV( ControlVolume(key='B',
-#                               initialState=outletState.copy(),
-#                               VdVFcn=recip.V_dV_backchamber,
-#                               becomes='B') )
     
     recip.add_tube( Tube(key1='inlet.1',key2='inlet.2',L=0.03,ID=0.02,
                              mdot=mdot_guess, State1=inletState.copy(),
@@ -81,13 +74,13 @@ def Compressor():
     
     recip.add_flow(FlowPath(key1='inlet.2',key2='A',MdotFcn=recip.Suction))
     recip.add_flow(FlowPath(key1='outlet.1',key2='A',MdotFcn=recip.Discharge))
-#    recip.add_flow(FlowPath(key1='B',key2='A',MdotFcn=recip.PistonLeakage))
+#    recip.add_flow(FlowPath(key1='inlet.2',key2='A',MdotFcn=recip.PistonLeakage))
 
     E = 1.93e11             #Youngs Modulus, [Pa]
     h_valve = 0.0001532     #Valve thickness, [m]
     l_valve = 0.018         #Total length of valve, [m]
     a_valve = 0.0140        #Distance from anchor to force, [m]
-    rho_valve = 8000        #Density of spring steel, [kg/m^3] 
+    rho_valve = 8000       #Density of spring steel, [kg/m^3] 
     C_D = 1.17              #Drag coefficient [-]
     d_valve = 0.007         #Valve Diameter [m]
     x_stopper = 0.0018      #Stopper location [m]

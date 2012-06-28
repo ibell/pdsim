@@ -117,7 +117,7 @@ class PDSimCore(object):
                     VarList+=list(getcol(self.rho,i,exists_indices)*self.V_)
                 else:
                     raise KeyError
-            if self.__hasValves__==True:
+            if self.__hasValves__:
                 VarList+=list(self.xValves[:,i])
             return listm(VarList)
         
@@ -127,6 +127,7 @@ class PDSimCore(object):
         """
         exists_indices=self.CVs.exists_indices
         Nexist = self.CVs.Nexist
+        Ns = len(self.stateVariables)
         if self.__hasLiquid__==True:
             raise ValueError
             self.T[:,i]=x[0:self.NCV]
@@ -143,7 +144,7 @@ class PDSimCore(object):
                     setcol(self.m, i, exists_indices, x_)
             #Left over terms are for the valves
             if self.__hasValves__:
-                setcol(self.xValves,i,range(len(self.Valves)*2),listm(x[iS*Nexist+2::]))
+                setcol(self.xValves, i, range(len(self.Valves)*2), listm(x[Ns*Nexist::]))
                     
         setcol(self.V, i, exists_indices, self.V_)
         setcol(self.dV, i, exists_indices, self.dV_)
@@ -375,6 +376,10 @@ class PDSimCore(object):
         self.FlowStorage.append(self.Flows.get_deepcopy())
         self.__array2vals(xold,0)
         
+        
+#        print self.Valves[0]
+#        print self.Valves[1]
+    
         for Itheta in range(N):
             if step_callback!=None:
                 step_callback(t0,h,Itheta)
@@ -763,6 +768,7 @@ class PDSimCore(object):
         self.rho = self.rho[:,0:self.Itheta+1]
         self.V = self.V[:,0:self.Itheta+1]
         self.dV = self.dV[:,0:self.Itheta+1]
+        self.xValves = self.xValves[:,0:self.Itheta+1]
         
         self.Wdot_pv = 0.0
         for CVindex in range(self.p.shape[0]):

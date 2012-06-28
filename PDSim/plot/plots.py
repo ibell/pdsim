@@ -58,7 +58,9 @@ class PlotNotebook(wx.Panel):
                       ('Pressure v. volume',self.p_V),
                       ('Density v. crank angle',self.rho_theta),
                       ('Mass v. crank angle',self.m_theta),
-                      ('Mass flow v. crank angle',self.mdot_theta)]
+                      ('Mass flow v. crank angle',self.mdot_theta),
+                      ('Valve lift v. crank angle',self.valve_theta)
+                      ]
         for value,callbackfcn in plot_buttons:
             btn = wx.Button(page,label=value)
             sizer.Add(btn)
@@ -146,6 +148,16 @@ class PlotNotebook(wx.Panel):
         axes.plot(self.Sim.FlowsProcessed.t,self.Sim.FlowsProcessed.mean_mdot['inlet.2']*np.ones_like(self.Sim.FlowsProcessed.t))
         axes.set_xlabel(r'$\theta$ [rad]')
         axes.set_ylabel(r'$\dot m$ [kg/s]')
+    
+    def valve_theta(self, event = None):
+        #valve lift
+        if hasattr(self.Sim,'__hasValves__') and self.Sim.__hasValves__:
+            axes = self.add('Valves').gca()
+            print self.Sim.xValves.shape
+            axes.plot(self.Sim.t,self.Sim.xValves[0,:])
+            axes.plot(self.Sim.t,self.Sim.xValves[2,:])
+            axes.set_xlabel(r'$\theta$ [rad]')
+            axes.set_ylabel(r'Valve lift [m]')
         
     #    if not Comp.__hasLiquid__:
     #        #Fluid T-p plot

@@ -28,13 +28,6 @@ class GeometryPanel(pdsim_panels.PDPanel):
         self.SetSizer(sizer)
         sizer.Layout()
         
-    def post_calculate(self,recip):
-        """
-        Other calculations that are an indirect result of the inputs on the panel
-        """
-        recip.A_piston = pi*(recip.piston_diameter)**2/4
-        recip.V_dead=recip.A_piston*recip.x_TDC
-        
 class MassFlowPanel(pdsim_panels.PDPanel):
     
     def __init__(self, parent, configfile,**kwargs):
@@ -77,10 +70,7 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         box_sizer.Layout()
         
         self.items=self.items1+self.items2
-    
-    def post_calculate(self,recip):
-        recip.A_discharge=pi*recip.d_discharge**2/4
-        recip.A_suction=pi*recip.d_suction**2/4
+
         
 class MechanicalLossesPanel(pdsim_panels.PDPanel):
     

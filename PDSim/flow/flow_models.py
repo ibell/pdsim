@@ -138,7 +138,10 @@ class ValveModel(object):
                    h_valve=cython.double,a_valve=cython.double, l_valve=cython.double, 
                    rho_valve=cython.double,E=cython.double,x_stopper=cython.double,
                    key_up=cython.bytes,key_down=cython.bytes)
-    def __init__(self,d_valve,d_port,C_D,h_valve,a_valve,l_valve,rho_valve,E,x_stopper,key_up,key_down):
+    def __init__(self, d_valve, d_port, C_D, h_valve, a_valve,
+                 l_valve, rho_valve, E, x_stopper, key_up, key_down):
+        
+        
         I=(d_valve*h_valve**3)/12  #Moment of Intertia for discharge valve,[m^4]
         k_valve=(6*E*I)/(a_valve**2*(3*l_valve-a_valve))    #Valve stiffness
         m_eff=(1/3)*rho_valve*l_valve*d_valve*h_valve      #Effective mass of valve reeds
@@ -219,7 +222,7 @@ class ValveModel(object):
         rho=self.State_up.get_rho()
         p_high=self.State_up.get_p()
         p_low=self.State_down.get_p()
-        deltap=p_high-p_low
+        deltap=(p_high-p_low)*1000
         if deltap<0.0:
             return [0.0,0.0]
         V = self.flow_velocity(self.State_up, self.State_down)
@@ -236,11 +239,17 @@ class ValveModel(object):
                'E']
         return {item:getattr(self,item) for item in items}
     
+    def __repr__(self):
+        """
+        Return a representation of Valve Model for outputting to screen
+        """
+        s=''
+        for item in self.__cdict__():
+            s += item+' : '+str(getattr(self,item))+'\n'
+        return s
+            
     def __reduce__(self):
         return rebuildValveModel,(self.__cdict__(),)
-        
-
-        
             
 def IsentropicNozzle(A,State_up,State_down,full_output=False):   
     """

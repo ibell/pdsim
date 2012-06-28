@@ -23,12 +23,6 @@ class Recip(PDSimCore):
              (2*sqrt(self.connecting_rod_length**2 - self.crank_length**2*sin(theta)**2)))*self.A_piston
         return V,dV
     
-    def V_dV_backchamber(self,theta):
-        """
-        Returns the volume and derivative of volume of the backchamber
-        """
-        return self.V_backchamber, 0
-    
     def Vdisp(self):
         """
         Returns displacement of compressor in m\ :math:`^3`\ /revolution
@@ -140,6 +134,15 @@ class Recip(PDSimCore):
         self.Qamb = self.ambient_heat_transfer() #[kW]
         return self.Qdot_from_gas + self.Wdot_mechanical + self.Qamb
     
+    def pre_solve(self):
+        """
+        Other calculations that are an indirect result of the inputs
+        """
+        self.A_piston = pi*(self.piston_diameter)**2/4
+        self.V_dead=self.A_piston*self.x_TDC
+        self.A_discharge=pi*self.d_discharge**2/4
+        self.A_suction=pi*self.d_suction**2/4
+        
     #Name gets mangled in the core base class, so un-mangle it
     def _PDSimCore__post_solve(self):
         """
