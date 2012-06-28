@@ -1,22 +1,6 @@
 flow Package
 ============
 
-:mod:`_flow` Module
--------------------
-
-.. automodule:: PDSim.flow._flow
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-:mod:`_sumterms` Module
------------------------
-
-.. automodule:: PDSim.flow._sumterms
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 :mod:`flow` Module
 ------------------
 

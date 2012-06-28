@@ -344,6 +344,7 @@ class PDSimCore(object):
         
     def cycle_SimpleEuler(self,N,x_state,tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
         """
+        The simple Euler PDSim ODE integrator
         
         Parameters
         ----------
@@ -351,9 +352,9 @@ class PDSimCore(object):
             Number of steps
         x0 : listm
             The initial values of the variables (only the state variables)
-        tmin : float
+        tmin : float, optional
             Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
-        tmax : float
+        tmax : float, optional
             Ending value for the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``] 
         step_callback : function, optional 
             A pointer to a function that is called at the beginning of the step.  This function must be of the form:: 
@@ -896,6 +897,7 @@ class PDSimCore(object):
         h2s = Props('H','T',T2s,'P',outletState.p,outletState.Fluid)
         self.eta_a = (h2s-h1)/(h2-h1)
         self.Wdot_i = self.mdot*(h2s-h1)
+        # self.Qamb is positive if heat is being added to the lumped mass
         self.Wdot = self.mdot*(h2-h1)-self.Qamb
         
         #Resize all the matrices to keep only the real data

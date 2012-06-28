@@ -27,7 +27,7 @@ class Recip(PDSimCore):
         """
         Returns displacement of compressor in m\ :math:`^3`\ /revolution
         """
-        return 2*self.crank_length*self.A_piston+self.V_dead
+        return 2*self.crank_length*self.A_piston
         
     def TubeCode(self,Tube,**kwargs):
         Tube.Q = flow_models.IsothermalWallTube(Tube.mdot,Tube.State1,Tube.State2,Tube.fixed,Tube.L,Tube.ID,T_wall=self.Tlumps[0])
@@ -96,7 +96,7 @@ class Recip(PDSimCore):
         
         .. math::
         
-            x = {L_c}\cos \theta  + \sqrt {L_1^2 - L_c^2{{\left( {\sin \theta } \right)}^2}}
+            x = {L_c}\cos \\theta  + \sqrt {L_1^2 - L_c^2{{\left( {\sin \\theta } \right)}^2}}
             
         .. math::
         
@@ -120,6 +120,9 @@ class Recip(PDSimCore):
         
     def ambient_heat_transfer(self):
         """
+        The ambient heat transfer for the compressor in kW
+        
+        Returns a positive value if heat is added to the compressor
         """
         return self.h_shell*self.A_shell*(self.Tamb-self.Tlumps[0]) #[kW]
         

@@ -1,18 +1,10 @@
 scroll Package
 ==============
 
-:mod:`Core` Module
+:mod:`core` Module
 ------------------
 
-.. automodule:: PDSim.scroll.Core
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-:mod:`_Core` Module
--------------------
-
-.. automodule:: PDSim.scroll._Core
+.. automodule:: PDSim.scroll.core
     :members:
     :undoc-members:
     :show-inheritance:

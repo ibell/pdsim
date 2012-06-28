@@ -874,6 +874,8 @@ class OutputDataPanel(wx.Panel):
                                'Wdot': 'Shaft power [kW]',
                                'Wdot_motor': 'Motor losses [kW]',
                                'Wdot_electrical': 'Electrical power [kW]',
+                               'Wdot_mechanical': 'Mechanical losses [kW]',
+                               'Qdot_from_gas': 'Heat transfer from gas [kW]',
                                'Qamb': 'Ambient heat transfer [kW]',
                                'run_index': 'Run Index',
                                'eta_oi': 'Overall isentropic efficiency [-]'
