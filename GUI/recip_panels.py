@@ -3,6 +3,10 @@ import wx
 from math import pi
 
 class GeometryPanel(pdsim_panels.PDPanel):
+    """
+    The geometry panel of the reciprocating compressor
+    Loads all parameters from the configuration file
+    """
     def __init__(self,parent,configfile,**kwargs):
         pdsim_panels.PDPanel.__init__(self,parent,**kwargs)
         

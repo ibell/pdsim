@@ -185,7 +185,6 @@ class PDSimCore(object):
         
         #Get all the nodes that can exist for tubes and CVs
         keys=collect_keys(self.Tubes,self.Flows)
-        
 
         
         #Get the instantaneous net flow through each node
@@ -335,8 +334,79 @@ class PDSimCore(object):
         # Assume all the valves to be fully closed and stationary at the beginning 
         self.xValves[:,0]=0
         
-    def cycle_SimpleEuler(self,N,tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
+    def cycle_SimpleEuler(self,N,x0,tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
         """
+        
+        Parameters
+        ----------
+        N : integer
+            Number of steps
+        x0 : listm
+            The initial values of the variables (state variables + valves)
+        tmin : float
+            Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
+        tmax : float
+            Ending value for the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``] 
+        step_callback : function, optional 
+            A pointer to a function that is called at the beginning of the step.  This function must be of the form:: 
+            
+                step_callback(t,h,Itheta)
+                
+            where ``h`` is the step size that the solver wants to use, ``t`` is the current value of the independent variable, and ``Itheta`` is the index in the container variables.  The return values are ignored, so the same callback can be used as for the ``cycle_RK45`` solver 
+                
+        heat_transfer_callback : function, optional
+            If provided, the heat_transfer_callback function should have a format like::
+            
+                Q_listm=heat_transfer_callback(t)
+            
+            It should return a ``listm`` instance with the same length as the number of CV in existence.  The entry in the ``listm`` is positive if the heat transfer is TO the fluid in the CV in order to maintain the sign convention that energy (or mass) input is positive.  Will raise an error otherwise
+        
+        """
+        #Do some initialization - create arrays, etc.
+        self.__pre_cycle()
+        
+        #Start at an index of 0
+        Itheta=0
+        t0=tmin
+        h=(tmax-tmin)/(N-1)
+        
+        #One call to build the flows at start
+        self.theta=t0
+        self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+        self.FlowStorage.append(self.Flows.get_deepcopy())
+        self.__array2vals(xold,0)
+    
+        for Itheta in range(N):
+            if step_callback!=None:
+                step_callback(t0,h,Itheta)
+                
+            xold=self.__vals2array(Itheta)
+                        
+            # Step 1: derivatives evaluated at old values
+            f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+            xnew=xold+h*f1
+            
+            self.t[Itheta+1]=t0+h
+            self.__array2vals(xnew,Itheta+1)
+            t0+=h
+            Itheta+=1
+            self.FlowStorage.append(self.Flows.get_deepcopy())
+            
+            #Some debugging information
+            #print t0,h
+            
+        #Run this at the end
+        V,dV=self.CVs.volumes(t0)
+        self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+        
+        # last index is Itheta, number of steps is Itheta+1
+        print 'Itheta steps taken',Itheta+1
+        self.Itheta=Itheta
+        self.__post_cycle()
+        
+    def cycle_Heun(self,N,tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
+        """
+        Use the Heun method (modified Euler method)
         
         Parameters
         ----------
@@ -375,10 +445,6 @@ class PDSimCore(object):
         self.derivs(t0,xold,heat_transfer_callback,valves_callback)
         self.FlowStorage.append(self.Flows.get_deepcopy())
         self.__array2vals(xold,0)
-        
-        
-#        print self.Valves[0]
-#        print self.Valves[1]
     
         for Itheta in range(N):
             if step_callback!=None:
@@ -388,17 +454,17 @@ class PDSimCore(object):
                         
             # Step 1: derivatives evaluated at old values
             f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
-            xnew=xold+h*f1
+            xtemp=xold+h*f1
+            
+            #Step 2: Evaluated at predicted step
+            f2=self.derivs(t0+h,xtemp,heat_transfer_callback,valves_callback)
+            xnew = xold + h/2.0*(f1 + f2)
             
             self.t[Itheta+1]=t0+h
             self.__array2vals(xnew,Itheta+1)
             t0+=h
             Itheta+=1
             self.FlowStorage.append(self.Flows.get_deepcopy())
-            #print self.FlowStorage[-1]
-            
-            #Some debugging information
-            #print t0,h
             
         #Run this at the end
         V,dV=self.CVs.volumes(t0)
@@ -408,6 +474,7 @@ class PDSimCore(object):
         print 'Itheta steps taken',Itheta+1
         self.Itheta=Itheta
         self.__post_cycle()
+        return 
         
     def cycle_RK45(self,hmin=1e-4,tmin=0,tmax=2.0*pi,eps_allowed=1e-10,step_relax=0.9,
               step_callback=None,heat_transfer_callback=None,valves_callback = None,**kwargs):
@@ -640,6 +707,10 @@ class PDSimCore(object):
         # Typically used from the GUI
         self.pipe_abort = pipe_abort
         
+        #If a function called pre_solve is provided, call it with no input arguments
+        if hasattr(self,'pre_solve'):
+            self.pre_solve()
+            
         #This runs before the model starts at all
         self.__pre_run()
         
@@ -675,13 +746,19 @@ class PDSimCore(object):
             while redo:
                 
                 # (2) Run a cycle with the given values for the temperatures
+                x0 = self.__vals2array(0)                
                 if solver_method == 'Euler':
                     N=kwargs.get('Euler_N',7000)
-                    self.cycle_SimpleEuler(N=N,step_callback=step_callback,
+                    self.cycle_SimpleEuler(N,x0,step_callback=step_callback,
+                                           heat_transfer_callback=heat_transfer_callback,
+                                           valves_callback=valves_callback)
+                if solver_method == 'Heun':
+                    N=kwargs.get('Heun_N',7000)
+                    self.cycle_SimpleEuler(N,x0,step_callback=step_callback,
                                            heat_transfer_callback=heat_transfer_callback,
                                            valves_callback=valves_callback)
                 elif solver_method=='RK45':
-                    self.cycle_RK45(step_callback=step_callback,
+                    self.cycle_RK45(x0,step_callback=step_callback,
                                     heat_transfer_callback=heat_transfer_callback,
                                     valves_callback=valves_callback,
                                     **kwargs)
@@ -707,9 +784,14 @@ class PDSimCore(object):
                     raise KeyError
                                 
                 if endcycle_callback is None:
-                    redo=False
+                    redo = False
                 else:
-                    redo=endcycle_callback()
+                    #endcycle_callback either returns the True for finished or the errors
+                    flag = endcycle_callback()
+                    if not flag == True: #Returned the errors since not within tolerance
+                        print flag
+                    else:
+                        redo = True
                 
                 #If the abort function returns true, quit this loop
                 if (Abort is not None and Abort()) or OneCycle:
@@ -917,7 +999,7 @@ class PDSimCore(object):
         
         #old and new CV keys
         LHS,RHS=[],[]
-        errorT,errorp=[],[]
+        errorT,errorp,error_rho=[],[],[]
         
         for key in self.CVs.exists_keys:
             # Get the 'becomes' field.  If a list, parse each fork of list. If a single key convert 
@@ -933,6 +1015,7 @@ class PDSimCore(object):
                 newCV = self.CVs[newkey]
                 errorT.append(abs((self.T[Iold,self.Itheta]-self.T[Inew,0])/self.T[Inew,0]))
                 errorp.append(abs((self.p[Iold,self.Itheta]-self.p[Inew,0])/self.p[Inew,0]))
+                error_rho.append(abs((self.rho[Iold,self.Itheta]-self.rho[Inew,0])/self.rho[Inew,0]))
                 #Update the list of keys for setting the exist flags
                 LHS.append(key)
                 RHS.append(newkey)
@@ -951,7 +1034,7 @@ class PDSimCore(object):
         
         print max(errorT),max(errorp),'errs'
         if max(max(errorT),max(errorp))<eps_wrap_allowed:
-            return False
+            return errorT+error_rho
         else:
             return True
     

@@ -234,17 +234,28 @@ class RedirectedWorkerThread(Thread):
             wx.CallAfter(self.stdout_target_.WriteText, self.name+": Process is done")
             if sim is not None:
                 #Get a unique identifier for the model run for pickling purposes
+                curdir = os.path.abspath(os.curdir)
+                temp_folder = os.path.join(curdir,'_tmp_')
+                
+                # Make the temporary folder if doesn't exist
+                if not os.path.exists(temp_folder):
+                    os.mkdir(temp_folder)
+                
                 identifier = 'PDSim recip ' + time.strftime('%Y-%m-%d-%H-%M-%S')+'_t'+self.name.split('-')[1]
-                print 'Trying to write to', identifier + '.mdl'
-                if not os.path.exists(identifier + '.mdl'):
-                    fName = identifier + '.mdl'
+                file_path = os.path.join(temp_folder, identifier + '.mdl')
+                print 'Trying to write to', file_path
+                if not os.path.exists(file_path):
+                    fName = file_path
                 else:
                     i = 65
-                    if os.path.exists(identifier + str(chr(i)) + '.mdl'):    
-                        while os.path.exists(identifier + str(chr(i)) + '.mdl'):
+                    def _file_path(i):
+                        return os.path.join(temp_folder, identifier + str(chr(i)) + '.mdl')
+                    
+                    if os.path.exists(_file_path(i)):
+                        while os.path.exists(_file_path(i)):
                             i += 1
                         i -= 1
-                    fName = identifier + str(chr(i)) + '.mdl'
+                    fName = _file_path(i)
                 
                 #Write it to a binary pickled file for safekeeping
                 fp = open(fName, 'wb')
@@ -692,10 +703,12 @@ class FileOutputDialog(wx.Dialog):
         hsizer = wx.BoxSizer(wx.HORIZONTAL)
         hsizer.Add(wx.StaticText(self,label="Output Directory:"))
         self.txtDir = wx.TextCtrl(self,value ='.')
-        hsizer.Add(self.txtDir, 1, wx.EXPAND)
+        self.txtDir.SetMinSize((200,-1))
+        hsizer.Add(self.txtDir,1,wx.EXPAND)
         self.cmdDirSelect = wx.Button(self,label="Select...")
         self.cmdDirSelect.Bind(wx.EVT_BUTTON,self.OnDirSelect)
         hsizer.Add(self.cmdDirSelect)
+        
         
         #The CSV selections
         file_list = ['Temperature', 'Pressure', 'Volume', 'Density','Mass']
@@ -705,7 +718,7 @@ class FileOutputDialog(wx.Dialog):
         self.file_list.SetCheckedStrings(file_list)
         
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(hsizer,1,wx.EXPAND)
+        sizer.Add(hsizer)
         sizer.AddSpacer(10)
         sizer.Add(wx.StaticText(self,label='CSV files:'))
         sizer.Add(self.file_list)
@@ -915,7 +928,7 @@ class OutputDataPanel(wx.Panel):
             self.rebuild()
         
     def OnLoadRuns(self, event = None):
-        FD = wx.FileDialog(None,"Load Runs",defaultDir='.',
+        FD = wx.FileDialog(None,"Load Runs",defaultDir='_tmp_',
                            wildcard = 'PDSim Runs (*.mdl)|*.mdl',
                            style=wx.FD_OPEN|wx.FD_MULTIPLE|wx.FD_FILE_MUST_EXIST)
         if wx.ID_OK == FD.ShowModal():
@@ -928,21 +941,12 @@ class OutputDataPanel(wx.Panel):
     
     def OnWriteFiles(self, event):
         """
-        Event that fires when the button is clicked to write table to files
+        Event that fires when the button is clicked to write a selection of things to files
         """
         table_string = self.ResultsList.AsString()
         dlg = FileOutputDialog(self.results, table_string = table_string)
         dlg.ShowModal()
         dlg.Destroy()
-        
-#        FD = wx.FileDialog(None,"Save results file",
-#                           style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
-#        if wx.ID_OK == FD.ShowModal():
-#            file_path=FD.GetPath() 
-#            fp = open(file_path,'w')
-#            fp.write(self.ResultsList.AsString())
-#            fp.close()
-#        FD.Destroy()
         
     def OnRefresh(self, event):
         self.rebuild()

@@ -9,6 +9,8 @@ import threading
 
 def RecipBuilder(recip):
     
+    recip.pre_solve()
+    
     outletState=CPState.State(recip.inletState.Fluid,{'T':400,'P':recip.discharge_pressure})
     mdot_guess = recip.inletState.rho*recip.Vdisp()*recip.omega/(2*pi)
     
@@ -17,10 +19,6 @@ def RecipBuilder(recip):
                                initialState=outletState.copy(),
                                VdVFcn=recip.V_dV,
                                becomes='A') )
-#    recip.add_CV( ControlVolume(key='B',
-#                               initialState=recip.inletState.copy(),
-#                               VdVFcn=recip.V_dV_backchamber,
-#                               becomes='B') )
     
     recip.add_tube( Tube(key1='inlet.1',key2='inlet.2',L=0.03,ID=0.02,
                              mdot=mdot_guess, State1=recip.inletState.copy(),
@@ -31,7 +29,7 @@ def RecipBuilder(recip):
     
     recip.add_flow(FlowPath(key1='inlet.2',key2='A',MdotFcn=recip.Suction))
     recip.add_flow(FlowPath(key1='outlet.1',key2='A',MdotFcn=recip.Discharge))
-#    recip.add_flow(FlowPath(key1='A',key2='B',MdotFcn=recip.Discharge))
+    recip.add_flow(FlowPath(key1='inlet.2',key2='A',MdotFcn=recip.PistonLeakage))
     
     #The suction valve parameters
     recip.suction_valve=ValveModel(

@@ -1,5 +1,7 @@
 import cython
 cimport cython
+
+import copy
         
 cdef class listm(list):
     """
@@ -77,6 +79,12 @@ cdef class listm(list):
         d={}
         d['data']=list(self)
         return rebuildListm,(d,)
+    
+    def copy(self):
+        """
+        Return a copy of the listm instance
+        """
+        return listm(self[:])
           
 def rebuildListm(d):
     return listm(d['data'])

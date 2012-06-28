@@ -4,7 +4,7 @@ from time import clock
 
 # If being run from the folder that contains the PDSim source tree, 
 # remove the current location from the python path and use the 
-# site-packages version 
+# site-packages version of PDSim
 import sys, os
 current_path = os.path.abspath(os.curdir)
 if current_path in sys.path:
@@ -32,7 +32,7 @@ def Compressor():
     recip.omega = 377       #Frequency, rad/sec (60Hz)
     recip.crank_length = 0.01      #length of crank, m
     recip.connecting_rod_length = 0.04      #length of connecting rod, m
-    recip.x_TDC = 0.001 #Distance to the TDC position of the piston from the valve plate
+    recip.x_TDC = 0.003 #Distance to the TDC position of the piston from the valve plate
 
     recip.d_discharge=0.0059;  #discharge port diameter in meters
     recip.d_suction=recip.d_discharge; #suction diameter in meters
@@ -43,13 +43,13 @@ def Compressor():
     recip.Tamb = 298 #[K]
     
     recip.mu_oil = 0.0086
-    recip.delta_gap = 20e-6
+    recip.delta_gap = 40e-6
     recip.eta_motor = 0.95
     
     #Calculate Vdisp
     recip.pre_solve()
     
-    Ref='R410A'
+    Ref='Air'
     inletState=State.State(Ref,dict(T=283.15, D=5.75))
     outletState=State.State(Ref,{'T':400,'P':inletState.p*2.0})
     mdot_guess = inletState.rho*recip.Vdisp()*recip.omega/(2*pi)
@@ -74,13 +74,13 @@ def Compressor():
     
     recip.add_flow(FlowPath(key1='inlet.2',key2='A',MdotFcn=recip.Suction))
     recip.add_flow(FlowPath(key1='outlet.1',key2='A',MdotFcn=recip.Discharge))
-#    recip.add_flow(FlowPath(key1='inlet.2',key2='A',MdotFcn=recip.PistonLeakage))
+    recip.add_flow(FlowPath(key1='inlet.2',key2='A',MdotFcn=recip.PistonLeakage))
 
     E = 1.93e11             #Youngs Modulus, [Pa]
     h_valve = 0.0001532     #Valve thickness, [m]
     l_valve = 0.018         #Total length of valve, [m]
     a_valve = 0.0140        #Distance from anchor to force, [m]
-    rho_valve = 8000       #Density of spring steel, [kg/m^3] 
+    rho_valve = 8000        #Density of spring steel, [kg/m^3] 
     C_D = 1.17              #Drag coefficient [-]
     d_valve = 0.007         #Valve Diameter [m]
     x_stopper = 0.0018      #Stopper location [m]
@@ -118,8 +118,9 @@ def Compressor():
     
     t1=clock()
     recip.solve(key_inlet='inlet.1',key_outlet='outlet.2',
-                eps_allowed=1e-10, #Only used with RK45 solver
+                eps_allowed = 1e-6, #Only used with RK45 solver
                 Euler_N = 7000, #Only used with Euler solver
+                Heun_N = 15000, #Only used with Heun solver
                 endcycle_callback=recip.endcycle_callback,
                 heat_transfer_callback=recip.heat_transfer_callback,
                 lump_energy_balance_callback = recip.lump_energy_balance_callback,
