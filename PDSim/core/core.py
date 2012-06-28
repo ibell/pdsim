@@ -895,6 +895,7 @@ class PDSimCore(object):
         T2s = newton(lambda T: Props('S','T',T,'P',outletState.p,outletState.Fluid)-s1,inletState.T+30)
         h2s = Props('H','T',T2s,'P',outletState.p,outletState.Fluid)
         self.eta_a = (h2s-h1)/(h2-h1)
+        self.Wdot_i = self.mdot*(h2s-h1)
         self.Wdot = self.mdot*(h2-h1)-self.Qamb
         
         #Resize all the matrices to keep only the real data

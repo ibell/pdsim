@@ -156,6 +156,10 @@ class Recip(PDSimCore):
         #Motor losses
         self.Wdot_motor = self.Wdot*(1/self.eta_motor-1)
         
+        #Electrical Power
         self.Wdot_electrical = self.Wdot + self.Wdot_motor
+        
+        #Overall isentropic efficiency
+        self.eta_oi = self.Wdot_i/self.Wdot_electrical
         
         

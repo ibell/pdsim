@@ -875,7 +875,8 @@ class OutputDataPanel(wx.Panel):
                                'Wdot_motor': 'Motor losses [kW]',
                                'Wdot_electrical': 'Electrical power [kW]',
                                'Qamb': 'Ambient heat transfer [kW]',
-                               'run_index': 'Run Index'
+                               'run_index': 'Run Index',
+                               'eta_oi': 'Overall isentropic efficiency [-]'
                                }
         
         for var in self.variables:
@@ -883,7 +884,7 @@ class OutputDataPanel(wx.Panel):
             value = var['text']
             self.column_options[key] = value
         
-        self.columns_selected = ['run_index','mdot','eta_v','eta_a','Td']
+        self.columns_selected = ['run_index','mdot','eta_v','eta_oi','Td']
         sizer.Layout()
         
         self.Bind(wx.EVT_SIZE, self.OnRefresh)
@@ -1044,10 +1045,6 @@ class MainFrame(wx.Frame):
         
         self.SetPosition(position)
         self.SetSize(size)
-    
-        #Temporary code
-        self.MTB.SetSelection(1)
-        self.MTB.SolverTB.SetSelection(1)
         
         self.worker = None
         self.workers = None
