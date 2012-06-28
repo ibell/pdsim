@@ -130,7 +130,7 @@ def Compressor():
                 )
     print 'time taken',clock()-t1
     
-    debug_plots(recip)
+#    debug_plots(recip)
     
 if __name__=='__main__':    
     Compressor()

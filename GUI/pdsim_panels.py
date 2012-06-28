@@ -297,6 +297,7 @@ class ParametricPanel(PDPanel):
                 self.ParaList.Destroy()
                 self.GetSizer().Remove(self.ParamListSizer)
                 self.ParamListSizer = None 
+            self.RunButton.Destroy()
         else:
             self.ParamSizer.Layout()
         self.GetSizer().Layout()
@@ -324,7 +325,7 @@ class ParametricPanel(PDPanel):
             self.ParamListBox = wx.StaticBox(self, label = "Parametric Runs")
             self.ParamListSizer = wx.StaticBoxSizer(self.ParamListBox, wx.VERTICAL)
             
-        self.GetSizer().Add(self.ParamListSizer)
+        self.GetSizer().Add(self.ParamListSizer,1,wx.EXPAND)
         self.ParaList = ParametricCheckList(self,names,values)
             
         self.ParamListSizer.Add(self.ParaList,1,wx.EXPAND)

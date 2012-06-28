@@ -163,7 +163,7 @@ class WorkerThreadManager(Thread):
         dlg = wx.MessageDialog(None,"Are you sure you want to kill the current runs?",caption ="Kill Batch?",style = wx.OK|wx.CANCEL)
         if dlg.ShowModal() == wx.ID_OK:
             message = "Aborting in progress, please wait..."
-            busy = PBI.PyBusyInfo(message, parent=None, title="Aborting")
+            busy = PBI.PyBusyInfo(message, parent = None, title = "Aborting")
             self.simulations = []
             for thread_ in self.threadsList:
                 #Send the abort signal
@@ -771,6 +771,7 @@ class FileOutputDialog(wx.Dialog):
                 fp = open(os.path.join(dir_path,'ResultsTable.csv'),'w')
                 fp.write(self.table_string)
                 fp.close()
+        self.Destroy()
     
     def write_pickle(self, dir_path, sim):
         fp = open(os.path.join(dir_path,'PickledSimulation.mdl'),'wb')
@@ -1288,12 +1289,46 @@ class MainFrame(wx.Frame):
         
         #Actually set it
         self.SetMenuBar(self.MenuBar)
-            
+
+class MySplashScreen(wx.SplashScreen):
+    """
+    Create a splash screen widget.
+    """
+    def __init__(self, parent=None):
+        # This is a recipe to a the screen.
+        # Modify the following variables as necessary.
+        img = wx.Image(name = os.path.join("imgs","PDSim_logo.png"))
+        width, height = img.GetWidth(), img.GetHeight()
+        width *= 0.5
+        height *= 0.5
+        aBitmap = img.Rescale(width,height).ConvertToBitmap()
+        splashStyle = wx.SPLASH_CENTRE_ON_SCREEN | wx.SPLASH_TIMEOUT
+        splashDuration = 2000 # milliseconds
+        # Call the constructor with the above arguments in exactly the
+        # following order.
+        wx.SplashScreen.__init__(self, aBitmap, splashStyle,
+                                 splashDuration, parent)
+        self.Bind(wx.EVT_CLOSE, self.OnExit)
+
+        wx.Yield()
+
+    def OnExit(self, evt):
+        self.Hide()
+        evt.Skip()  # Make sure the default handler runs too...
+                    
 if __name__ == '__main__':
     # The following line is required to allow cx_Freeze 
-    # to package multiprocessing properly 
+    # to package multiprocessing properly.  Must be the first line 
+    # after if __name__ == '__main__':
     freeze_support()
+    
     app = wx.App(False)
+    wx.InitAllImageHandlers()
+    
+    Splash=MySplashScreen()
+    Splash.Show()
+    time.sleep(2.0)
+    
     frame = MainFrame() 
     frame.Show(True) 
     app.MainLoop()
