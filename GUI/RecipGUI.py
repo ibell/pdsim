@@ -6,6 +6,7 @@ from wx.lib.embeddedimage import PyEmbeddedImage
 import wx.lib.agw.pybusyinfo as PBI
 from wx.lib.wordwrap import wordwrap
 
+import codecs
 import numpy as np
 import CoolProp.State as CPState
 from PDSim.recip.core import Recip
@@ -320,6 +321,32 @@ class InputsToolBook(wx.Toolbook):
             items += panel.items
         return items
             
+class SolverInputsPanel(pdsim_panels.PDPanel):
+    def __init__(self, parent):
+        pdsim_panels.PDPanel.__init__(self,parent)
+    
+        #Loads all the parameters from the config file
+        configdict,descdict = self.get_from_configfile(configfile,'SolverInputsPanel')
+        
+        # Things in self.items are linked through to the module code where 
+        # it attempts to set the attribute.  They are also automatically
+        # written to configuration file
+        self.items = [
+        dict(attr='piston_diameter'),
+        dict(attr='piston_length'),
+        dict(attr='crank_length'),
+        dict(attr='connecting_rod_length'),
+        dict(attr='x_TDC', tooltip='The distance from the top of the cylinder to the piston head at top dead center'),
+        dict(attr='V_backchamber'),
+        ]
+        
+        sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
+        
+        self.ConstructItems(self.items,sizer,configdict,descdict)
+            
+        self.SetSizer(sizer)
+        sizer.Layout()
+        
 class SolverToolBook(wx.Toolbook):
     def __init__(self,parent,configfile,id=-1):
         wx.Toolbook.__init__(self, parent, -1, style=wx.BK_LEFT)
@@ -1149,9 +1176,18 @@ class MainFrame(wx.Frame):
             file_path=FD.GetPath()
             print 'Writing configuration file to ',file_path   
             #Build the config file entry
-            string_list = [panel.prep_for_configfile().encode('latin-1') for panel in self.MTB.InputsTB.panels+self.MTB.SolverTB.panels] 
-            fp = open(file_path,'w')
-            fp.write('\n'.join(string_list))
+            string_list = []
+            for panel in self.MTB.InputsTB.panels+self.MTB.SolverTB.panels:
+                panel_string = panel.prep_for_configfile()
+                if isinstance(panel_string,str):
+                    string_list.append(unicode(panel_string,'latin-1'))
+                elif isinstance(panel_string,unicode):
+                    #Convert to a string
+                    panel_string = unicode.decode(panel_string,'utf-8')
+                    string_list.append(panel_string)
+            
+            fp = codecs.open(file_path,'w',encoding = 'latin-1')
+            fp.write(u'\n'.join(string_list))
             fp.close()
         FD.Destroy()
         

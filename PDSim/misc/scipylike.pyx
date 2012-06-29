@@ -3,6 +3,14 @@ import numpy as np
 cimport numpy as np
 
 def trapz(np.ndarray[np.float_t] y, np.ndarray[np.float_t] x):
+    """
+    Do a trapezoidal integration of the array y with respect to x 
+    
+    Parameters
+    ----------
+    x : numpy array (1-D, float type)
+    y : numpy array (1-D, float type)
+    """
     cdef int i,n
     cdef double sum=0
     

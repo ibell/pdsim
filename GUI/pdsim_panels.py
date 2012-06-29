@@ -6,6 +6,7 @@ import CoolProp
 from CoolProp.State import State
 from CoolProp import CoolProp as CP
 from ConfigParser import SafeConfigParser
+import codecs
 import numpy as np
 import itertools
 from multiprocessing import Process
@@ -114,7 +115,11 @@ class PDPanel(wx.Panel):
         desc={}
         
         parser = SafeConfigParser()
-        parser.optionxform = str
+        parser.optionxform = unicode
+        # Open the file with the correct encoding
+        with codecs.open(configfile, 'r', encoding='latin-1') as f:
+            parser.readfp(f)
+    
         parser.read(configfile)
         
         for name,value in parser.items(section):
@@ -134,7 +139,7 @@ class PDPanel(wx.Panel):
             elif type=='float':
                 d[name]=float(val)
             elif type=='str':
-                d[name]=val
+                d[name]=unicode(val)
             elif type=='State':
                 Fluid,T,rho=val.split(',')
                 d[name]=dict(Fluid=Fluid,T=float(T),rho=float(rho))

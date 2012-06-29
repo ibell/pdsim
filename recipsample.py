@@ -51,7 +51,7 @@ def Compressor():
     
     Ref='Air'
     inletState=State.State(Ref,dict(T=283.15, D=5.75))
-    outletState=State.State(Ref,{'T':400,'P':inletState.p*5.0})
+    outletState=State.State(Ref,{'T':400,'P':inletState.p*2.5})
     mdot_guess = inletState.rho*recip.Vdisp()*recip.omega/(2*pi)
     
 #    CP.set_1phase_LUT_params(Ref,40,40,inletState.T-50,outletState.T+50,inletState.p*0.8,outletState.p*1.8)
