@@ -17,6 +17,36 @@ class PDPanel(wx.Panel):
     
     Not intended for direct instantiation, rather it should be 
     subclassed, like in :class:`recip_panels.GeometryPanel`
+    
+    Loading from configuration file
+    -------------------------------
+    Method (A)
+    
+    Any subclassed PDPanel must either store a list of items as 
+    ``self.items`` where the entries are dictionaries with at least the entries:
+    
+    - ``text``: The text description of the term 
+    - ``attr``: The attribute in the simulation class that is linked with this term
+    
+    Other terms that can be included in the item are:
+    - ``tooltip``: The tooltip to be attached to the textbox
+    
+    Method (B)
+    
+    The subclassed panel can provide the functions post_prep_for_configfile
+    and post_get_from_configfile, each of which take no inputs.
+    
+    In post_prep_for_configfile, the subclassed panel can package up its elements
+    into a form that can then be re-created when post_get_from_configfile is
+    called
+    
+    
+    Saving to configuration file
+    ----------------------------
+    
+    Adding terms to parametric table
+    --------------------------------
+    
     """
     def __init__(self,*args,**kwargs):
         wx.Panel.__init__(self,*args,**kwargs)
@@ -38,8 +68,9 @@ class PDPanel(wx.Panel):
                 return value
              
     def calculate(self,sim):
-        for item in self.items:
-            setattr(sim,item['attr'],self._get_value(item['textbox']))
+        if hasattr(self,'items'):
+            for item in self.items:
+                setattr(sim,item['attr'],self._get_value(item['textbox']))
     
     def ConstructItems(self,items,sizer,configdict=None,descdict=None):
         for item in items:
@@ -400,7 +431,7 @@ class ParametricPanel(PDPanel):
         raise KeyError
         
 
-def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True):
+def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True, tooltip = None):
     """
     A convenience function that returns a tuple of StaticText and TextCtrl 
     items with the necessary label and values set
@@ -409,6 +440,8 @@ def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True):
     thing = wx.TextCtrl(parent,id,value)
     if enabled==False:
         thing.Disable()
+    if tooltip is not None:
+        thing.SetToolTipString(tooltip)
     return label,thing
 
 class StateChooser(wx.Dialog):
@@ -597,12 +630,18 @@ class StatePanel(wx.Panel):
         An event handler that runs the State Chooser dialog and sets the
         values back in the panel
         """
+        #Values from the GUI
         Fluid = str(self.Fluid.GetValue())
         T = float(self.T.GetValue())
         rho = float(self.rho.GetValue())
+        
+        #Instantiate the chooser Dialog
         SCfrm=StateChooser(Fluid=Fluid,T=T,rho=rho)
+        
+        #If they clicked accept
         if wx.ID_OK == SCfrm.ShowModal():
             Fluid,T,p,rho=SCfrm.GetValues()
+            #Set the GUI values
             self.Fluid.SetValue(str(Fluid))
             self.T.SetValue(str(T))
             self.p.SetValue(str(p))

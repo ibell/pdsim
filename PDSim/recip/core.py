@@ -21,7 +21,7 @@ class Recip(PDSimCore):
         V=x_2*self.A_piston+self.V_dead
         dV=-(-self.crank_length*sin(theta) - (self.crank_length**2*sin(2*theta))/
              (2*sqrt(self.connecting_rod_length**2 - self.crank_length**2*sin(theta)**2)))*self.A_piston
-        return V,dV
+        return V, dV
     
     def Vdisp(self):
         """

@@ -350,7 +350,7 @@ class PDSimCore(object):
         ----------
         N : integer
             Number of steps
-        x0 : listm
+        x_state : listm
             The initial values of the variables (only the state variables)
         tmin : float, optional
             Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
@@ -415,7 +415,7 @@ class PDSimCore(object):
         self.Itheta=Itheta
         self.__post_cycle()
         
-    def cycle_Heun(self,N,xold,tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
+    def cycle_Heun(self,N,x_state, tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
         """
         Use the Heun method (modified Euler method)
         
@@ -423,6 +423,8 @@ class PDSimCore(object):
         ----------
         N : integer
             Number of steps
+        x_state : listm
+            The initial values of the variables (only the state variables)
         tmin : float
             Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
         tmax : float
@@ -450,11 +452,13 @@ class PDSimCore(object):
         t0=tmin
         h=(tmax-tmin)/(N-1)
         
-        #One call to build the flows at start
+         #One call to build the flows at start
+        x_state.extend([0.0]*len(self.Valves)*2)
+        xold = listm(x_state[:])
         self.theta=t0
-        self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+        self.derivs(t0, xold, heat_transfer_callback, valves_callback)
         self.FlowStorage.append(self.Flows.get_deepcopy())
-        self.__put_to_matrices(xold,0)
+        self.__put_to_matrices(xold, 0)
     
         for Itheta in range(N):
             if step_callback!=None:
@@ -486,7 +490,7 @@ class PDSimCore(object):
         self.__post_cycle()
         return 
         
-    def cycle_RK45(self,hmin=1e-4,tmin=0,tmax=2.0*pi,eps_allowed=1e-10,step_relax=0.9,
+    def cycle_RK45(self,x_state,hmin=1e-4,tmin=0,tmax=2.0*pi,eps_allowed=1e-10,step_relax=0.9,
               step_callback=None,heat_transfer_callback=None,valves_callback = None,**kwargs):
         """
         
@@ -495,6 +499,8 @@ class PDSimCore(object):
         
         Parameters
         ----------
+        x_state : listm
+            The initial values of the variables (only the state variables)
         hmin : float
             Minimum step size, something like 1e-5 usually is good.  Don't make this too big or you may not be able to get a stable solution
         tmin : float
@@ -558,11 +564,13 @@ class PDSimCore(object):
         t0=tmin
         h=hmin
         
-        #One call to build the flows at theta=
-        xold=self.__get_from_matrices(0)
+         #One call to build the flows at start
+        x_state.extend([0.0]*len(self.Valves)*2)
+        xold = listm(x_state[:])
         self.theta=t0
-        self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+        self.derivs(t0, xold, heat_transfer_callback, valves_callback)
         self.FlowStorage.append(self.Flows.get_deepcopy())
+        self.__put_to_matrices(xold, 0)
         
         #t is the independent variable here, where t takes on values in the bounded range [tmin,tmax]
         while (t0<tmax):
@@ -766,17 +774,20 @@ class PDSimCore(object):
                 print 'x_state is', x_state
                 
                 if solver_method == 'Euler':
-                    N=kwargs.get('Euler_N',7000)
+                    N=self.EulerN
                     self.cycle_SimpleEuler(N,x_state,step_callback=step_callback,
                                            heat_transfer_callback=heat_transfer_callback,
                                            valves_callback=valves_callback)
                 elif solver_method == 'Heun':
-                    N=kwargs.get('Heun_N',7000)
+                    N=self.HeunN
                     self.cycle_SimpleEuler(N,x_state,step_callback=step_callback,
                                            heat_transfer_callback=heat_transfer_callback,
                                            valves_callback=valves_callback)
                 elif solver_method=='RK45':
-                    self.cycle_RK45(x_state,step_callback=step_callback,
+                    eps_allowed = self.RK45_eps
+                    self.cycle_RK45(x_state,
+                                    eps_allowed = eps_allowed,
+                                    step_callback=step_callback,
                                     heat_transfer_callback=heat_transfer_callback,
                                     valves_callback=valves_callback,
                                     **kwargs)

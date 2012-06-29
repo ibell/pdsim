@@ -73,15 +73,16 @@ class Run1Recip(Process):
         sys.stderr = redir
         
         self.recip.solve(key_inlet='inlet.1',key_outlet='outlet.2',
-            eps_allowed=1e-10, #Only used with RK45 solver
             endcycle_callback=self.recip.endcycle_callback,
             heat_transfer_callback=self.recip.heat_transfer_callback,
             lump_energy_balance_callback = self.recip.lump_energy_balance_callback,
             valves_callback =self.recip.valves_callback, 
-            OneCycle=False, 
+            OneCycle=False,
+            solver_type = self.recip.cycle_integrator_type,
             pipe_abort = self.pipe_abort
             )
         
+        #Delete the pipe_abort since it cannot pickle
         if hasattr(self.recip,'pipe_abort'):
             del self.recip.pipe_abort
             del self.recip.FlowStorage
@@ -320,32 +321,109 @@ class InputsToolBook(wx.Toolbook):
         for panel in self.panels:
             items += panel.items
         return items
-            
-class SolverInputsPanel(pdsim_panels.PDPanel):
-    def __init__(self, parent):
-        pdsim_panels.PDPanel.__init__(self,parent)
     
-        #Loads all the parameters from the config file
-        configdict,descdict = self.get_from_configfile(configfile,'SolverInputsPanel')
+class IntegratorChoices(wx.Choicebook):
+    def __init__(self, parent, **kwargs):
+        wx.Choicebook.__init__(self, parent, id = wx.ID_ANY, **kwargs)
+    
+        # Build the choicebook items
+        self.pageEuler=wx.Panel(self)
+        self.AddPage(self.pageEuler,'Simple Euler')
+        tt = 'Number of steps to be taken by the Euler solver per cycle'
+        self.EulerNlabel, self.EulerN = pdsim_panels.LabeledItem(self.pageEuler,
+                                                  label="Number of Steps [-]",
+                                                  value='7000',
+                                                  tooltip = tt)
+        sizer=wx.FlexGridSizer(cols=2,hgap=3,vgap=3)
+        sizer.AddMany([self.EulerNlabel, self.EulerN])
+        self.pageEuler.SetSizer(sizer)
         
-        # Things in self.items are linked through to the module code where 
-        # it attempts to set the attribute.  They are also automatically
-        # written to configuration file
-        self.items = [
-        dict(attr='piston_diameter'),
-        dict(attr='piston_length'),
-        dict(attr='crank_length'),
-        dict(attr='connecting_rod_length'),
-        dict(attr='x_TDC', tooltip='The distance from the top of the cylinder to the piston head at top dead center'),
-        dict(attr='V_backchamber'),
-        ]
+        self.pageHeun=wx.Panel(self)
+        self.AddPage(self.pageHeun,'Heun')
+        tt ='Number of steps to be taken by the Heun solver per cycle'
+        self.HeunNlabel, self.HeunN = pdsim_panels.LabeledItem(self.pageHeun,
+                                                  label="Number of Steps [-]",
+                                                  value='7000',
+                                                  tooltip = tt)
+        sizer=wx.FlexGridSizer(cols=2,hgap=3,vgap=3)
+        sizer.AddMany([self.HeunNlabel, self.HeunN])
+        self.pageHeun.SetSizer(sizer)
+
+        tt = """The maximum allowed absolute error per step of the solver"""
+        self.pageRK45=wx.Panel(self)
+        self.AddPage(self.pageRK45,'Adaptive Runge-Kutta 4/5')
+        self.RK45_eps_label, self.RK45_eps = pdsim_panels.LabeledItem(self.pageRK45,
+                                                  label="Maximum allowed error per step [-]",
+                                                  value='1e-8',
+                                                  tooltip = tt)
+        sizer=wx.FlexGridSizer(cols=2,hgap=3,vgap=3)
+        sizer.AddMany([self.RK45_eps_label, self.RK45_eps])
+        self.pageRK45.SetSizer(sizer)
+    
+    def set_sim(self, simulation):
+        if self.GetSelection() == 0:
+            simulation.cycle_integrator_type = 'Euler'
+            simulation.EulerN = int(self.EulerN.GetValue())
+        elif self.GetSelection() == 1:
+            simulation.cycle_integrator_type = 'Heun'
+            simulation.HeunN = int(self.HeunN.GetValue())
+        else:
+            simulation.cycle_integrator_type = 'RK45'
+            simulation.RK45_eps = float(self.RK45_eps.GetValue())
+        print 'setting IC'
         
-        sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
+    def set_from_string(self, config_string):
+        """
+        config_string will be something like Cycle,Euler,7000 or Cycle,RK45,1e-8
+        """
+        #Chop off the Cycle,
+        config_string = config_string.split(',',1)[1]
         
-        self.ConstructItems(self.items,sizer,configdict,descdict)
-            
-        self.SetSizer(sizer)
+        SolverType, config = config_string.split(',',1)
+        if SolverType == 'Euler':
+            self.SetSelection(0)
+            self.EulerN.SetValue(config)
+        elif SolverType == 'Heun':
+            self.SetSelection(1)
+            self.HeunN.SetValue(config)
+        elif SolverType == 'RK45':
+            self.SetSelection(2)
+            self.RK45_eps.SetValue(config)
+        
+    def save_to_string(self):
+         pass
+        
+class SolverInputsPanel(pdsim_panels.PDPanel):
+    def __init__(self, parent, configfile,**kwargs):
+        pdsim_panels.PDPanel.__init__(self, parent, **kwargs)
+    
+        self.IC = IntegratorChoices(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Insert(0,self.IC)
         sizer.Layout()
+    
+        # Loads all the parameters from the config file - 
+        # it will call post_get_from_configfile 
+        self.get_from_configfile(configfile, 'SolverInputsPanel') 
+        
+    def post_get_from_configfile(self, key, config_string):
+        """
+        Build the integrator chooser 
+        
+        This function will be called by PDPanel.get_from_configfile
+        """
+        if key == 'Cycle':
+            self.IC.set_from_string(config_string)
+        
+    def post_prep_for_configfile(self):
+        return self.IC.save_to_string()
+        
+    def post_calculate(self, simulation):
+        print 'SIP called'
+        self.IC.set_sim(simulation)
+            
+    def supply_parametric_term(self):
+        pass
         
 class SolverToolBook(wx.Toolbook):
     def __init__(self,parent,configfile,id=-1):
@@ -359,7 +437,7 @@ class SolverToolBook(wx.Toolbook):
         
         items = self.Parent.InputsTB.collect_parametric_terms()
         #Make the recip panels.  Name should be consistent with configuration file
-        pane1=pdsim_panels.PDPanel(self)
+        pane1=SolverInputsPanel(self, configfile, name = 'SolverInputsPanel')
         pane2=pdsim_panels.ParametricPanel(self, configfile, items, name='ParametricPanel')
         self.panels=(pane1,pane2)
         
@@ -1042,8 +1120,8 @@ class MainToolBook(wx.Toolbook):
             self.AddPage(panel,Name,imageId=index)
 
 class MainFrame(wx.Frame):
-    def __init__(self,configfile=None, position=None, size=None):
-        wx.Frame.__init__(self, None, -1, "Recip GUI", size=(700, 700))
+    def __init__(self, configfile=None, position=None, size=None):
+        wx.Frame.__init__(self, None, title = "Recip GUI", size=(700, 700))
         
         #The default configuration file
         if configfile is None: #No file name passed in
@@ -1125,6 +1203,7 @@ class MainFrame(wx.Frame):
         recip=Recip()
         #Pull things from the GUI as much as possible
         self.MTB.InputsTB.calculate(recip)
+        self.MTB.SolverTB.calculate(recip)
         #Build the model the rest of the way
         RecipBuilder(recip)
         return recip
