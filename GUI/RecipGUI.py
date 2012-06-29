@@ -78,7 +78,7 @@ class Run1Recip(Process):
             lump_energy_balance_callback = self.recip.lump_energy_balance_callback,
             valves_callback =self.recip.valves_callback, 
             OneCycle=False,
-            solver_type = self.recip.cycle_integrator_type,
+            solver_method = self.recip.cycle_integrator_type,
             pipe_abort = self.pipe_abort
             )
         
@@ -361,6 +361,7 @@ class IntegratorChoices(wx.Choicebook):
         self.pageRK45.SetSizer(sizer)
     
     def set_sim(self, simulation):
+        
         if self.GetSelection() == 0:
             simulation.cycle_integrator_type = 'Euler'
             simulation.EulerN = int(self.EulerN.GetValue())
@@ -370,8 +371,7 @@ class IntegratorChoices(wx.Choicebook):
         else:
             simulation.cycle_integrator_type = 'RK45'
             simulation.RK45_eps = float(self.RK45_eps.GetValue())
-        print 'setting IC'
-        
+
     def set_from_string(self, config_string):
         """
         config_string will be something like Cycle,Euler,7000 or Cycle,RK45,1e-8

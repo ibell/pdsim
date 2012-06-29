@@ -783,7 +783,7 @@ class PDSimCore(object):
                     self.cycle_SimpleEuler(N,x_state,step_callback=step_callback,
                                            heat_transfer_callback=heat_transfer_callback,
                                            valves_callback=valves_callback)
-                elif solver_method=='RK45':
+                elif solver_method == 'RK45':
                     eps_allowed = self.RK45_eps
                     self.cycle_RK45(x_state,
                                     eps_allowed = eps_allowed,
