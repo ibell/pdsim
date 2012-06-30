@@ -695,108 +695,135 @@ class ResultsList(wx.Panel, ColumnSorterMixin):
         rows_string = [','.join(tostr(row)) for row in self.values]
         return '\n'.join(header_string+rows_string)
 
-class ColumnSelectionList(AutoWidthListCtrl, CheckListCtrlMixin):
-    def __init__(self, parent, col_options, selected):
-        """
-        values: a list of list of values.  Each entry should be as long as the number of headers
-        """
-        AutoWidthListCtrl.__init__(self, parent, style=wx.LC_REPORT)
-        CheckListCtrlMixin.__init__(self)
-        
-        #Set local variables
-        self.col_options = col_options
-        from operator import itemgetter
-        self.col_options_sorted = sorted(col_options.items(), key=lambda x: x[1])
-        self.selected = selected
-        
-        self.InsertColumn(0, 'Name')
-        
-        #Add the values one row at a time
-        for i,(key,val) in enumerate(self.col_options_sorted):            
-            self.InsertStringItem(i, self.col_options[key])
-            if key in self.selected:
-                self.CheckItem(i)
-            
-        self.SetColumnWidth(0, wx.LIST_AUTOSIZE)
-        
-        width_available = self.Parent.GetSize()[0]
-        self.SetMinSize((width_available,-1))
-        
-        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnItemActivated)
-
-    def OnItemActivated(self, event): 
-        self.ToggleItem(event.m_itemIndex)
-    
-    def GetSelections(self):
-        """
-        Return a list of attributes that should be included in table
-        """
-        selected = []
-        for i in range(self.GetItemCount()):
-            if self.IsChecked(i):
-                value = self.GetItemText(i)
-                for k,v in self.col_options.iteritems():
-                    if v == value:
-                        selected.append(k)
-                        break
-        return selected
-        
 class ColumnSelectionDialog(wx.Dialog):
     def __init__(self, parent, col_options, cols_selected):
-        wx.Dialog.__init__(self,parent)
-
-        self.ColList = ColumnSelectionList(self,col_options,cols_selected)
-        self.OK = wx.Button(self, label = 'Ok')
-        self.CANCEL = wx.Button(self, label = 'Cancel')
-        self.CheckAll = wx.Button(self, label = 'Check All')
-        self.CheckNone = wx.Button(self, label = 'Check None')
-        hsizer1 = wx.BoxSizer(wx.HORIZONTAL)
-        hsizer1.Add(self.CheckAll)
-        hsizer1.Add(self.CheckNone)
+        wx.Dialog.__init__(self,parent,size = (500,300))
         
-        hsizer2 = wx.BoxSizer(wx.HORIZONTAL)
-        hsizer2.Add(self.OK)
-        hsizer2.AddStretchSpacer(1)
-        hsizer2.Add(self.CANCEL)
+        self.col_options = col_options
+        print cols_selected
+        self.selected = [col_options[col] for col in cols_selected]
+        self.not_selected = [col_options[col] for col in col_options if col not in cols_selected]
         
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(hsizer1,0,wx.EXPAND)
-        sizer.Add(self.ColList,1,wx.EXPAND)
-        sizer.Add(hsizer2,0,wx.EXPAND)
+        self.col_library = wx.ListBox(self, choices = self.not_selected, style = wx.LB_EXTENDED)
+        self.col_used = wx.ListBox(self, choices = self.selected, style = wx.LB_EXTENDED)
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.Add(self.col_library, 1, wx.EXPAND)
+        self.AddAllButton=wx.Button(self, label='All ->')
+        self.RemoveAllButton=wx.Button(self, label='<- All')
+        self.AddButton=wx.Button(self, label='-->')
+        self.RemoveButton=wx.Button(self, label='<--')
+        self.AddButton.Bind(wx.EVT_BUTTON,self.OnAdd)
+        self.RemoveButton.Bind(wx.EVT_BUTTON,self.OnRemove)
+        self.AddAllButton.Bind(wx.EVT_BUTTON,self.OnAddAll)
+        self.RemoveAllButton.Bind(wx.EVT_BUTTON,self.OnRemoveAll)
+        vsizer = wx.BoxSizer(wx.VERTICAL)
+        vsizer.AddMany([self.AddAllButton, self.RemoveAllButton])
+        vsizer.AddSpacer(20)
+        vsizer.AddMany([self.AddButton, self.RemoveButton])
+        
+        self.Up = wx.Button(self, label='Up')
+        self.Up.Bind(wx.EVT_BUTTON,self.OnUp)
+        self.Down = wx.Button(self, label='Down')
+        self.Down.Bind(wx.EVT_BUTTON,self.OnDown)
+        
+        self.OkButton = wx.Button(self, label='Ok')
+        self.OkButton.Bind(wx.EVT_BUTTON,self.OnAccept)
+        self.CancelButton = wx.Button(self, label='Cancel')
+        self.CancelButton.Bind(wx.EVT_BUTTON,self.OnClose)
+        vsizer2 = wx.BoxSizer(wx.VERTICAL)
+        vsizer2.AddMany([self.Up,self.Down])
+        vsizer2.AddStretchSpacer(0)
+        vsizer2.AddMany([self.OkButton,self.CancelButton])
+        
+        sizer.Add(vsizer)
+        sizer.Add(self.col_used,1,wx.EXPAND)
+        sizer.Add(vsizer2)
         self.SetSizer(sizer)
+        sizer.Layout()
         
-        self.CheckAll.Bind(wx.EVT_BUTTON,self.OnAll)
-        self.CheckNone.Bind(wx.EVT_BUTTON,self.OnNone)
-        self.Bind(wx.EVT_CLOSE,self.OnClose)
-        self.OK.Bind(wx.EVT_BUTTON, self.OnAccept)
-        self.CANCEL.Bind(wx.EVT_BUTTON, self.OnClose)
-        #Bind a key-press event to all objects to get Esc 
+        #Bind a key-press event to all objects to get Esc key press
         children = self.GetChildren()
         for child in children:
             child.Bind(wx.EVT_KEY_UP,  self.OnKeyPress) 
-        
-    def OnNone(self,event):
-        for i in range(self.ColList.GetItemCount()):
-            self.ColList.CheckItem(i, False)
-    
-    def OnAll(self,event):
-        for i in range(self.ColList.GetItemCount()):
-            self.ColList.CheckItem(i, True)
-                    
-    def OnAccept(self, event):
-        self.EndModal(wx.ID_OK)
-        
+
     def OnKeyPress(self,event):
         """ cancel if Escape key is pressed """
         event.Skip()
         if event.GetKeyCode() == wx.WXK_ESCAPE:
-            self.EndModal(wx.ID_CANCEL)
+            self.EndModal(wx.ID_CANCEL)        
+        
+    def label2attr(self,label):
+        for col in self.col_options:
+            if self.col_options[col] == label:
+                return col
+        raise KeyError
+        
+    def OnAccept(self, event):
+        self.EndModal(wx.ID_OK)
         
     def OnClose(self,event):
         self.EndModal(wx.ID_CANCEL)
         
+    def OnAddAll(self, event):
+        self.selected += self.not_selected
+        self.not_selected = []
+        self.col_library.SetItems(self.not_selected)
+        self.col_used.SetItems(self.selected)
+        
+    def OnRemoveAll(self, event):
+        self.not_selected += self.selected
+        self.selected = []
+        self.col_library.SetItems(self.not_selected)
+        self.col_used.SetItems(self.selected)
+        
+    def OnAdd(self, event):
+        indices = self.col_library.GetSelections()
+        labels = [self.col_library.GetString(index) for index in indices]
+
+        for label in reversed(labels):
+            i = self.not_selected.index(label)
+            self.selected.append(self.not_selected.pop(i))
+        self.col_library.SetItems(self.not_selected)
+        self.col_used.SetItems(self.selected)
+        
+    def OnRemove(self, event):
+        indices = self.col_used.GetSelections()
+        labels = [self.col_used.GetString(index) for index in indices]
+
+        for label in reversed(labels):
+            i = self.selected.index(label)
+            self.not_selected.append(self.selected.pop(i))
+        self.col_library.SetItems(self.not_selected)
+        self.col_used.SetItems(self.selected)
+        
+    def OnUp(self, event):
+        indices = self.col_used.GetSelections()
+        labels = [self.col_used.GetString(index) for index in indices]
+        for label in labels:
+            i = self.selected.index(label)
+            if i>0:
+                #swap item and the previous item
+                self.selected[i-1],self.selected[i]=self.selected[i],self.selected[i-1]
+        self.col_used.SetItems(self.selected)
+        if len(labels) == 1:
+            self.col_used.SetSelection(indices[0]-1)
+    
+    def OnDown(self, event):
+        indices = self.col_used.GetSelections()
+        labels = [self.col_used.GetString(index) for index in indices]
+        for label in labels:
+            i = self.selected.index(label)
+            if i<len(self.selected)-1:
+                #swap item and the next item
+                self.selected[i+1],self.selected[i]=self.selected[i],self.selected[i+1]
+        self.col_used.SetItems(self.selected)
+        if len(labels) == 1:
+            self.col_used.SetSelection(indices[0]+1)
+    
     def GetSelections(self):
-        return self.ColList.GetSelections()
+        labels = self.col_used.GetStrings()
+        attrs = [self.label2attr(label) for label in labels]
+        return attrs
 
 class FileOutputDialog(wx.Dialog):
     def __init__(self,Simulations, table_string):
@@ -1093,7 +1120,7 @@ class OutputDataPanel(wx.Panel):
         self.rebuild()
         
     def OnSelectCols(self, event = None):
-        dlg = ColumnSelectionDialog(None,self.column_options,self.columns_selected)
+        dlg = ColumnSelectionDialog(None, self.column_options, self.columns_selected)
         if dlg.ShowModal() == wx.ID_OK:
             self.columns_selected = dlg.GetSelections() 
         dlg.Destroy()
