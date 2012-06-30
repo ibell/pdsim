@@ -295,7 +295,7 @@ class InputsToolBook(wx.Toolbook):
         self.panels=(recip_panels.GeometryPanel(self,configfile,name='GeometryPanel'),
                      recip_panels.MassFlowPanel(self,configfile,name='MassFlowPanel'),
                      recip_panels.MechanicalLossesPanel(self,configfile,name='MechanicalLossesPanel'),
-                     recip_panels.StatePanel(self,configfile,name='StatePanel')
+                     pdsim_panels.StateInputsPanel(self,configfile,name='StatePanel')
                      )
         
         for Name,index,panel in zip(['Geometry','Mass Flow && Valves','Mechanical','State Points'],indices,self.panels):
@@ -648,7 +648,7 @@ class ResultsList(wx.Panel, ColumnSorterMixin):
         for i, row in enumerate(self.data):
             Data = []
             for val in row:
-                Data.append(str(val))
+                Data.append(val)
             self.itemDataMap[i] = tuple(Data)
         
         total_width = 0    
@@ -1327,17 +1327,32 @@ class MainFrame(wx.Frame):
             #Build the config file entry
             string_list = []
             
+            #Based on mode selected in menu select type to be written to file
+            if self.TypeRecip.IsChecked():
+                Type = 'recip'
+            elif self.TypeScroll.IsChecked():
+                Type = 'scroll'
+            else:
+                raise ValueError
+            
+            if self.TypeCompressor.IsChecked():
+                mode = 'compressor'
+            elif self.TypeExpander.IsChecked():
+                mode = 'expander'
+            else:
+                raise ValueError
+            
             #Header information
             header_string_template = textwrap.dedent(
                  """
                  [Globals]
                  Type = {CompressorType}
-                 Mode = compressor
+                 Mode = {Mode}
                  """
                  ) 
-            terms = dict(CompressorType = 'recip')
+            terms = dict(CompressorType = Type, Mode = mode)
             header_string = header_string_template.format(**terms)
-            print header_string
+
             string_list.append(unicode(header_string,'latin-1'))
             
             for panel in self.MTB.InputsTB.panels+self.MTB.SolverTB.panels:
@@ -1462,8 +1477,17 @@ class MainFrame(wx.Frame):
         self.Type = wx.Menu()
         self.TypeRecip = wx.MenuItem(self.Type, -1, "Recip", "", wx.ITEM_RADIO)
         self.TypeScroll = wx.MenuItem(self.Type, -1, "Scroll", "", wx.ITEM_RADIO)
+        
+        self.TypeCompressor = wx.MenuItem(self.Type, -1, "Compressor mode", "", wx.ITEM_RADIO)
+        self.TypeExpander = wx.MenuItem(self.Type, -1, "Expander mode", "", wx.ITEM_RADIO)
+        self.TypeCompressor.Enable(False)
+        self.TypeExpander.Enable(False)
         self.Type.AppendItem(self.TypeRecip)
         self.Type.AppendItem(self.TypeScroll)
+        self.Type.AppendSeparator()
+        self.Type.AppendItem(self.TypeCompressor)
+        self.Type.AppendItem(self.TypeExpander)
+        
         self.MenuBar.Append(self.Type, "Type")
         def f1(event):  print 'Scroll-type compressor'
         def f2(event):  print 'Recip-type compressor'
