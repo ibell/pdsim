@@ -156,7 +156,9 @@ class PDPanel(wx.Panel):
         
         #Section not included, use the default section from the default config file
         if not parser.has_section(section):
-            wx.MessageDialog(None,'Section '+section+' was not found, falling back to default configuration file').ShowModal().Destroy()
+            dlg = wx.MessageDialog(None,'Section '+section+' was not found, falling back to default configuration file')
+            dlg.ShowModal()
+            dlg.Destroy()
             parser = SafeConfigParser()
             parser.optionxform = unicode
             # Open the file with the correct encoding
@@ -275,7 +277,7 @@ class ParametricCheckList(wx.ListCtrl, CheckListCtrlMixin):
         
         #Build the headers
         self.InsertColumn(0, '')
-        self.SetColumnWidth(0,wx.LIST_AUTOSIZE)
+        self.SetColumnWidth(0, wx.LIST_AUTOSIZE)
         for i, header in enumerate(headers):
             self.InsertColumn(i+1, header)
         

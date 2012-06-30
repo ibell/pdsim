@@ -703,15 +703,19 @@ class ResultsList(wx.Panel, ColumnSorterMixin):
 
 class ColumnSelectionDialog(wx.Dialog):
     def __init__(self, parent, col_options, cols_selected):
-        wx.Dialog.__init__(self,parent,size = (500,300))
+        wx.Dialog.__init__(self,parent,size = (800,350))
         
         self.col_options = col_options
 
         self.selected = [col_options[col] for col in cols_selected]
         self.not_selected = [col_options[col] for col in col_options if col not in cols_selected]
         
+        self.col_library_label = wx.StaticText(self, label = 'Available columns:')
+        self.col_used_label = wx.StaticText(self, label = 'Selected columns:')
         self.col_library = wx.ListBox(self, choices = self.not_selected, style = wx.LB_EXTENDED)
         self.col_used = wx.ListBox(self, choices = self.selected, style = wx.LB_EXTENDED)
+        self.col_library.SetMinSize((300,300))
+        self.col_used.SetMinSize((300,300))
         
         #The central column with add and remove buttons
         self.AddAllButton=wx.Button(self, label='All ->')
@@ -728,9 +732,9 @@ class ColumnSelectionDialog(wx.Dialog):
         vsizer.AddMany([self.AddButton, self.RemoveButton])
 
         #The far-right column with up,down, ok, cancel buttons      
-        self.Up = wx.Button(self, label='Up')
+        self.Up = wx.Button(self, label='Move Up')
         self.Up.Bind(wx.EVT_BUTTON,self.OnUp)
-        self.Down = wx.Button(self, label='Down')
+        self.Down = wx.Button(self, label='Move Down')
         self.Down.Bind(wx.EVT_BUTTON,self.OnDown)
         self.OkButton = wx.Button(self, label='Ok')
         self.OkButton.Bind(wx.EVT_BUTTON,self.OnAccept)
@@ -743,9 +747,19 @@ class ColumnSelectionDialog(wx.Dialog):
         
         #Layout the dialog
         sizer = wx.BoxSizer(wx.HORIZONTAL)
-        sizer.Add(self.col_library, 1, wx.EXPAND)
+        
+        vsizer0 = wx.BoxSizer(wx.VERTICAL)
+        vsizer0.Add(self.col_library_label)
+        vsizer0.Add(self.col_library, 1, wx.EXPAND)
+        sizer.Add(vsizer0)
+        sizer.AddSpacer(10)
         sizer.Add(vsizer,0,wx.ALIGN_CENTER_VERTICAL)
-        sizer.Add(self.col_used,1,wx.EXPAND)
+        sizer.AddSpacer(10)
+        vsizer20 = wx.BoxSizer(wx.VERTICAL)
+        vsizer20.Add(self.col_used_label)
+        vsizer20.Add(self.col_used, 1, wx.EXPAND)
+        sizer.Add(vsizer20)
+        sizer.AddSpacer(10)
         sizer.Add(vsizer2,0,wx.ALIGN_CENTER_VERTICAL)
         self.SetSizer(sizer)
         sizer.Layout()
@@ -981,9 +995,9 @@ class FileOutputDialog(wx.Dialog):
             fp.write(s)
             fp.close()
     
-class OutputDataPanel(wx.Panel):
-    def __init__(self, parent, variables):
-        wx.Panel.__init__(self, parent)
+class OutputDataPanel(pdsim_panels.PDPanel):
+    def __init__(self, parent, variables, configfile, **kwargs):
+        pdsim_panels.PDPanel.__init__(self, parent, **kwargs)
         
         self.results = []
         
@@ -1029,10 +1043,12 @@ class OutputDataPanel(wx.Panel):
             value = var['text']
             self.column_options[key] = value
         
-        self.columns_selected = ['run_index','mdot','eta_v','eta_oi','Td']
+        self.columns_selected = []
         sizer.Layout()
         
         self.Bind(wx.EVT_SIZE, self.OnRefresh)
+        
+        self.get_from_configfile(configfile,'OutputDataPanel')
         
     def rebuild(self):
         
@@ -1136,10 +1152,26 @@ class OutputDataPanel(wx.Panel):
             self.columns_selected = dlg.GetSelections() 
         dlg.Destroy()
         self.rebuild()
+    
+    def post_get_from_configfile(self, key, value):
+        if not key == 'selected':
+            raise KeyError
+        
+        list_str = value.split(',',1)[1].replace("'","").replace('[','').replace(']','')
+        for attr in list_str.split(';'):
+            #Strip leading and trailing space
+            attr = attr.strip()
+            self.columns_selected.append(attr)
+            
+        print self.columns_selected
+            
+    
+    def post_prep_for_configfile(self):
+        return 'selected  = selected,'+str(self.columns_selected).replace(',',';')+'\n'
         
 class OutputsToolBook(wx.Toolbook):
-    def __init__(self,parent,id=-1):
-        wx.Toolbook.__init__(self, parent, -1, style=wx.BK_LEFT)
+    def __init__(self,parent,configfile):
+        wx.Toolbook.__init__(self, parent, wx.ID_ANY, style=wx.BK_LEFT)
         il = wx.ImageList(32, 32)
         indices=[]
         for imgfile in ['Geometry.png','MassFlow.png']:
@@ -1149,7 +1181,10 @@ class OutputsToolBook(wx.Toolbook):
         
         variables = self.Parent.InputsTB.collect_parametric_terms()
         self.PlotsPanel = wx.Panel(self)
-        self.DataPanel = OutputDataPanel(self, variables = variables)
+        self.DataPanel = OutputDataPanel(self,
+                                         variables = variables, 
+                                         name = 'OutputDataPanel',
+                                         configfile = configfile)
         
         #Make a Recip instance
         self.panels=(self.DataPanel,self.PlotsPanel)
@@ -1183,7 +1218,7 @@ class MainToolBook(wx.Toolbook):
         self.InputsTB = InputsToolBook(self, configfile)
         self.SolverTB = SolverToolBook(self, configfile)
         self.RunTB = RunToolBook(self)
-        self.OutputsTB = OutputsToolBook(self)
+        self.OutputsTB = OutputsToolBook(self, configfile)
         
         self.panels=(self.InputsTB,self.SolverTB,self.RunTB,self.OutputsTB)
         for Name,index,panel in zip(['Inputs','Solver','Run','Output'],indices,self.panels):
@@ -1355,7 +1390,11 @@ class MainFrame(wx.Frame):
 
             string_list.append(unicode(header_string,'latin-1'))
             
-            for panel in self.MTB.InputsTB.panels+self.MTB.SolverTB.panels:
+            for panel in self.MTB.InputsTB.panels + self.MTB.SolverTB.panels + self.MTB.OutputsTB.panels:
+                #Skip any panels that do not subclass PDPanel
+                if not isinstance(panel,pdsim_panels.PDPanel):
+                    continue
+                
                 panel_string = panel.prep_for_configfile()
                 if isinstance(panel_string,str):
                     string_list.append(unicode(panel_string,'latin-1'))

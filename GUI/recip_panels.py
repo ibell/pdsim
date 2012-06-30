@@ -80,7 +80,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
     
     def __init__(self, parent, configfile,**kwargs):
     
-        pdsim_panels.PDPanel.__init__(self, parent,**kwargs)
+        pdsim_panels.PDPanel.__init__(self, parent, **kwargs)
         
         #Loads all the parameters from the config file (case-sensitive)
         self.configdict,self.descdict = self.get_from_configfile(configfile,'MechanicalLossesPanel')
