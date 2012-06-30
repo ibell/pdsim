@@ -419,7 +419,6 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         return self.IC.save_to_string()
         
     def post_calculate(self, simulation):
-        print 'SIP called'
         self.IC.set_sim(simulation)
             
     def supply_parametric_term(self):
@@ -605,6 +604,7 @@ class RunToolBook(wx.Panel):
 class AutoWidthListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
     def __init__(self, parent, ID = wx.ID_ANY, pos=wx.DefaultPosition,
                  size=wx.DefaultSize, style=0):
+        
         wx.ListCtrl.__init__(self, parent, ID, pos, size, style)
         ListCtrlAutoWidthMixin.__init__(self)
         
@@ -1002,6 +1002,7 @@ class OutputDataPanel(wx.Panel):
             
             if self.ResultsList is not None:
                 self.WriteButton.Destroy()
+                self.RemoveButton.Destroy()
                 self.ResultsList.Destroy()
                 self.GetSizer().Layout()
                 
@@ -1019,15 +1020,26 @@ class OutputDataPanel(wx.Panel):
             
             #The items being created
             self.ResultsList = ResultsList(self, headers, rows)
+
+            
             self.WriteButton = wx.Button(self, label = 'Write to file...')
             self.WriteButton.Bind(wx.EVT_BUTTON, self.OnWriteFiles)
+            
+            self.RemoveButton = wx.Button(self,label = 'Remove selected')
+            self.RemoveButton.Bind(wx.EVT_BUTTON, self.OnRemoveSelected)
+            
             
             #Do the layout of the panel
             sizer = self.GetSizer()
             hsizer = wx.BoxSizer(wx.HORIZONTAL)
             hsizer.Add(self.ResultsList,1,wx.EXPAND)
             sizer.Add(hsizer)
-            sizer.Add(self.WriteButton)
+            
+            hsizer = wx.BoxSizer(wx.HORIZONTAL)
+            hsizer.Add(self.WriteButton)
+            hsizer.Add(self.RemoveButton)
+            sizer.Add(hsizer)
+            
             sizer.Layout()
             self.Refresh()
     
@@ -1047,6 +1059,26 @@ class OutputDataPanel(wx.Panel):
                 self.add_runs([sim])
             self.rebuild()
         FD.Destroy()
+        
+    def OnRemoveSelected(self, event):
+        list_ = self.ResultsList.GetListCtrl()
+        
+        indices = []
+        index = list_.GetFirstSelected()
+        while index != -1:
+            indices.append(index)
+            index = list_.GetNextSelected(index)
+            
+        #Some runs to delete
+        if indices:
+            #Warn before removing
+            dlg = wx.MessageDialog(None,'You are about to remove '+str(len(indices))+' runs.  Ok to confirm', style = wx.OK|wx.CANCEL)
+            if dlg.ShowModal() == wx.ID_OK:
+                for index in reversed(indices):
+                    self.results.pop(index)
+            dlg.Destroy()
+            self.rebuild()
+                
     
     def OnWriteFiles(self, event):
         """
