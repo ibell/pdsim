@@ -130,18 +130,20 @@ class PDPanel(wx.Panel):
         return s
         
                     
-    def get_from_configfile(self,configfile,section,default_configfile = os.path.join('configs','default.cfg')):
+    def get_from_configfile(self,configfile,section,
+                            default_configfile = os.path.join('configs','default.cfg')):
         """
         Returns a dictionary with each of the elements from the given section 
         name from the given configuration file.  Each of the values in the configuration 
-        file must have a string in the format 
+        file may have a string in the format 
         
         int,3,
         float,3.0
         string,hello
-        State,Ref,T,rho
         
-        so that the code can know what type the value is.
+        so that the code can know what type the value is.  If the value is something else,
+        ask post_get_from_configfile if it knows what to do with it
+        
         """
         d={}
         desc={}
@@ -152,7 +154,7 @@ class PDPanel(wx.Panel):
         with codecs.open(configfile, 'r', encoding='latin-1') as f:
             parser.readfp(f)
         
-        #Section not included, use the default section from the default file
+        #Section not included, use the default section from the default config file
         if not parser.has_section(section):
             parser = SafeConfigParser()
             parser.optionxform = unicode
@@ -186,7 +188,7 @@ class PDPanel(wx.Panel):
                 if hasattr(self,'post_get_from_configfile'):
                     self.post_get_from_configfile(name, value)
                 else:
-                    raise KeyError('Type in line '+name+' = ' +value+' must be one of int,float,str,State')
+                    raise KeyError('Type in line '+name+' = ' +value+' must be one of int,float,str')
 
         return d,desc
     

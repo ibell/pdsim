@@ -22,6 +22,7 @@ from PDSimLoader import RecipBuilder
 from PDSim.plot.plots import PlotNotebook
 import PDSim
 import time
+import textwrap
 import cPickle
                 
 #def stupid(pipe_inlet):
@@ -391,7 +392,12 @@ class IntegratorChoices(wx.Choicebook):
             self.RK45_eps.SetValue(config)
         
     def save_to_string(self):
-         pass
+        if self.GetSelection() == 0:
+            return 'Cycle = Cycle,Euler,'+self.EulerN.GetValue()
+        elif self.GetSelection() == 1:
+            return 'Cycle = Cycle,Heun,'+self.HeunN.GetValue()
+        else:
+            return 'Cycle = Cycle,RK45,'+self.RK45_eps.GetValue()
         
 class SolverInputsPanel(pdsim_panels.PDPanel):
     def __init__(self, parent, configfile,**kwargs):
@@ -416,7 +422,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
             self.IC.set_from_string(config_string)
         
     def post_prep_for_configfile(self):
-        return self.IC.save_to_string()
+        return self.IC.save_to_string()+'\n'
         
     def post_calculate(self, simulation):
         self.IC.set_sim(simulation)
@@ -700,14 +706,14 @@ class ColumnSelectionDialog(wx.Dialog):
         wx.Dialog.__init__(self,parent,size = (500,300))
         
         self.col_options = col_options
-        print cols_selected
+
         self.selected = [col_options[col] for col in cols_selected]
         self.not_selected = [col_options[col] for col in col_options if col not in cols_selected]
         
         self.col_library = wx.ListBox(self, choices = self.not_selected, style = wx.LB_EXTENDED)
         self.col_used = wx.ListBox(self, choices = self.selected, style = wx.LB_EXTENDED)
-        sizer = wx.BoxSizer(wx.HORIZONTAL)
-        sizer.Add(self.col_library, 1, wx.EXPAND)
+        
+        #The central column with add and remove buttons
         self.AddAllButton=wx.Button(self, label='All ->')
         self.RemoveAllButton=wx.Button(self, label='<- All')
         self.AddButton=wx.Button(self, label='-->')
@@ -720,12 +726,12 @@ class ColumnSelectionDialog(wx.Dialog):
         vsizer.AddMany([self.AddAllButton, self.RemoveAllButton])
         vsizer.AddSpacer(20)
         vsizer.AddMany([self.AddButton, self.RemoveButton])
-        
+
+        #The far-right column with up,down, ok, cancel buttons      
         self.Up = wx.Button(self, label='Up')
         self.Up.Bind(wx.EVT_BUTTON,self.OnUp)
         self.Down = wx.Button(self, label='Down')
         self.Down.Bind(wx.EVT_BUTTON,self.OnDown)
-        
         self.OkButton = wx.Button(self, label='Ok')
         self.OkButton.Bind(wx.EVT_BUTTON,self.OnAccept)
         self.CancelButton = wx.Button(self, label='Cancel')
@@ -735,6 +741,9 @@ class ColumnSelectionDialog(wx.Dialog):
         vsizer2.AddSpacer(40)
         vsizer2.AddMany([self.CancelButton, self.OkButton])
         
+        #Layout the dialog
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.Add(self.col_library, 1, wx.EXPAND)
         sizer.Add(vsizer,0,wx.ALIGN_CENTER_VERTICAL)
         sizer.Add(self.col_used,1,wx.EXPAND)
         sizer.Add(vsizer2,0,wx.ALIGN_CENTER_VERTICAL)
@@ -1314,16 +1323,30 @@ class MainFrame(wx.Frame):
                            style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
         if wx.ID_OK==FD.ShowModal():
             file_path=FD.GetPath()
-            print 'Writing configuration file to ',file_path   
+            print 'Writing configuration file to ', file_path   
             #Build the config file entry
             string_list = []
+            
+            #Header information
+            header_string_template = textwrap.dedent(
+                 """
+                 [Globals]
+                 Type = {CompressorType}
+                 Mode = compressor
+                 """
+                 ) 
+            terms = dict(CompressorType = 'recip')
+            header_string = header_string_template.format(**terms)
+            print header_string
+            string_list.append(unicode(header_string,'latin-1'))
+            
             for panel in self.MTB.InputsTB.panels+self.MTB.SolverTB.panels:
                 panel_string = panel.prep_for_configfile()
                 if isinstance(panel_string,str):
                     string_list.append(unicode(panel_string,'latin-1'))
                 elif isinstance(panel_string,unicode):
                     #Convert to a string
-                    panel_string = unicode.decode(panel_string,'utf-8')
+                    panel_string = unicode.decode(panel_string,'latin-1')
                     string_list.append(panel_string)
             
             fp = codecs.open(file_path,'w',encoding = 'latin-1')

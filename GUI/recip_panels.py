@@ -181,4 +181,4 @@ class StatePanel(pdsim_panels.PDPanel):
         State_ = self.SuctionState.GetState()
         StateString = 'inletState = State,'+State_.Fluid+','+str(State_.T)+','+str(State_.rho)
         DischargeString = 'discharge = Discharge,'+str(self.DischargeValue.GetValue())+','+self.cmbDischarge.GetStringSelection()
-        return StateString+'\n'+DischargeString
+        return StateString+'\n'+DischargeString+'\n'
