@@ -732,12 +732,12 @@ class ColumnSelectionDialog(wx.Dialog):
         self.CancelButton.Bind(wx.EVT_BUTTON,self.OnClose)
         vsizer2 = wx.BoxSizer(wx.VERTICAL)
         vsizer2.AddMany([self.Up,self.Down])
-        vsizer2.AddStretchSpacer(0)
-        vsizer2.AddMany([self.OkButton,self.CancelButton])
+        vsizer2.AddSpacer(40)
+        vsizer2.AddMany([self.CancelButton, self.OkButton])
         
-        sizer.Add(vsizer)
+        sizer.Add(vsizer,0,wx.ALIGN_CENTER_VERTICAL)
         sizer.Add(self.col_used,1,wx.EXPAND)
-        sizer.Add(vsizer2)
+        sizer.Add(vsizer2,0,wx.ALIGN_CENTER_VERTICAL)
         self.SetSizer(sizer)
         sizer.Layout()
         
@@ -750,7 +750,9 @@ class ColumnSelectionDialog(wx.Dialog):
         """ cancel if Escape key is pressed """
         event.Skip()
         if event.GetKeyCode() == wx.WXK_ESCAPE:
-            self.EndModal(wx.ID_CANCEL)        
+            self.EndModal(wx.ID_CANCEL)
+        elif event.GetKeyCode() == wx.WXK_RETURN:
+            self.EndModal(wx.ID_OK)
         
     def label2attr(self,label):
         for col in self.col_options:

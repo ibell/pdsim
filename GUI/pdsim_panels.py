@@ -8,6 +8,7 @@ from CoolProp import CoolProp as CP
 from ConfigParser import SafeConfigParser
 import codecs
 import numpy as np
+import os
 import itertools
 from multiprocessing import Process
 
@@ -129,7 +130,7 @@ class PDPanel(wx.Panel):
         return s
         
                     
-    def get_from_configfile(self,configfile,section):
+    def get_from_configfile(self,configfile,section,default_configfile = os.path.join('configs','default.cfg')):
         """
         Returns a dictionary with each of the elements from the given section 
         name from the given configuration file.  Each of the values in the configuration 
@@ -150,10 +151,16 @@ class PDPanel(wx.Panel):
         # Open the file with the correct encoding
         with codecs.open(configfile, 'r', encoding='latin-1') as f:
             parser.readfp(f)
-    
-        parser.read(configfile)
         
-        for name,value in parser.items(section):
+        #Section not included, use the default section from the default file
+        if not parser.has_section(section):
+            parser = SafeConfigParser()
+            parser.optionxform = unicode
+            # Open the file with the correct encoding
+            with codecs.open(default_configfile, 'r', encoding='latin-1') as f:
+                parser.readfp(f)
+        
+        for name, value in parser.items(section):
             
             #Split at the first comma to get type, and value+description
             type,val_desc = value.split(',',1)
@@ -487,7 +494,7 @@ class StateChooser(wx.Dialog):
         fgs= wx.FlexGridSizer(cols=2,hgap=3,vgap=3)
         self.Tlabel, self.T = LabeledItem(self,label="Temperature [K]",value='300',enabled=False)
         self.plabel, self.p = LabeledItem(self,label="Pressure [kPa]",value='300',enabled=False)
-        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/mï¿½]",value='1',enabled=False)
+        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/m³]",value='1',enabled=False)
         fgs.AddMany([self.Tlabel,self.T,self.plabel,self.p,self.rholabel,self.rho])
         sizer.Add(fgs)
         
@@ -603,12 +610,12 @@ class StatePanel(wx.Panel):
     def __init__(self,parent,id=-1,Fluid='R404A',T=283.15,rho=5.74):
         wx.Panel.__init__(self,parent,id)
         
-        p = CP.Props('P','T',T,'D',rho,Fluid)
+        p = CP.Props('P','T',T,'D',rho,str(Fluid))
         sizer=wx.FlexGridSizer(cols=2,hgap=4,vgap=4)
         self.Fluidlabel, self.Fluid = LabeledItem(self,label="Fluid",value=str(Fluid),enabled=False)
         self.Tlabel, self.T = LabeledItem(self,label="Temperature [K]",value=str(T),enabled=False)
         self.plabel, self.p = LabeledItem(self,label="Pressure [kPa]",value=str(p),enabled=False)
-        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/mï¿½]",value=str(rho),enabled=False)
+        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/m³]",value=str(rho),enabled=False)
         sizer.AddMany([self.Fluidlabel, self.Fluid,self.Tlabel,self.T,self.plabel,self.p,self.rholabel,self.rho])
         self.calcbtn=wx.Button(self,-1,"Choose")
         sizer.Add(self.calcbtn)
