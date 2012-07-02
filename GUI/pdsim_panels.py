@@ -69,8 +69,19 @@ class PDPanel(wx.Panel):
                 return value
              
     def calculate(self,sim):
+        
+        if not hasattr(self,'items'):
+            return
+        else:
+            items = self.items
+        
+        if hasattr(self,'skip_list'):
+            # Don't actually set these attributes (they might over-write 
+            # methods or attributes in the simulation)
+            items = [item for item in items if item['attr'] not in self.skip_list()]
+            
         if hasattr(self,'items'):
-            for item in self.items:
+            for item in items:
                 setattr(sim,item['attr'],self._get_value(item['textbox']))
     
     def ConstructItems(self,items,sizer,configdict=None,descdict=None):
@@ -103,7 +114,7 @@ class PDPanel(wx.Panel):
         """
         if self.name=='':
             return ''
-        
+            
         if not hasattr(self,'items'):
             self.items=[]
         
@@ -128,11 +139,10 @@ class PDPanel(wx.Panel):
         
         s=s.replace('%','%%')
         return s
-        
                     
-    def get_from_configfile(self,configfile,section,
-                            default_configfile = os.path.join('configs','default.cfg')):
+    def get_from_configfile(self, section):
         """
+        configfile: file path or readable object (StringIO instance or file)
         Returns a dictionary with each of the elements from the given section 
         name from the given configuration file.  Each of the values in the configuration 
         file may have a string in the format 
@@ -148,24 +158,19 @@ class PDPanel(wx.Panel):
         d={}
         desc={}
         
-        parser = SafeConfigParser()
-        parser.optionxform = unicode
-        # Open the file with the correct encoding
-        with codecs.open(configfile, 'r', encoding='latin-1') as f:
-            parser.readfp(f)
+        Main = wx.GetTopLevelParent(self)
+        parser, default_parser = Main.get_config_objects()
         
         #Section not included, use the default section from the default config file
         if not parser.has_section(section):
             dlg = wx.MessageDialog(None,'Section '+section+' was not found, falling back to default configuration file')
             dlg.ShowModal()
             dlg.Destroy()
-            parser = SafeConfigParser()
-            parser.optionxform = unicode
-            # Open the file with the correct encoding
-            with codecs.open(default_configfile, 'r', encoding='latin-1') as f:
-                parser.readfp(f)
+            _parser = default_parser
+        else:
+            _parser = parser
         
-        for name, value in parser.items(section):
+        for name, value in _parser.items(section):
             
             #Split at the first comma to get type, and value+description
             type,val_desc = value.split(',',1)
@@ -318,7 +323,7 @@ class ParametricPanel(PDPanel):
         self.ParamListSizer = None
         
         #Has no self.items, so all processing done through post_get_from_configfile
-        self.get_from_configfile(configfile, 'ParametricPanel')
+        self.get_from_configfile('ParametricPanel')
         
     def OnAddTerm(self, event = None):
         if self.NTerms == 0:
@@ -453,7 +458,10 @@ def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True, toolti
     if enabled==False:
         thing.Disable()
     if tooltip is not None:
-        thing.SetToolTipString(tooltip)
+        if enabled:
+            thing.SetToolTipString(tooltip)
+        else:
+            label.SetToolTipString(tooltip)
     return label,thing
 
 class StateChooser(wx.Dialog):
@@ -667,7 +675,7 @@ class StateInputsPanel(PDPanel):
         PDPanel.__init__(self, parent,**kwargs)
         
         #Loads all the parameters from the config file (case-sensitive)
-        self.configdict, self.descdict = self.get_from_configfile(configfile,'StatePanel')
+        self.configdict, self.descdict = self.get_from_configfile('StatePanel')
         
         self.items = [
                       dict(attr='omega')

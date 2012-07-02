@@ -20,10 +20,10 @@ def Compressor():
         
     Ref='Air'
 #    State.debug(0)
-    CP.set_1phase_LUT_params(Ref,30,30,250,1000,180,5000)
-    CP.UseSinglePhaseLUT(True)
-    State.set_1phase_LUT_params(Ref,30,30,250,1000,180,5000)
-    State.LUT(True)
+#    CP.set_1phase_LUT_params(Ref,30,30,250,1000,180,5000)
+#    CP.UseSinglePhaseLUT(True)
+#    State.set_1phase_LUT_params(Ref,30,30,250,1000,180,5000)
+#    State.LUT(True)
     
     inletState = State.State(Ref,{'T':300,'P':310})
     outletState = State.State(Ref,{'T':400,'P':1200})

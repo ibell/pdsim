@@ -12,7 +12,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         pdsim_panels.PDPanel.__init__(self,parent,**kwargs)
         
         #Loads all the parameters from the config file
-        configdict,descdict = self.get_from_configfile(configfile,'GeometryPanel')
+        configdict, descdict = self.get_from_configfile('GeometryPanel')
         
         # Things in self.items are linked through to the module code where 
         # it attempts to set the attribute.  They are also automatically
@@ -39,7 +39,7 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         pdsim_panels.PDPanel.__init__(self, parent,**kwargs)
         
         #Loads all the parameters from the config file
-        self.configdict,self.descdict = self.get_from_configfile(configfile,'MassFlowPanel')
+        self.configdict,self.descdict = self.get_from_configfile('MassFlowPanel')
         
         self.items1 = [
         dict(attr='d_discharge'),
@@ -83,7 +83,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         pdsim_panels.PDPanel.__init__(self, parent, **kwargs)
         
         #Loads all the parameters from the config file (case-sensitive)
-        self.configdict,self.descdict = self.get_from_configfile(configfile,'MechanicalLossesPanel')
+        self.configdict,self.descdict = self.get_from_configfile('MechanicalLossesPanel')
         
         self.items = [
         dict(attr='eta_motor'),

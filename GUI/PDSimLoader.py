@@ -63,3 +63,35 @@ def RecipBuilder(recip):
           key_down='outlet.1'
           )
     recip.add_valve(recip.discharge_valve)
+    
+def ScrollBuilder(scroll):
+    
+    if hasattr(scroll,'pre_solve'):
+        scroll.pre_solve()
+    
+    outletState=CPState.State(scroll.inletState.Fluid,{'T':400,'P':scroll.discharge_pressure})
+    
+    if callable(scroll.Vdisp):
+        Vdisp = scroll.Vdisp()
+    else:
+        Vdisp = scroll.Vdisp
+        
+    mdot_guess = scroll.inletState.rho*Vdisp*scroll.omega/(2*pi)
+    
+    scroll.auto_add_CVs(scroll.inletState, outletState)
+    scroll.auto_add_leakage(flankFunc = scroll.FlankLeakage, 
+                                radialFunc = scroll.RadialLeakage)
+    
+    scroll.add_tube( Tube(key1='inlet.1',key2='inlet.2',L=0.03,ID=0.02,
+                             mdot=mdot_guess, 
+                             State1=scroll.inletState.copy(),
+                             fixed=1,TubeFcn=scroll.TubeCode) )
+    
+    scroll.add_tube( Tube(key1='outlet.1',key2='outlet.2',L=0.03,ID=0.02,
+                             mdot=mdot_guess, 
+                             State2=outletState.copy(),
+                             fixed=2,TubeFcn=scroll.TubeCode) )
+    
+    scroll.add_flow(FlowPath(key1='inlet.2',key2='A',MdotFcn=scroll.Suction))
+    scroll.add_flow(FlowPath(key1='outlet.1',key2='A',MdotFcn=scroll.Discharge))
+    

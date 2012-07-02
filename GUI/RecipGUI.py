@@ -1,38 +1,38 @@
 # -*- coding: latin-1 -*-
 
+#Imports from wx package
 import wx,os,sys
 from wx.lib.mixins.listctrl import CheckListCtrlMixin, ColumnSorterMixin, ListCtrlAutoWidthMixin
 from wx.lib.embeddedimage import PyEmbeddedImage
 import wx.lib.agw.pybusyinfo as PBI
 from wx.lib.wordwrap import wordwrap
 
+#Provided by python
 import codecs
-import numpy as np
-import CoolProp.State as CPState
-from PDSim.recip.core import Recip
 from operator import itemgetter
-import pdsim_panels
-import recip_panels
 from math import pi
 from Queue import Queue
 from multiprocessing import Process, Pipe, freeze_support, cpu_count, allow_connection_pickling
 from Queue import Empty
 from threading import Thread
-from PDSimLoader import RecipBuilder
-from PDSim.plot.plots import PlotNotebook
-import PDSim
 import time
 import textwrap
 import cPickle
-                
-#def stupid(pipe_inlet):
-#    redir = RedirectText2Pipe(pipe_inlet)
-#    sys.stdout = redir
-#    sys.stderr = redir
-#    for i in range(100):
-#        time.sleep(0.1)
-#        print int(i),'Hi'
-#    return
+from ConfigParser import SafeConfigParser
+import StringIO
+
+import numpy as np
+import CoolProp.State as CPState
+from PDSim.recip.core import Recip
+from PDSim.scroll.core import Scroll
+from PDSimLoader import RecipBuilder, ScrollBuilder
+from PDSim.plot.plots import PlotNotebook
+import PDSim
+
+import pdsim_panels
+import recip_panels
+import scroll_panels
+import default_configs
 
 class InfiniteList(object):
     """
@@ -286,19 +286,54 @@ class InputsToolBook(wx.Toolbook):
         wx.Toolbook.__init__(self, parent, -1, style=wx.BK_LEFT)
         il = wx.ImageList(32, 32)
         indices=[]
-        for imgfile in ['Geometry.png','MassFlow.png','MechanicalLosses.png','StatePoint.png']:
+        for imgfile in ['Geometry.png',
+                        'MassFlow.png',
+                        'MechanicalLosses.png',
+                        'StatePoint.png']:
             ico_path = os.path.join('ico',imgfile)
             indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
         self.AssignImageList(il)
         
-        #Make the recip panels.  Name should be consistent with configuration file
-        self.panels=(recip_panels.GeometryPanel(self,configfile,name='GeometryPanel'),
-                     recip_panels.MassFlowPanel(self,configfile,name='MassFlowPanel'),
-                     recip_panels.MechanicalLossesPanel(self,configfile,name='MechanicalLossesPanel'),
-                     pdsim_panels.StateInputsPanel(self,configfile,name='StatePanel')
-                     )
+        parser = SafeConfigParser()
+        parser.optionxform = unicode
         
-        for Name,index,panel in zip(['Geometry','Mass Flow && Valves','Mechanical','State Points'],indices,self.panels):
+        Main = wx.GetTopLevelParent(self)
+        if Main.SimType == 'recip':
+            # Make the recip panels.  Name should be consistent with configuration 
+            # file section heading
+            self.panels=(recip_panels.GeometryPanel(self, 
+                                                    configfile,
+                                                    name='GeometryPanel'),
+                         recip_panels.MassFlowPanel(self,
+                                                    configfile,
+                                                    name='MassFlowPanel'),
+                         recip_panels.MechanicalLossesPanel(self,
+                                                            configfile,
+                                                            name='MechanicalLossesPanel'),
+                         pdsim_panels.StateInputsPanel(self,
+                                                       configfile,
+                                                       name='StatePanel')
+                         )
+            
+        elif Main.SimType == 'scroll':
+            # Make the scroll panels.  Name should be consistent with configuration 
+            # file section heading
+            self.panels=(scroll_panels.GeometryPanel(self, 
+                                                    configfile,
+                                                    name='GeometryPanel'),
+                         scroll_panels.MassFlowPanel(self,
+                                                    configfile,
+                                                    name='MassFlowPanel'),
+                         scroll_panels.MechanicalLossesPanel(self,
+                                                    configfile,
+                                                    name='MechanicalLossesPanel'),
+                         pdsim_panels.StateInputsPanel(self,
+                                                   configfile,
+                                                   name='StatePanel')
+                         )
+        
+        
+        for Name, index, panel in zip(['Geometry','Mass Flow && Valves','Mechanical','State Points'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
             
     def calculate(self, simulation):
@@ -312,10 +347,10 @@ class InputsToolBook(wx.Toolbook):
             if hasattr(panel,'post_calculate'):
                 panel.post_calculate(simulation)
     
-    def post_calculate(self, simulation):
-        for panel in self.panels:
-            if hasattr(panel,'post_calculate'):
-                panel.post_calculate(simulation)
+#    def post_calculate(self, simulation):
+#        for panel in self.panels:
+#            if hasattr(panel,'post_calculate'):
+#                panel.post_calculate(simulation)
                 
     def collect_parametric_terms(self):
         items = [] 
@@ -410,7 +445,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
     
         # Loads all the parameters from the config file - 
         # it will call post_get_from_configfile 
-        self.get_from_configfile(configfile, 'SolverInputsPanel') 
+        self.get_from_configfile('SolverInputsPanel') 
         
     def post_get_from_configfile(self, key, config_string):
         """
@@ -1048,7 +1083,7 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         
         self.Bind(wx.EVT_SIZE, self.OnRefresh)
         
-        self.get_from_configfile(configfile,'OutputDataPanel')
+        self.get_from_configfile('OutputDataPanel')
         
     def rebuild(self):
         
@@ -1162,9 +1197,6 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             #Strip leading and trailing space
             attr = attr.strip()
             self.columns_selected.append(attr)
-            
-        print self.columns_selected
-            
     
     def post_prep_for_configfile(self):
         return 'selected  = selected,'+str(self.columns_selected).replace(',',';')+'\n'
@@ -1226,11 +1258,60 @@ class MainToolBook(wx.Toolbook):
 
 class MainFrame(wx.Frame):
     def __init__(self, configfile=None, position=None, size=None):
-        wx.Frame.__init__(self, None, title = "Recip GUI", size=(700, 700))
+        wx.Frame.__init__(self, None, title = "PDSim GUI", size=(700, 700))
         
-        #The default configuration file
-        if configfile is None: #No file name passed in
+        if configfile is None: #No file name or object passed in
+            
+            #First see if there is a file at configs/default.cfg
             configfile = os.path.join('configs','default.cfg')
+            if os.path.exists(configfile):
+                configbuffer = open(configfile,'rb')
+                
+            #Command line option provided
+            elif '--config' in sys.argv:
+                i = sys.argv.index('--config')
+                configfile = sys.argv[i+1]
+                configbuffer = open(configfile, 'rb') 
+                
+            #Then use the internal default recip
+            else:
+                configbuffer = default_configs.get_scroll_defaults()
+        
+        elif isinstance(configfile, basestring):
+            if os.path.exists(configfile):
+                configbuffer = open(configfile,'rb')
+                        
+        elif isinstance(configfile, StringIO.StringIO):
+            configbuffer = configfile
+                
+        else:
+            raise ValueError
+        
+        #Get a unicode-wrapped version of the selected file-like object
+        enc, dec, reader, writer = codecs.lookup('latin-1')
+        uConfigParser = reader(configbuffer)
+                
+        #The file-like object for the configuration
+        self.config_parser = SafeConfigParser()
+        self.config_parser.optionxform = unicode 
+        self.config_parser.readfp(uConfigParser)
+        
+        #The file-like object for the default scroll configuration
+        parser = SafeConfigParser()
+        parser.optionxform = unicode
+        uConfigParser = reader(default_configs.get_scroll_defaults())
+        parser.readfp(uConfigParser)
+        self.config_parser_default_scroll = parser
+        
+        #The file-like object for the default recip configuration
+        parser = SafeConfigParser()
+        parser.optionxform = unicode
+        uConfigParser = reader(default_configs.get_recip_defaults())
+        parser.readfp(uConfigParser)
+        self.config_parser_default_recip = parser
+        
+        #Get the simulation type (recip, scroll, ...)
+        self.SimType = self.config_parser.get('Globals', 'Type')
             
         #The position and size are needed when the frame is rebuilt, but not otherwise
         if position is None:
@@ -1238,8 +1319,8 @@ class MainFrame(wx.Frame):
         if size is None:
             size = (-1,-1)
         
-        #Use the builder function to rebuild using the default configuration file
-        self.build(configfile)
+        #Use the builder function to rebuild using the configuration objects
+        self.build()
         
         # Set up redirection of input and output to logging wx.TextCtrl
         # Taken literally from http://www.blog.pythonlibrary.org/2009/01/01/wxpython-redirecting-stdout-stderr/
@@ -1265,17 +1346,28 @@ class MainFrame(wx.Frame):
         #A thread-safe queue for the processing of the results 
         self.results_list = Queue()
         
-        #Bind the idle event handler that will always run and deal with the results
+        # Bind the idle event handler that will always run and
+        # deal with the results
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnIdle, self.timer)
         self.timer.Start(1000) #1000 ms between checking the queue
         
+        self.default_configfile = default_configs.get_recip_defaults()
+        
+    def get_config_objects(self):
+        if self.SimType == 'recip':
+            return (self.config_parser, self.config_parser_default_recip)
+        elif self.SimType == 'scroll':
+            return (self.config_parser, self.config_parser_default_scroll)
+        else:
+            raise AttributeError
+    
     def get_logctrls(self):
         return [self.MTB.RunTB.log_ctrl_thread1,
                 self.MTB.RunTB.log_ctrl_thread2,
                 self.MTB.RunTB.log_ctrl_thread3]
     
-    def rebuild(self,configfile):
+    def rebuild(self, configfile):
         """
         Destroy everything in the main frame and recreate 
         the contents based on parsing the config file
@@ -1291,11 +1383,11 @@ class MainFrame(wx.Frame):
         #Destroy the current MainFrame
         self.Destroy()
         
-    def build(self,configfile):
+    def build(self):
         self.make_menu_bar()
         
         sizer = wx.BoxSizer(wx.VERTICAL)
-        self.MTB=MainToolBook(self,configfile)
+        self.MTB=MainToolBook(self, self.get_config_objects())
         sizer.Add(self.MTB, 1, wx.EXPAND)
         self.SetSizer(sizer)
         sizer.Layout()
@@ -1312,6 +1404,16 @@ class MainFrame(wx.Frame):
         #Build the model the rest of the way
         RecipBuilder(recip)
         return recip
+    
+    def build_scroll(self):
+        #Instantiate the scroll class
+        scroll=Scroll()
+        #Pull things from the GUI as much as possible
+        self.MTB.InputsTB.calculate(scroll)
+        self.MTB.SolverTB.calculate(scroll)
+        #Build the model the rest of the way
+        ScrollBuilder(scroll)
+        return scroll
     
     def run_simulation(self, sim):
         """
@@ -1414,9 +1516,15 @@ class MainFrame(wx.Frame):
         """
         print "Running.."
         self.MTB.SetSelection(2)
-        self.recip = self.build_recip()
-        self.recip.run_index = 1
-        self.run_simulation(self.recip)
+        if self.SimType == 'recip':
+            self.recip = self.build_recip()
+            self.recip.run_index = 1
+            self.run_simulation(self.recip)
+        
+        elif self.SimType == 'scroll':
+            self.scroll = self.build_scroll()
+            self.scroll.run_index = 1
+            self.run_simulation(self.scroll)
             
     def OnStop(self, event):
         """Stop Computation."""
@@ -1493,6 +1601,14 @@ class MainFrame(wx.Frame):
         # Then we call wx.AboutBox giving it that info object
         wx.AboutBox(info)
         
+    def OnChangeSimType(self, event):  
+        if self.TypeScroll.IsChecked():
+            print 'Scroll-type compressor'
+            self.rebuild(default_configs.get_scroll_defaults())
+        elif self.TypeRecip.IsChecked():
+            print 'Recip-type compressor'
+            self.rebuild(default_configs.get_recip_defaults())
+        
     def make_menu_bar(self):
         #################################
         ####       Menu Bar         #####
@@ -1516,7 +1632,6 @@ class MainFrame(wx.Frame):
         self.Type = wx.Menu()
         self.TypeRecip = wx.MenuItem(self.Type, -1, "Recip", "", wx.ITEM_RADIO)
         self.TypeScroll = wx.MenuItem(self.Type, -1, "Scroll", "", wx.ITEM_RADIO)
-        
         self.TypeCompressor = wx.MenuItem(self.Type, -1, "Compressor mode", "", wx.ITEM_RADIO)
         self.TypeExpander = wx.MenuItem(self.Type, -1, "Expander mode", "", wx.ITEM_RADIO)
         self.TypeCompressor.Enable(False)
@@ -1528,10 +1643,15 @@ class MainFrame(wx.Frame):
         self.Type.AppendItem(self.TypeExpander)
         
         self.MenuBar.Append(self.Type, "Type")
-        def f1(event):  print 'Scroll-type compressor'
-        def f2(event):  print 'Recip-type compressor'
-        self.Bind(wx.EVT_MENU,f1,self.TypeScroll)
-        self.Bind(wx.EVT_MENU,f2,self.TypeRecip)
+        
+        
+        if self.config_parser.get('Globals', 'Type') == 'recip':
+            self.TypeRecip.Check(True)
+        else:
+            self.TypeScroll.Check(True)
+            
+        self.Bind(wx.EVT_MENU,self.OnChangeSimType,self.TypeScroll)
+        self.Bind(wx.EVT_MENU,self.OnChangeSimType,self.TypeRecip)
         
         self.Solve = wx.Menu()
         self.SolveSolve = wx.MenuItem(self.Solve, -1, "Solve\tF5", "", wx.ITEM_NORMAL)
@@ -1586,9 +1706,10 @@ if __name__ == '__main__':
     app = wx.App(False)
     wx.InitAllImageHandlers()
     
-    Splash=MySplashScreen()
-    Splash.Show()
-    time.sleep(2.0)
+    if '--nosplash' not in sys.argv:
+        Splash=MySplashScreen()
+        Splash.Show()
+        time.sleep(2.0)
     
     frame = MainFrame() 
     frame.Show(True) 

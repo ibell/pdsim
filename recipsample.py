@@ -115,17 +115,16 @@ def Compressor():
           key_down='outlet.1'
           )
     recip.add_valve(recip.discharge_valve)
-    
+
+    recip.EulerN = 7000
+    recip.HeunN = 3000
     t1=clock()
     recip.solve(key_inlet='inlet.1',key_outlet='outlet.2',
-                eps_allowed = 1e-6, #Only used with RK45 solver
-                Euler_N = 7000, #Only used with Euler solver
-                Heun_N = 15000, #Only used with Heun solver
                 endcycle_callback=recip.endcycle_callback,
                 heat_transfer_callback=recip.heat_transfer_callback,
                 lump_energy_balance_callback = recip.lump_energy_balance_callback,
                 valves_callback =recip.valves_callback,
-                solver_method = 'Euler',
+                solver_method = 'Heun',
                 OneCycle = False
                 )
     print 'time taken',clock()-t1
