@@ -838,14 +838,10 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
 
     """
 
-    if axis is not None:
-        if fig is not None:
+    if axis is None:
+        if fig is None:
             fig=pylab.figure(figsize=(5,5))
-        else:
-            fig=kwargs['fig']
         axis=fig.add_axes((0,0,1,1))
-    else:
-        axis=kwargs['axis']
         
     if geo is None:
         geo=geoVals(rb=0.003522,phi_i0=0.19829,phi_is=4.7,phi_ie=15.5,phi_o0=-1.1248,phi_os=1.8,phi_oe=15.5,h=0.03289)
