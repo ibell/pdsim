@@ -32,7 +32,7 @@ import PDSim
 
 import pdsim_panels
 import recip_panels
-import scroll_panels
+#import scroll_panels
 import default_configs
 
 class InfiniteList(object):
@@ -316,26 +316,27 @@ class InputsToolBook(wx.Toolbook):
                                                        name='StatePanel')
                          )
             
-        elif Main.SimType == 'scroll':
+#        elif Main.SimType == 'scroll':
             # Make the scroll panels.  Name should be consistent with configuration 
             # file section heading
-            self.panels=(scroll_panels.GeometryPanel(self, 
-                                                    configfile,
-                                                    name='GeometryPanel'),
-                         scroll_panels.MassFlowPanel(self,
-                                                    configfile,
-                                                    name='MassFlowPanel'),
-                         scroll_panels.MechanicalLossesPanel(self,
-                                                    configfile,
-                                                    name='MechanicalLossesPanel'),
-                         pdsim_panels.StateInputsPanel(self,
-                                                   configfile,
-                                                   name='StatePanel')
-                         )
-        
-        
+#            self.panels=(scroll_panels.GeometryPanel(self, 
+#                                                    configfile,
+#                                                    name='GeometryPanel'),
+#                         scroll_panels.MassFlowPanel(self,
+#                                                    configfile,
+#                                                    name='MassFlowPanel'),
+#                         scroll_panels.MechanicalLossesPanel(self,
+#                                                    configfile,
+#                                                    name='MechanicalLossesPanel'),
+#                         pdsim_panels.StateInputsPanel(self,
+#                                                   configfile,
+#                                                   name='StatePanel')
+#                         )
+#        
+#        
         for Name, index, panel in zip(['Geometry','Mass Flow && Valves','Mechanical','State Points'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
+            
             
     def set_params(self, simulation):
         """
