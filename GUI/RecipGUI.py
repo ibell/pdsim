@@ -1205,7 +1205,7 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             self.columns_selected.append(attr)
     
     def post_prep_for_configfile(self):
-        return 'selected  = selected,'+str(self.columns_selected).replace(',',';')+'\n'
+        return 'selected  = selected,'+str(self.columns_selected).replace(',',';').replace("u'","'")+'\n'
         
 class OutputsToolBook(wx.Toolbook):
     def __init__(self,parent,configfile):

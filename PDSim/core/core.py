@@ -681,6 +681,7 @@ class PDSimCore(object):
         # last index is Itheta, number of steps is Itheta+1
         print 'Itheta steps taken',Itheta+1
         self.Itheta=Itheta
+        self.Ntheta = Itheta
         self.__post_cycle()
         
     def __post_cycle(self):
@@ -793,17 +794,26 @@ class PDSimCore(object):
                 print 'x_state is', x_state
                 
                 if solver_method == 'Euler':
-                    N=self.EulerN
+                    if hasattr(self,'EulerN'):
+                        N=self.EulerN
+                    else:
+                        N=7000
                     self.cycle_SimpleEuler(N,x_state,step_callback=step_callback,
                                            heat_transfer_callback=heat_transfer_callback,
                                            valves_callback=valves_callback)
                 elif solver_method == 'Heun':
-                    N=self.HeunN
+                    if hasattr(self,'HeunN'):
+                        N=self.HeunN
+                    else:
+                        N=7000
                     self.cycle_SimpleEuler(N,x_state,step_callback=step_callback,
                                            heat_transfer_callback=heat_transfer_callback,
                                            valves_callback=valves_callback)
                 elif solver_method == 'RK45':
-                    eps_allowed = self.RK45_eps
+                    if hasattr(self,'RK45_eps'):
+                        eps_allowed=self.RK45_eps
+                    else:
+                        eps_allowed = 1e-8
                     self.cycle_RK45(x_state,
                                     eps_allowed = eps_allowed,
                                     step_callback=step_callback,
@@ -841,13 +851,14 @@ class PDSimCore(object):
                 else:
                     #endcycle_callback returns the errors and new initial st
                     errors, x_state_ = endcycle_callback()
+                    print errors
                     self.x_state = x_state_[:] #Make a copy
                     return errors
                 
             #! End of OBJECTIVE_CYCLE
             
             if UseNR:
-                self.x_state = Broyden(OBJECTIVE_CYCLE, self.x_state, dx = 0.1, itermax = 50, ytol = 1e-4)
+                self.x_state = Broyden(OBJECTIVE_CYCLE, self.x_state, Nfd = 1, dx = 0.01*np.array(self.x_state), itermax = 50, ytol = 1e-4)
                 print self.x_state
                 if self.x_state[0] is None:
                     return None
@@ -898,7 +909,7 @@ class PDSimCore(object):
         
         #end of OJECTIVE
         
-        x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,[315.0,325.0],dx=0.2,ytol=0.001,itermax=30)
+        x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,[315.0,325.0],dx=0.3,ytol=0.001,itermax=30)
         print 'Solution is', x_soln,'Td, Tlumps'
         
         del self.resid_Td, self.x_state

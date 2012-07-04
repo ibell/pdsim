@@ -35,7 +35,7 @@ def MultiDimNewtRaph(f,x0,dx=1e-6,args=(),ytol=1e-5,w=1.0,JustOneStep=False):
             return x
     return x
         
-def Broyden(f,x0,dx=1e-5,args=(),ytol=1e-5,w=0.75,wJ=0.5,itermax=10,JustOneStep=False):
+def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 2, w=1.0, wJ=1.0, itermax=10, JustOneStep=False):
     """
     Broyden's method
     
@@ -47,19 +47,29 @@ def Broyden(f,x0,dx=1e-5,args=(),ytol=1e-5,w=0.75,wJ=0.5,itermax=10,JustOneStep=
     A1=np.zeros((len(x0),len(x0)))
     A0=np.zeros((len(x0),len(x0)))
     
-    #If a float is passed in for dx, convert to a numpy-like list the same shape
-    #as x
     if isinstance(dx,float) or isinstance(dx,int):
         dx=dx*np.ones_like(x0)
-    f0=f(x0,*args)
-    F0=array(f0)
-    if f0 is None:
-        return [None,None]
-    iter=1
-    x1=x0.copy()
-    F1=F0.copy()
+    error_vec=[]
+    
+    def not_improving():
+        # If the error increased in the last step, re-evaluate the Jacobian
+        if len(error_vec)>2 and error_vec[-1]>error_vec[-2]:
+            return True
+        else:
+            return False
+    
+    iter = 1
     while abs(error)>ytol:
-        if iter==1:
+        if iter <= Nfd or not_improving():
+            # If past the first numerical derivative step, use the value of x
+            # calculated below 
+            if iter > 1:
+                x0 = x1.copy()
+            f0=f(x0,*args)
+            F0=array(f0)
+            if f0 is None:
+                return [None,None]
+            
             #Build the Jacobian matrix by columns
             for i in range(len(x0)):
                 epsilon=np.zeros_like(x0)
@@ -70,10 +80,14 @@ def Broyden(f,x0,dx=1e-5,args=(),ytol=1e-5,w=0.75,wJ=0.5,itermax=10,JustOneStep=
                 A0[:,i]=(array(fplus)-F0)/epsilon[i]
             #Get the difference vector
             x1=x0-w*np.dot(inv(A0),F0)
+            print x1,w*np.dot(inv(A0),F0)
             #Just do one step and stop
             if JustOneStep==True:
                 return x1
             iter+=1
+            # Flush the error vector to ensure that you don't continually 
+            # rebuild the Jacobian
+            error_vec=[]
             
         elif iter>1 and iter<itermax:
             #Jacobian updating parameters
@@ -84,7 +98,7 @@ def Broyden(f,x0,dx=1e-5,args=(),ytol=1e-5,w=0.75,wJ=0.5,itermax=10,JustOneStep=
             if f1 is None:
                 return [None,None]
             Y=F1-F0
-            A1=A0+wJ/d*dot((Y-dot(A0,S)),S.T)
+            A1=A0+w/d*dot((Y-dot(A0,S)),S.T)
             x2=x1-w*np.dot(inv(A1),F1)
             #Update values
             x0=x1
@@ -92,6 +106,8 @@ def Broyden(f,x0,dx=1e-5,args=(),ytol=1e-5,w=0.75,wJ=0.5,itermax=10,JustOneStep=
             F0=F1
             A0=A1
             error=np.sqrt(np.sum(np.power(F1,2)))
+            error_vec.append(error)
+            print 'error_vec',error_vec
             iter+=1
         else:
             raise ValueError('Reached maximum number of iterations without getting below ytol RMS error')

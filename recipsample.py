@@ -51,7 +51,7 @@ def Compressor():
     recip.pre_solve()
     
     Ref='R410A'
-    inletState=State.State(Ref,dict(T=283.15, D=5.75))
+    inletState=State.State(Ref,dict(T=289.15, D=33.1))
     outletState=State.State(Ref,{'T':400,'P':inletState.p*2.5})
     mdot_guess = inletState.rho*recip.Vdisp()*recip.omega/(2*pi)
     
@@ -122,7 +122,7 @@ def Compressor():
           )
     recip.add_valve(recip.discharge_valve)
 
-    recip.EulerN = 10000
+    recip.EulerN = 3000
     recip.HeunN = 3000
     recip.RK45_eps = 1e-10
     t1=clock()
