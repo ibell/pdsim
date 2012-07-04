@@ -15,6 +15,7 @@ crank_length = float,0.01,Crank length [m]
 connecting_rod_length = float,0.04,Connecting rod length [m]
 dead_volume_perc = float,4.0,Dead volume percentage [%%]
 x_TDC = float,0.005,Distance to piston at TDC [m]
+shell_volume = float,100e-6,Shell volume [m³]
 
 [MassFlowPanel]
 d_discharge = float,0.0059,Discharge port diameter [m]
@@ -60,9 +61,9 @@ Mode = compressor
 
 [GeometryPanel]
 Vdisp = float,104.8e-6,Displacement volume / revolution [m³/rev]
-Vratio = float,1.8,Built-in volume ratio [-]
+Vratio = float,1.61,Built-in volume ratio [-]
 ro = float, 0.005, Orbiting radius [m]
-t = float,0.003,Scroll wrap thickness [m]
+t = float,0.004,Scroll wrap thickness [m]
 
 [MassFlowPanel]
 d_discharge = float,0.0059,Discharge port diameter [m]

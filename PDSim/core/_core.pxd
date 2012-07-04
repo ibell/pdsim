@@ -3,7 +3,7 @@ cimport cython
 
 #Import the listm type used in PDSim
 from PDSim.misc._listmath cimport listm
-from PDSim.flow._Flow cimport _FlowPath
+from PDSim.flow._flow cimport _FlowPath
 
 cdef class _PDSimCore:
     cdef bint __hasLiquid__

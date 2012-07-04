@@ -5,8 +5,8 @@ from Cython.Distutils.extension import Extension as CyExtension
 import sys,shutil,os
 
 if len(sys.argv)==1:
-    #sys.argv+=['build_ext','--inplace','install']
-    sys.argv+=['build_ext','install']
+    sys.argv+=['build_ext','--inplace','install']
+    #sys.argv+=['build_ext','install']
     
 import Cython
 
@@ -24,7 +24,7 @@ pyx_list = [
             "PDSim/flow/_flow.pyx",
             "PDSim/scroll/scroll_geo.py",
             "PDSim/misc/_listmath.pyx",
-            "PDSim/core/_core.pyx",
+            #"PDSim/core/_core.pyx",
             ]
 
 # Try to remove the generated files in the source tree 

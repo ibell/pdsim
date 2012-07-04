@@ -35,7 +35,7 @@ def MultiDimNewtRaph(f,x0,dx=1e-6,args=(),ytol=1e-5,w=1.0,JustOneStep=False):
             return x
     return x
         
-def Broyden(f,x0,dx=1e-5,args=(),ytol=1e-5,w=1.0,itermax=10,JustOneStep=False):
+def Broyden(f,x0,dx=1e-5,args=(),ytol=1e-5,w=0.75,wJ=0.5,itermax=10,JustOneStep=False):
     """
     Broyden's method
     
@@ -69,11 +69,12 @@ def Broyden(f,x0,dx=1e-5,args=(),ytol=1e-5,w=1.0,itermax=10,JustOneStep=False):
                     return [None,None]
                 A0[:,i]=(array(fplus)-F0)/epsilon[i]
             #Get the difference vector
-            x1=x0-np.dot(inv(A0),F0)
+            x1=x0-w*np.dot(inv(A0),F0)
             #Just do one step and stop
             if JustOneStep==True:
                 return x1
             iter+=1
+            
         elif iter>1 and iter<itermax:
             #Jacobian updating parameters
             S=x1-x0
@@ -83,8 +84,8 @@ def Broyden(f,x0,dx=1e-5,args=(),ytol=1e-5,w=1.0,itermax=10,JustOneStep=False):
             if f1 is None:
                 return [None,None]
             Y=F1-F0
-            A1=A0+1.0/d*dot((Y-dot(A0,S)),S.T)
-            x2=x1-np.dot(inv(A1),F1)
+            A1=A0+wJ/d*dot((Y-dot(A0,S)),S.T)
+            x2=x1-w*np.dot(inv(A1),F1)
             #Update values
             x0=x1
             x1=x2
@@ -95,6 +96,7 @@ def Broyden(f,x0,dx=1e-5,args=(),ytol=1e-5,w=1.0,itermax=10,JustOneStep=False):
         else:
             raise ValueError('Reached maximum number of iterations without getting below ytol RMS error')
             return np.nan*np.ones_like(x0)
+            
     return x1
                 
 if __name__=='__main__':

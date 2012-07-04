@@ -1,3 +1,15 @@
+
+# If being run from the folder that contains the PDSim source tree, 
+# remove the current location from the python path and use the 
+# site-packages version of PDSim
+import sys, os
+current_path = os.path.abspath(os.curdir)
+if current_path in sys.path and os.path.exists(os.path.join('PDSim','__init__.py')):
+    i = sys.path.index(current_path)
+    sys.path.pop(i)
+else:
+    print current_path,sys.path
+    
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll.core import Scroll
 from PDSim.core.containers import ControlVolume
@@ -7,6 +19,8 @@ from CoolProp import State
 from CoolProp import CoolProp as CP
 from math import pi
     
+
+        
 def Compressor():
     
     ScrollComp=Scroll()
@@ -54,15 +68,17 @@ def Compressor():
 
     from time import clock
     t1=clock()
+    ScrollComp.RK45_eps = 1e-6
+    ScrollComp.EulerN = 10000
     ScrollComp.solve(key_inlet='inlet.1',key_outlet='outlet.2',
                  step_callback=ScrollComp.step_callback, 
                  endcycle_callback=ScrollComp.endcycle_callback,
                  heat_transfer_callback=ScrollComp.heat_transfer_callback,
                  lump_energy_balance_callback=ScrollComp.lump_energy_balance_callback,
-                 eps_allowed=1e-6,
                  solver_method='RK45',
-                 Euler_N=10000,
-                 hmin=2*pi/(100000)
+                 hmin=2*pi/(100000),
+                 UseNR = False,
+                 OneCycle = True
                  )
     print 'time taken',clock()-t1
     

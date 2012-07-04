@@ -23,6 +23,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         dict(attr='crank_length'),
         dict(attr='connecting_rod_length'),
         dict(attr='x_TDC', tooltip='The distance from the top of the cylinder to the piston head at top dead center'),
+        dict(attr='shell_volume', tooltip='The volume of the shell of the compressor'),
         ]
         
         sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)

@@ -1,5 +1,6 @@
 from __future__ import division
 from math import pi,cos,sin,sqrt
+from scipy.integrate import simps
 from PDSim.misc.scipylike import trapz
 from PDSim.flow import flow_models
 from PDSim.core.core import PDSimCore
@@ -28,11 +29,29 @@ class Recip(PDSimCore):
         Returns displacement of compressor in m\ :math:`^3`\ /revolution
         """
         return 2*self.crank_length*self.A_piston
+    
+    def V_shell(self, theta):
+        
+        return self.shell_volume, 0
         
     def TubeCode(self,Tube,**kwargs):
         Tube.Q = flow_models.IsothermalWallTube(Tube.mdot,Tube.State1,Tube.State2,Tube.fixed,Tube.L,Tube.ID,T_wall=self.Tlumps[0])
     
-    def PistonLeakage(self,FlowPath,**kwargs):
+    def Inlet(self, FlowPath, **kwargs):
+        try:
+            FlowPath.A=0.01**2/4*pi
+            mdot=flow_models.IsentropicNozzle(FlowPath.A,FlowPath.State_up,FlowPath.State_down)
+            return mdot
+        except ZeroDivisionError:
+            return 0.0
+        
+#        #Find the tube that this flow path is part of. Return its flow rate
+#        for Tube in self.Tubes:
+#            if (FlowPath.key_up in [Tube.key1, Tube.key2] or
+#               FlowPath.key_down in [Tube.key1, Tube.key2]) :
+#                return Tube.mdot
+        
+    def PistonLeakage(self, FlowPath, **kwargs):
         try:
             FlowPath.A=self.delta_gap*self.piston_diameter*pi
             mdot=flow_models.IsentropicNozzle(FlowPath.A,FlowPath.State_up,FlowPath.State_down)
@@ -130,12 +149,16 @@ class Recip(PDSimCore):
         #Mean heat transfer rate from gas to lump using Simpson's method for numerical integration
         #Note: Qdot_from_gas has opposite sign of heat transfer TO the gas as calculated in the heat_transfer_callback
         #Note: Qdot_from_gas will likely be less than 0 because heat is being removed and delivered to the gas
-        self.Qdot_from_gas = -trapz(self.Q[0,0:self.Itheta+1],self.t[0:self.Itheta+1])/(self.t[self.Itheta]-self.t[0]) #[kW]
+        self.Qdot_from_gas = -simps(self.Q[0,0:self.Itheta],self.t[0:self.Itheta])/(self.t[self.Itheta-1]-self.t[0]) #[kW]
         #Mechanical losses are added to the lump
         self.Wdot_mechanical = self.mechanical_losses() #[kW]
         #Heat transfer between the shell and the ambient
         self.Qamb = self.ambient_heat_transfer() #[kW]
-        return self.Qdot_from_gas + self.Wdot_mechanical + self.Qamb
+        #Note: heat transfer TO the gas in the tubes is given a positive sign
+        #      so sign is flipped for the lump
+        self.Qtubes = -sum([Tube.Q for Tube in self.Tubes])
+        print 'self.Qtubes',self.Qtubes
+        return self.Qdot_from_gas + self.Wdot_mechanical + self.Qamb + self.Qtubes
     
     def pre_solve(self):
         """

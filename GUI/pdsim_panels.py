@@ -68,7 +68,7 @@ class PDPanel(wx.Panel):
             except ValueError:
                 return value
              
-    def calculate(self,sim):
+    def set_params(self, sim):
         
         if not hasattr(self,'items'):
             return
@@ -80,9 +80,8 @@ class PDPanel(wx.Panel):
             # methods or attributes in the simulation)
             items = [item for item in items if item['attr'] not in self.skip_list()]
             
-        if hasattr(self,'items'):
-            for item in items:
-                setattr(sim,item['attr'],self._get_value(item['textbox']))
+        for item in items:
+            setattr(sim, item['attr'],self._get_value(item['textbox']))
     
     def ConstructItems(self,items,sizer,configdict=None,descdict=None):
         for item in items:
@@ -410,8 +409,8 @@ class ParametricPanel(PDPanel):
                     val = self.ParaList.GetStringItem(Irow, Icol)
                     Name = self.ParaList.GetColumn(Icol+1).Text
                     setattr(recip,self._get_attr(Name),float(val))
-                    #Run the post_calculate for all the panels
-                    Main.MTB.InputsTB.post_calculate(recip)
+                    #Run the post_set_params for all the panels
+                    Main.MTB.InputsTB.post_set_params(recip)
             #Add an index for the run so that it can be sorted properly
             recip.run_index = Irow + 1
             recips.append(recip)
@@ -732,7 +731,7 @@ class StateInputsPanel(PDPanel):
         self.Discharge_key = key
         self.Discharge_value = str(value)
         
-    def post_calculate(self, simulation):
+    def post_set_params(self, simulation):
         simulation.inletState = self.SuctionState.GetState()
         if self.cmbDischarge.GetStringSelection() == 'Discharge pressure [kPa]':
             simulation.discharge_pressure = float(self.DischargeValue.GetValue())

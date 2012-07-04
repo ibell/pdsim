@@ -5,9 +5,12 @@ from CoolProp.State import State
 import numpy as np
 from math import pi
 import textwrap
-from PDSim.misc.scipylike import trapz
+from scipy.integrate import trapz
+#from PDSim.misc.scipylike import trapz
+from scipy.integrate import simps
 from scipy.optimize import newton
 import copy
+import pylab
 
 ##--  Package imports  --
 from PDSim.flow._sumterms import setcol, getcol
@@ -164,8 +167,10 @@ class PDSimCore(object):
             
             Flows "into" the node are positive, flows out of the 
             node are negative
+            
+            Use the code in the Cython module
             """
-            return _flow.sum_flows(key,Flows)
+            return _flow.sum_flows(key, Flows)
             
         def collect_keys(Tubes,Flows):
             """
@@ -186,7 +191,6 @@ class PDSimCore(object):
         
         #Get all the nodes that can exist for tubes and CVs
         keys=collect_keys(self.Tubes,self.Flows)
-
         
         #Get the instantaneous net flow through each node
         #   and the averaged mass flow rate through each node
@@ -196,21 +200,29 @@ class PDSimCore(object):
         self.FlowsProcessed.mean_mdot={}
         self.FlowsProcessed.integrated_mdoth={}
         self.FlowsProcessed.integrated_mdot={}
-        self.FlowsProcessed.t=self.t[0:(self.Itheta+1)]
+        self.FlowsProcessed.t=self.t[0:self.Ntheta]
+
         for key in keys:
             # Empty container numpy arrays
-            self.FlowsProcessed.summed_mdot[key]=np.zeros((self.Itheta+1,))
-            self.FlowsProcessed.summed_mdoth[key]=np.zeros((self.Itheta+1,))
-            for i in range(self.Itheta+1):
+            self.FlowsProcessed.summed_mdot[key]=np.zeros((self.Itheta,))
+            self.FlowsProcessed.summed_mdoth[key]=np.zeros((self.Itheta,))
+            for i in range(self.Ntheta):
                 mdot,mdoth=sum_flows(key,self.FlowStorage[i])
                 self.FlowsProcessed.summed_mdot[key][i]=mdot
                 self.FlowsProcessed.summed_mdoth[key][i]=mdoth
             
-            self.FlowsProcessed.integrated_mdoth[key]=trapz(self.FlowsProcessed.summed_mdoth[key],self.t[0:(self.Itheta+1)])
-            self.FlowsProcessed.integrated_mdot[key]=trapz(self.FlowsProcessed.summed_mdot[key],self.t[0:(self.Itheta+1)])
-            self.FlowsProcessed.mean_mdot[key]=self.FlowsProcessed.integrated_mdot[key]/(self.t[self.Itheta]-self.t[0])
+            # All the calculations here should be done in the time domain,
+            # rather than crank angle.  So convert angle to time by dividing 
+            # by omega, the rotational speed in rad/s.
+            trange = self.t[self.Ntheta-1]-self.t[0]
+            # integrated_mdoth has units of kJ/rev * f [Hz] --> kJ/s or kW
+            self.FlowsProcessed.integrated_mdoth[key]=trapz(self.FlowsProcessed.summed_mdoth[key], 
+                                                            self.t[0:self.Ntheta]/self.omega)*self.omega/(2*pi)
+            # integrated_mdot has units of kg/rev * f [Hz] --> kg/s
+            self.FlowsProcessed.integrated_mdot[key]=trapz(self.FlowsProcessed.summed_mdot[key], 
+                                                           self.t[0:self.Ntheta]/self.omega)*self.omega/(2*pi)
+            self.FlowsProcessed.mean_mdot[key]=np.mean(self.FlowsProcessed.integrated_mdot[key])
             
-        
         # Special-case the tubes.  Only one of the nodes can have flow.  
         #   The other one is invariant because it is quasi-steady.
         for Tube in self.Tubes:
@@ -333,9 +345,9 @@ class PDSimCore(object):
             self.p[self.CVs.exists_indices, 0] = self.CVs.p
             self.rho[self.CVs.exists_indices, 0] = self.CVs.rho
         else:
+            x0_ = copy.copy(x0)
             #x0 is provided
             if self.__hasValves__:
-                x0_ = copy.copy(x0)
                 x0_.extend([0]*len(self.Valves)*2)
             self.__put_to_matrices(x0_, 0)
         
@@ -374,45 +386,44 @@ class PDSimCore(object):
         #Do some initialization - create arrays, etc.
         self.__pre_cycle(x_state)
         
-        #Start at an index of 0
-        Itheta=0
+        #Step variables
         t0=tmin
         h=(tmax-tmin)/(N-1)
         
-        #One call to build the flows at start
+        #Get the beginning of the cycle configured
         x_state.extend([0.0]*len(self.Valves)*2)
         xold = listm(x_state[:])
-        self.theta=t0
-        self.derivs(t0, xold, heat_transfer_callback, valves_callback)
-        self.FlowStorage.append(self.Flows.get_deepcopy())
-        self.__put_to_matrices(xold, 0)
     
-        for Itheta in range(N):
+        for Itheta in range(N-1):
+            
+            #Call the step callback if provided
             if step_callback!=None:
                 step_callback(t0, h, Itheta)
-                
-            xold = self.__get_from_matrices(Itheta)
-                        
-            # Step 1: derivatives evaluated at old values
+                      
+            # Step 1: derivatives evaluated at old values of t = t0
             f1 = self.derivs(t0, xold, heat_transfer_callback, valves_callback)
             xnew = xold+h*f1
             
-            self.t[Itheta+1] = t0 + h
-            self.__put_to_matrices(xnew, Itheta + 1)
-            t0+=h
-            Itheta+=1
+            #Store at the current index (first run at index 0)
+            self.t[Itheta] = t0
+            self.__put_to_matrices(xold, Itheta)
             self.FlowStorage.append(self.Flows.get_deepcopy())
             
-            #Some debugging information
-            #print t0,h
+            # Everything from this step is finished, now update for the next
+            # step coming
+            t0+=h
+            xold = xnew
             
-        #Run this at the end
-        V,dV=self.CVs.volumes(t0)
-        self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+        #Run this at the end at index N-1
+        self.t[N-1]=2*pi
+        self.derivs(tmax, xnew, heat_transfer_callback, valves_callback)
+        self.__put_to_matrices(xnew, N-1)
+        self.FlowStorage.append(self.Flows.get_deepcopy())
         
         # last index is Itheta, number of steps is Itheta+1
-        print 'Itheta steps taken',Itheta+1
-        self.Itheta=Itheta
+        print 'Itheta steps taken', N
+        self.Itheta = N
+        self.Ntheta = N
         self.__post_cycle()
         
     def cycle_Heun(self,N,x_state, tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
@@ -486,7 +497,8 @@ class PDSimCore(object):
         
         # last index is Itheta, number of steps is Itheta+1
         print 'Itheta steps taken',Itheta+1
-        self.Itheta=Itheta
+        self.Itheta = Itheta
+        self.Ntheta = N
         self.__post_cycle()
         return 
         
@@ -678,6 +690,12 @@ class PDSimCore(object):
         for name in self.temp_vectors_list:
             delattr(self,name)
             
+        self.Wdot_pv = 0.0
+        for CVindex in range(self.p.shape[0]):
+            y = self.p[CVindex,0:self.Ntheta]
+            x = self.V[CVindex,0:self.Ntheta]
+            self.Wdot_pv += -trapz(y, x)*self.omega/(2*pi)
+            
         self.__postprocess_flows()
     
     def check_abort(self):
@@ -700,6 +718,7 @@ class PDSimCore(object):
               OneCycle = False,
               Abort = None,
               pipe_abort = None,
+              UseNR = True,
               **kwargs):
         """
         This is the driving function for the PDSim model.  It can be extended through the 
@@ -760,11 +779,11 @@ class PDSimCore(object):
             # The rest are the lumps in order
             self.Tlumps = Td_Tlumps
             
-            # (0) Update the discharge temperature
+            # (0). Update the discharge temperature
             p = self.Tubes.Nodes[key_outlet].p
             self.Tubes.Nodes[key_outlet].update({'T':self.Td,'P':p})
             
-            # (1) First, run all the tubes
+            # (1). First, run all the tubes
             for tube in self.Tubes:
                 tube.TubeFcn(tube)
             
@@ -827,9 +846,8 @@ class PDSimCore(object):
                 
             #! End of OBJECTIVE_CYCLE
             
-            UseNR = True #Change this to True to enable the use of the Newton-Raphson
             if UseNR:
-                self.x_state = Broyden(OBJECTIVE_CYCLE, self.x_state, dx = 0.1, itermax = 30, ytol = 1e-4)
+                self.x_state = Broyden(OBJECTIVE_CYCLE, self.x_state, dx = 0.1, itermax = 50, ytol = 1e-4)
                 print self.x_state
                 if self.x_state[0] is None:
                     return None
@@ -891,6 +909,9 @@ class PDSimCore(object):
         """
         Do some post-processing to calculate flow rates, efficiencies, etc.  
         """
+        if not hasattr(self,'Qamb'):
+            self.Qamb = 0
+            
         #The total mass flow rate
         self.mdot = self.FlowsProcessed.mean_mdot[self.key_inlet]
         
@@ -900,10 +921,16 @@ class PDSimCore(object):
             if key == self.key_outlet:
                  outletState = State
         
-        self.eta_v = self.mdot / (self.omega/(2*pi)*self.Vdisp()*inletState.rho)
+        if callable(self.Vdisp):
+            Vdisp = self.Vdisp()
+        else:
+            Vdisp = self.Vdisp
+            
+        self.eta_v = self.mdot / (self.omega/(2*pi)*Vdisp*inletState.rho)
         h1 = inletState.h
         h2 = outletState.h
         s1 = inletState.s
+        print h1, h2
         T2s = newton(lambda T: Props('S','T',T,'P',outletState.p,outletState.Fluid)-s1,inletState.T+30)
         h2s = Props('H','T',T2s,'P',outletState.p,outletState.Fluid)
         self.eta_a = (h2s-h1)/(h2-h1)
@@ -912,24 +939,19 @@ class PDSimCore(object):
         self.Wdot = self.mdot*(h2-h1)-self.Qamb
         
         #Resize all the matrices to keep only the real data
-        self.t = self.t[0:self.Itheta+1]
-        self.T = self.T[:,0:self.Itheta+1]
-        self.p = self.p[:,0:self.Itheta+1]
-        self.m = self.m[:,0:self.Itheta+1]
-        self.rho = self.rho[:,0:self.Itheta+1]
-        self.V = self.V[:,0:self.Itheta+1]
-        self.dV = self.dV[:,0:self.Itheta+1]
-        self.xValves = self.xValves[:,0:self.Itheta+1]
+        self.t = self.t[  0:self.Ntheta]
+        self.T = self.T[:,0:self.Ntheta]
+        self.p = self.p[:,0:self.Ntheta]
+        self.m = self.m[:,0:self.Ntheta]
+        self.rho = self.rho[:,0:self.Ntheta]
+        self.V = self.V[:,0:self.Ntheta]
+        self.dV = self.dV[:,0:self.Ntheta]
+        self.xValves = self.xValves[:,0:self.Ntheta]
         
-        self.Wdot_pv = 0.0
-        for CVindex in range(self.p.shape[0]):
-            self.Wdot_pv += -trapz(self.p[CVindex,:], self.V[CVindex,:])*self.omega/(2*pi)
-        
-        print 'mdot*(h2-h1),P-v,Qamb', self.Wdot*1000, self.Wdot_pv*1000, self.Qamb
+        print 'mdot*(h2-h1),P-v,Qamb', self.Wdot, self.Wdot_pv, self.Qamb
         print 'Mass flow rate is',self.mdot*1000,'g/s'
         print 'Volumetric efficiency is',self.eta_v*100,'%'
         print 'Adiabatic efficiency is',self.eta_a*100,'%'
-        
         
     def derivs(self,theta,x,heat_transfer_callback=None,valves_callback=None):
         """
@@ -1082,16 +1104,16 @@ class PDSimCore(object):
             for newkey in becomes:
                 Inew = self.CVs.index(newkey)
                 newCV = self.CVs[newkey]
-                newT.append(self.T[Iold,self.Itheta])
-                new_rho.append(self.rho[Iold,self.Itheta])
-                errorT.append((self.T[Iold,self.Itheta]-self.T[Inew,0])/self.T[Inew,0])
-                errorp.append((self.p[Iold,self.Itheta]-self.p[Inew,0])/self.p[Inew,0])
-                error_rho.append((self.rho[Iold,self.Itheta]-self.rho[Inew,0])/self.rho[Inew,0])
+                newT.append(self.T[Iold,self.Itheta-1])
+                new_rho.append(self.rho[Iold,self.Itheta-1])
+                errorT.append((self.T[Iold,self.Itheta-1]-self.T[Inew,0])/self.T[Inew,0])
+                errorp.append((self.p[Iold,self.Itheta-1]-self.p[Inew,0])/self.p[Inew,0])
+                error_rho.append((self.rho[Iold,self.Itheta-1]-self.rho[Inew,0])/self.rho[Inew,0])
                 #Update the list of keys for setting the exist flags
                 LHS.append(key)
                 RHS.append(newkey)
                 #Update the CV with the new value - use the copy of the CVs from before
-                newCV.State.update({'T':self.T[Iold,self.Itheta],'D':self.rho[Iold,self.Itheta]})
+                #newCV.State.update({'T':self.T[Iold,self.Itheta],'D':self.rho[Iold,self.Itheta]})
                 
         errorT_abs = [abs(err) for err in errorT]
         error_rho_abs = [abs(err) for err in error_rho]

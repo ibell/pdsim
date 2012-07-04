@@ -5,11 +5,11 @@ from time import clock
 # If being run from the folder that contains the PDSim source tree, 
 # remove the current location from the python path and use the 
 # site-packages version of PDSim
-import sys, os
-current_path = os.path.abspath(os.curdir)
-if current_path in sys.path:
-    i = sys.path.index(current_path)
-    sys.path.pop(i)
+#import sys, os
+#current_path = os.path.abspath(os.curdir)
+#if current_path in sys.path:
+#    i = sys.path.index(current_path)
+#    sys.path.pop(i)
 
 from PDSim.flow.flow import FlowPath
 from PDSim.flow import flow_models
@@ -43,9 +43,10 @@ def Compressor():
     recip.Tamb = 298 #[K]
     
     recip.mu_oil = 0.0086
-    recip.delta_gap = 40e-6
+    recip.delta_gap = 10e-6
     recip.eta_motor = 0.95
     
+    recip.shell_volume = 100e-6
     #Calculate Vdisp
     recip.pre_solve()
     
@@ -64,6 +65,10 @@ def Compressor():
                                initialState=outletState.copy(),
                                VdVFcn=recip.V_dV,
                                becomes='A') )
+    recip.add_CV( ControlVolume(key='shell',
+                               initialState=inletState.copy(),
+                               VdVFcn=recip.V_shell,
+                               becomes='shell') )
     
     recip.add_tube( Tube(key1='inlet.1',key2='inlet.2',L=0.03,ID=0.02,
                              mdot=mdot_guess, State1=inletState.copy(),
@@ -72,9 +77,10 @@ def Compressor():
                              mdot=mdot_guess, State2=outletState.copy(),
                              fixed=2,TubeFcn=recip.TubeCode) )
     
-    recip.add_flow(FlowPath(key1='inlet.2',key2='A',MdotFcn=recip.Suction))
-    recip.add_flow(FlowPath(key1='outlet.1',key2='A',MdotFcn=recip.Discharge))
-    recip.add_flow(FlowPath(key1='inlet.2',key2='A',MdotFcn=recip.PistonLeakage))
+    recip.add_flow(FlowPath(key1='shell', key2='inlet.2', MdotFcn=recip.Inlet))
+    recip.add_flow(FlowPath(key1='shell', key2='A', MdotFcn=recip.Suction))
+    recip.add_flow(FlowPath(key1='outlet.1', key2='A', MdotFcn=recip.Discharge))
+    recip.add_flow(FlowPath(key1='shell', key2='A', MdotFcn=recip.PistonLeakage))
 
     E = 1.93e11             #Youngs Modulus, [Pa]
     h_valve = 0.0001532     #Valve thickness, [m]
@@ -116,20 +122,21 @@ def Compressor():
           )
     recip.add_valve(recip.discharge_valve)
 
-    recip.EulerN = 7000
+    recip.EulerN = 10000
     recip.HeunN = 3000
+    recip.RK45_eps = 1e-10
     t1=clock()
     recip.solve(key_inlet='inlet.1',key_outlet='outlet.2',
                 endcycle_callback=recip.endcycle_callback,
                 heat_transfer_callback=recip.heat_transfer_callback,
                 lump_energy_balance_callback = recip.lump_energy_balance_callback,
                 valves_callback =recip.valves_callback,
-                solver_method = 'Heun',
+                solver_method = 'Euler',
                 OneCycle = False
                 )
-    print 'time taken',clock()-t1
+    print 'time taken', clock()-t1
     
-#    debug_plots(recip)
+    debug_plots(recip)
     
 if __name__=='__main__':    
     Compressor()

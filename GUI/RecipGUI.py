@@ -6,6 +6,7 @@ from wx.lib.mixins.listctrl import CheckListCtrlMixin, ColumnSorterMixin, ListCt
 from wx.lib.embeddedimage import PyEmbeddedImage
 import wx.lib.agw.pybusyinfo as PBI
 from wx.lib.wordwrap import wordwrap
+wx.SetDefaultPyEncoding('latin-1') 
 
 #Provided by python
 import codecs
@@ -58,7 +59,7 @@ class RedirectText2Pipe(object):
     def flush(self):
         return None
 
-class Run1Recip(Process):
+class Run1(Process):
     def __init__(self,pipe_std, pipe_abort, pipe_results, recip, pipe2):
         Process.__init__(self)
         self.pipe_std = pipe_std
@@ -199,7 +200,7 @@ class RedirectedWorkerThread(Thread):
         pipe_results_outlet, pipe_results_inlet = Pipe(duplex = True)
         pipe_results_outlet2, pipe_results_inlet2 = Pipe(duplex = True)
 
-        p = Run1Recip(pipe_inlet, pipe_abort_outlet, pipe_results_inlet, self.args_[0],pipe_results_inlet2)
+        p = Run1(pipe_inlet, pipe_abort_outlet, pipe_results_inlet, self.args_[0],pipe_results_inlet2)
         p.daemon = True
         p.start()
         
@@ -336,21 +337,21 @@ class InputsToolBook(wx.Toolbook):
         for Name, index, panel in zip(['Geometry','Mass Flow && Valves','Mechanical','State Points'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
             
-    def calculate(self, simulation):
+    def set_params(self, simulation):
         """
         Pull all the values out of the child panels, using the values in 
-        self.items and the function post_calculate if the panel implements
+        self.items and the function post_set_params if the panel implements
         it
         """
         for panel in self.panels:
-            panel.calculate(simulation)
-            if hasattr(panel,'post_calculate'):
-                panel.post_calculate(simulation)
+            panel.set_params(simulation)
+            if hasattr(panel,'post_set_params'):
+                panel.post_set_params(simulation)
     
-#    def post_calculate(self, simulation):
-#        for panel in self.panels:
-#            if hasattr(panel,'post_calculate'):
-#                panel.post_calculate(simulation)
+    def post_set_params(self, simulation):
+        for panel in self.panels:
+            if hasattr(panel,'post_set_params'):
+                panel.post_set_params(simulation)
                 
     def collect_parametric_terms(self):
         items = [] 
@@ -459,7 +460,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
     def post_prep_for_configfile(self):
         return self.IC.save_to_string()+'\n'
         
-    def post_calculate(self, simulation):
+    def post_set_params(self, simulation):
         self.IC.set_sim(simulation)
             
     def supply_parametric_term(self):
@@ -484,11 +485,11 @@ class SolverToolBook(wx.Toolbook):
         for Name,index,panel in zip(['Params','Parametric'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
             
-    def calculate(self,simulat):
+    def set_params(self,simulat):
         for panel in self.panels:
-            panel.calculate(simulat)
-            if hasattr(panel,'post_calculate'):
-                panel.post_calculate(simulat)            
+            panel.set_params(simulat)
+            if hasattr(panel,'post_set_params'):
+                panel.post_set_params(simulat)            
 
 class WriteOutputsPanel(wx.Panel):
     def __init__(self,parent):
@@ -763,7 +764,7 @@ class ColumnSelectionDialog(wx.Dialog):
         self.RemoveAllButton.Bind(wx.EVT_BUTTON,self.OnRemoveAll)
         vsizer = wx.BoxSizer(wx.VERTICAL)
         vsizer.AddMany([self.AddAllButton, self.RemoveAllButton])
-        vsizer.AddSpacer(20)
+        vsizer.AddSpacer(40)
         vsizer.AddMany([self.AddButton, self.RemoveButton])
 
         #The far-right column with up,down, ok, cancel buttons      
@@ -954,11 +955,16 @@ class FileOutputDialog(wx.Dialog):
             return
         
         for i, sim in enumerate(self.Simulations):
-            run_path = 'RunNumber{0:04d}'.format(i+1)
-            if not os.path.exists(os.path.join(dir_path, run_path)):
-                os.mkdir(os.path.join(dir_path, run_path))
-            self.write_csv_files(os.path.join(dir_path, run_path), sim)
-            self.write_pickle(os.path.join(dir_path, run_path), sim)
+            if (self.file_list.GetCheckedStrings() or 
+                self.chkPickled.GetValue()):
+                
+                run_path = 'RunNumber{0:04d}'.format(i+1)
+                if not os.path.exists(os.path.join(dir_path, run_path)):
+                    os.mkdir(os.path.join(dir_path, run_path))
+                self.write_csv_files(os.path.join(dir_path, run_path), sim)
+            
+            if self.chkPickled.GetValue():
+                self.write_pickle(os.path.join(dir_path, run_path), sim)
             if self.chkTable.GetValue():
                 fp = open(os.path.join(dir_path,'ResultsTable.csv'),'w')
                 fp.write(self.table_string)
@@ -1399,8 +1405,8 @@ class MainFrame(wx.Frame):
         #Instantiate the recip class
         recip=Recip()
         #Pull things from the GUI as much as possible
-        self.MTB.InputsTB.calculate(recip)
-        self.MTB.SolverTB.calculate(recip)
+        self.MTB.InputsTB.set_params(recip)
+        self.MTB.SolverTB.set_params(recip)
         #Build the model the rest of the way
         RecipBuilder(recip)
         return recip
@@ -1409,8 +1415,8 @@ class MainFrame(wx.Frame):
         #Instantiate the scroll class
         scroll=Scroll()
         #Pull things from the GUI as much as possible
-        self.MTB.InputsTB.calculate(scroll)
-        self.MTB.SolverTB.calculate(scroll)
+        self.MTB.InputsTB.set_params(scroll)
+        self.MTB.SolverTB.set_params(scroll)
         #Build the model the rest of the way
         ScrollBuilder(scroll)
         return scroll
@@ -1428,7 +1434,7 @@ class MainFrame(wx.Frame):
         """
         if self.WTM is None:
             self.MTB.SetSelection(2)
-            self.WTM = WorkerThreadManager(Run1Recip,sims,self.get_logctrls(),args = tuple(), done_callback = self.deliver_result)
+            self.WTM = WorkerThreadManager(Run1, sims, self.get_logctrls(),args = tuple(), done_callback = self.deliver_result)
             self.WTM.setDaemon(True)
             self.WTM.start()
         else:

@@ -24,6 +24,7 @@ cpdef setcol(np.ndarray[np.float_t, ndim=2] mat, int colIndex, list indices, lis
     cdef int i,j
     cdef double val
     if not len(indices) == len(x):
+        print 'indices:',indices, 'x:',x
         raise ValueError('Length of indices [{0:d}] and x [{1:d}] are not the same'.format(len(indices),len(x)))
     for j in range(len(x)):
         i = indices[j]

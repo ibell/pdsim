@@ -122,7 +122,8 @@ class GeometryPanel(pdsim_panels.PDPanel):
         
     def skip_list(self):
         """
-        Returns a list of atttributes to skip setting in calculate() function
+        Returns a list of atttributes to skip setting in set_params() function
+        from the base class PDPanel
         """
         return ['Vdisp','Vratio','t','ro']
         
@@ -148,6 +149,16 @@ class GeometryPanel(pdsim_panels.PDPanel):
         self.ax.cla()
         plotScrollSet(pi/4.0, axis = self.ax, geo = self.Scroll.geo)
         self.PP.canvas.draw()
+    
+    def post_set_params(self, scroll):
+        Vdisp=float(self.Vdisp.GetValue())
+        Vratio=float(self.Vratio.GetValue())
+        t=float(self.t.GetValue())
+        ro=float(self.ro.GetValue())
+        
+        scroll.set_scroll_geo(Vdisp,Vratio,t,ro) #Set the scroll wrap geometry
+        scroll.set_disc_geo('2Arc', r2='PMP')
+        
         
 class MassFlowPanel(pdsim_panels.PDPanel):
     
