@@ -12,9 +12,8 @@ wx.SetDefaultPyEncoding('latin-1')
 import codecs
 from operator import itemgetter
 from math import pi
-from Queue import Queue
+from Queue import Queue, Empty
 from multiprocessing import Process, Pipe, freeze_support, cpu_count, allow_connection_pickling
-from Queue import Empty
 from threading import Thread
 import time
 import textwrap
@@ -1199,7 +1198,7 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         if not key == 'selected':
             raise KeyError
         
-        list_str = value.split(',',1)[1].replace("'","").replace('[','').replace(']','')
+        list_str = value.split(',',1)[1].replace("'","").replace('[','').replace(']','').replace("u'","'")
         for attr in list_str.split(';'):
             #Strip leading and trailing space
             attr = attr.strip()
@@ -1286,7 +1285,7 @@ class MainFrame(wx.Frame):
         
         elif isinstance(configfile, basestring):
             if os.path.exists(configfile):
-                configbuffer = open(configfile,'rb')
+                configbuffer = open(configfile, 'rb')
                         
         elif isinstance(configfile, StringIO.StringIO):
             configbuffer = configfile

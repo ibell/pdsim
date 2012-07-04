@@ -45,12 +45,6 @@ class Recip(PDSimCore):
         except ZeroDivisionError:
             return 0.0
         
-#        #Find the tube that this flow path is part of. Return its flow rate
-#        for Tube in self.Tubes:
-#            if (FlowPath.key_up in [Tube.key1, Tube.key2] or
-#               FlowPath.key_down in [Tube.key1, Tube.key2]) :
-#                return Tube.mdot
-        
     def PistonLeakage(self, FlowPath, **kwargs):
         try:
             FlowPath.A=self.delta_gap*self.piston_diameter*pi

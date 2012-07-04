@@ -5,11 +5,11 @@ from time import clock
 # If being run from the folder that contains the PDSim source tree, 
 # remove the current location from the python path and use the 
 # site-packages version of PDSim
-#import sys, os
-#current_path = os.path.abspath(os.curdir)
-#if current_path in sys.path:
-#    i = sys.path.index(current_path)
-#    sys.path.pop(i)
+import sys, os
+current_path = os.path.abspath(os.curdir)
+if current_path in sys.path:
+    i = sys.path.index(current_path)
+    sys.path.pop(i)
 
 from PDSim.flow.flow import FlowPath
 from PDSim.flow import flow_models
@@ -50,7 +50,7 @@ def Compressor():
     #Calculate Vdisp
     recip.pre_solve()
     
-    Ref='Air'
+    Ref='R410A'
     inletState=State.State(Ref,dict(T=283.15, D=5.75))
     outletState=State.State(Ref,{'T':400,'P':inletState.p*2.5})
     mdot_guess = inletState.rho*recip.Vdisp()*recip.omega/(2*pi)
