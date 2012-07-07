@@ -5,24 +5,38 @@ from PDSim.misc.scipylike import trapz
 from PDSim.flow import flow_models
 from PDSim.core.core import PDSimCore
 from PDSim.misc._listmath import listm
+from _recip import _Recip
 
-class Recip(PDSimCore):
+class Recip(PDSimCore,_Recip):
     """
     Recip is derived from :class:`PDSimCore`.
-     
+    
+    functions V_dV and heat_transfer_callback are provided in _Recip Cython class 
     """
-    def V_dV(self,theta):
-        """
-        Returns the volume and derivative of volume of the working chamber
-        """
-        #At theta=pi,x_calc=-crank_length+connecting_rod_length since sin(pi)=0.  Thus x_2 is 2*crank_length
+    def __init__(self):
+        PDSimCore.__init__(self)
         
-        x_calc = self.crank_length*cos(theta) + sqrt(self.connecting_rod_length**2 - self.crank_length**2*sin(theta)**2)
-        x_2 = (self.connecting_rod_length + self.crank_length)-x_calc
-        V=x_2*self.A_piston+self.V_dead
-        dV=-(-self.crank_length*sin(theta) - (self.crank_length**2*sin(2*theta))/
-             (2*sqrt(self.connecting_rod_length**2 - self.crank_length**2*sin(theta)**2)))*self.A_piston
-        return V, dV
+    def __getstate__(self):
+        """
+        A function for preparing class instance for pickling
+         
+        Combine the dictionaries from the _Recip base class and the Recip
+        class when pickling
+        """
+        py_dict = self.__dict__.copy()
+        py_dict.update(_Recip.__cdict__(self))
+        return py_dict
+
+    def __setstate__(self, d):
+        """
+        A function for unpacking class instance for unpickling
+        """
+        for k,v in d.iteritems():
+            setattr(self,k,v)
+            
+    def V_dV(self, theta):
+        "A thin wrapper around Cython code for pickling purposes"
+        return _Recip.V_dV(self, theta)
     
     def Vdisp(self):
         """
@@ -77,30 +91,35 @@ class Recip(PDSimCore):
                 FlowPath.A=self.discharge_valve.A()
 #                FlowPath.A=self.A_discharge
                 mdot=flow_models.IsentropicNozzle(FlowPath.A,FlowPath.State_up,FlowPath.State_down)
+                
                 return mdot
             except ZeroDivisionError:
                 return 0.0
-    
+
     def heat_transfer_callback(self,theta):
-        T_w  = self.Tlumps[0] #[K]
-        V,dV=self.V_dV(theta) #[m3,m3/radian]
-        D_h = self.piston_diameter #[m]
-        A_ht = pi*self.piston_diameter*(V/self.A_piston) #[m2]
-        
-        Pr = self.CVs['A'].State.Prandtl #[-]
-        rho = self.CVs['A'].State.rho #[kg/m3]
-        k = self.CVs['A'].State.k #[kW/m-K]
-        mu = self.CVs['A'].State.visc #[Pa-s]
-        T = self.CVs['A'].State.T #[K]
-        u = abs(0.5*dV*self.omega/self.A_piston) #[m/s]
-        Re = (rho*u*D_h)/mu #[kg/m3*m/s*m/Pa/s]=[-]
-        
-        h_c = 0.053*(k/D_h)*Pr**(0.6)*Re**(0.8) #[kW/m2/K]
-        Q = h_c*A_ht*(T_w-T)   #Net heat into control volume [kW]
-        if self.CVs.N > 1:
-            return listm([Q,0])
-        else:
-            return listm([Q])
+        "A thin wrapper of the Cython code for pickling purposes"
+        return _Recip.heat_transfer_callback(self,theta)   
+     
+#    def heat_transfer_callback(self,theta):
+#        T_w  = self.Tlumps[0] #[K]
+#        V,dV=self.V_dV(theta) #[m3,m3/radian]
+#        D_h = self.piston_diameter #[m]
+#        A_ht = pi*self.piston_diameter*(V/self.A_piston) #[m2]
+#        
+#        Pr = self.CVs['A'].State.Prandtl #[-]
+#        rho = self.CVs['A'].State.rho #[kg/m3]
+#        k = self.CVs['A'].State.k #[kW/m-K]
+#        mu = self.CVs['A'].State.visc #[Pa-s]
+#        T = self.CVs['A'].State.T #[K]
+#        u = abs(0.5*dV*self.omega/self.A_piston) #[m/s]
+#        Re = (rho*u*D_h)/mu #[kg/m3*m/s*m/Pa/s]=[-]
+#        
+#        h_c = 0.053*(k/D_h)*Pr**(0.6)*Re**(0.8) #[kW/m2/K]
+#        Q = h_c*A_ht*(T_w-T)   #Net heat into control volume [kW]
+#        if self.CVs.N > 1:
+#            return listm([Q,0])
+#        else:
+#            return listm([Q])
     
     def mechanical_losses(self):
         """
@@ -151,7 +170,6 @@ class Recip(PDSimCore):
         #Note: heat transfer TO the gas in the tubes is given a positive sign
         #      so sign is flipped for the lump
         self.Qtubes = -sum([Tube.Q for Tube in self.Tubes])
-        print 'self.Qtubes',self.Qtubes
         return self.Qdot_from_gas + self.Wdot_mechanical + self.Qamb + self.Qtubes
     
     def pre_solve(self):
@@ -182,4 +200,5 @@ class Recip(PDSimCore):
         #Overall isentropic efficiency
         self.eta_oi = self.Wdot_i/self.Wdot_electrical
         
-        
+if __name__=='__main__':
+    print "Running this file doesn't do anything"

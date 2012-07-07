@@ -64,6 +64,8 @@ Vdisp = float,104.8e-6,Displacement volume / revolution [m³/rev]
 Vratio = float,1.61,Built-in volume ratio [-]
 ro = float, 0.005, Orbiting radius [m]
 t = float,0.004,Scroll wrap thickness [m]
+delta_flank = float,3e-6,Flank gap width [m]
+delta_radial = float,3e-6,Radial gap width [m]
 
 [MassFlowPanel]
 d_discharge = float,0.0059,Discharge port diameter [m]
@@ -87,7 +89,7 @@ delta_gap = float,2e-05,Gap width [m]
 
 [StatePanel]
 omega = float,377.0,Rotational speed [rad/s]
-inletState = State,R404A,283.15,5.75
+inletState = State,R410A,283.15,5.75
 discharge = Discharge,2.0,Pressure ratio [-]
 
 [ParametricPanel]

@@ -354,6 +354,11 @@ class PDSimCore(object):
         # Assume all the valves to be fully closed and stationary at the beginning of cycle
         self.xValves[:,0]=0
         
+        self.Tubes_hdict={}
+        for Tube in self.Tubes:
+            self.Tubes_hdict[Tube.key1]=Tube.State1.get_h()
+            self.Tubes_hdict[Tube.key2]=Tube.State2.get_h()
+        
     def cycle_SimpleEuler(self,N,x_state,tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
         """
         The simple Euler PDSim ODE integrator
@@ -393,13 +398,18 @@ class PDSimCore(object):
         #Get the beginning of the cycle configured
         x_state.extend([0.0]*len(self.Valves)*2)
         xold = listm(x_state[:])
-    
+        self.__put_to_matrices(xold, 0)
+        
         for Itheta in range(N-1):
             
             #Call the step callback if provided
-            if step_callback!=None:
-                step_callback(t0, h, Itheta)
-                      
+            if step_callback is not None:
+                CVchanged = False
+                disable, h = step_callback(t0, h, Itheta, CVchanged = CVchanged)
+                if CVchanged:
+                    print 'CV have changed'
+                    xold = self.__get_from_matrices(Itheta)
+            
             # Step 1: derivatives evaluated at old values of t = t0
             f1 = self.derivs(t0, xold, heat_transfer_callback, valves_callback)
             xnew = xold+h*f1
@@ -500,10 +510,11 @@ class PDSimCore(object):
         self.Itheta = Itheta
         self.Ntheta = N
         self.__post_cycle()
-        return 
+        return
         
     def cycle_RK45(self,x_state,hmin=1e-4,tmin=0,tmax=2.0*pi,eps_allowed=1e-10,step_relax=0.9,
-              step_callback=None,heat_transfer_callback=None,valves_callback = None,**kwargs):
+              step_callback=None,heat_transfer_callback=None,valves_callback = None,
+              UseCashKarp=True,**kwargs):
         """
         
         This function implements an adaptive Runge-Kutta-Feldberg 4th/5th order
@@ -576,6 +587,13 @@ class PDSimCore(object):
         t0=tmin
         h=hmin
         
+        gamma1=16.0/135.0
+        gamma2=0.0
+        gamma3=6656.0/12825.0
+        gamma4=28561.0/56430.0
+        gamma5=-9.0/50.0
+        gamma6=2.0/55.0
+        
          #One call to build the flows at start
         x_state.extend([0.0]*len(self.Valves)*2)
         xold = listm(x_state[:])
@@ -588,17 +606,16 @@ class PDSimCore(object):
         while (t0<tmax):
             
             stepAccepted=False
-            
             while not stepAccepted:
                 
                 #Reset the flag
                 disableAdaptive=False
                 
-                if t0+h>tmax:
+                if t0 + h > tmax:
                     disableAdaptive=True
-                    h=tmax-t0
+                    h=tmax - t0
             
-                if step_callback!=None and disableAdaptive==False:
+                if step_callback is not None and not disableAdaptive:
                     #The user has provided a disabling function for the adaptive method
                     #Call it to figure out whether to use the adaptive method or not
                     #Pass it a copy of the compressor class and the current step size
@@ -607,59 +624,88 @@ class PDSimCore(object):
                 else:
                     disableAdaptive=False
                     
-                if h<hmin and disableAdaptive==False:
+                if h < hmin and not disableAdaptive:
                     #Step is too small, just use the minimum step size
-                    h=1.0*hmin
-                    disableAdaptive=True
+                    h = 1.0*hmin
+                    disableAdaptive = True
                     
                 xold=self.__get_from_matrices(Itheta)
+                
                     
-                # Step 1: derivatives evaluated at old values
-                f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
-                xnew1=xold+h*(+1.0/4.0*f1)
-                
-                f2=self.derivs(t0+1.0/4.0*h,xnew1,heat_transfer_callback,valves_callback)
-                xnew2=xold+h*(+3.0/32.0*f1+9.0/32.0*f2)
-
-                f3=self.derivs(t0+3.0/8.0*h,xnew2,heat_transfer_callback,valves_callback)
-                xnew3=xold+h*(+1932.0/2197.0*f1-7200.0/2197.0*f2+7296.0/2197.0*f3)
-
-                f4=self.derivs(t0+12.0/13.0*h,xnew3,heat_transfer_callback,valves_callback)
-                xnew4=xold+h*(+439.0/216.0*f1-8.0*f2+3680.0/513.0*f3-845.0/4104.0*f4)
-                
-                f5=self.derivs(t0+h,xnew4,heat_transfer_callback,valves_callback);
-                xnew5=xold+h*(-8.0/27.0*f1+2.0*f2-3544.0/2565.0*f3+1859.0/4104.0*f4-11.0/40.0*f5)
-                
-                gamma1=16.0/135.0
-                gamma2=0.0
-                gamma3=6656.0/12825.0
-                gamma4=28561.0/56430.0
-                gamma5=-9.0/50.0
-                gamma6=2.0/55.0
-                
-                #Updated values at the next step
-                f6=self.derivs(t0+1/2*h,xnew5,heat_transfer_callback,valves_callback)
-                
-                xnew=xold+h*(gamma1*f1 + gamma2*f2 + gamma3*f3 + gamma4*f4 + gamma5*f5 + gamma6*f6)
+                if not UseCashKarp:
+                    ## Using RKF constants ##
                     
-                error=h*(1.0/360.0*f1-128.0/4275.0*f3-2197.0/75240.0*f4+1.0/50.0*f5+2.0/55.0*f6)
+                    # Step 1: derivatives evaluated at old values
+                    f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+                    xnew1=xold+h*(+1.0/4.0*f1)
+                    
+                    f2=self.derivs(t0+1.0/4.0*h,xnew1,heat_transfer_callback,valves_callback)
+                    xnew2=xold+h*(+3.0/32.0*f1+9.0/32.0*f2)
+    
+                    f3=self.derivs(t0+3.0/8.0*h,xnew2,heat_transfer_callback,valves_callback)
+                    xnew3=xold+h*(+1932.0/2197.0*f1-7200.0/2197.0*f2+7296.0/2197.0*f3)
+    
+                    f4=self.derivs(t0+12.0/13.0*h,xnew3,heat_transfer_callback,valves_callback)
+                    xnew4=xold+h*(+439.0/216.0*f1-8.0*f2+3680.0/513.0*f3-845.0/4104.0*f4)
+                    
+                    f5=self.derivs(t0+h,xnew4,heat_transfer_callback,valves_callback);
+                    xnew5=xold+h*(-8.0/27.0*f1+2.0*f2-3544.0/2565.0*f3+1859.0/4104.0*f4-11.0/40.0*f5)
+                    
+                    #Updated values at the next step
+                    f6=self.derivs(t0+h/2.0,xnew5,heat_transfer_callback,valves_callback)
+                    
+                    xnew=xold+h*(gamma1*f1 + gamma2*f2 + gamma3*f3 + gamma4*f4 + gamma5*f5 + gamma6*f6)
+                        
+                    error=h*(1.0/360.0*f1-128.0/4275.0*f3-2197.0/75240.0*f4+1.0/50.0*f5+2.0/55.0*f6)
+                else:
+                    
+                    # Step 1: derivatives evaluated at old values
+                    f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+                    xnew1=xold+h*(+1.0/5.0*f1)
+                    
+                    f2=self.derivs(t0+1.0/5.0*h,xnew1,heat_transfer_callback,valves_callback)
+                    xnew2=xold+h*(+3.0/40.0*f1+9.0/40.0*f2)
+    
+                    f3=self.derivs(t0+3.0/10.0*h,xnew2,heat_transfer_callback,valves_callback)
+                    xnew3=xold+h*(3.0/10.0*f1-9.0/10.0*f2+6.0/5.0*f3)
+    
+                    f4=self.derivs(t0+3.0/5.0*h,xnew3,heat_transfer_callback,valves_callback)
+                    xnew4=xold+h*(-11.0/54.0*f1+5.0/2.0*f2-70/27.0*f3+35.0/27.0*f4)
+                    
+                    f5=self.derivs(t0+h,xnew4,heat_transfer_callback,valves_callback);
+                    xnew5=xold+h*(1631.0/55296*f1+175.0/512.0*f2+575.0/13824.0*f3+44275.0/110592.0*f4+253.0/4096.0*f5)
+                    
+                    f6=self.derivs(t0+7.0/8.0*h,xnew5,heat_transfer_callback,valves_callback)
+                    
+                    #Updated values at the next step using 5-th order
+                    xnew=xold+h*(37/378*f1 + 250/621*f3 + 125/594*f4 + 512/1771*f6)
+                    xnew2 = xold+h*(-3/2*f1+5/2*f2)
+                        
+                    error = h*(-277/64512*f1+6925/370944*f3-6925/202752*f4-277.0/14336*f5+277/7084*f6)
+                    error2 = h*(-1/2*f1+5/2*f2)
                 
-                max_error=np.max(np.abs(error))
+                max_error=np.sqrt(np.sum(np.power(error,2)))
+                max_error2=np.sqrt(np.sum(np.power(error2,2)))
+#                print max_error, error
                 
-                # If the error is too large
+                # If the error is too large, make the step size smaller and try
+                # the step again
                 if (max_error > eps_allowed):
-                    if disableAdaptive==False:
+                    if not disableAdaptive:
                         # Take a smaller step next time, try again on this step
                         # But only if adaptive mode is on
-                        h*=step_relax*(eps_allowed/max_error)**(0.25)
+#                        print 'downsizing', h,
+                        h *= step_relax*(eps_allowed/max_error)**(0.25)
+#                        print h, eps_allowed, max_error
                         stepAccepted=False
                     else:
-                        #Accept the step regardless of whether the error is too large or not
-                        stepAccepted=True
+                        # Accept the step regardless of whether the error 
+                        # is too large or not
+                        stepAccepted = True
                 else:
-                    stepAccepted=True
+                    stepAccepted = True
             
-            # Step has been accepted (or adaptive disabled), write values back to arrays
+            # Step has been accepted (or adaptive disabled), write values back to matrices
             self.t[Itheta+1]=t0+h
             self.__put_to_matrices(xnew,Itheta+1)
             t0+=h
@@ -670,10 +716,11 @@ class PDSimCore(object):
             #print t0,h,hmin
             
             #The error is already below the threshold
-            if (max_error<eps_allowed and disableAdaptive == False):
+            if (max_error < eps_allowed and disableAdaptive == False):
+#                print 'upsizing',h,
                 #Take a bigger step next time, since eps_allowed>max_error
                 h *= step_relax*(eps_allowed/max_error)**(0.2)
-        
+#                print h, eps_allowed, max_error
         #Run this at the end
         V,dV=self.CVs.volumes(t0)
         self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
@@ -841,6 +888,8 @@ class PDSimCore(object):
                 else:
                     raise KeyError
                       
+                #debug_plots(self)
+                
                 #If the abort function returns true, quit this loop
                 if (Abort is not None and Abort()) or OneCycle:
                     print 'Quitting OBJECTIVE_CYCLE loop in core.solve'
@@ -851,7 +900,6 @@ class PDSimCore(object):
                 else:
                     #endcycle_callback returns the errors and new initial st
                     errors, x_state_ = endcycle_callback()
-                    print errors
                     self.x_state = x_state_[:] #Make a copy
                     return errors
                 
@@ -870,9 +918,13 @@ class PDSimCore(object):
                     x_state_old = listm(self.x_state).copy()
                     OBJECTIVE_CYCLE(x_state_old)
                     x_state_new = listm(self.x_state).copy()
-                        
-                    diff = (x_state_old - x_state_new) / x_state_old
-                    diff_abs = [abs(dx) for dx in (x_state_old - x_state_new)/x_state_old]
+                    
+                    try:    
+                        diff = (x_state_old - x_state_new) / x_state_old
+                        diff_abs = [abs(dx) for dx in (x_state_old - x_state_new)/x_state_old]
+                    except IndexError:
+                        continue
+                    
                     def all_negative(yvec):
                         for y in yvec:
                             if y>0:
@@ -880,7 +932,7 @@ class PDSimCore(object):
                         return True
                     
                     print 'diff', diff
-                    if max(diff_abs) < 1e-5:
+                    if max(diff_abs) < 1e-4:
                         break
 #                    elif diff_old is not None and all_negative(diff * diff_old):
 #                        #If the signs are opposite for all of the diffs, weight the next step
@@ -898,18 +950,20 @@ class PDSimCore(object):
             # (3) After convergence of the inner loop, check the energy balance on the lumps
             if lump_energy_balance_callback is not None:
                 resid_HT = lump_energy_balance_callback()
+                if not isinstance(resid_HT,list) and not isinstance(resid_HT,listm):
+                    resid_HT = [resid_HT]
                 
             #If the abort function returns true, quit this loop
             if (Abort is not None and Abort()) or OneCycle:
                 print 'Quitting OBJECTIVE function in core.solve'
                 return None
                 
-            print [self.resid_Td]+[resid_HT],'resids'
-            return [self.resid_Td]+[resid_HT]
+            print [self.resid_Td]+resid_HT,'resids'
+            return [self.resid_Td]+resid_HT
         
         #end of OJECTIVE
         
-        x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,[315.0,325.0],dx=0.3,ytol=0.001,itermax=30)
+        x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,[360.0,390.0],dx=0.3,ytol=0.001,itermax=30)
         print 'Solution is', x_soln,'Td, Tlumps'
         
         del self.resid_Td, self.x_state
@@ -991,6 +1045,7 @@ class PDSimCore(object):
         dfdt : ``listm`` instance
         
         """
+        
         #Call the Cython method
         #return self._derivs(theta,x,heat_transfer_callback)
         
@@ -1002,28 +1057,6 @@ class PDSimCore(object):
             raise NotImplementedError
         else:
             self.CVs.updateStates('T',x[0:self.CVs.Nexist],'D',x[self.CVs.Nexist:2*self.CVs.Nexist])
-            
-        #Run the valves model if it is provided in order to calculate the new valve positions
-        if self.__hasValves__==True:
-            for iV,Valve in enumerate(self.Valves):
-                Valve.set_xv(x[2*self.CVs.Nexist+iV*2:2*self.CVs.Nexist+(iV+1)*2])
-            f_valves=valves_callback()
-            
-#        if self.CVs['A'].State.p<self.Tubes[0].State2.p:
-#            print 'Suction valves open'
-#        if self.CVs['A'].State.p>self.Tubes[1].State1.p:
-#            print 'Discharge valves open'
-        #2. Calculate the mass flow terms between the model components
-        self.Flows.calculate(self)
-        summerdT,summerdm=self.Flows.sumterms(self)
-        
-        #3. Calculate the heat transfer terms
-        if heat_transfer_callback is not None:
-            Q=heat_transfer_callback(theta)
-            if not len(Q) == self.CVs.Nexist:
-                raise ValueError('Length of Q is not equal to length of number of CV')
-        else:
-            Q=0.0
         
         ## Calculate properties and property derivatives
         ## needed for differential equations
@@ -1042,8 +1075,31 @@ class PDSimCore(object):
         self.m_=m
         self.p_=p
         self.T_=T
-        self.Q_=Q
-                
+
+        #Run the valves model if it is provided in order to calculate the new valve positions
+        if self.__hasValves__==True:
+            for iV,Valve in enumerate(self.Valves):
+                Valve.set_xv(x[2*self.CVs.Nexist+iV*2:2*self.CVs.Nexist+(iV+1)*2])
+            f_valves=valves_callback()
+        
+        #Build a dictionary of enthalpy values to speed up _calculate
+        #Halves the number of calls to get_h which calculates the enthalpy
+        hdict = {key:h_ for key, h_ in zip(self.CVs.exists_keys, h)}
+        hdict.update(self.Tubes_hdict)
+        
+        #2. Calculate the mass flow terms between the model components
+        self.Flows.calculate(self, hdict)
+        summerdT,summerdm=self.Flows.sumterms(self)
+        
+        #3. Calculate the heat transfer terms
+        if heat_transfer_callback is not None:
+            Q=heat_transfer_callback(theta)
+            if not len(Q) == self.CVs.Nexist:
+                raise ValueError('Length of Q is not equal to length of number of CV')
+        else:
+            Q=0.0
+        
+        self.Q_=Q        
         dudxL=0.0
         summerdxL=0.0
         xL=0.0
@@ -1052,6 +1108,9 @@ class PDSimCore(object):
         dxLdtheta=1.0/m*(summerdxL-xL*dmdtheta)
         dTdtheta=1/(m*cv)*(-1.0*T*dpdT*(dV-v*dmdtheta)-m*dudxL*dxLdtheta-h*dmdtheta+Q/self.omega+summerdT)
         drhodtheta = 1.0/V*(dmdtheta-rho*dV)
+        
+#        Ic1 = self.CVs.exists_keys.index('c1.1')
+#        print drhodtheta[Ic1]*V[Ic1]+rho[Ic1]*dV[Ic1],summerdT[Ic1]
         
         if self.__hasLiquid__==True:
             f=np.zeros((3*self.NCV,))
@@ -1101,7 +1160,7 @@ class PDSimCore(object):
         
         #old and new CV keys
         LHS,RHS=[],[]
-        errorT,errorp,error_rho,newT,new_rho=[],[],[],[],[]
+        errorT,error_rho,newT,new_rho,oldT,old_rho={},{},{},{},{},{}
         
         for key in self.CVs.exists_keys:
             # Get the 'becomes' field.  If a list, parse each fork of list. If a single key convert 
@@ -1115,19 +1174,29 @@ class PDSimCore(object):
             for newkey in becomes:
                 Inew = self.CVs.index(newkey)
                 newCV = self.CVs[newkey]
-                newT.append(self.T[Iold,self.Itheta-1])
-                new_rho.append(self.rho[Iold,self.Itheta-1])
-                errorT.append((self.T[Iold,self.Itheta-1]-self.T[Inew,0])/self.T[Inew,0])
-                errorp.append((self.p[Iold,self.Itheta-1]-self.p[Inew,0])/self.p[Inew,0])
-                error_rho.append((self.rho[Iold,self.Itheta-1]-self.rho[Inew,0])/self.rho[Inew,0])
+                # There can't be any overlap between keys
+                if newkey in newT:
+                    raise KeyError
+                #What the temperature and density were at the start of the rotation
+                oldT[newkey]=self.T[Inew, 0]
+                old_rho[newkey]=self.rho[Inew, 0]
+                #What they are at the end of the rotation
+                newT[newkey]=self.T[Iold,self.Itheta-1]
+                new_rho[newkey]=self.rho[Iold,self.Itheta-1]
+                errorT[newkey]=(oldT[newkey]-newT[newkey])/newT[newkey]
+                error_rho[newkey]=(old_rho[newkey]-new_rho[newkey])/new_rho[newkey]
                 #Update the list of keys for setting the exist flags
                 LHS.append(key)
                 RHS.append(newkey)
                 #Update the CV with the new value - use the copy of the CVs from before
                 #newCV.State.update({'T':self.T[Iold,self.Itheta],'D':self.rho[Iold,self.Itheta]})
-                
-        errorT_abs = [abs(err) for err in errorT]
-        error_rho_abs = [abs(err) for err in error_rho]
+            
+        errorTlist = [errorT[key] for key in self.CVs.keys() if key in newT]
+        errorrholist = [error_rho[key] for key in self.CVs.keys() if key in new_rho]
+        newTlist = [newT[key] for key in self.CVs.keys() if key in newT]
+        new_rho_list = [new_rho[key] for key in self.CVs.keys() if key in new_rho]
+        errorT_abs = [abs(err) for err in errorTlist]
+        error_rho_abs = [abs(err) for err in errorrholist]
         
         #Reset the exist flags for the CV - this should handle all the possibilities
         #Turn off the LHS CV
@@ -1139,7 +1208,7 @@ class PDSimCore(object):
             
         self.CVs.rebuild_exists()
         
-        return errorT+error_rho, newT+new_rho
+        return errorTlist + errorrholist, newTlist + new_rho_list
     
 if __name__=='__main__':
     print 'This is the base class that is inherited by other compressor types.  Running this file doesn\'t do anything'

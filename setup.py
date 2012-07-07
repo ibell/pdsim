@@ -5,8 +5,8 @@ from Cython.Distutils.extension import Extension as CyExtension
 import sys,shutil,os
 
 if len(sys.argv)==1:
-    #sys.argv+=['build_ext','--inplace','install']
-    sys.argv+=['build_ext','install']
+    #sys.argv+=['build_ext','--inplace']
+    sys.argv+=['install']
     
 import Cython
 
@@ -24,6 +24,8 @@ pyx_list = [
             "PDSim/flow/_flow.pyx",
             "PDSim/scroll/scroll_geo.py",
             "PDSim/misc/_listmath.pyx",
+            "PDSim/recip/_recip.pyx",
+            "PDSim/scroll/_scroll.pyx"
             #"PDSim/core/_core.pyx",
             ]
 
@@ -63,5 +65,6 @@ setup(
   packages = ['PDSim','PDSim.core','PDSim.flow','PDSim.plot','PDSim.scroll','PDSim.misc','PDSim.recip'],
   cmdclass={'build_ext': build_ext},
   ext_modules = ext_module_list,
+  package_data = {'PDSim':['scroll/scroll_geo.pxd']},
   include_dirs = [numpy.get_include()]
 )

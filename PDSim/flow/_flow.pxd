@@ -13,6 +13,6 @@ cdef class _FlowPath:
     cdef public dict MdotFcn_kwargs
     cdef public State State1,State2,State_up,State_down
     
-    cpdef dict __cdict__(self,AddStates=*)
+    cpdef dict __cdict__(self, AddStates = *)
     cpdef _FlowPath get_deepcopy(self)
-    cpdef _calculate(self)
+    cpdef _calculate(self, dict hdict = *)

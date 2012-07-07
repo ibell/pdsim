@@ -85,21 +85,33 @@ class PDPanel(wx.Panel):
     
     def ConstructItems(self,items,sizer,configdict=None,descdict=None):
         for item in items:
+            #item is a dictionary of values including the keys:
+            #  - attr
+            #  - textbox
+            #  - val
+            
             if 'val' not in item and configdict is not None:
                 k = item['attr']
-                val = configdict[k]
+                if k not in configdict:
+                    self.warn_unmatched_attr(k)
+                    val,item['text']=self.get_from_configfile(self.name, k, default = True)
+                    print val, item['text']
+                else:
+                    val = configdict[k]
+                    item['text'] = descdict[k]
             else:
                 val = item['val']
-                
-            if descdict is not None:
-                item['text'] = descdict[item['attr']]
+                item['text'] = descdict[k]
                 
             label=wx.StaticText(self, -1, item['text'])
             sizer.Add(label, 1, wx.EXPAND)
             textbox=wx.TextCtrl(self,-1,str(val))
             sizer.Add(textbox, 1, wx.EXPAND)
             item.update(dict(textbox=textbox,label=label))
-            
+        
+    def warn_unmatched_attr(self, attr):
+        print "didn't match attribute", attr
+        
     def prep_for_configfile(self):
         """
         Writes the panel to a format ready for writing to config file
@@ -138,8 +150,37 @@ class PDPanel(wx.Panel):
         
         s=s.replace('%','%%')
         return s
-                    
-    def get_from_configfile(self, section):
+           
+    def _get_from_configfile(self, name, value):
+        
+        #Split at the first comma to get type, and value+description
+        type,val_desc = value.split(',',1)
+        #If it has a description, use it, otherwise, just use the config file key
+        if len(val_desc.split(','))==2:
+            val,desc_=val_desc.split(',')
+            desc=desc_.strip()
+        else:
+            val=val_desc
+            desc=name.strip()
+            
+        if type=='int':
+            d=int(val)
+        elif type=='float':
+            d=float(val)
+        elif type=='str':
+            d=unicode(val)
+        elif type=='State':
+            Fluid,T,rho=val.split(',')
+            d=dict(Fluid=Fluid,T=float(T),rho=float(rho))
+        else:
+            #Try to let the panel use the (name, value) directly
+            if hasattr(self,'post_get_from_configfile'):
+                d = self.post_get_from_configfile(name, value)
+            else:
+                raise KeyError('Type in line '+name+' = ' +value+' must be one of int,float,str')     
+        return d, desc 
+               
+    def get_from_configfile(self, section, key = None, default = False):
         """
         configfile: file path or readable object (StringIO instance or file)
         Returns a dictionary with each of the elements from the given section 
@@ -154,8 +195,7 @@ class PDPanel(wx.Panel):
         ask post_get_from_configfile if it knows what to do with it
         
         """
-        d={}
-        desc={}
+        d, desc={}, {}
         
         Main = wx.GetTopLevelParent(self)
         parser, default_parser = Main.get_config_objects()
@@ -166,37 +206,23 @@ class PDPanel(wx.Panel):
             dlg.ShowModal()
             dlg.Destroy()
             _parser = default_parser
+        elif default:
+            # We are programatically using the default parameters, 
+            # don't warn automatically'
+            _parser = default_parser
         else:
             _parser = parser
         
+        if key is not None and default:
+            value = _parser.get(section, key)
+            _d,_desc =  self._get_from_configfile(key, value)
+            return _d,_desc
+        
         for name, value in _parser.items(section):
+            _d,_desc = self._get_from_configfile(name,value)
+            d[name] = _d
+            desc[name] = _desc
             
-            #Split at the first comma to get type, and value+description
-            type,val_desc = value.split(',',1)
-            #If it has a description, use it, otherwise, just use the config file key
-            if len(val_desc.split(','))==2:
-                val,desc_=val_desc.split(',')
-                desc[name]=desc_.strip()
-            else:
-                val=val_desc
-                desc[name]=name.strip()
-                
-            if type=='int':
-                d[name]=int(val)
-            elif type=='float':
-                d[name]=float(val)
-            elif type=='str':
-                d[name]=unicode(val)
-            elif type=='State':
-                Fluid,T,rho=val.split(',')
-                d[name]=dict(Fluid=Fluid,T=float(T),rho=float(rho))
-            else:
-                #Try to let the panel use the (name, value) directly
-                if hasattr(self,'post_get_from_configfile'):
-                    self.post_get_from_configfile(name, value)
-                else:
-                    raise KeyError('Type in line '+name+' = ' +value+' must be one of int,float,str')
-
         return d,desc
     
 class ParaSelectDialog(wx.Dialog):
@@ -399,22 +425,31 @@ class ParametricPanel(PDPanel):
         This event can only fire if the table is built
         """
         Main = self.GetTopLevelParent()
-        recips=[]
+        sims=[]
         #Column index 1 is the list of parameters
         self.ParaList.GetColumn(1)
         for Irow in range(self.ParaList.GetItemCount()):
             if self.ParaList.IsChecked(Irow):
-                recip = Main.build_recip()
+                
+                #Build the recip or the scroll
+                if Main.SimType == 'recip':
+                    sim = Main.build_recip()
+                elif Main.SimType == 'scroll':
+                    sim = Main.build_scroll()
+                else:
+                    raise AttributeError
+                    
                 for Icol in range(self.ParaList.GetColumnCount()-1):
                     val = self.ParaList.GetStringItem(Irow, Icol)
                     Name = self.ParaList.GetColumn(Icol+1).Text
-                    setattr(recip,self._get_attr(Name),float(val))
+                    print self._get_attr(Name),float(val)
+                    setattr(sim,self._get_attr(Name),float(val))
                     #Run the post_set_params for all the panels
-                    Main.MTB.InputsTB.post_set_params(recip)
+                    Main.MTB.InputsTB.post_set_params(sim)
             #Add an index for the run so that it can be sorted properly
-            recip.run_index = Irow + 1
-            recips.append(recip)
-        Main.run_batch(recips)
+            sim.run_index = Irow + 1
+            sims.append(sim)
+        Main.run_batch(sims)
         
     def post_prep_for_configfile(self):
         """

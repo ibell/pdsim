@@ -45,7 +45,9 @@ class GeometryPanel(pdsim_panels.PDPanel):
         dict(attr='Vdisp'),
         dict(attr='Vratio'),
         dict(attr='t'),
-        dict(attr='ro')
+        dict(attr='ro'),
+        dict(attr='delta_flank'),
+        dict(attr='delta_radial')
         ]
         
         sizerInputs = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
@@ -85,7 +87,6 @@ class GeometryPanel(pdsim_panels.PDPanel):
         self.hs.Enable(False)
         
         self.PP = PlotPanel(self)
-        
         
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(sizerInputs)
@@ -158,6 +159,8 @@ class GeometryPanel(pdsim_panels.PDPanel):
         
         scroll.set_scroll_geo(Vdisp,Vratio,t,ro) #Set the scroll wrap geometry
         scroll.set_disc_geo('2Arc', r2='PMP')
+        scroll.geo.delta_flank = float(self.delta_flank.GetValue())
+        scroll.geo.delta_radial = float(self.delta_radial.GetValue())
         
         
 class MassFlowPanel(pdsim_panels.PDPanel):

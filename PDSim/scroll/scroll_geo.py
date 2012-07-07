@@ -3,6 +3,7 @@ from __future__ import division
 
 import numpy as np
 import cython
+import time #(temporary)
  
 #This is a list of all the members in geoVals
 geoValsvarlist=['h','phi_i0','phi_is','phi_ie','phi_e','phi_o0','ro','rb','phi_os','phi_oe','t',
@@ -19,13 +20,16 @@ def rebuild_geoVals(d):
     return geo 
     
 class geoVals:
-    
     def __reduce__(self):
         d={}
         for atr in geoValsvarlist:
             d[atr]=getattr(self,atr)
         return rebuild_geoVals,(d,)
-        
+    def __repr__(self):
+        s='geoVals instance at '+str(id(self))+'\n'
+        for atr in geoValsvarlist:
+            s+=atr+': '+str(getattr(self,atr))+'\n'
+        return s
         
 def fxA(rb,phi,phi0):
     return rb**3/3.0*(4.0*((phi-phi0)**2-2.0)*sin(phi)+(phi0-phi)*((phi-phi0)**2-8.0)*cos(phi))
@@ -1065,7 +1069,6 @@ def phi_d_dd(theta,geo):
     else: return geo.phi_is;
 
 def Area_d_dd(theta, geo):
-    
     x_fis,y_fis=coords_inv(phi_d_dd(theta,geo),geo,theta,"fi")
     x_oos,y_oos=coords_inv(geo.phi_os,geo,theta,"oo")
     return geo.h*((x_fis-x_oos)**2+(y_fis-y_oos)**2)**0.5

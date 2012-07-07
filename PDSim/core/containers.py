@@ -49,6 +49,7 @@ class ControlVolumeCollection(collections.OrderedDict):
     def Nodes(self):
         return self._Nodes
     
+    
     def index(self,key):
         return self._keys.index(key)
     
@@ -86,10 +87,6 @@ class ControlVolumeCollection(collections.OrderedDict):
     
     @property
     def h(self):
-        #return collect_State_h(self._exists_CV)
-#        hlist2= [CV.State.get_h() for CV in self._exists_CV]
-#        print hlist1
-#        print hlist2
         return [CV.State.get_h() for CV in self._exists_CV]
     
     @property
@@ -102,16 +99,16 @@ class ControlVolumeCollection(collections.OrderedDict):
     
     @property
     def dpdT(self):
-        return [self[k].State.dpdT for k in self._exists_keys]
+        return [CV.State.get_dpdT() for CV in self._exists_CV]
     ## ---- End property callbacks --------
     
     def updateStates(self,name1,array1,name2,array2,keys=None):
 #        if not len(array1) == len(array2) or not len(array2)==len(self.exists_CV):
 #            raise AttributeError('length of arrays must be the same and equal number of CV in existence')
-        if keys==None:
+        if keys is None:
             keys=self.exists_keys
         # Update each of the states of the control volume
-        for k,v1,v2 in zip(keys,array1,array2):
+        for k,v1,v2 in zip(keys, array1, array2):
             self[k].State.update({name1:v1,name2:v2})
      
     def volumes(self,theta):
@@ -165,20 +162,10 @@ class ControlVolume(object):
         d=self.__dict__
         d['State']=self.State
         return d.copy()
-#    
-#    
+    
     def __setstate__(self, d):
         for item in d:
             setattr(self,item,d[item])
-#            
-#    def __getinitargs__(self):
-#        return (self.key, self.V_dV, self.State)
-        
-#    def __reduce__(self):
-#        print 'reduce'
-#        d=self.__dict__
-#        d['State']=self.State
-#        return rebuildCV, (d, )
         
     def __deepcopy__(self):
         return copy.deepcopy(self)

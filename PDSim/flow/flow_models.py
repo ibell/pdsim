@@ -1,5 +1,4 @@
 from __future__ import division
-from CoolProp.CoolProp import Props
 from CoolProp.State import State
 from math import log,exp,pi
 import numpy as np
@@ -200,7 +199,7 @@ class ValveModel(object):
     def A(self):
         return pi*self.xv[0]*self.d_valve
     
-    def flow_velocity(self,State_up,State_down):
+    def flow_velocity(self, State_up, State_down):
         """
         For a given set of states, and a known valve lift, first
         check whether it is within the valve lift range, and then
@@ -215,6 +214,7 @@ class ValveModel(object):
         except ZeroDivisionError:
             return 0.0
         
+    @cython.cdivision(True)
     def derivs(self,Core): 
         x=self.xv[0]
         xdot=self.xv[1]
@@ -250,7 +250,10 @@ class ValveModel(object):
             
     def __reduce__(self):
         return rebuildValveModel,(self.__cdict__(),)
-            
+
+
+
+@cython.cdivision(True)        
 def IsentropicNozzle(A,State_up,State_down,full_output=False):   
     """
     The mass flow rate is calculated by using isentropic flow model
@@ -271,26 +274,28 @@ def IsentropicNozzle(A,State_up,State_down,full_output=False):
     -------
     
     """
-    cp=State_up.get_cp()
-    cv=State_up.get_cv()
+    # Since ideal, R=cp-cv, and k=cp/cv
+    cp=State_up.get_cp0()
+    R = 8.314472/State_up.get_MM()*1000 #[J/kg/K]
+    cv = cp-R/1000.0 #[kJ/kg/K]
+    k = cp / cv
+    
     p_up=State_up.get_p()
     T_up=State_up.get_T()
     p_down=State_down.get_p()
-    # Since ideal, R=cp-cv, and k=cp/cv
-    R=(cp-cv)*1000.0
-    k=cp/cv
+    
     # Speed of sound
-    c=sqrt(k*R*T_up)
+    c=(k*R*T_up)**0.5
     # Upstream density
     rho_up=p_up*1000.0/(R*T_up)
     pr=p_down/p_up
     pr_crit=(1+(k-1)/2)**(k/(1-k))
     if pr > pr_crit:
-        # Mass flow rate if not choked
-        mdot=A*p_up*1000.0/(sqrt(R*T_up))*sqrt(2*k/(k-1.0)*(pr)**(2.0/k)*(1-pow(pr,(k-1.0)/k)))
-        # Throat temperature
+        # Mass flow rate if not choked [kg/s]
+        mdot=A*p_up*1000.0/(R*T_up)**0.5*(2*k/(k-1.0)*pr**(2.0/k)*(1-pr**((k-1.0)/k)))**0.5
+        # Throat temperature [K]
         T_down=T_up*pow(p_down/p_up,(k-1.)/k)
-        # Throat density
+        # Throat density [kg/m3]
         rho_down=p_down*1000.0/(R*T_down)
         # Velocity at throat
         v=mdot/(rho_down*A)
@@ -298,7 +303,7 @@ def IsentropicNozzle(A,State_up,State_down,full_output=False):
         Ma=v/c
     else:
         # Mass flow rate if choked
-        mdot=A*rho_up*sqrt(k*R*T_up)*pow(1.+(k-1.)/2.,(1+k)/(2*(1-k)))
+        mdot=A*rho_up*(k*R*T_up)**0.5*pow(1.+(k-1.)/2.,(1+k)/(2*(1-k)))
         # Velocity at throat
         v=c
         # Mach Number

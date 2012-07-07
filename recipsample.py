@@ -126,6 +126,11 @@ def Compressor():
     recip.HeunN = 3000
     recip.RK45_eps = 1e-10
     t1=clock()
+    
+    
+#    import cPickle
+#    recip = cPickle.loads(cPickle.dumps(recip,-1))
+    
     recip.solve(key_inlet='inlet.1',key_outlet='outlet.2',
                 endcycle_callback=recip.endcycle_callback,
                 heat_transfer_callback=recip.heat_transfer_callback,
@@ -136,7 +141,8 @@ def Compressor():
                 )
     print 'time taken', clock()-t1
     
-    debug_plots(recip)
+    
+    #debug_plots(recip)
     
 if __name__=='__main__':    
     Compressor()

@@ -55,7 +55,7 @@ cdef class _FlowPath:
             setattr(FP,k,v)
         return FP
         
-    cpdef _calculate(self):
+    cpdef _calculate(self, dict hdict = None):
         """
         calculate
         """
@@ -67,22 +67,30 @@ cdef class _FlowPath:
         if p1 > p2:
             # The pressure in chamber 1 is higher than chamber 2
             # and thus the flow is from chamber 1 to 2
+            self.key_up=self.key1
+            self.key_down=self.key2
             self.State_up=self.State1
             self.State_down=self.State2
             self.T_up=self.State1.get_T()
-            self.h_up=self.State1.get_h()
+            if hdict is None:
+                self.h_up=self.State1.get_h()
+            else:
+                self.h_up = hdict[self.key_up]
             self.p_up=p1
             self.p_down=p2
-            self.key_up=self.key1
-            self.key_down=self.key2
+            
             self.Gas=self.State1.Fluid
         else:
+            self.key_up=self.key2
+            self.key_down=self.key1
             self.State_up=self.State2
             self.State_down=self.State1
             self.T_up=self.State2.get_T()
-            self.h_up=self.State2.get_h()
+            if hdict is None:
+                self.h_up=self.State2.get_h()
+            else:
+                self.h_up = hdict[self.key_up]
             self.p_up=p2
             self.p_down=p1
-            self.key_up=self.key2
-            self.key_down=self.key1
+            
             self.Gas=self.State2.Fluid

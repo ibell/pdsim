@@ -59,7 +59,9 @@ class PlotNotebook(wx.Panel):
                       ('Density v. crank angle',self.rho_theta),
                       ('Mass v. crank angle',self.m_theta),
                       ('Mass flow v. crank angle',self.mdot_theta),
-                      ('Valve lift v. crank angle',self.valve_theta)
+                      ('Valve lift v. crank angle',self.valve_theta),
+                      ('Temperature-pressure',self.temperature_pressure)
+                      
                       ]
         for value,callbackfcn in plot_buttons:
             btn = wx.Button(page,label=value)
@@ -153,23 +155,23 @@ class PlotNotebook(wx.Panel):
         #valve lift
         if hasattr(self.Sim,'__hasValves__') and self.Sim.__hasValves__:
             axes = self.add('Valves').gca()
-            print self.Sim.xValves.shape
             axes.plot(self.Sim.t,self.Sim.xValves[0,:])
             axes.plot(self.Sim.t,self.Sim.xValves[2,:])
             axes.set_xlabel(r'$\theta$ [rad]')
             axes.set_ylabel(r'Valve lift [m]')
         
-    #    if not Comp.__hasLiquid__:
-    #        #Fluid T-p plot
-    #        axes = notebook.add('T-P phase').gca()
-    #        Fluid=Comp.CVs['s1'].State.Fluid
-    #        #Saturation curve
-    #        Tsat=np.linspace(Props(Fluid,'Ttriple'),Props(Fluid,'Tcrit'))
-    #        psat=np.array([Props('P','T',T_,'Q',1.0,Fluid) for T_ in Tsat])
-    #        axes.plot(Tsat,psat)
-    #        axes.plot(T,p,'.')
-    #        axes.set_xlabel('Temperature [K]')
-    #        axes.set_ylabel(r'Pressure [kPa]')
+    def temperature_pressure(self, event = None):
+        if not hasattr(self.Sim,'__hasLiquid__') or not Comp.__hasLiquid__:
+            #Fluid T-p plot
+            axes = notebook.add('T-P phase').gca()
+            Fluid=Comp.CVs[0].State.Fluid
+            #Saturation curve
+            Tsat=np.linspace(Props(Fluid,'Ttriple'),Props(Fluid,'Tcrit'))
+            psat=np.array([Props('P','T',T_,'Q',1.0,Fluid) for T_ in Tsat])
+            axes.plot(Tsat,psat)
+            axes.plot(T,p,'.')
+            axes.set_xlabel('Temperature [K]')
+            axes.set_ylabel(r'Pressure [kPa]')
     
 def debug_plots(Comp,plotparent=None):
     #Build a new frame, not embedded

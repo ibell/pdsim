@@ -182,4 +182,4 @@ cpdef DDD(double theta, geoVals geo, bint poly=?, bint forces=?)
 cdef double phi_d_dd(double theta, geoVals geo)
 
 cpdef double Area_d_dd(double theta, geoVals geo)
-    
+cpdef double Area_s_sa(double theta, geoVals geo)

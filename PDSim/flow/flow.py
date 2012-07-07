@@ -65,7 +65,7 @@ class FlowPathCollection(_FlowPathCollection):
     def N(self):
         return self.__len__()
     
-    def calculate(self, Core):
+    def calculate(self, Core, hdict):
         """
         Core is the main model core, it contains information that 
         is needed for the flow models
@@ -93,7 +93,7 @@ class FlowPathCollection(_FlowPathCollection):
                 continue
           
             #Calculate using the unpacked keyword arguments
-            FlowPath.calculate(**FlowPath.MdotFcn_kwargs)
+            FlowPath.calculate(hdict = hdict, **FlowPath.MdotFcn_kwargs)
             
     def sumterms(self,Core):
         
@@ -128,13 +128,13 @@ class FlowPath(_FlowPath):
         if isinstance(d,dict):
             for k,v in d.iteritems():
                 setattr(self,k,v)
-    def calculate(self):
+    def calculate(self, hdict):
         """
         calculate
         """
         # Call the Cython routine in _Flow.pyx to evaluate the states
         # in preparation for the mass flow function
-        self._calculate()
+        self._calculate(hdict)
         
         # Pass off to the calculation function
         #
@@ -142,7 +142,7 @@ class FlowPath(_FlowPath):
         # instance of the current FlowPath class to the function
         #
         #Some other keyword arguments can be passed along to the function
-        self.mdot=self.MdotFcn(self,**self.MdotFcn_kwargs)
+        self.mdot=self.MdotFcn(self)#,**self.MdotFcn_kwargs)
     
     def __reduce__(self):
         return rebuildFlowPath,(self.__getstate__(),)

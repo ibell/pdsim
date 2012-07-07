@@ -59,39 +59,53 @@ class RedirectText2Pipe(object):
         return None
 
 class Run1(Process):
-    def __init__(self,pipe_std, pipe_abort, pipe_results, recip, pipe2):
+    def __init__(self,pipe_std, pipe_abort, pipe_results, simulation):
         Process.__init__(self)
         self.pipe_std = pipe_std
         self.pipe_abort = pipe_abort
         self.pipe_results = pipe_results
-        self.recip = recip
+        self.sim = simulation
         self._want_abort = False
-        self.pipe2 = pipe2
 
     def run(self):
         redir = RedirectText2Pipe(self.pipe_std)
         sys.stdout = redir
         sys.stderr = redir
         
-        self.recip.solve(key_inlet='inlet.1',key_outlet='outlet.2',
-            endcycle_callback=self.recip.endcycle_callback,
-            heat_transfer_callback=self.recip.heat_transfer_callback,
-            lump_energy_balance_callback = self.recip.lump_energy_balance_callback,
-            valves_callback =self.recip.valves_callback, 
+        if isinstance(self.sim, Recip):
+            self.sim.solve(key_inlet='inlet.1',key_outlet='outlet.2',
+            endcycle_callback=self.sim.endcycle_callback,
+            heat_transfer_callback=self.sim.heat_transfer_callback,
+            lump_energy_balance_callback = self.sim.lump_energy_balance_callback,
+            valves_callback =self.sim.valves_callback, 
             OneCycle=False,
-            solver_method = self.recip.cycle_integrator_type,
+            UseNR = True,
+            solver_method = self.sim.cycle_integrator_type,
             pipe_abort = self.pipe_abort
             )
+        elif isinstance(self.sim, Scroll):
+            self.sim.solve(key_inlet='inlet.1',key_outlet='outlet.2',
+            step_callback = self.sim.step_callback,
+            endcycle_callback=self.sim.endcycle_callback,
+            heat_transfer_callback=self.sim.heat_transfer_callback,
+            lump_energy_balance_callback = self.sim.lump_energy_balance_callback, 
+            OneCycle=False,
+            UseNR = False,
+            solver_method = self.sim.cycle_integrator_type,
+            pipe_abort = self.pipe_abort
+            )
+        else:
+            raise TypeError
         
         #Delete the pipe_abort since it cannot pickle
-        if hasattr(self.recip,'pipe_abort'):
-            del self.recip.pipe_abort
-            del self.recip.FlowStorage
+        if hasattr(self.sim,'pipe_abort'):
+            del self.sim.pipe_abort
+            del self.sim.FlowStorage
             
-        if not self.recip._want_abort:
+        if not self.sim._want_abort:
             #Send simulation result back to calling thread
             print 'About to send recip back to calling thread'
-            self.pipe_results.send(self.recip)
+            self.pipe_results.send(self.sim)
             print 'Sent recip back to calling thread'
             #Wait for an acknowledgement of receipt
             while not self.pipe_results.poll():
@@ -167,12 +181,14 @@ class WorkerThreadManager(Thread):
         if dlg.ShowModal() == wx.ID_OK:
             message = "Aborting in progress, please wait..."
             busy = PBI.PyBusyInfo(message, parent = None, title = "Aborting")
+            #Empty the list of simulations to go
             self.simulations = []
-            for thread_ in self.threadsList:
-                #Send the abort signal
-                thread_.abort()
-                #Wait for it to finish up
-                thread_.join()
+            while self.threadsList:
+                for thread_ in self.threadsList:
+                    #Send the abort signal
+                    thread_.abort()
+                    #Wait for it to finish up
+                    thread_.join()
             del busy
         dlg.Destroy()
         
@@ -197,9 +213,8 @@ class RedirectedWorkerThread(Thread):
         pipe_outlet, pipe_inlet = Pipe(duplex = False)
         pipe_abort_outlet, pipe_abort_inlet = Pipe(duplex = True)
         pipe_results_outlet, pipe_results_inlet = Pipe(duplex = True)
-        pipe_results_outlet2, pipe_results_inlet2 = Pipe(duplex = True)
 
-        p = Run1(pipe_inlet, pipe_abort_outlet, pipe_results_inlet, self.args_[0],pipe_results_inlet2)
+        p = Run1(pipe_inlet, pipe_abort_outlet, pipe_results_inlet, self.args_[0])
         p.daemon = True
         p.start()
         
@@ -588,7 +603,7 @@ class WriteOutputsPanel(wx.Panel):
             
             #Actually write to file
             print 'writing data to ',os.path.join(dir_path,file+'.csv')
-            fp = open(os.path.join(dir_path,file+'.csv'),'w')
+            fp = open(os.path.join(dir_path, file+'.csv'),'w')
             fp.write(headers+'\n')
             fp.write(s)
             fp.close()
