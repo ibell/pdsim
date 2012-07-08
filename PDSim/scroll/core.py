@@ -657,8 +657,10 @@ class Scroll(PDSimCore):
         
         Nc = scroll_geo.getNc(theta, self.geo)    
         #Start at the outside of the given scroll wrap
-        print phi_e-theta,phi,phi_e-theta-2*pi*Nc
-        if phi_e > phi > phi_e-theta:            
+        # x1 where x is s,d,c has the inner involute of the fixed scroll as 
+        # its outer surface
+        if phi_e > phi > phi_e-theta:     
+            #It is a suction chamber       
             return 's1' if inner_outer == 'i' else 's2'
             
         elif phi_e-theta > phi > phi_e-theta-2*pi*Nc:
@@ -680,6 +682,7 @@ class Scroll(PDSimCore):
             import matplotlib.pyplot as plt
             from PDSim.scroll.plots import plotScrollSet
             import numpy as np
+            from math import pi
             from PDSim.scroll import scroll_geo
             
             theta = pi/3
