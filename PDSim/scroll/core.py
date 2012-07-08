@@ -56,12 +56,29 @@ class Scroll(PDSimCore):
     
     @property
     def Vdisp(self):
-        return -2*pi*self.geo.h*self.geo.rb*self.geo.ro*(3*pi-2*self.geo.phi_ie+self.geo.phi_i0+self.geo.phi_o0)
+        return -2*pi*self.geo.h*self.geo.rb*self.geo.ro*(3*pi
+                                                         -2*self.geo.phi_ie
+                                                         +self.geo.phi_i0
+                                                         +self.geo.phi_o0)
     
     @property
     def Vratio(self):
         return (3*pi-2*self.geo.phi_ie+self.geo.phi_i0+self.geo.phi_o0)/(-2*self.geo.phi_os-3*pi+self.geo.phi_i0+self.geo.phi_o0)
     
+    def V_injection(self, theta, V_tube = None):
+        """
+        Volume of injection tube
+        
+        The tube volume can either be given by the keyword argument V_tube 
+        (so you can easily have more than one injection tube), or it can be 
+        provided by setting the attribute V_inj_tube and NOT providing the V_tube
+        argument
+        """
+        if V_tube is None:
+            return self.V_inj_tube, 0.0
+        else:
+            return V_tube, 0.0
+        
     def V_sa(self,theta,full_output=False):
         """
         Wrapper around the Cython code for sa calcs
@@ -624,6 +641,101 @@ class Scroll(PDSimCore):
 #            return flow_models.IsentropicNozzle(FlowPath.A,
 #                                                FlowPath.State_up,
 #                                                FlowPath.State_down)
+        except ZeroDivisionError:
+            return 0.0
+        
+    def _get_injection_CVkey(self,phi,theta,inner_outer):
+        if inner_outer == 'i':
+            phi_0 = self.geo.phi_i0
+            phi_s = self.geo.phi_is
+            phi_e = self.geo.phi_ie
+        elif inner_outer == 'o':
+            phi_0 = self.geo.phi_o0
+            phi_s = self.geo.phi_os
+            phi_e = self.geo.phi_oe-pi # The actual part of the wrap that could 
+                                       # have an injection port 
+        
+        Nc = scroll_geo.getNc(theta, self.geo)    
+        #Start at the outside of the given scroll wrap
+        print phi_e-theta,phi,phi_e-theta-2*pi*Nc
+        if phi_e > phi > phi_e-theta:            
+            return 's1' if inner_outer == 'i' else 's2'
+            
+        elif phi_e-theta > phi > phi_e-theta-2*pi*Nc:
+            #It is one of the compression chambers, figure out which one
+            for I in range(Nc+1):
+                if phi_e - theta - 2*pi*(I-1) > phi > phi_e - theta - 2*pi*I:
+                    i_str = '.'+str(I)
+                    break
+            return 'c1'+i_str if inner_outer == 'i' else 'c2'+i_str
+        
+        else:
+            return 'd1' if inner_outer == 'i' else 'd2'
+        
+    def Injection_to_Comp(self,FlowPath,**kwargs):
+        """
+        Function to calculate flow rate with
+        
+        .. plot::
+            import matplotlib.pyplot as plt
+            from PDSim.scroll.plots import plotScrollSet
+            import numpy as np
+            from PDSim.scroll import scroll_geo
+            
+            theta = pi/3
+            #Plot the scroll wraps
+            plotScrollSet(theta, ScrollComp.geo)
+            ax = plt.gca()
+            
+            #Plot the injection ports (symmetric)
+            phi = ScrollComp.geo.phi_oe-pi-2*pi
+            #Involute angle along the outer involute of the scroll wrap
+            x,y = scroll_geo.coords_inv(phi,ScrollComp.geo,theta,'fo')
+            nx,ny = scroll_geo.coords_norm(phi,ScrollComp.geo,theta,'fo')
+            rport = 0.002
+            xc,yc = x-nx*rport,y-ny*rport
+            ax.plot(xc, yc, '.')
+            t = np.linspace(0,2*pi,100)
+            ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
+            
+            #Plot the injection ports (symmetric)
+            phi = ScrollComp.geo.phi_oe-pi-2*pi+pi
+            #Involute angle along the outer involute of the scroll wrap
+            x,y = scroll_geo.coords_inv(phi,ScrollComp.geo,theta,'fi')
+            nx,ny = scroll_geo.coords_norm(phi,ScrollComp.geo,theta,'fi')
+            rport = 0.002
+            xc,yc = x-nx*rport,y-ny*rport
+            ax.plot(xc, yc, '.')
+            t = np.linspace(0,2*pi,100)
+            ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
+            
+            plt.show()
+        
+        """
+        #1. Figure out what CV is connected to the port
+        phi = kwargs.get('phi',self.geo.phi_oe-pi-2*pi)
+        partner_key = self._get_injection_CVkey(phi, self.theta, 'i')
+        #2. Based on what CV is connected to the port, maybe quit
+        if partner_key in ['d1','d2'] and 'ddd' in [FlowPath.key_up, 
+                                                    FlowPath.key_down]:
+            # Other chamber based on geometry is d1 or d2 but they are not 
+            # defined due to the angle but ddd is, and as a result, use 
+            # ddd
+            #
+            # Don't do anything, just let it go to the next section even though
+            # 'd1' or 'd2 is not key_up or key_down 
+            pass
+        
+        elif partner_key not in [FlowPath.key_up, FlowPath.key_down]:
+            return 0.0
+        #3. Find the distance of the scroll from the point on the involute
+        #   where the port is tangent
+        FlowPath.A = pi*0.003**2/4.0
+        try:
+            mdot = flow_models.IsentropicNozzle(FlowPath.A,
+                                                FlowPath.State_up,
+                                                FlowPath.State_down)
+            return mdot
         except ZeroDivisionError:
             return 0.0
         

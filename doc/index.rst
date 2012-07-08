@@ -12,7 +12,7 @@ Contents:
    :maxdepth: 2
    
    install_build
-   apidoc/modules
+   PDSim_apidoc/modules
    GUI_apidoc/modules
     
 Indices and tables

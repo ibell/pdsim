@@ -17,6 +17,14 @@ GUI Package
     :undoc-members:
     :show-inheritance:
 
+:mod:`default_configs` Module
+-----------------------------
+
+.. automodule:: GUI.default_configs
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 :mod:`pdsim_panels` Module
 --------------------------
 
@@ -29,6 +37,14 @@ GUI Package
 --------------------------
 
 .. automodule:: GUI.recip_panels
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+:mod:`scroll_panels` Module
+---------------------------
+
+.. automodule:: GUI.scroll_panels
     :members:
     :undoc-members:
     :show-inheritance:

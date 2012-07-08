@@ -20,6 +20,16 @@ import sys, os
 
 # -- General configuration -----------------------------------------------------
 
+#When this module is imported, run sphinx-apidoc for GUI and PDSim.  It is fast.
+import subprocess
+print 'Building API documentation'
+print subprocess.check_output(['sphinx-apidoc','-f','-o','GUI_apidoc','../GUI'])
+
+import PDSim
+
+PDSim_path=PDSim.__file__.rsplit(os.sep,1)[0]
+print subprocess.check_output(['sphinx-apidoc','-f','-o','PDSim_apidoc',PDSim_path],shell=False)
+
 # If your documentation needs a minimal Sphinx version, state it here.
 #needs_sphinx = '1.0'
 

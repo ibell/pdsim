@@ -148,9 +148,12 @@ def _coords_inv_d(phi,geo,theta,flag=""):
     else:
         raise ValueError('flag not valid')
     return (x,y)    
-    
+  
 def coords_inv(phi,geo,theta,flag="fi"):
     """ 
+    
+    def coords_inv(phi,geo,theta,flag="fi")
+    
     The involute angles corresponding to the points along the involutes
     (fixed inner [fi], fixed scroll outer involute [fo], orbiting
     scroll outer involute [oo], and orbiting scroll inner involute [oi] )
