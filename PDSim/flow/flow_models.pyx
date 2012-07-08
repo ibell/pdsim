@@ -1,23 +1,22 @@
 from __future__ import division
 from CoolProp.State import State
-from math import log,exp,pi
+
 import numpy as np
 import cython
+
+#Uncomment this line to use the python math functions
+#from math import log,pi,e,pow,sqrt
+
 """
 This is the module that contains all the flow models
 """
 
-def pow(a,b):
-    # This function is provided so that Cython can properly
-    # optimize calls for the powers
-    return a**b
-    
-def sqrt(x):
-    # This function is provided so that Cython can properly
-    # optimize calls for the sqrt function
-    return x**0.5
+cdef list a_radial = [25932.1070099, 0.914825434095, -177.588568125, -0.237052788124, -172347.610527, -12.0687599808, -0.0128861161041, -151.202604262, -0.999674457769, 0.0161435039267, 0.825533456725]
+cdef double Re_star_radial = 5243.58194594
+cdef list a_flank = [-2.63970395918, -0.567164431229 , 0.83655499929 , 0.810567167521 , 6174.02825667 , -7.60907962464 , -0.510200923053 , -1205.17482697 , -1.02938914174 , 0.689497785772, 1.09607735134]
+cdef double Re_star_flank = 826.167177885
         
-def IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',Tmean=None,T_wall=None):
+cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',Tmean=None,T_wall=None):
     """
     In this tube model, one of the nodes is known (fixed), but the other is calculated based on heat transfer and pressure drop for a given mass flow rate
     
@@ -130,7 +129,7 @@ def rebuildValveModel(d):
         setattr(VM,item,d[item])
     return VM
         
-class ValveModel(object):
+cdef class ValveModel(object):
     
     #Give Cython type definitions for terms
     @cython.locals(d_valve=cython.double,d_port=cython.double,C_D=cython.double,
@@ -161,7 +160,7 @@ class ValveModel(object):
         self.key_up = key_up
         self.key_down = key_down
         
-    def get_States(self, Core):
+    cpdef get_States(self, Core):
         """
         Core is the main model core, it contains information that 
         is needed for the flow models
@@ -175,17 +174,17 @@ class ValveModel(object):
             elif key in Tubes_Nodes:
                 setattr(self,Statevar,Tubes_Nodes[key])                  
     
-    def _pressure_dominant(self,x,xdot,rho,V,deltap):
+    cpdef tuple _pressure_dominant(self,double x, double xdot, double rho, double V, double deltap):
         dxdt = xdot
         dxdot_dt = (0.5*self.C_D*rho*(V-xdot)**2*self.A_valve+deltap*self.A_valve-self.k_valve*x)/(self.m_eff)
         return (dxdt,dxdot_dt)
         
-    def _flux_dominant(self,x,xdot,rho,V):
+    cpdef tuple _flux_dominant(self,double x, double xdot, double rho, double V):
         dxdt = xdot
         dxdot_dt = (0.5*self.C_D*rho*(V-xdot)**2*self.A_valve+rho*(V-xdot)**2*self.A_port-self.k_valve*x)/(self.m_eff)
         return (dxdt,dxdot_dt)
     
-    def set_xv(self,xv):
+    cpdef set_xv(self, list xv):
         #If xv[0] is less than zero, just use zero
         if xv[0]<0.0:
             xv[0]=0.0
@@ -196,10 +195,10 @@ class ValveModel(object):
             xv[1]=0.0
         self.xv=xv
         
-    def A(self):
+    cpdef double A(self):
         return pi*self.xv[0]*self.d_valve
     
-    def flow_velocity(self, State_up, State_down):
+    cpdef double flow_velocity(self,State State_up, State State_down):
         """
         For a given set of states, and a known valve lift, first
         check whether it is within the valve lift range, and then
@@ -215,7 +214,7 @@ class ValveModel(object):
             return 0.0
         
     @cython.cdivision(True)
-    def derivs(self,Core): 
+    cpdef list derivs(self,Core): 
         x=self.xv[0]
         xdot=self.xv[1]
         self.get_States(Core)
@@ -233,7 +232,7 @@ class ValveModel(object):
             f=self._flux_dominant(x,xdot,rho,V)
         return [_dummy/Core.omega for _dummy in f] #[dxdtheta, dxdot_dtheta]
     
-    def __cdict__(self):
+    cpdef dict __cdict__(self):
         items=['A_port','A_valve','d_valve','h_valve','d_port','m_eff','C_D','a_valve','l_valve',
                'rho_valve','k_valve','x_stopper','key_up','key_down','xv','State_up', 'State_down',
                'E']
@@ -251,10 +250,8 @@ class ValveModel(object):
     def __reduce__(self):
         return rebuildValveModel,(self.__cdict__(),)
 
-
-
 @cython.cdivision(True)        
-def IsentropicNozzle(A,State_up,State_down,full_output=False):   
+cpdef IsentropicNozzle(double A, State State_up, State State_down, bint full_output = False):   
     """
     The mass flow rate is calculated by using isentropic flow model
     
@@ -315,34 +312,83 @@ def IsentropicNozzle(A,State_up,State_down,full_output=False):
     else:
         return mdot
     
-#    // Hydraulic diameter
-#        Dh=2.*delta;
-#    // Viscosity for Re
-#        mu=mu_g(Gas,T_up,p_up);
-#    // Reynolds number
-#        *Re=rho_up*v*Dh/mu;
-#
-#    if (Type==CORRECTED_RADIAL_NOZZLE && *Re>1e-12)
-#    {
-#        a=a_radial;
-#        Re_star=Re_star_radial;
-#        xi=1.0/(1.0+exp(-0.01*(*Re-Re_star)));
-#        Lstar=t/0.005;
-#        delta_star=delta/10e-6;
-#        mdot_ratio=a[0]*pow(Lstar,a[1])/(a[2]*delta_star+a[3])*(xi*(a[4]*pow(*Re,a[5])+a[6])+(1-xi)*(a[7]*pow(*Re,a[8])+a[9]))+a[10];
-#    }
-#    else if (Type==CORRECTED_FLANK_NOZZLE  && *Re>1e-12)
-#    {
-#        a=a_flank;
-#        Re_star=Re_star_flank;
-#        xi=1.0/(1.0+exp(-0.01*(*Re-Re_star)));
-#        Lstar=ro/0.005;
-#        delta_star=delta/10e-6;
-#        mdot_ratio=a[0]*pow(Lstar,a[1])/(a[2]*delta_star+a[3])*(xi*(a[4]*pow(*Re,a[5])+a[6])+(1-xi)*(a[7]*pow(*Re,a[8])+a[9]))+a[10];
-#    }
-#    else
-#    {
-#        mdot_ratio=1.0;
-#    }
-#    *mdot=*mdot/mdot_ratio;
-#}
+@cython.cdivision(True)
+cpdef FrictionCorrectedIsentropicNozzle(double A, State State_up, State State_down, double delta, bytes Type, double t = -1.0, double ro = -1.0, bint full_output = False):
+    """
+    Frictionally-corrected nozzle model - the so-called hybrid leakage model
+    
+    Parameters
+    ----------
+    A : float
+        Flow area at the minimum area, equal to :math:`\delta_{flank}*h` for flank, 
+        and :math:`s_r\delta_{radial}` for radial leakage.  Intended for scroll
+        compressor, but can be used with other compressors
+    State_up : :class:`CoolProp.State.State` instance
+        The State instance corresponding to the upstream side of the flow path
+    State_down : :class:`CoolProp.State.State` instance
+        The State instance corresponding to the downstream side of the flow path
+    delta : float
+        Gap width in meters
+    Type : string
+        Valid options are 'radial' or 'flank'
+    t : float
+        Scroll wrap thickness in m
+    ro : float
+        Orbiting radius in m
+    full_output : boolean
+        If False, just return float value of mdot. If True, return tuple of 
+        mdot and others, where others is a dictionary of other outputs with the
+        keys `` 
+        
+    Notes
+    -----
+    If Type is 'radial', t must be provided
+    
+    If Type is 'scroll', ro must be provided
+        
+    Implements the frictionally-corrected method of 
+    Bell et al., *A Computationally Efficient Hybrid Leakage Model for Modeling Leakage in Positive Displacement Compressors*, "2012 International Compressor Engineering Conference at Purdue University
+    
+    Journal publication to follow
+    """
+    
+    cdef double mdot,Re,v,mdot_ratio
+    #Get the flow velocity using the Isentropic nozzle model
+    mdot, others = IsentropicNozzle(A, State_up, State_down, full_output = True)
+    if abs(mdot) < 1e-12:
+        return mdot
+    v = others['v']
+    # Hydraulic diameter
+    Dh=2 * delta
+    # Viscosity for Re
+    mu = State_up.get_visc()
+    rho_up = State_up.get_rho()
+    # Reynolds number
+    Re=rho_up*v*Dh/mu
+
+    if (Type == 'radial' and t<=0):
+        raise ValueError("Type 'radial' provided, but thickness of scroll [{0:g}] is not positive".format(t))
+    elif (Type == 'radial' and Re > 1e-12):
+        a=a_radial
+        Re_star=Re_star_radial
+        xi=1.0/(1.0+exp(-0.01*(Re-Re_star)))
+        Lstar=t/0.005
+        delta_star=delta/10e-6
+        mdot_ratio=a[0]*pow(Lstar,a[1])/(a[2]*delta_star+a[3])*(xi*(a[4]*pow(Re,a[5])+a[6])+(1-xi)*(a[7]*pow(Re,a[8])+a[9]))+a[10]
+    elif (Type == 'flank' and ro <= 0):
+        raise ValueError("Type 'flank' provided, but orbiting radius of scroll [{0:g}] is not positive".format(ro))
+    elif (Type == 'flank' and Re > 1e-12):
+        a=a_flank
+        Re_star=Re_star_flank
+        xi=1.0/(1.0+exp(-0.01*(Re-Re_star)))
+        Lstar=ro/0.005
+        delta_star=delta/10e-6
+        mdot_ratio=a[0]*pow(Lstar,a[1])/(a[2]*delta_star+a[3])*(xi*(a[4]*pow(Re,a[5])+a[6])+(1-xi)*(a[7]*pow(Re,a[8])+a[9]))+a[10]
+    else:
+        mdot_ratio=1.0
+    mdot=mdot/mdot_ratio
+    if full_output:
+        other = dict()
+        return mdot,others
+    else:
+        return mdot

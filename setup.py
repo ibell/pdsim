@@ -19,7 +19,7 @@ import numpy
 #Each of the Pure-Python or PYX files in this list will be compiled to a python module       
 pyx_list = [
             "PDSim/misc/scipylike.pyx",
-            "PDSim/flow/flow_models.py",
+            "PDSim/flow/flow_models.pyx",
             "PDSim/flow/_sumterms.pyx",
             "PDSim/flow/_flow.pyx",
             "PDSim/scroll/scroll_geo.py",

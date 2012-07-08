@@ -11,6 +11,7 @@ from scipy.integrate import simps
 from scipy.optimize import newton
 import copy
 import pylab
+from time import clock
 
 ##--  Package imports  --
 from PDSim.flow._sumterms import setcol, getcol
@@ -840,6 +841,7 @@ class PDSimCore(object):
                 x_state = listm(x_state)
                 print 'x_state is', x_state
                 
+                t1 = clock()
                 if solver_method == 'Euler':
                     if hasattr(self,'EulerN'):
                         N=self.EulerN
@@ -869,6 +871,8 @@ class PDSimCore(object):
                                     **kwargs)
                 else:
                     raise AttributeError
+                t2 = clock()
+                print 'Elapsed time for cycle is {0:g} s'.format(t2-t1)
                 
                 if (key_inlet in self.FlowsProcessed.mean_mdot and 
                     key_outlet in self.FlowsProcessed.mean_mdot):

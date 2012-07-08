@@ -613,9 +613,17 @@ class Scroll(PDSimCore):
         #Calculate the area
         FlowPath.A=self.geo.h*self.geo.delta_flank
         try:
-            return flow_models.IsentropicNozzle(FlowPath.A,
-                                                FlowPath.State_up,
-                                                FlowPath.State_down)
+            return flow_models.FrictionCorrectedIsentropicNozzle(
+                                 FlowPath.A,
+                                 FlowPath.State_up,
+                                 FlowPath.State_down,
+                                 self.geo.delta_flank,
+                                 Type = 'flank',
+                                 ro = self.geo.ro
+                                 )
+#            return flow_models.IsentropicNozzle(FlowPath.A,
+#                                                FlowPath.State_up,
+#                                                FlowPath.State_down)
         except ZeroDivisionError:
             return 0.0
         

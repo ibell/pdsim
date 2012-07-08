@@ -25,15 +25,15 @@ def Compressor():
     #This runs if the module code is run directly
     ScrollComp.set_scroll_geo(104.8e-6,1.6,0.004,0.005) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2='PMP')
-    ScrollComp.geo.delta_flank=3e-6
-    ScrollComp.geo.delta_radial=3e-6
+    ScrollComp.geo.delta_flank=12e-6
+    ScrollComp.geo.delta_radial=12e-6
     ScrollComp.omega=3500/60*2*pi
     ScrollComp.Tamb = 298.0
         
     Ref='R290'
-#    State.debug(10)
-#    State.set_1phase_LUT_params(Ref,30,30,250,1000,180,3000)
-#    State.LUT(True)
+    #State.debug(10)
+    State.set_1phase_LUT_params(Ref,100,100,250,500,200,3000)
+    State.LUT(True)
     
     inletState = State.State(Ref,{'T':300,'P':310})
     outletState = State.State(Ref,{'T':400,'P':1200})
@@ -72,7 +72,7 @@ def Compressor():
                  endcycle_callback=ScrollComp.endcycle_callback,
                  heat_transfer_callback=ScrollComp.heat_transfer_callback,
                  lump_energy_balance_callback=ScrollComp.lump_energy_balance_callback,
-                 solver_method='Euler',
+                 solver_method='RK45',
                  hmin=2*pi/(100000000),
                  UseNR = False,
                  OneCycle = False

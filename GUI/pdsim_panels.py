@@ -442,7 +442,6 @@ class ParametricPanel(PDPanel):
                 for Icol in range(self.ParaList.GetColumnCount()-1):
                     val = self.ParaList.GetStringItem(Irow, Icol)
                     Name = self.ParaList.GetColumn(Icol+1).Text
-                    print self._get_attr(Name),float(val)
                     setattr(sim,self._get_attr(Name),float(val))
                     #Run the post_set_params for all the panels
                     Main.MTB.InputsTB.post_set_params(sim)
