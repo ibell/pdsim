@@ -57,21 +57,24 @@ class GeometryPanel(pdsim_panels.PDPanel):
         for item in self.items:
             setattr(self,item['attr'],item['textbox'])
         
-        kwargs = dict(label = "φ_i0 [radian]",
+        kwargs = dict(label = u"\u03D5_i0 [radian]",
                       tooltip = 'Initial involute angle for inner involute'
                       )
         self.phi_i0_label, self.phi_i0 = LabeledItem(self, **kwargs)
         
         self.phi_is_label, self.phi_is= LabeledItem(self,
-                                                       label="phi_is [radian]")
+                                                       label=u"\u03D5_is [radian]")
+
+        width = max([item['label'].GetEffectiveMinSize()[0] for item in self.items])
+        self.phi_is_label.SetMinSize((width,-1))
         self.phi_ie_label, self.phi_ie= LabeledItem(self,
-                                                       label="phi_ie [radian]")
+                                                       label=u"\u03D5_ie [radian]")
         self.phi_o0_label, self.phi_o0= LabeledItem(self,
-                                                       label="phi_o0 [radian]")
+                                                       label=u"\u03D5_o0 [radian]")
         self.phi_os_label, self.phi_os= LabeledItem(self,
-                                                       label="phi_os [radian]")
+                                                       label=u"\u03D5_os [radian]")
         self.phi_oe_label, self.phi_oe= LabeledItem(self,
-                                                       label="phi_oe [radian]")
+                                                       label=u"\u03D5_oe [radian]")
         self.rb_label, self.rb = LabeledItem(self,
                                              label="rb [m]")
         self.hs_label, self.hs= LabeledItem(self,
