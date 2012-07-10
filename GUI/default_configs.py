@@ -99,7 +99,7 @@ Term1 = Term,Rotational speed [rad/s],250.0;300.0
 Cycle = Cycle,Heun,7000
 
 [OutputDataPanel]
-selected  = selected,['run_index'; 'mdot'; 'eta_v'; 'eta_oi']
+selected  = selected,['run_index'; 'mdot'; 'eta_v'; 'eta_a']
 """
 )
 

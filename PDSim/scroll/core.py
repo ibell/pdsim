@@ -390,27 +390,38 @@ class Scroll(PDSimCore):
                                       discharge_becomes=disc_becomes_c2,
                                       becomes=becomes_c2))
     
-    def auto_add_leakage(self,flankFunc,radialFunc):
-        #First do the flank leakage terms since they are easier to handle
-        #Always a s1-c1 leakage and s2-c2 leakage
+    def auto_add_leakage(self,flankFunc,radialFunc,):
+        
+        # First do the flank leakage terms since they are easier to handle
+        # Always a s1-c1 leakage and s2-c2 leakage
         self.add_flow(FlowPath(key1='s1',key2='c1.1',MdotFcn=flankFunc))
         self.add_flow(FlowPath(key1='s2',key2='c2.1',MdotFcn=flankFunc))
+        
+        # Only add the DDD-S1 and DDD-S2 flow path if there is one set of
+        # compression chambers.  You can provide a different flank leakage
+        # function if desired by setting the 
+        if scroll_geo.nC_Max(self.geo) == 1:
+            self.add_flow(FlowPath(key1='s1',key2='ddd',MdotFcn=self.DDD_to_S))
+            self.add_flow(FlowPath(key1='s2',key2='ddd',MdotFcn=self.DDD_to_S))
+        
         #Add each pair of compression chambers
         nCmax = scroll_geo.nC_Max(self.geo)
+        
         # Must have at least one pair
         assert (nCmax>=1)
         for alpha in range(1,nCmax+1):
             keyc1 = 'c1.'+str(alpha)
             keyc2 = 'c2.'+str(alpha)
-            if alpha<nCmax-1:
+            
+            if alpha < nCmax - 1:
                 #Leakage between compression chambers along a path
                 self.add_flow(FlowPath(key1=keyc1,key2='c1.'+str(alpha+1),MdotFcn=flankFunc))
                 self.add_flow(FlowPath(key1=keyc2,key2='c2.'+str(alpha+1),MdotFcn=flankFunc))
+                
             elif alpha==nCmax:
-                #Leakage with the discharge region and the innermost chamber
+                #Leakage between the discharge region and the innermost chamber
                 self.add_flow(FlowPath(key1=keyc1,key2='ddd',MdotFcn=flankFunc))
                 self.add_flow(FlowPath(key1=keyc2,key2='ddd',MdotFcn=flankFunc))
-        print 'Missing s1-ddd and s1-dd flank leakages'
     
 #    def RadialLeak(self, geo, phi_max, phi_min):
 #        flowVec->A[*count]=(geo->delta_radial)*(geo->rb)*(1.0/2.0*(phi_max*phi_max-phi_min*phi_min)-(geo->phi.phi_fi0)*(phi_max-phi_min))
@@ -597,7 +608,18 @@ class Scroll(PDSimCore):
                                                 FlowPath.State_down)
         except ZeroDivisionError:
             return 0.0
-        
+    
+    def DDD_to_S(self,FlowPath,flankFunc = None,**kwargs):
+        if  flankFunc is None:
+            flankFunc = self.FlankLeakage
+        # If there are any compression chambers, don't evaluate this flow
+        # since the compression chambers "get in the way" of flow directly from 
+        # ddd to s1 and s2
+        if scroll_geo.getNc(self.theta,self.geo) > 0:
+            return 0.0
+        else:
+            return flankFunc(FlowPath)
+            
     def D_to_DD(self,FlowPath,**kwargs):
         FlowPath.A=scroll_geo.Area_d_dd(self.theta,self.geo)
         try:

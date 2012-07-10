@@ -1416,6 +1416,11 @@ class MainFrame(wx.Frame):
         self.worker=None
         self.Layout() 
         
+        if self.SimType == 'scroll':
+            dlg = wx.MessageDialog(None,"Sorry but scroll compressor is a work in progress")
+            dlg.ShowModal()
+            dlg.Destroy()
+        
     def build_recip(self):
         #Instantiate the recip class
         recip=Recip()

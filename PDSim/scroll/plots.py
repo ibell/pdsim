@@ -1,13 +1,19 @@
-import pylab
+
 fig_size =  [8,10]
 
 import glob
-from pylab import arange,pi,sin,cos,sqrt,tan
-import numpy as np
 import math
 from math import atan2
+import numpy as np
+import pylab
+from pylab import arange,pi,sin,cos,sqrt,tan
+import threading
+import wx
+
 import os,subprocess
 #import scrollCalcs as Calcs
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
 global geo,setDiscGeo,coords_inv,circle,sortAnglesCCW,Shave,plotScrollSet
 global polyarea,theta_d
 import scipy.optimize as optimize
@@ -931,6 +937,121 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
         np.savetxt('yos.csv',YOS,delimiter=',')
     
     return OrbScroll
+
+
+class PlotPanel(wx.Panel):
+    def __init__(self, *args, **kwds):
+        kwds["style"] = wx.TAB_TRAVERSAL
+        wx.Panel.__init__(self, *args,**kwds)
+
+        self.figure=Figure(figsize=(6,4),dpi=100)
+        self.axes=self.figure.add_subplot(111)
+        self.canvas=FigureCanvas(self,wx.ID_ANY,self.figure)
+
+class TaskThread(threading.Thread):
+    """Thread that executes a task every N seconds"""
+    
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self._finished = threading.Event()
+        self._interval = 15.0
+    
+    def setInterval(self, interval):
+        """Set the number of seconds we sleep between executing our task"""
+        self._interval = interval
+    
+    def shutdown(self):
+        """Stop this thread"""
+        self._finished.set()
+    
+    def run(self):
+        while 1:
+            if self._finished.isSet(): return
+            self.task()
+            
+            # sleep for interval or until shutdown
+            self._finished.wait(self._interval)
+    
+    def task(self):
+        """The task done by this thread - override in subclasses"""
+        raise Exception
+        
+class PlotThread(TaskThread):
+
+    def setGUI(self,GUI):
+        self._GUI=GUI
+
+    def task(self):
+        if self._GUI.btn.Value==True:
+            wx.CallAfter(self._GUI.plotStep)
+
+class ScrollAnimForm(wx.Frame):
+ 
+    #----------------------------------------------------------------------
+    def __init__(self,geo=None):
+        wx.Frame.__init__(self, None, wx.ID_ANY, "Scroll Model GUI")
+ 
+        # Add a panel so it looks the correct on all platforms
+        panel = wx.Panel(self, wx.ID_ANY)
+        # Create the items
+        self.btn = btn = wx.ToggleButton(panel, -1, "Start")
+        self.pltTs = PlotPanel(panel, -1)
+        # Do the layout
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.btn, 0, wx.ALL|wx.CENTER, 5)
+        sizer.Add(self.pltTs, 0, wx.ALL|wx.CENTER, 5)
+        panel.SetSizer(sizer)
+        # Bind the events
+        btn.Bind(wx.EVT_TOGGLEBUTTON,self.onButton)
+        self.Bind(wx.EVT_CLOSE,self.preClose)
+        
+        self.theta=0
+        self.N=50
+        self.geo=geo
+        self.OS=plotScrollSet(0,axis=self.pltTs.axes,geo=self.geo,lw=1,discOn=False)
+
+        self.PT=PlotThread()
+        self.PT.setGUI(self) #pass it an instance of the frame (by reference)
+        self.PT.setInterval(0.05) #delay between plot events
+        self.PT.start()
+        
+    def onButton(self, event):
+        """
+        Runs the thread
+        """
+        btn = event.GetEventObject()
+        if btn.GetValue()==True:
+            btn.SetLabel("Stop")
+        else:
+            btn.SetLabel("Start")
+        
+    def updateDisplay(self):
+        wx.CallAfter(self._updateDisplay)
+    
+    def _updateDisplay(self):
+        """
+        Updates the animation
+        """
+        if self.Animate==True:
+            wx.CallAfter(self.plotStep)
+            self.plotThread=threading.Timer(0.001,self.updateDisplay)
+            self.plotThread.daemon=True
+            self.plotThread.start()
+
+    def plotStep(self):
+        self.theta+=2*np.pi/(self.N-1)
+        (x,y)=CoordsOrbScroll(self.theta,self.geo)
+        self.OS.set_xy(np.hstack((x,y)))
+        self.pltTs.axes.figure.canvas.draw() #Annoyingly this draw is required to flush the ghost orbiting scroll
+        self.SetTitle('theta= '+str(self.theta)+' radians')
+
+    def preClose(self,event):
+        """
+        This runs at the beginning of the closing event to deal with cleanup
+        of threads and the GUI
+        """
+        self.PT.shutdown()
+        self.Destroy()
 
 if __name__== "__main__":
     Scroll2WRL('Scroll.wrl')

@@ -36,9 +36,9 @@ def Compressor():
     
     Injection = False
         
-    Ref='R410A'
+    Ref='Air'
     #State.debug(10)
-    State.set_1phase_LUT_params(Ref,100,100,250,500,200,3000)
+    State.set_1phase_LUT_params(Ref,10,10,250,500,200,3000)
     State.LUT(True)
     
     inletState = State.State(Ref,{'T':300,'P':310})

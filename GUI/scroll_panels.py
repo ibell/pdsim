@@ -1,4 +1,4 @@
-# -*- coding: latin-1 -*-
+# -*- coding: utf-8 -*-
 import pdsim_panels
 import wx
 import numpy as np
@@ -7,7 +7,7 @@ from PDSim.scroll.core import Scroll
 import matplotlib as mpl
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as WXCanvas
 from matplotlib.backends.backend_wxagg import NavigationToolbar2Wx as WXToolbar
-from PDSim.scroll.plots import plotScrollSet
+from PDSim.scroll.plots import plotScrollSet, ScrollAnimForm
 
 LabeledItem = pdsim_panels.LabeledItem
 
@@ -57,7 +57,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         for item in self.items:
             setattr(self,item['attr'],item['textbox'])
         
-        kwargs = dict(label = "phi_i0 [radian]",
+        kwargs = dict(label = "φ_i0 [radian]",
                       tooltip = 'Initial involute angle for inner involute'
                       )
         self.phi_i0_label, self.phi_i0 = LabeledItem(self, **kwargs)
@@ -87,11 +87,16 @@ class GeometryPanel(pdsim_panels.PDPanel):
         self.hs.Enable(False)
         
         self.PP = PlotPanel(self)
+        hsizer = wx.BoxSizer(wx.HORIZONTAL)
+        hsizer.Add(self.PP,0,wx.EXPAND)
+        anibutton = wx.Button(self, label = 'Animate')
+        anibutton.Bind(wx.EVT_BUTTON,self.OnAnimate)
+        hsizer.Add(anibutton,1,wx.EXPAND)
         
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(sizerInputs)
         sizer.AddSpacer(10)
-        sizer.Add(self.PP,0,wx.EXPAND)
+        sizer.Add(hsizer)
         sizer.AddSpacer(10)
         
         self.ax = self.PP.figure.add_axes((0,0,1,1))
@@ -127,6 +132,10 @@ class GeometryPanel(pdsim_panels.PDPanel):
         from the base class PDPanel
         """
         return ['Vdisp','Vratio','t','ro']
+        
+    def OnAnimate(self, event):
+        SAF = ScrollAnimForm(self.Scroll.geo)
+        SAF.Show()
         
     def OnChangeParam(self, event = None):
         
@@ -183,28 +192,12 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
         self.ConstructItems(self.items1,sizer,self.configdict,self.descdict)
 
-        box_sizer.Add(sizer)
-        box_sizer.Add((10,10))
-        box_sizer.Add(wx.StaticText(self,-1,"Valve Inputs"))
-        box_sizer.Add(wx.StaticLine(self,-1,(25, 50), (300,1)))
+        box_sizer.Add(sizer)        
         
-        self.items2 = [
-        dict(attr='valve_E'),
-        dict(attr='valve_d'),
-        dict(attr='valve_h'),
-        dict(attr='valve_l'),
-        dict(attr='valve_a'),
-        dict(attr='valve_x_stopper'),
-        dict(attr='valve_rho'),
-        dict(attr='valve_C_D'),
-        ]
-        sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
-        self.ConstructItems(self.items2,sizer,self.configdict,self.descdict)
-        box_sizer.Add(sizer)
         self.SetSizer(box_sizer)
         box_sizer.Layout()
         
-        self.items=self.items1+self.items2
+        self.items=self.items1
 
         
 class MechanicalLossesPanel(pdsim_panels.PDPanel):
@@ -221,8 +214,6 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         dict(attr='h_shell'),
         dict(attr='A_shell'),
         dict(attr='Tamb'),
-        dict(attr='mu_oil'),
-        dict(attr='delta_gap'),
         ]
         
         sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
