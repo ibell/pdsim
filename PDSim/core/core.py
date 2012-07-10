@@ -5,9 +5,7 @@ from CoolProp.State import State
 import numpy as np
 from math import pi
 import textwrap
-from scipy.integrate import trapz
-#from PDSim.misc.scipylike import trapz
-from scipy.integrate import simps
+from scipy.integrate import trapz, simps
 from scipy.optimize import newton
 import copy
 import pylab
@@ -150,10 +148,11 @@ class PDSimCore(object):
             #Left over terms are for the valves
             if self.__hasValves__:
                 setcol(self.xValves, i, range(len(self.Valves)*2), listm(x[Ns*Nexist::]))
-                    
+        
         setcol(self.V, i, exists_indices, self.V_)
         setcol(self.dV, i, exists_indices, self.dV_)
         setcol(self.p, i, exists_indices, self.p_)
+        setcol(self.h, i, exists_indices, self.h_)
         setcol(self.Q, i, exists_indices, self.Q_)
     
     def __postprocess_flows(self):
@@ -224,6 +223,7 @@ class PDSimCore(object):
                                                            self.t[0:self.Ntheta]/self.omega)*self.omega/(2*pi)
             self.FlowsProcessed.mean_mdot[key]=np.mean(self.FlowsProcessed.integrated_mdot[key])
             
+            
         # Special-case the tubes.  Only one of the nodes can have flow.  
         #   The other one is invariant because it is quasi-steady.
         for Tube in self.Tubes:
@@ -255,6 +255,7 @@ class PDSimCore(object):
             An initialized control volume.  See :class:`PDSim.core.containers.ControlVolume`
             
         """
+
         if CV.key in self.CVs:
             raise KeyError('Sorry but the key for your Control Volume ['+CV.key+'] is already in use')
         
@@ -292,6 +293,7 @@ class PDSimCore(object):
         self.T=np.zeros((self.CVs.N,50000))
         self.T.fill(np.nan)
         self.p=self.T.copy()
+        self.h = self.T.copy()
         self.m=self.T.copy()
         self.V=self.T.copy()
         self.dV=self.T.copy()
@@ -659,7 +661,6 @@ class PDSimCore(object):
                         
                     error=h*(1.0/360.0*f1-128.0/4275.0*f3-2197.0/75240.0*f4+1.0/50.0*f5+2.0/55.0*f6)
                 else:
-                    
                     # Step 1: derivatives evaluated at old values
                     f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
                     xnew1=xold+h*(+1.0/5.0*f1)
@@ -680,14 +681,10 @@ class PDSimCore(object):
                     
                     #Updated values at the next step using 5-th order
                     xnew=xold+h*(37/378*f1 + 250/621*f3 + 125/594*f4 + 512/1771*f6)
-                    xnew2 = xold+h*(-3/2*f1+5/2*f2)
-                        
+                    
                     error = h*(-277/64512*f1+6925/370944*f3-6925/202752*f4-277.0/14336*f5+277/7084*f6)
-                    error2 = h*(-1/2*f1+5/2*f2)
                 
                 max_error=np.sqrt(np.sum(np.power(error,2)))
-                max_error2=np.sqrt(np.sum(np.power(error2,2)))
-#                print max_error, error
                 
                 # If the error is too large, make the step size smaller and try
                 # the step again
@@ -708,7 +705,9 @@ class PDSimCore(object):
             
             # Step has been accepted (or adaptive disabled), write values back to matrices
             self.t[Itheta+1]=t0+h
-            self.__put_to_matrices(xnew,Itheta+1)
+            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+            self.p_ = listm(self.CVs.p)
+            self.__put_to_matrices(xnew, Itheta+1)
             t0+=h
             Itheta+=1
             self.FlowStorage.append(self.Flows.get_deepcopy())
@@ -727,7 +726,7 @@ class PDSimCore(object):
         self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
         
         # last index is Itheta, number of steps is Itheta+1
-        print 'Itheta steps taken',Itheta+1
+        print 'Itheta steps taken', Itheta+1
         self.Itheta=Itheta
         self.Ntheta = Itheta
         self.__post_cycle()
@@ -1075,6 +1074,7 @@ class PDSimCore(object):
         
         self.V_=V
         self.dV_=dV
+        self.h_ = h
         self.rho_=rho
         self.m_=m
         self.p_=p
@@ -1112,9 +1112,6 @@ class PDSimCore(object):
         dxLdtheta=1.0/m*(summerdxL-xL*dmdtheta)
         dTdtheta=1/(m*cv)*(-1.0*T*dpdT*(dV-v*dmdtheta)-m*dudxL*dxLdtheta-h*dmdtheta+Q/self.omega+summerdT)
         drhodtheta = 1.0/V*(dmdtheta-rho*dV)
-        
-#        Ic1 = self.CVs.exists_keys.index('c1.1')
-#        print drhodtheta[Ic1]*V[Ic1]+rho[Ic1]*dV[Ic1],summerdT[Ic1]
         
         if self.__hasLiquid__==True:
             f=np.zeros((3*self.NCV,))

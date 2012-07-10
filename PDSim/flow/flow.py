@@ -93,7 +93,7 @@ class FlowPathCollection(_FlowPathCollection):
                 continue
           
             #Calculate using the unpacked keyword arguments
-            FlowPath.calculate(hdict = hdict, **FlowPath.MdotFcn_kwargs)
+            FlowPath.calculate(hdict = hdict)
             
     def sumterms(self,Core):
         
@@ -144,7 +144,7 @@ class FlowPath(_FlowPath):
         # instance of the current FlowPath class to the function
         #
         #Some other keyword arguments can be passed along to the function
-        self.mdot=self.MdotFcn(self)#,**self.MdotFcn_kwargs)
+        self.mdot=self.MdotFcn(self, **self.MdotFcn_kwargs)
     
     def __reduce__(self):
         return rebuildFlowPath,(self.__getstate__(),)

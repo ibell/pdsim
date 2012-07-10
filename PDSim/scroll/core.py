@@ -13,6 +13,7 @@ from CoolProp.CoolProp import UseSinglePhaseLUT
 from CoolProp import State
 from math import pi,cos
 from _scroll import _Scroll
+import copy
 
 class Scroll(PDSimCore):
     """
@@ -326,13 +327,13 @@ class Scroll(PDSimCore):
         #Discharge chambers are also easy.  Assume that you start with 'ddd' chamber merged.
         # No problem if this isn't true.
         self.add_CV(ControlVolume(key='d1',initialState=outletState.copy(),
-                                VdVFcn=self.V_d1,exists=False,becomes='d1'))
+                                VdVFcn=self.V_d1,exists=False))
         self.add_CV(ControlVolume(key='d2',initialState=outletState.copy(),
-                                VdVFcn=self.V_d2,exists=False,becomes='d2'))
+                                VdVFcn=self.V_d2,exists=False))
         self.add_CV(ControlVolume(key='dd',initialState=outletState.copy(),
-                                VdVFcn=self.V_dd,exists=False,becomes='dd'))
+                                VdVFcn=self.V_dd,exists=False))
         self.add_CV(ControlVolume(key='ddd',initialState=outletState.copy(),
-                                VdVFcn=self.V_ddd,discharge_becomes='dd',becomes='ddd'))
+                                VdVFcn=self.V_ddd,discharge_becomes='dd'))
 
         #Add each pair of compression chambers
         nCmax = scroll_geo.nC_Max(self.geo)
@@ -343,7 +344,11 @@ class Scroll(PDSimCore):
             keyc2 = 'c2.'+str(alpha)
             if alpha==1:
                 #It is the outermost pair of compression chambers
-                initState = inletState.copy()
+                initState = State.State(inletState.Fluid,
+                                        dict(T=inletState.T,
+                                             D=inletState.rho)
+                                        )
+                
             else:
                 #It is not the first CV, more involved analysis
                 #Assume isentropic compression from the inlet state at the end of the suction process
@@ -354,28 +359,36 @@ class Scroll(PDSimCore):
                 V2 = self.V_c1(0,alpha)[0]
                 p2 = p1 * (V1/V2)**k
                 T2 = T1 * (V1/V2)**(k-1)
-                initState=State.State(inletState.Fluid,dict(T=T2,P=p2))
+                initState=State.State(inletState.Fluid,dict(T=T2,P=p2)).copy()
             if alpha<nCmax:
-                # It is not the innermost pair of chambers, becomes another 
-                # set of compression chambers at the end of the rotation
+                # Does not change definition at discharge angle
                 disc_becomes_c1 = 'c1.'+str(alpha)
                 disc_becomes_c2 = 'c2.'+str(alpha)
+                # It is not the innermost pair of chambers, becomes another 
+                # set of compression chambers at the end of the rotation
                 becomes_c1 = 'c1.'+str(alpha+1)
                 becomes_c2 = 'c2.'+str(alpha+1)
             else:
                 #It is the innermost pair of chambers, becomes discharge chamber
+                #at the discharge angle
                 disc_becomes_c1 = 'd1'
                 disc_becomes_c2 = 'd2'
-                becomes_c1 = 'c1.'+str(alpha+1)
-                becomes_c2 = 'c2.'+str(alpha+1)
+                becomes_c1 = 'c1.'+str(alpha+1) #Not used - CV dies at disc.
+                becomes_c2 = 'c2.'+str(alpha+1) #Not used - CV dies at disc.
                 
-            self.add_CV(ControlVolume(key=keyc1,initialState=initState,
-                                    VdVFcn=self.V_c1,VdVFcn_kwargs={'alpha':alpha},
-                                    discharge_becomes=disc_becomes_c1,becomes=becomes_c1))
-            self.add_CV(ControlVolume(key=keyc2,initialState=initState,
-                                    VdVFcn=self.V_c2,VdVFcn_kwargs={'alpha':alpha},
-                                    discharge_becomes=disc_becomes_c2,becomes=becomes_c2))
-            print 'adding CV', keyc1, keyc2
+            self.add_CV(ControlVolume(key=keyc1,
+                                      initialState=initState.copy(),
+                                      VdVFcn=self.V_c1,
+                                      VdVFcn_kwargs={'alpha':alpha},
+                                      discharge_becomes=disc_becomes_c1,
+                                      becomes=becomes_c1))
+            
+            self.add_CV(ControlVolume(key=keyc2,
+                                      initialState=initState.copy(),
+                                      VdVFcn=self.V_c2,
+                                      VdVFcn_kwargs={'alpha':alpha},
+                                      discharge_becomes=disc_becomes_c2,
+                                      becomes=becomes_c2))
     
     def auto_add_leakage(self,flankFunc,radialFunc):
         #First do the flank leakage terms since they are easier to handle
@@ -397,7 +410,7 @@ class Scroll(PDSimCore):
                 #Leakage with the discharge region and the innermost chamber
                 self.add_flow(FlowPath(key1=keyc1,key2='ddd',MdotFcn=flankFunc))
                 self.add_flow(FlowPath(key1=keyc2,key2='ddd',MdotFcn=flankFunc))
-        print 'Missing s1-ddd and s1-dd leakages'
+        print 'Missing s1-ddd and s1-dd flank leakages'
     
 #    def RadialLeak(self, geo, phi_max, phi_min):
 #        flowVec->A[*count]=(geo->delta_radial)*(geo->rb)*(1.0/2.0*(phi_max*phi_max-phi_min*phi_min)-(geo->phi.phi_fi0)*(phi_max-phi_min))
@@ -576,6 +589,15 @@ class Scroll(PDSimCore):
     def TubeCode(self,Tube,**kwargs):
         Tube.Q = flow_models.IsothermalWallTube(Tube.mdot,Tube.State1,Tube.State2,Tube.fixed,Tube.L,Tube.ID,T_wall=self.Tlumps[0])
         
+    def InjectionTubeFM(self,FlowPath,**kwargs):
+        FlowPath.A=pi*0.005**2/4.0
+        try:
+            return flow_models.IsentropicNozzle(FlowPath.A,
+                                                FlowPath.State_up,
+                                                FlowPath.State_down)
+        except ZeroDivisionError:
+            return 0.0
+        
     def D_to_DD(self,FlowPath,**kwargs):
         FlowPath.A=scroll_geo.Area_d_dd(self.theta,self.geo)
         try:
@@ -598,13 +620,13 @@ class Scroll(PDSimCore):
 #    def FlankLeakage(self,*args,**kwargs):
 #        return _Scroll.FlankLeakage(self,*args,**kwargs)
         
-    def Inlet_sa(self,FlowPath,**kwargs):
-        FlowPath.A=pi*0.03**2/4.0
+    def Inlet_sa(self, FlowPath, X_d=1.0, **kwargs):
+        FlowPath.A=X_d*pi*0.03**2/4.0
         return flow_models.IsentropicNozzle(FlowPath.A,
                                             FlowPath.State_up,
                                             FlowPath.State_down)
         
-    def Discharge(self,FlowPath,**kwargs):
+    def Discharge(self, FlowPath, **kwargs):
         FlowPath.A=pi*0.01**2/4.0
         try:
             return flow_models.IsentropicNozzle(FlowPath.A,
@@ -613,8 +635,8 @@ class Scroll(PDSimCore):
         except ZeroDivisionError:
             return 0.0
         
-    def SA_S(self,FlowPath):
-        FlowPath.A=scroll_geo.Area_s_sa(self.theta, self.geo)
+    def SA_S(self, FlowPath, X_d=1.0,**kwargs):
+        FlowPath.A=X_d*scroll_geo.Area_s_sa(self.theta, self.geo)
         try:
             mdot = flow_models.IsentropicNozzle(FlowPath.A,
                                                 FlowPath.State_up,
@@ -674,7 +696,7 @@ class Scroll(PDSimCore):
         else:
             return 'd1' if inner_outer == 'i' else 'd2'
         
-    def Injection_to_Comp(self,FlowPath,**kwargs):
+    def Injection_to_Comp(self,FlowPath,phi,inner_outer,**kwargs):
         """
         Function to calculate flow rate with
         
@@ -716,11 +738,11 @@ class Scroll(PDSimCore):
         
         """
         #1. Figure out what CV is connected to the port
-        phi = kwargs.get('phi',self.geo.phi_oe-pi-2*pi)
-        partner_key = self._get_injection_CVkey(phi, self.theta, 'i')
+        partner_key = self._get_injection_CVkey(phi, self.theta, inner_outer)
+
         #2. Based on what CV is connected to the port, maybe quit
-        if partner_key in ['d1','d2'] and 'ddd' in [FlowPath.key_up, 
-                                                    FlowPath.key_down]:
+        if partner_key in ['d1', 'd2'] and 'ddd' in [FlowPath.key_up, 
+                                                     FlowPath.key_down]:
             # Other chamber based on geometry is d1 or d2 but they are not 
             # defined due to the angle but ddd is, and as a result, use 
             # ddd
@@ -733,7 +755,7 @@ class Scroll(PDSimCore):
             return 0.0
         #3. Find the distance of the scroll from the point on the involute
         #   where the port is tangent
-        FlowPath.A = pi*0.003**2/4.0
+        FlowPath.A = pi*0.005**2/4.0
         try:
             mdot = flow_models.IsentropicNozzle(FlowPath.A,
                                                 FlowPath.State_up,

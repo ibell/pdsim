@@ -108,8 +108,8 @@ class ControlVolumeCollection(collections.OrderedDict):
         if keys is None:
             keys=self.exists_keys
         # Update each of the states of the control volume
-        for k,v1,v2 in zip(keys, array1, array2):
-            self[k].State.update({name1:v1,name2:v2})
+        for CV,v1,v2 in zip(self._exists_CV, array1, array2):
+            CV.State.update({name1:v1,name2:v2})
      
     def volumes(self,theta):
         """
@@ -145,15 +145,16 @@ class ControlVolume(object):
     must be overloaded on instantiation
     """
     
-    def __init__(self,key,VdVFcn,initialState,exists=True,VdVFcn_kwargs={},discharge_becomes='',becomes=''):
+    def __init__(self, key, VdVFcn, initialState, exists=True,
+                 VdVFcn_kwargs={}, discharge_becomes=None, becomes=None):
         #_ControlVolume.__init__(self)
         self.State=initialState
         self.exists=exists
         self.key=key
         self.V_dV=VdVFcn
         self.V_dV_kwargs=VdVFcn_kwargs #Keyword-arguments that can get passed to volume function
-        self.discharge_becomes=discharge_becomes
-        self.becomes=becomes
+        self.discharge_becomes=discharge_becomes if discharge_becomes is not None else key
+        self.becomes=becomes if becomes is not None else key
     
     def __reduce__(self):
         return rebuildCV,(self.__getstate__().copy(),)
