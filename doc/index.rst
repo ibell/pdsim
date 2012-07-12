@@ -12,6 +12,7 @@ Contents:
    :maxdepth: 2
    
    install_build
+   tutorial/tutorial
    PDSim_apidoc/modules
    GUI_apidoc/modules
     

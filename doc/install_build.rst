@@ -4,15 +4,17 @@ Building and Using PDSim
 Get PDSim
 ===========
 
-The svn repo can be checked out by running a command like::
+The git repo can be cloned by running a command like::
 
-    svn checkout svn://svn.code.sf.net/p/pdsim/code/trunk pdsim-code
+    git clone git://git.code.sf.net/p/pdsim/git pdsim-git
     
 Or if you have read/write abilities::
 
-    svn checkout --username=ibell svn+ssh://ibell@svn.code.sf.net/p/pdsim/code/trunk pdsim-code
+    git clone ssh://ibell@git.code.sf.net/p/pdsim/git pdsim-git
     
-where you should replace both ``ibell`` with your username.
+where you should replace ``ibell`` with your sourceforge username.
+
+.. _install-PDSim:
 
 Install PDSim
 ===============
@@ -48,8 +50,10 @@ and line_profiler, which can be obtained from http://pypi.python.org/pypi/line_p
 
     python setup.py install
 
+.. _Use-PDSim:
+
 Use PDSim
-===========
+=========
 It is recommended to use `Eclipse <http://www.eclipse.org/downloads/>`_ (pick the Eclipse IDE for C/C++ development because it is the smallest) to do the development.  Once Eclipse is installed, you will want the Pydev plugin.  Once Eclipse is open, go to the menu Help-->Install New Software... Click *Add...* and add http://pydev.org/updates to the sources.  Then go back and you should be able to install pydev.  Don't install mylyn integration.
 
 SciTE is also nice for doing python development.  Here are the user options I use and recommend::

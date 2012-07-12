@@ -1,18 +1,18 @@
 GUI Package
 ===========
 
-:mod:`PDSimLoader` Module
--------------------------
+:mod:`PDSimGUI` Module
+----------------------
 
-.. automodule:: GUI.PDSimLoader
+.. automodule:: GUI.PDSimGUI
     :members:
     :undoc-members:
     :show-inheritance:
 
-:mod:`RecipGUI` Module
-----------------------
+:mod:`PDSimLoader` Module
+-------------------------
 
-.. automodule:: GUI.RecipGUI
+.. automodule:: GUI.PDSimLoader
     :members:
     :undoc-members:
     :show-inheritance:
