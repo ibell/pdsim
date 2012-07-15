@@ -48,6 +48,7 @@ def theta_d(geo):
     ======  =======================================
     geo     The class that defines the geometry of the compressor.
     ======  =======================================
+    
     """
     N_c_max=floor((geo.phi_ie-geo.phi_os-pi)/(2*pi))
     return geo.phi_ie-geo.phi_os-2*pi*N_c_max-pi
@@ -68,6 +69,7 @@ def getNc(theta,geo):
     Returns:
         Nc : int
             Number of pairs of compressions chambers
+            
     """
      
     return int(floor((geo.phi_ie-theta-geo.phi_os-pi)/(2*pi)))

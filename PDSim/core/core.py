@@ -152,7 +152,8 @@ class PDSimCore(object):
         setcol(self.V, i, exists_indices, self.V_)
         setcol(self.dV, i, exists_indices, self.dV_)
         setcol(self.p, i, exists_indices, self.p_)
-        setcol(self.h, i, exists_indices, self.h_)
+        if hasattr(self,'h_'):
+            setcol(self.h, i, exists_indices, self.h_)
         setcol(self.Q, i, exists_indices, self.Q_)
     
     def __postprocess_flows(self):
@@ -1023,6 +1024,7 @@ class PDSimCore(object):
         
     def derivs(self,theta,x,heat_transfer_callback=None,valves_callback=None):
         """
+        
         derivs() is an internal function that should (probably) not actually be called by
         any user-provided code, but is documented here for completeness.
         

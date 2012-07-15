@@ -1296,7 +1296,7 @@ class MainFrame(wx.Frame):
                 
             #Then use the internal default recip
             else:
-                configbuffer = default_configs.get_scroll_defaults()
+                configbuffer = default_configs.get_recip_defaults()
         
         elif isinstance(configfile, basestring):
             if os.path.exists(configfile):
@@ -1417,7 +1417,7 @@ class MainFrame(wx.Frame):
         self.Layout() 
         
         if self.SimType == 'scroll':
-            dlg = wx.MessageDialog(None,"Sorry but scroll compressor is a work in progress")
+            dlg = wx.MessageDialog(None,"Warning: scroll compressor is not fully implemented yet.  Results are experimental")
             dlg.ShowModal()
             dlg.Destroy()
         
@@ -1686,12 +1686,12 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.OnStart, self.SolveSolve)
         
         self.Help = wx.Menu()
-        self.HelpHelp = wx.MenuItem(self.Help, -1, "Help...\tCtrl+H", "", wx.ITEM_NORMAL)
+        #self.HelpHelp = wx.MenuItem(self.Help, -1, "Help...\tCtrl+H", "", wx.ITEM_NORMAL)
         self.HelpAbout = wx.MenuItem(self.Help, -1, "About", "", wx.ITEM_NORMAL)
-        self.Help.AppendItem(self.HelpHelp)
+        #self.Help.AppendItem(self.HelpHelp)
         self.Help.AppendItem(self.HelpAbout)
         self.MenuBar.Append(self.Help, "Help")
-        self.Bind(wx.EVT_MENU, lambda event: self.Destroy(), self.HelpHelp)
+        #self.Bind(wx.EVT_MENU, lambda event: self.Destroy(), self.HelpHelp)
         self.Bind(wx.EVT_MENU, self.OnAbout, self.HelpAbout)
         
         #Actually set it

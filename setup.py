@@ -5,8 +5,8 @@ from Cython.Distutils.extension import Extension as CyExtension
 import sys, shutil, os
 
 if len(sys.argv) == 1:
-    #sys.argv+=['build_ext','--inplace']
-    sys.argv+=['install']
+    sys.argv+=['build_ext','--inplace']
+    #sys.argv+=['install']
     
 import Cython
 

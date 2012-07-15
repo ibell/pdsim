@@ -1,5 +1,5 @@
-Building and Using PDSim
-**************************
+Building and Using PDSim modules
+********************************
 
 Get PDSim
 ===========
@@ -31,14 +31,18 @@ For Windows development, the use of the `Python(x,y) <http://www.pythonxy.com/>`
         swig
         mingw
     
-A final pre-requisite for the use of ``PDSim`` is `CoolProp <http://coolprop.sf.net>`_.  Development of CoolProp is also ongoing, so the releases of CoolProp are likely not recent enough for the use of ``PDSim``.  Therefore it is recommended to build CoolProp from source.  This is pretty easy.  Use TortoiseSVN to checkout the Coolprop sources, or at the command line::
+A final pre-requisite for the use of ``PDSim`` is `CoolProp <http://coolprop.sf.net>`_.  Development of CoolProp is also ongoing, so the releases of CoolProp are likely not recent enough for the use of ``PDSim``.  
+
+If you are on windows and are using 32-bit python 2.7, you can use nightly CoolProp executables from `nightly CoolProp build <https://sourceforge.net/projects/coolprop/files/CoolProp/Nightly/>`_.  Beware, these are development builds, but are likely stable enough.
+
+Failing that, you will have to build from source.  This is pretty easy.  Use TortoiseSVN to checkout the Coolprop sources, or at the command line::
 
     svn co https://coolprop.svn.sourceforge.net/svnroot/coolprop coolprop
     
 Then ``cd`` into the folder and run::
 
     python setup.py install
-    
+
 Profiling
 ---------
 

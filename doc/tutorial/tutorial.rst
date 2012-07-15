@@ -1,7 +1,7 @@
 .. contents:: `Tutorial Contents`
 
-Tutorial of PDSim
-=================
+PDSim Tutorial
+==============
 
 This tutorial will walk a windows user step-by-step through the use of PDSim on a windows platform machine
 

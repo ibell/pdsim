@@ -682,9 +682,6 @@ class Scroll(PDSimCore):
                                  Type = 'flank',
                                  ro = self.geo.ro
                                  )
-#            return flow_models.IsentropicNozzle(FlowPath.A,
-#                                                FlowPath.State_up,
-#                                                FlowPath.State_down)
         except ZeroDivisionError:
             return 0.0
         

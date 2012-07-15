@@ -1,21 +1,27 @@
-.. PDModel documentation master file, created by
-   sphinx-quickstart on Wed May 02 18:01:14 2012.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
 
+.. image:: /_static/PDSim_logo.png
+    :width: 6in
+    
 Welcome to PDSim's documentation!
-===================================
+=================================
 
 Contents:
     
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    
-   install_build
    tutorial/tutorial
-   PDSim_apidoc/modules
-   GUI_apidoc/modules
+   install_build
+   API
     
+PDSim is a software package developed to enable quasi-steady simulation of positive displacement compressors and expanders.  
+
+It was written in Python by `Ian Bell <http://www.BellThermal.com>`_ with assistance from Craig Bradshaw.  Development is ongoing, particularly of functionality for scroll compressors and expanders.
+
+Windows users can download a graphical user interface by going here: `PDSim GUI <https://sourceforge.net/projects/pdsim/files/>`_
+
+PDSim is an open-source project and welcomes the assistance of other researchers, developers, or anyone generally interested in compressors.
+
 Indices and tables
 ==================
 

@@ -118,7 +118,7 @@ class FlowPath(_FlowPath):
     the flow models.  
     """
         
-    def __init__(self,key1,key2,MdotFcn,MdotFcn_kwargs={}):
+    def __init__(self,key1='',key2='',MdotFcn='',MdotFcn_kwargs={}):
         self.key1=key1
         self.key2=key2
         #Add the bound method in a wrapper that will pickle properly
