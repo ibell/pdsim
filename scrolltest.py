@@ -2,13 +2,18 @@
 # If being run from the folder that contains the PDSim source tree, 
 # remove the current location from the python path and use the 
 # site-packages version of PDSim
-#import sys, os
-#current_path = os.path.abspath(os.curdir)
-#if current_path in sys.path and os.path.exists(os.path.join('PDSim','__init__.py')):
-#    i = sys.path.index(current_path)
-#    sys.path.pop(i)
-#else:
-#    print current_path,sys.path
+import sys, os
+try:
+    # if you can import listmath
+    import PDSim.misc._listmath
+except ImportError:
+    #If you can't import listmath, remove the PDSim folder
+    current_path = os.path.abspath(os.curdir)
+    if current_path in sys.path:
+        i = sys.path.index(current_path)
+        sys.path.pop(i)
+    else:
+        raise ImportError('_listmath was not found and PDSim folder not found on the path') 
     
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo

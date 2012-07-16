@@ -6,10 +6,16 @@ from time import clock
 # remove the current location from the python path and use the 
 # site-packages version of PDSim
 import sys, os
-current_path = os.path.abspath(os.curdir)
-if current_path in sys.path:
-    i = sys.path.index(current_path)
-    sys.path.pop(i)
+try:
+    # if you can import listmath
+    import PDSim.misc._listmath
+except ImportError:
+    current_path = os.path.abspath(os.curdir)
+    if current_path in sys.path:
+        i = sys.path.index(current_path)
+        sys.path.pop(i)
+    else:
+        raise ImportError('_listmath was not found and PDSim folder not found on the path')
 
 from PDSim.flow.flow import FlowPath
 from PDSim.flow import flow_models
