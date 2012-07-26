@@ -1,6 +1,7 @@
 
 from __future__ import division
 
+import matplotlib.pyplot as plt
 import numpy as np
 import cython
 import time #(temporary)
@@ -31,10 +32,10 @@ class geoVals:
             s+=atr+': '+str(getattr(self,atr))+'\n'
         return s
         
-def fxA(rb,phi,phi0):
+def fxA(rb, phi, phi0):
     return rb**3/3.0*(4.0*((phi-phi0)**2-2.0)*sin(phi)+(phi0-phi)*((phi-phi0)**2-8.0)*cos(phi))
 
-def fyA(rb,phi,phi0):
+def fyA(rb, phi, phi0):
     return rb**3/3.0*((phi0-phi)*((phi-phi0)**2-8.0)*sin(phi)-4.0*((phi-phi0)**2-2.0)*cos(phi))
 
 def theta_d(geo):  
@@ -442,7 +443,27 @@ def SA(theta, geo, poly=False, forces=False):
     else:
         raise ValueError('no forces or polygons for SA yet')
     
-def S1(theta, geo, poly=False, forces=False, theta_0_volume=1e-9):
+def S1(theta, geo, poly=False, theta_0_volume=1e-9):
+    """
+    Volume and derivative of volume of S1 chamber
+    
+    Parameters
+    ----------
+    theta : float
+        The crank angle in the range [:math:`0, 2\pi`]
+    geo : geoVals instance
+        The geometry class
+    poly : boolean
+        If true, also output the polygon calculation at the end of the tuple (SLOW!!)
+    theta_0_volume : float, optional
+        The offset to be added to the volume to avoid division by zero
+    
+    Returns
+    -------
+    V : float
+    dVdTheta : float
+    V_poly : float (only if ``poly = True``)
+    """
         
     h=geo.h
     rb=geo.rb 
@@ -466,8 +487,8 @@ def S1(theta, geo, poly=False, forces=False, theta_0_volume=1e-9):
     VIb=h*rb*ro/2.0*((B-phi_o0+phi_e-pi)*sin(B+theta)+cos(B+theta))
     dVIb=h*rb*ro*(B_prime+1)/2.0*((phi_e-pi+B-phi_o0)*cos(B+theta)-sin(B+theta))
     
-    VIc=h*rb*ro/2
-    dVIc=0
+    VIc=h*rb*ro/2.0
+    dVIc=0.0
         
     Vs=VO-(VIa+VIb-VIc)
     dVs=dVO-(dVIa+dVIb-dVIc)
@@ -476,35 +497,79 @@ def S1(theta, geo, poly=False, forces=False, theta_0_volume=1e-9):
     #  at theta=0
     Vs+=theta_0_volume
     
-    if forces==False and poly==False:
+    if poly==False:
         return Vs,dVs
-        
-    if forces==True:
-        cx_O=h/VO*(fxA(rb,phi_ie,phi_i0)-fxA(rb,phi_ie-theta,phi_i0))
-        cy_O=h/VO*(fyA(rb,phi_ie,phi_i0)-fyA(rb,phi_ie-theta,phi_i0))
-        
-        cx_Ia=h/VIa*(fxA(rb,phi_ie-pi+B,phi_o0)-fxA(rb,phi_ie-pi-theta,phi_o0))
-        cy_Ia=h/VIa*(fyA(rb,phi_ie-pi+B,phi_o0)-fyA(rb,phi_ie-pi-theta,phi_o0))
-        
-        cx_Ib=1.0/3.0*(-rb*(B-phi_o0+phi_e-pi)*sin(B+phi_e)-rb*cos(B+phi_e)-ro*sin(theta-phi_e))
-        cy_Ib=1.0/3.0*(-rb*sin(B+phi_e)+rb*(B-phi_o0+phi_e-pi)*cos(B+phi_e)-ro*cos(theta-phi_e))
-        
-        cx_Ic=1.0/3.0*(rb*(-theta-phi_o0+phi_e-pi)*sin(theta-phi_e)-ro*sin(theta-phi_e)-rb*cos(theta-phi_e))
-        cy_Ic=1.0/3.0*(rb*sin(theta-phi_e)+rb*(-theta-phi_o0+phi_e-pi)*cos(theta-phi_e)-ro*cos(theta-phi_e))
+    elif poly==True:
+        ############### Polygon calculations ##################
+        phi=np.linspace(phi_ie-theta,phi_ie,2000)
+        (xi,yi)=coords_inv(phi, geo, theta, 'fi')
+        phi=np.linspace(phi_ie-pi+B,phi_ie-pi-theta,2000)
+        (xo,yo)=coords_inv(phi, geo, theta, 'oo')
+        V_poly=h*polyarea(np.r_[xi,xo,xi[0]], np.r_[yi,yo,yi[0]])
+        (cx_poly,cy_poly)=polycentroid(np.r_[xi,xo,xi[0]], np.r_[yi,yo,yi[0]])
+        return Vs,dVs,V_poly
+
+def S1_forces(theta, geo, poly = False):
     
-        cx_I=-(cx_Ia*VIa+cx_Ib*VIb-cx_Ic*VIc)/(VIa+VIb-VIc)+ro*cos(phi_ie-pi/2.0-theta)
-        cy_I=-(cy_Ia*VIa+cy_Ib*VIb-cy_Ic*VIc)/(VIa+VIb-VIc)+ro*sin(phi_ie-pi/2.0-theta)
+    h=geo.h
+    rb=geo.rb 
+    phi_ie=geo.phi_ie
+    phi_e=geo.phi_ie
+    phi_o0=geo.phi_o0
+    phi_i0=geo.phi_i0
+    ro=rb*(pi-phi_i0+phi_o0)
+    
+    b=(-phi_o0+phi_e-pi)
+    D=ro/rb*((phi_i0-phi_e)*sin(theta)-cos(theta)+1)/(phi_e-phi_i0)
+    B=1.0/2.0*(sqrt(b**2-4.0*D)-b)
+    B_prime=-ro/rb*(sin(theta)+(phi_i0-phi_ie)*cos(theta))/((phi_e-phi_i0)*sqrt(b**2-4*D))
+    
+    VO=h*rb**2/6.0*((phi_e-phi_i0)**3-(phi_e-theta-phi_i0)**3)
+    dVO=h*rb**2/2.0*((phi_e-theta-phi_i0)**2)
+    
+    VIa=h*rb**2/6.0*((phi_e-pi+B-phi_o0)**3-(phi_e-pi-theta-phi_o0)**3)
+    dVIa=h*rb**2/2.0*((phi_e-pi+B-phi_o0)**2*B_prime+(phi_e-pi-theta-phi_o0)**2)
         
-        cx=(cx_O*VO-cx_I*(VIa+VIb-VIc))/Vs
-        cy=(cy_O*VO-cy_I*(VIa+VIb-VIc))/Vs
+    VIb=h*rb*ro/2.0*((B-phi_o0+phi_e-pi)*sin(B+theta)+cos(B+theta))
+    dVIb=h*rb*ro*(B_prime+1)/2.0*((phi_e-pi+B-phi_o0)*cos(B+theta)-sin(B+theta))
+    
+    VIc=h*rb*ro/2.0
+    dVIc=0.0
         
-        fx_p=-rb*h*(sin(B+phi_e)-(B-phi_o0+phi_e-pi)*cos(B+phi_e)+sin(theta-phi_e)-(theta+phi_o0-phi_e+pi)*cos(theta-phi_e))
-        fy_p=rb*h*((B-phi_o0+phi_e-pi)*sin(B+phi_e)+cos(B+phi_e)-(theta+phi_o0-phi_e+pi)*sin(theta-phi_e)-cos(theta-phi_e))
-        M_O=(h*rb**2*(B-theta-2*phi_o0+2*phi_e-2*pi)*(B+theta))/2
+    Vs=VO-(VIa+VIb-VIc)
+    dVs=dVO-(dVIa+dVIb-dVIc)
+    
+    cx_O=h/VO*(fxA(rb,phi_ie,phi_i0)-fxA(rb,phi_ie-theta,phi_i0))
+    cy_O=h/VO*(fyA(rb,phi_ie,phi_i0)-fyA(rb,phi_ie-theta,phi_i0))
+    
+    cx_Ia=h/VIa*(fxA(rb,phi_ie-pi+B,phi_o0)-fxA(rb,phi_ie-pi-theta,phi_o0))
+    cy_Ia=h/VIa*(fyA(rb,phi_ie-pi+B,phi_o0)-fyA(rb,phi_ie-pi-theta,phi_o0))
+    
+    cx_Ib=1.0/3.0*(-rb*(B-phi_o0+phi_e-pi)*sin(B+phi_e)-rb*cos(B+phi_e)-ro*sin(theta-phi_e))
+    cy_Ib=1.0/3.0*(-rb*sin(B+phi_e)+rb*(B-phi_o0+phi_e-pi)*cos(B+phi_e)-ro*cos(theta-phi_e))
+    
+    cx_Ic=1.0/3.0*(rb*(-theta-phi_o0+phi_e-pi)*sin(theta-phi_e)-ro*sin(theta-phi_e)-rb*cos(theta-phi_e))
+    cy_Ic=1.0/3.0*(rb*sin(theta-phi_e)+rb*(-theta-phi_o0+phi_e-pi)*cos(theta-phi_e)-ro*cos(theta-phi_e))
+
+    cx_I=-(cx_Ia*VIa+cx_Ib*VIb-cx_Ic*VIc)/(VIa+VIb-VIc)+ro*cos(phi_ie-pi/2.0-theta)
+    cy_I=-(cy_Ia*VIa+cy_Ib*VIb-cy_Ic*VIc)/(VIa+VIb-VIc)+ro*sin(phi_ie-pi/2.0-theta)
+    
+    cx=(cx_O*VO-cx_I*(VIa+VIb-VIc))/Vs
+    cy=(cy_O*VO-cy_I*(VIa+VIb-VIc))/Vs
+    
+    fx_p=-rb*h*(sin(B+phi_e)-(B-phi_o0+phi_e-pi)*cos(B+phi_e)+sin(theta-phi_e)-(theta+phi_o0-phi_e+pi)*cos(theta-phi_e))
+    fy_p=rb*h*((B-phi_o0+phi_e-pi)*sin(B+phi_e)+cos(B+phi_e)-(theta+phi_o0-phi_e+pi)*sin(theta-phi_e)-cos(theta-phi_e))
+    M_O=(h*rb**2*(B-theta-2*phi_o0+2*phi_e-2*pi)*(B+theta))/2
+    
+    exact_dict = dict(fx_p = fx_p,
+                      fy_p = fy_p,
+                      M_O = M_O,
+                      cx = cx,
+                      cy = cy
+                      )
+    if not poly:
+        return exact_dict
     else:
-        (cx,cy,fx_p,fy_p,M_O)=(None,None,None,None,None)
-    
-    if poly==True:
         ############### Polygon calculations ##################
         phi=np.linspace(phi_ie-theta,phi_ie,2000)
         (xi,yi)=coords_inv(phi, geo, theta, 'fi')
@@ -528,34 +593,157 @@ def S1(theta, geo, poly=False, forces=False, theta_0_volume=1e-9):
         rOy=yo-geo.ro*sin(phi_e-pi/2-theta)
         rOy=(rOy[1:L]+rOy[0:L-1])/2
         MO_poly=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
-    else:
-        (V_poly,cx_poly,cy_poly,fxp_poly,fyp_poly,MO_poly)=(None,None,None,None,None,None)
-    
-    if forces==False and poly==True:
-        return Vs,dVs,V_poly
-    else:
-        return Vs,dVs,cx,cy,fx_p,fy_p,M_O,V_poly,cx_poly,cy_poly,fxp_poly,fyp_poly,MO_poly
+        poly_dict = dict(MO_poly = MO_poly,
+                         fxp_poly = fxp_poly,
+                         fyp_poly = fyp_poly,
+                         cx_poly = cx_poly,
+                         cy_poly = cy_poly
+                         )
+        exact_dict.update(poly_dict)
+        return exact_dict
 
-def S2(theta, geo,poly=False, forces=False, theta_0_volume=1e-9):
+def HT_angles(theta, geo, key):
+    """
+    Return the heat transfer bounding angles for the given control volume
     
-    if forces==False and poly==False:
-        return S1(theta,geo,theta_0_volume=theta_0_volume)
+    Parameters
+    ----------
+    theta : float
+        Crank angle in the range [:math:`0,2\pi`]
+    geo : geoVals instance
+    key : string
+        Key for the control volume following the scroll compressor naming conventions
+    
+    Returns
+    -------
+    dict with the keys:
+        '1_i': maximum involute angle on the inner involute of the wrap that forms the outer wall of the CV
+        '2_i': minimum involute angle on the inner involute of the wrap that forms the outer wall of the CV
+        '1_o': maximum involute angle on the outer involute of the wrap that forms the inner wall of the CV
+        '2_o': minimum involute angle on the outer involute of the wrap that forms the inner wall of the CV
+        
+    """
+    ##TODO: Offset considerations to the 
+    if key == 's1':
+        return {'1_i':geo.phi_ie,
+                '2_i':geo.phi_ie-theta,
+                '1_o':phi_s_sa(theta, geo),
+                '2_o':geo.phi_oe-pi-theta}
+    elif key == 's2':
+        return {'1_i':geo.phi_ie,
+                '2_i':geo.phi_ie-theta,
+                '1_o':phi_s_sa(theta, geo),
+                '2_o':geo.phi_oe - pi - theta}
+    elif key.startswith('c1') or key.startswith('c2'):
+        alpha = int(key.split('.')[1])
+        return {'1_i':geo.phi_ie - theta - geo.phi_i0 - (alpha-1)*2*pi, 
+                '2_i':geo.phi_ie - theta - geo.phi_i0 - alpha*2*pi,
+                '1_o':phi_s_sa(theta, geo) - (alpha-1)*2*pi,
+                '2_o':geo.phi_oe - pi - theta - alpha*2*pi
+                }
+    elif key == 'd1':
+        pass
+    elif key == 'd2':
+        pass
+    
+def plot_HT_angles(theta, geo, keys, involute):
+    
+    fig = plt.figure()
+    ax = fig.add_axes((0.15,0.15,0.8,0.8))
+    for i, key in enumerate(keys):
+        y = np.r_[i+1, i+1]
+        angles = HT_angles(theta, geo, key)
+        if involute == 'i':
+            x = np.r_[angles['2_i'], angles['1_i']]
+        elif involute == 'o':
+            x = np.r_[angles['2_o'], angles['1_o']]
+        ax.plot(x,y)
+    plt.show()
+    
+def S2(theta, geo, poly = False, theta_0_volume = 1e-9):
+    """
+    Volume and derivative of volume of S2 chamber
+    
+    Parameters
+    ----------
+    theta : float
+        The crank angle in the range [:math:`0, 2\pi`]
+    geo : geoVals instance
+        The geometry class
+    poly : boolean
+        If true, also output the polygon calculation at the end of the tuple (SLOW!!)
+    theta_0_volume : float, optional
+        The offset to be added to the volume to avoid division by zero
+    
+    Returns
+    -------
+    V : float
+    dVdTheta : float
+    V_poly : float (only if ``poly = True``)
+    """
+    if not poly:
+        return S1(theta, geo, theta_0_volume = theta_0_volume)
     else:
-        h=geo.h
-        rb=geo.rb
-        phi_ie=geo.phi_ie
-        phi_e=geo.phi_ie
-        phi_o0=geo.phi_o0
-        phi_i0=geo.phi_i0
-        ro=rb*(pi-phi_i0+phi_o0)
-        (Vs1,dVs1,cx_s1,cy_s1,fx_ps1,fy_ps1,M_O_s1,cs1,V_polys1,cx_polys1,cy_polys1,fxp_polys1,fyp_polys1,M_Os1_poly)=S1(theta,geo)
-        (cx,cy)=(-cx_s1+ro*cos(phi_ie-pi/2-theta),-cy_s1+ro*sin(phi_ie-pi/2-theta))
+        return S1(theta, geo, poly = True, theta_0_volume = theta_0_volume)
+        
+def S2_forces(theta,geo,poly=False):
+    """
+    Force terms for S2 chamber
     
-        fx_p=-rb*h*(sin(theta-phi_e)-(theta+phi_i0-phi_e)*cos(theta-phi_e)+cos(phi_e)*(phi_i0-phi_e)+sin(phi_e))
-        fy_p=-rb*h*((theta+phi_i0-phi_e)*sin(theta-phi_e)+cos(theta-phi_e)+sin(phi_e)*(phi_i0-phi_e)-cos(phi_e))
-        M_O=(h*rb**2*theta*(theta+2*phi_i0-2*phi_e))/2
+    Parameters
+    ----------
+    theta : float
+        The crank angle in the range [:math:`0,2\pi`]
+    geo : geoVals instance
+        The geometry class
+    poly : boolean
+        If true, also output the polygon calculations to the dict (SLOW!!)
     
-    if poly==True:
+    Returns
+    -------
+    values : dictionary
+        A dictionary with fields for the analytic and numerical solutions (if requested)
+    
+    """
+    cython.declare(h = cython.double, 
+                   rb = cython.double, 
+                   phi_ie = cython.double,
+                   phi_o0 = cython.double,
+                   phi_i0 = cython.double,
+                   cx_s1 = cython.double,
+                   cy_s1 = cython.double,
+                   cx = cython.double,
+                   cy = cython.double,
+                   exact_dict = cython.dict
+                   )
+    h=geo.h
+    rb=geo.rb
+    phi_ie=geo.phi_ie
+    phi_e=geo.phi_ie
+    phi_o0=geo.phi_o0
+    phi_i0=geo.phi_i0
+    ro=rb*(pi-phi_i0+phi_o0)
+    
+    S1_terms = S1_forces(theta,geo)
+    cx_s1 = S1_terms['cx']
+    cy_s1 = S1_terms['cy']
+    
+    (cx,cy)=(-cx_s1+ro*cos(phi_ie-pi/2-theta),-cy_s1+ro*sin(phi_ie-pi/2-theta))
+
+    fx_p=-rb*h*(sin(theta-phi_e)-(theta+phi_i0-phi_e)*cos(theta-phi_e)+cos(phi_e)*(phi_i0-phi_e)+sin(phi_e))
+    fy_p=-rb*h*((theta+phi_i0-phi_e)*sin(theta-phi_e)+cos(theta-phi_e)+sin(phi_e)*(phi_i0-phi_e)-cos(phi_e))
+    M_O=(h*rb**2*theta*(theta+2*phi_i0-2*phi_e))/2
+    
+    exact_dict = dict(fx_p = fx_p,
+                      fy_p = fy_p,
+                      M_O = M_O,
+                      cx = cx,
+                      cy = cy
+                      )
+    
+    if not poly:
+        return exact_dict
+    else:
         ############### Numerical Force Calculations ###########
         phi=np.linspace(phi_ie-theta,phi_ie,2000)
         (xo,yo)=coords_inv(phi, geo, theta, 'oi')
@@ -566,10 +754,14 @@ def S2(theta, geo,poly=False, forces=False, theta_0_volume=1e-9):
         dA=h*np.sqrt(np.power(xo[1:L]-xo[0:L-1],2)+np.power(yo[1:L]-yo[0:L-1],2))
         fxp_poly=np.sum(dA*(nx[1:L]+nx[0:L-1])/2.0)
         fyp_poly=np.sum(dA*(ny[1:L]+ny[0:L-1])/2.0)
-    else:
-        (V_poly,cx_poly,cy_poly,fxp_poly,fyp_poly,MO_poly)=(None,None,None,None,None,None)
-    
-    return (Vs1,dVs1,cx,cy,fx_p,fy_p,fxp_poly,fyp_poly)
+        poly_dict = dict(fxp_poly = fxp_poly,
+                         fyp_poly = fyp_poly,
+#                         MO_poly = MO_poly,
+#                         cx_poly = cx_poly,
+#                         cy_poly = cy_poly
+                         )
+        exact_dict.update(poly_dict)
+        return exact_dict
 
 def C1(theta, alpha, geo, poly=False, forces=False):
     h=geo.h
@@ -663,7 +855,9 @@ def C2(theta, alpha, geo, poly=False, forces=False):
         
     return (Vc1,dVc1,cx,cy,fx_p,fy_p,fxp_poly,fyp_poly)
 
-def D1(theta, geo, poly=False, forces=False):
+def D1(theta, geo, poly = False):
+    cython.declare(Nc = cython.double)
+    
     hs=geo.h
     rb=geo.rb
     phi_ie=geo.phi_ie
@@ -673,7 +867,7 @@ def D1(theta, geo, poly=False, forces=False):
     phi_is=geo.phi_is
     phi_os=geo.phi_os
     ro=rb*(pi-phi_i0+phi_o0)
-    Nc=getNc(theta,geo=geo)
+    Nc=getNc(theta, geo)
     
     phi2=phi_ie-theta-2.0*pi*Nc
     phi1=phi_os+pi
@@ -689,7 +883,7 @@ def D1(theta, geo, poly=False, forces=False):
     dVIb=hs*rb*ro/2.0*((phi_os-phi_o0)*cos(theta+phi_os-phi_ie)-sin(theta+phi_os-phi_ie))
     
     VIc=hs*rb*ro/2.0
-    dVIc=0
+    dVIc=0.0
     
     VId= hs*rb*ro/2.0*((phi_os-phi_i0+pi)*sin(theta+phi_os-phi_ie)+cos(theta+phi_os-phi_ie)+1)
     dVId=hs*rb*ro/2.0*((phi_os-phi_i0+pi)*cos(theta+phi_os-phi_ie)-sin(theta+phi_os-phi_ie))
@@ -700,31 +894,87 @@ def D1(theta, geo, poly=False, forces=False):
     Vd1=VO-VI
     dVd1=dVO-dVI
     
-    if forces==False and poly==False:
+    if not poly:
         return Vd1,dVd1
+    else:
+        ######################### Polygon calculations ##################
+        phi=np.linspace(phi_os+pi,phi_ie-theta-2.0*pi*Nc,1000)
+        (xi,yi)=coords_inv(phi, geo, theta, "fi")
+        phi=np.linspace(phi_ie-theta-2.0*pi*Nc-pi,phi_os,1000)
+        (xo,yo)=coords_inv(phi, geo, theta, "oo")
+        V_poly=hs*polyarea(np.r_[xi,xo], np.r_[yi,yo])
+        return Vd1,dVd1,V_poly
     
-    if forces==True:
-        cx_O=hs/VO*(fxA(rb,phi2,phi_i0)-fxA(rb,phi1,phi_i0))
-        cy_O=hs/VO*(fyA(rb,phi2,phi_i0)-fyA(rb,phi1,phi_i0))
-        cx_Ia=hs/VIa*(fxA(rb,phi2,phi_o0)-fxA(rb,phi1,phi_o0))
-        cy_Ia=hs/VIa*(fyA(rb,phi2,phi_o0)-fyA(rb,phi1,phi_o0))
-        cx_Ib=1.0/3.0*(-ro*sin(theta-phi_ie)+rb*(phi_os-phi_o0)*sin(phi_os)+rb*cos(phi_os))
-        cy_Ib=1.0/3.0*(-ro*cos(theta-phi_ie)-rb*(phi_os-phi_o0)*cos(phi_os)+rb*sin(phi_os))
-        cx_Ic=1.0/3.0*((rb*(-theta+phi_ie-phi_o0-2*pi*Nc-pi)-ro)*sin(theta-phi_ie)-rb*cos(theta-phi_ie))
-        cy_Ic=1.0/3.0*((rb*(-theta+phi_ie-phi_o0-2*pi*Nc-pi)-ro)*cos(theta-phi_ie)+rb*sin(theta-phi_ie))
-        cx_Id=(rb*(2*phi_os-phi_o0-phi_i0+pi)*sin(phi_os)-2*(ro*sin(theta-phi_ie)-rb*cos(phi_os)))/3.0
-        cy_Id=(-2*(ro*cos(theta-phi_ie)-rb*sin(phi_os))-rb*(2*phi_os-phi_o0-phi_i0+pi)*cos(phi_os))/3.0
-        cx_I=-(cx_Ia*VIa+cx_Ib*VIb+cx_Ic*VIc+cx_Id*VId)/VI+ro*cos(phi_ie-pi/2.0-theta)
-        cy_I=-(cy_Ia*VIa+cy_Ib*VIb+cy_Ic*VIc+cy_Id*VId)/VI+ro*sin(phi_ie-pi/2.0-theta)
-        
-        cx=(cx_O*VO-cx_I*VI)/Vd1
-        cy=(cy_O*VO-cy_I*VI)/Vd1
-        
-        fx_p=rb*hs*(sin(theta-phi_e)+(-theta-phi_o0+phi_e-2*pi*Nc-pi)*cos(theta-phi_e)-sin(phi_os)-(phi_o0-phi_os)*cos(phi_os))
-        fy_p=-rb*hs*((-theta-phi_o0+phi_e-2*pi*Nc-pi)*sin(theta-phi_e)-cos(theta-phi_e)-(phi_os-phi_o0)*sin(phi_os)-cos(phi_os))
-        M_O=(hs*rb**2*(theta-phi_os+2*phi_o0-phi_e+2*pi*Nc+pi)*(theta+phi_os-phi_e+2*pi*Nc+pi))/2.0
+def D1_forces(theta, geo, poly = False):
     
-    if poly==True:
+    cython.declare(Nc = cython.double)
+    
+    hs=geo.h
+    rb=geo.rb
+    phi_ie=geo.phi_ie
+    phi_e=geo.phi_ie
+    phi_o0=geo.phi_o0
+    phi_i0=geo.phi_i0
+    phi_is=geo.phi_is
+    phi_os=geo.phi_os
+    ro=rb*(pi-phi_i0+phi_o0)
+    Nc=getNc(theta, geo)
+    
+    phi2=phi_ie-theta-2.0*pi*Nc
+    phi1=phi_os+pi
+    VO=hs*rb**2/6.0*((phi2-phi_i0)**3-(phi1-phi_i0)**3)
+    dVO=-hs*rb**2/2.0*((phi2-phi_i0)**2)
+    
+    phi2=phi_ie-theta-2.0*pi*Nc-pi
+    phi1=phi_os
+    VIa=hs*rb**2/6.0*((phi2-phi_o0)**3-(phi1-phi_o0)**3)
+    dVIa=-hs*rb**2/2.0*((phi2-phi_o0)**2)
+    
+    VIb=hs*rb*ro/2.0*((phi_os-phi_o0)*sin(theta+phi_os-phi_ie)+cos(theta+phi_os-phi_ie))
+    dVIb=hs*rb*ro/2.0*((phi_os-phi_o0)*cos(theta+phi_os-phi_ie)-sin(theta+phi_os-phi_ie))
+    
+    VIc=hs*rb*ro/2.0
+    dVIc=0.0
+    
+    VId= hs*rb*ro/2.0*((phi_os-phi_i0+pi)*sin(theta+phi_os-phi_ie)+cos(theta+phi_os-phi_ie)+1)
+    dVId=hs*rb*ro/2.0*((phi_os-phi_i0+pi)*cos(theta+phi_os-phi_ie)-sin(theta+phi_os-phi_ie))
+    
+    VI=VIa+VIb+VIc+VId
+    dVI=dVIa+dVIb+dVIc+dVId
+    
+    Vd1=VO-VI
+    dVd1=dVO-dVI
+
+    cx_O=hs/VO*(fxA(rb,phi2,phi_i0)-fxA(rb,phi1,phi_i0))
+    cy_O=hs/VO*(fyA(rb,phi2,phi_i0)-fyA(rb,phi1,phi_i0))
+    cx_Ia=hs/VIa*(fxA(rb,phi2,phi_o0)-fxA(rb,phi1,phi_o0))
+    cy_Ia=hs/VIa*(fyA(rb,phi2,phi_o0)-fyA(rb,phi1,phi_o0))
+    cx_Ib=1.0/3.0*(-ro*sin(theta-phi_ie)+rb*(phi_os-phi_o0)*sin(phi_os)+rb*cos(phi_os))
+    cy_Ib=1.0/3.0*(-ro*cos(theta-phi_ie)-rb*(phi_os-phi_o0)*cos(phi_os)+rb*sin(phi_os))
+    cx_Ic=1.0/3.0*((rb*(-theta+phi_ie-phi_o0-2*pi*Nc-pi)-ro)*sin(theta-phi_ie)-rb*cos(theta-phi_ie))
+    cy_Ic=1.0/3.0*((rb*(-theta+phi_ie-phi_o0-2*pi*Nc-pi)-ro)*cos(theta-phi_ie)+rb*sin(theta-phi_ie))
+    cx_Id=(rb*(2*phi_os-phi_o0-phi_i0+pi)*sin(phi_os)-2*(ro*sin(theta-phi_ie)-rb*cos(phi_os)))/3.0
+    cy_Id=(-2*(ro*cos(theta-phi_ie)-rb*sin(phi_os))-rb*(2*phi_os-phi_o0-phi_i0+pi)*cos(phi_os))/3.0
+    cx_I=-(cx_Ia*VIa+cx_Ib*VIb+cx_Ic*VIc+cx_Id*VId)/VI+ro*cos(phi_ie-pi/2.0-theta)
+    cy_I=-(cy_Ia*VIa+cy_Ib*VIb+cy_Ic*VIc+cy_Id*VId)/VI+ro*sin(phi_ie-pi/2.0-theta)
+    
+    cx=(cx_O*VO-cx_I*VI)/Vd1
+    cy=(cy_O*VO-cy_I*VI)/Vd1
+    
+    fx_p=rb*hs*(sin(theta-phi_e)+(-theta-phi_o0+phi_e-2*pi*Nc-pi)*cos(theta-phi_e)-sin(phi_os)-(phi_o0-phi_os)*cos(phi_os))
+    fy_p=-rb*hs*((-theta-phi_o0+phi_e-2*pi*Nc-pi)*sin(theta-phi_e)-cos(theta-phi_e)-(phi_os-phi_o0)*sin(phi_os)-cos(phi_os))
+    M_O=(hs*rb**2*(theta-phi_os+2*phi_o0-phi_e+2*pi*Nc+pi)*(theta+phi_os-phi_e+2*pi*Nc+pi))/2.0
+    
+    exact_dict = dict(fx_p = fx_p,
+                      fy_p = fy_p,
+                      M_O = M_O,
+                      cx = cx,
+                      cy = cy
+                      )
+    
+    if not poly:
+        return exact_dict
+    else:
         ######################### Polygon calculations ##################
         phi=np.linspace(phi_os+pi,phi_ie-theta-2.0*pi*Nc,1000)
         (xi,yi)=coords_inv(phi, geo, theta, "fi")
@@ -749,10 +999,14 @@ def D1(theta, geo, poly=False, forces=False):
         rOy=yo-geo.ro*sin(phi_e-pi/2-theta)
         rOy=(rOy[1:L]+rOy[0:L-1])/2
         MO_poly=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
-    else:
-        (V_poly,cx_poly,cy_poly,fxp_poly,fyp_poly,MO_poly)=(None,None,None,None,None,None)
-         
-    return Vd1,dVd1,cx,cy,fx_p,fy_p,M_O,(cx_Ia,cy_Ia,cx_Ib,cy_Ib,cx_Ic,cy_Ic,cx_Id,cy_Id,cx_I,cy_I,cx_O,cy_O,VO,VIa,VIb,VIc,VId,dVO,dVIa,dVIb,dVIc,dVId),V_poly,cx_poly,cy_poly,fxp_poly,fyp_poly,MO_poly
+        poly_dict = dict(MO_poly = MO_poly,
+                         fxp_poly = fxp_poly,
+                         fyp_poly = fyp_poly,
+                         cx_poly = cx_poly,
+                         cy_poly = cy_poly
+                         )
+        exact_dict.update(poly_dict)
+        return exact_dict
 
 def D2(theta, geo, poly=False, forces=False):
     

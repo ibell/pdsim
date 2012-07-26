@@ -1,14 +1,17 @@
 import subprocess, os, glob
 
+print 'Rebuilding pdsim locally i.e. in the PDSim folder rather than to site-packages'
+this_location = os.path.abspath('.')
+os.chdir('..')
+subprocess.call(['python','setup.py','build_ext','--inplace'])
+os.chdir(this_location)
 
 #When this module is imported, run sphinx-apidoc for GUI and PDSim.  It is fast.
 if raw_input(r'run sphinx-apidoc (y/[n])? ') == 'y':
-    import subprocess
     print 'Building API documentation'
     print subprocess.check_output(['sphinx-apidoc','-f','-o','GUI_apidoc','../GUI'])
     import PDSim
     PDSim_path=os.path.join('..','PDSim')
-    #PDSim_path=PDSim.__file__.rsplit(os.sep,1)[0]
     print subprocess.check_output(['sphinx-apidoc','-f','-o','PDSim_apidoc',PDSim_path],shell=False)
     
 ##     #Remove the undoc-members in each of the api-doc generated files

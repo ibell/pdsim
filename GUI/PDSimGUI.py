@@ -1,5 +1,7 @@
 # -*- coding: latin-1 -*-
 
+
+
 #Imports from wx package
 import wx,os,sys
 from wx.lib.mixins.listctrl import CheckListCtrlMixin, ColumnSorterMixin, ListCtrlAutoWidthMixin
@@ -33,6 +35,7 @@ import pdsim_panels
 import recip_panels
 import scroll_panels
 import default_configs
+
 
 class InfiniteList(object):
     """

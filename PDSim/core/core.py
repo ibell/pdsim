@@ -1024,6 +1024,7 @@ class PDSimCore(object):
         
     def derivs(self,theta,x,heat_transfer_callback=None,valves_callback=None):
         """
+        Evaluate the derivatives of the state variables
         
         derivs() is an internal function that should (probably) not actually be called by
         any user-provided code, but is documented here for completeness.

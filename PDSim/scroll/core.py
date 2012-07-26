@@ -116,7 +116,6 @@ class Scroll(PDSimCore):
         Wrapper around the Cython code for Vs1_calcs
         
         theta: angle in range [0,2*pi]
-        alpha: index of compression chamber pair; 1 is for outermost set
         """
         if full_output==True:
             HTangles = {'1_i':self.geo.phi_ie,
@@ -482,9 +481,9 @@ class Scroll(PDSimCore):
         elif self.__before_discharge2__==True:
             #At the discharge angle
             print 'At the discharge angle'
-            #-----------------
+            ########################
             #Reassign chambers
-            #-----------------
+            ########################
             #Find chambers with a discharge_becomes flag
             for key in self.CVs.exists_keys:
                 if self.CVs[key].discharge_becomes in self.CVs.keys():
@@ -550,7 +549,7 @@ class Scroll(PDSimCore):
                 u_after=self.CVs['ddd'].State.u*self.CVs['ddd'].State.rho*Vddd
                 
                 DeltaU=m*(u_before-u_after)
-                if abs(DeltaU)>1e-6:
+                if abs(DeltaU)>1e-5:
                     raise ValueError('Internal energy not sufficiently conserved in merging process')
                 
                 self.CVs['d1'].exists=False
@@ -686,6 +685,24 @@ class Scroll(PDSimCore):
             return 0.0
         
     def _get_injection_CVkey(self,phi,theta,inner_outer):
+        """
+        Find the CV that is in contact with the given injection port location
+        
+        Parameters
+        ----------
+        phi : float
+            Involute angle of the injection port location
+        theta : float
+            Crank angle in radians in the range [:math:`0,2\pi`]
+        inner_outer : string ['i','o']
+            'i' : involute angle corresponds to outer surface of fixed scroll
+            'o' : involute angle corresponds to inner surface of orb. scroll 
+            
+        Notes
+        -----
+        Typically 'i' will require a positive offset in involute angle of 
+        :math:`\pi` radians
+        """
         if inner_outer == 'i':
             phi_0 = self.geo.phi_i0
             phi_s = self.geo.phi_is
@@ -717,7 +734,15 @@ class Scroll(PDSimCore):
         
     def Injection_to_Comp(self,FlowPath,phi,inner_outer,**kwargs):
         """
-        Function to calculate flow rate with
+        Function to calculate flow rate with injection line and chamber
+        
+        Parameters
+        ----------
+        FlowPath : FlowPath instance
+        phi : involute angle where the port is located
+        inner_outer : string ['i','o']
+            'i' : involute angle corresponds to outer surface of fixed scroll
+            'o' : involute angle corresponds to inner surface of orb. scroll 
         
         .. plot::
             import matplotlib.pyplot as plt

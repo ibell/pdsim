@@ -16,124 +16,28 @@ cdef class geoVals:
     cdef public double x0_wall,y0_wall,r_wall
     cdef public double delta_radial, delta_flank
     
-cpdef coords_inv(phi_vec,geoVals geo,double theta, flag=?) 
+cpdef double fxA(double rb, double phi, double phi0)
+cpdef double fyA(double rb, double phi, double phi0)
 
-@cython.locals(phi_i0=cython.double,phi_o0=cython.double,phi_ie=cython.double,rb=cython.double,ro=cython.double,om=cython.double)
-cpdef _coords_inv_np(np.ndarray phi, geoVals geo, double theta, flag=?)
-
-@cython.locals(phi_i0=cython.double,phi_o0=cython.double,phi_ie=cython.double,rb=cython.double,ro=cython.double,om=cython.double)
-cpdef _coords_inv_d(double phi, geoVals geo, double theta, flag=?)
+cpdef tuple coords_inv(phi_vec,geoVals geo, double theta, flag = *) 
+cpdef tuple _coords_inv_np(np.ndarray phi, geoVals geo, double theta, flag = *)
+cpdef tuple _coords_inv_d(double phi, geoVals geo, double theta, flag = *)
 
 cpdef int getNc(double theta, geoVals geo)
 
-@cython.locals(h=cython.double,
-           phi_ie=cython.double,
-            phi_e=cython.double,
-           phi_o0=cython.double, 
-           phi_oe=cython.double,
-           phi_i0=cython.double,
-           phi_ie=cython.double,
-                ro=cython.double,
-                rb=cython.double,
-                b=cython.double,
-                D=cython.double,
-                B=cython.double,
-                B_prime=cython.double,
-                V_Isa=cython.double,
-                V=cython.double,
-                dV=cython.double
-                )
-cpdef SA(double theta, geoVals geo, bint poly=?, bint forces=?)
+cpdef tuple SA(double theta, geoVals geo, bint poly=*, bint forces=*)
 
-@cython.locals(h=cython.double,
-           phi_ie=cython.double,
-            phi_e=cython.double,
-           phi_o0=cython.double, 
-           phi_i0=cython.double,
-                ro=cython.double,
-                rb=cython.double,
-                b=cython.double,
-                D=cython.double,
-                B=cython.double,
-                B_prime=cython.double,
-                VO=cython.double,
-                dVO=cython.double,
-                VIa=cython.double,
-                dVIa=cython.double,
-                VIb=cython.double,
-                dVIb=cython.double,
-                VIc=cython.double,
-                dVIc=cython.double,
-                Vs=cython.double,
-                dVs=cython.double
-                )
-cpdef S1(double theta, geoVals geo, bint poly=?, bint forces=?,double theta_0_volume=?)
+cpdef tuple S1(double theta, geoVals geo, bint poly = *, double theta_0_volume = *)
+cpdef dict S1_forces(double theta, geoVals geo, bint poly = *)
 
-@cython.locals(h=cython.double,
-           phi_ie=cython.double,
-            phi_e=cython.double,
-           phi_o0=cython.double, 
-           phi_i0=cython.double,
-                ro=cython.double,
-                rb=cython.double,
-                b=cython.double,
-                D=cython.double,
-                B=cython.double,
-                B_prime=cython.double,
-                VO=cython.double,
-                dVO=cython.double,
-                VIa=cython.double,
-                dVIa=cython.double,
-                VIb=cython.double,
-                dVIb=cython.double,
-                VIc=cython.double,
-                dVIc=cython.double,
-                Vs=cython.double,
-                dVs=cython.double
-                )
-cpdef S2(double theta, geoVals geo, bint poly=?, bint forces=?,double theta_0_volume=?)
+cpdef tuple S2(double theta, geoVals geo, bint poly = *, double theta_0_volume = *)
+cpdef dict S2_forces(double theta, geoVals geo, bint poly = *)
 
-@cython.locals( h=cython.double,
-               rb=cython.double,
-           phi_ie=cython.double,
-            phi_e=cython.double,
-           phi_o0=cython.double, 
-           phi_i0=cython.double,
-                ro=cython.double,
-                V=cython.double,
-                dV=cython.double,
-                psi=cython.double,
-                cx=cython.double,
-                cy=cython.double,
-                fx_p=cython.double,
-                fy_p=cython.double,
-                M_0=cython.double)
 cpdef C1(double theta, double alpha, geoVals geo, bint poly=?, bint forces=?)
+cpdef C2(double theta, double alpha, geoVals geo, bint poly=?, bint forces=?)
 
-@cython.locals(h=cython.double,
-           phi_ie=cython.double,
-            phi_e=cython.double,
-           phi_o0=cython.double, 
-           phi_i0=cython.double,
-                ro=cython.double,
-                rb=cython.double,
-                b=cython.double,
-                D=cython.double,
-                B=cython.double,
-                B_prime=cython.double,
-                VO=cython.double,
-                dVO=cython.double,
-                VIa=cython.double,
-                dVIa=cython.double,
-                VIb=cython.double,
-                dVIb=cython.double,
-                VIc=cython.double,
-                dVIc=cython.double,
-                Vs=cython.double,
-                dVs=cython.double,
-                Nc=cython.int
-                )
-cpdef D1(double theta, geoVals geo, bint poly=?, bint forces=?)
+cpdef tuple D1(double theta, geoVals geo, bint poly=*)
+cpdef dict D1_forces(double theta, geoVals geo, bint poly = *)
 
 @cython.locals(hs=cython.double,
 				xa1=cython.double,
@@ -175,7 +79,14 @@ cpdef D1(double theta, geoVals geo, bint poly=?, bint forces=?)
                 )
 cpdef DD(double theta, geoVals geo, bint poly=?, bint forces=?)
 
-@cython.locals(V_d1=cython.double,dV_d1=cython.double,V_d2=cython.double,dV_d2=cython.double,V_dd=cython.double,dV_dd=cython.double,V_ddd=cython.double,dV_ddd=cython.double)
+@cython.locals(V_d1=cython.double,
+                dV_d1=cython.double,
+                V_d2=cython.double,
+                dV_d2=cython.double,
+                V_dd=cython.double,
+                dV_dd=cython.double,
+                V_ddd=cython.double,
+                dV_ddd=cython.double)
 cpdef DDD(double theta, geoVals geo, bint poly=?, bint forces=?) 
 
 @cython.locals(iter=cython.int,phi_os=cython.double,phi_o0=cython.double,phi_ie=cython.double,phi_i0=cython.double,change=cython.double,eps=cython.double,f=cython.double,x1=cython.double,x2=cython.double,x3=cython.double,y1=cython.double,y2=cython.double,phi=cython.double,alpha=cython.double)

@@ -1,3 +1,8 @@
+try:
+    import cython
+except:
+    raise ImportError('Sorry the required package cython was not found')
+
 from distutils.core import setup, Extension
 from Cython.Build import cythonize
 from Cython.Distutils import build_ext
@@ -7,6 +12,11 @@ import sys, shutil, os
 if len(sys.argv) == 1:
     sys.argv+=['build_ext','--inplace']
     #sys.argv+=['install']
+    
+try:
+    import CoolProp
+except ImportError:
+    raise ImportError('The required python package CoolProp was not found.  Please go to coolprop.sf.net to obtain a copy')
     
 import Cython
 

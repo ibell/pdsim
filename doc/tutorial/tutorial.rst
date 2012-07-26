@@ -11,8 +11,9 @@ Pre-Requisites
 Requirements:
 
 - `TortoiseGit <http://code.google.com/p/tortoisegit/>`_
-- `Python(x,y) <http://code.google.com/p/pythonxy/>`_ (Version 2.7.2.3 used here)
+- `Python(x,y) <http://code.google.com/p/pythonxy/>`_ (Version 2.7.2.3 used here).  Under Packages, you need to ensure that you have cython, wxpython, matplotlib, nose, scipy, numpy checked, and under Other, you want SciTE, WinMerge, MinGW and SWIG.
 - `CoolProp` - see installation instructions in :ref:`CoolProp installation <install-PDSim>`
+- A C++ compiler.  If you installed MinGW from Python(x,y), you are are all set. Otherwise you can get a copy of `Microsoft Visual Studio 2008 C++ Express <http://www.microsoft.com/visualstudio/en-us/products/2008-editions/express>`_ for free and it works great
 
 Optional:
 
@@ -40,7 +41,11 @@ Saving the files is successful
 .. image:: page004.png
 
 You will then need to install the PDSim module files.  To do this open a command
-line prompt (Start button -> type *cmd* into the search box).  Change the directory to the directory where you installed the files.  Then run::
+line prompt (Start button -> type ``cmd`` into the search box).  Change the directory to the directory where you installed the files.  If you have installed MinGW as recommened above, you can install PDSim by running::
+
+    python setup.py build --compiler=mingw32 install
+    
+Otherwise if you have Microsoft Visual Studio installed, you can just run::
 
     python setup.py install
 
