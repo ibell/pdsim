@@ -3,20 +3,12 @@
 # remove the current location from the python path and use the 
 # site-packages version of PDSim
 import sys, os
-
-try:
-    # if you can import listmath
-    import PDSim.misc._listmath
-except ImportError:
-    #If you can't import listmath, remove the PDSim folder
-    current_path = os.path.abspath(os.curdir)
-    if current_path in sys.path:
-        i = sys.path.index(current_path)
-        sys.path.pop(i)
-    else:
-        raise ImportError('_listmath was not found and PDSim folder not found on the path') 
-
 from math import pi
+
+# If the following line is uncommented, python will try to use a local version
+# of PDSim.  This is handy for debugging purposes.  Generally you want this line 
+# commented out
+sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo
@@ -45,16 +37,18 @@ def Compressor():
     ScrollComp.omega=3500/60*2*pi
     ScrollComp.Tamb = 298.0
     
-    scroll_geo.plot_HT_angles(pi, ScrollComp.geo, ['s1','s2','c1.1','c1.2'], 'i')
+#    for th in np.linspace(0,2*pi,10):
+#        scroll_geo.plot_HT_angles(th, ScrollComp.geo, ['s1','c1.1','c1.2','d1'], 'o')
+    #scroll_geo.plot_HT_angles(pi, ScrollComp.geo, ['s1','c1.1','c1.2','d1'], 'o')
     
     Injection = False
         
-    Ref='R410A'
+    Ref='R404A'
     #State.debug(10)
-    State.set_1phase_LUT_params(Ref,10,10,250,500,200,3000)
-    State.LUT(True)
+#    State.set_1phase_LUT_params(Ref,10,10,250,500,200,3000)
+#    State.LUT(True)
     
-    inletState = State.State(Ref,{'T':300,'P':310})
+    inletState = State.State(Ref,{'T':300,'P':300})
     outletState = State.State(Ref,{'T':400,'P':1200})
     
     mdot_guess = inletState.rho*ScrollComp.Vdisp*ScrollComp.omega/(2*pi)
@@ -98,7 +92,7 @@ def Compressor():
         V_tube = 1.0*pi*0.01**2/4.0
         ScrollComp.add_CV(ControlVolume(key ='injCV.1',
                                         VdVFcn = ScrollComp.V_injection,
-                                        VdVFcn_kwargs = dict(V_tube=V_tube),
+                                        VdVFcn_kwargs = dict(V_tube = V_tube),
                                         initialState = injState1,
                                         becomes = 'injCV.1'
                                         )
@@ -159,26 +153,28 @@ def Compressor():
 
     from time import clock
     t1=clock()
-    ScrollComp.RK45_eps = 1e-8
+    ScrollComp.RK45_eps = 1e-7
     ScrollComp.EulerN = 20000
     ScrollComp.HeunN = 6000
-    ScrollComp.solve(key_inlet='inlet.1',key_outlet='outlet.2',
+    
+    ScrollComp.precond_solve(key_inlet='inlet.1',key_outlet='outlet.2',
                  step_callback=ScrollComp.step_callback, 
                  endcycle_callback=ScrollComp.endcycle_callback,
                  heat_transfer_callback=ScrollComp.heat_transfer_callback,
                  lump_energy_balance_callback=ScrollComp.lump_energy_balance_callback,
                  solver_method='RK45',
-                 hmin=2*pi/(100000000),
+                 hmin=1e-12,
                  UseNR = False, #Use Newton-Raphson ND solver to determine the initial state
-                 OneCycle = False
+                 OneCycle = False,
+                 plot_every_cycle= False
                  )
-    
+
     print 'time taken',clock()-t1
     
     if Injection:
         print ScrollComp.FlowsProcessed.mean_mdot
+        
     debug_plots(ScrollComp)
-
     
 if __name__=='__main__':
         

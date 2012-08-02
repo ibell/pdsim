@@ -418,7 +418,110 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         
     else:
         raise AttributeError('Type not understood, should be one of 2Arc or ArcLineArc')
-  
+
+def HT_angles(theta, geo, key):
+    """
+    Return the heat transfer bounding angles for the given control volume
+    
+    Parameters
+    ----------
+    theta : float
+        Crank angle in the range [:math:`0,2\pi`]
+    geo : geoVals instance
+    key : string
+        Key for the control volume following the scroll compressor 
+        naming conventions
+    
+    Returns
+    -------
+    dict with the keys:
+        '1_i': maximum involute angle on the inner involute of the wrap 
+        that forms the outer wall of the CV
+        
+        '2_i': minimum involute angle on the inner involute of the wrap 
+        that forms the outer wall of the CV
+        
+        '1_o': maximum involute angle on the outer involute of the wrap 
+        that forms the inner wall of the CV
+        
+        '2_o': minimum involute angle on the outer involute of the wrap 
+        that forms the inner wall of the CV
+        
+    Notes
+    -----
+    The keys s1, c1.x, and d1 have as their outer wrap the fixed scroll
+    
+    The keys s2, c2.x, and d2 have as their outer wrap the orbiting scroll
+    
+    Raises
+    ------
+    If key is not valid, raises a KeyError
+    """
+    cython.declare(alpha = cython.int)
+    ## TODO: Offset considerations to the angles
+    if key == 's1' or key == 's2':
+        return {'1_i':geo.phi_ie,
+                '2_i':geo.phi_ie-theta,
+                '1_o':phi_s_sa(theta, geo),
+                '2_o':geo.phi_oe - geo.phi_o0 - pi - theta}
+    elif key.startswith('c1') or key.startswith('c2'):
+        alpha = int(key.split('.')[1])
+        if alpha > getNc(theta,geo):
+            raise KeyError('CV '+key+' does not exist')
+        else:
+            return {'1_i':geo.phi_ie - theta - (alpha-1)*2*pi, 
+                    '2_i':geo.phi_ie - theta - alpha*2*pi,
+                    '1_o':geo.phi_oe - pi - theta - (alpha-1)*2*pi,
+                    '2_o':geo.phi_oe - geo.phi_o0 - pi - theta - alpha*2*pi
+                    }
+    elif key == 'd1' or key == 'd2':
+        alpha = getNc(theta,geo)+1
+        return {'1_i':geo.phi_ie - theta - geo.phi_i0 - (alpha-1)*2*pi, 
+                '2_i':geo.phi_is,
+                '1_o':geo.phi_oe - pi - theta - (alpha-1)*2*pi,
+                '2_o':geo.phi_os
+                }
+    else:
+        raise KeyError
+    
+def plot_HT_angles(theta, geo, keys, involute):
+    """
+    Plot an involute bound angle graph for each CV for checking of  
+    heat transfer bounding angles purposes.
+    
+    Parameters
+    ----------
+    theta : float
+    geo : geoVals instance
+    keys : list of strings of compliant CV keys
+    involute : string ['i','o']
+        'i': inner involute of the wrap forming the outer surface of CV
+        
+        'o': outer involute of the wrap forming the inner surface of CV
+    
+    """
+    fig = plt.figure()
+    ax = fig.add_axes((0.15,0.15,0.8,0.8))
+    if involute == 'i':
+        ax.set_title('Inner involute angles on outer surface of CV')
+    elif involute == 'o':
+        ax.set_title('Outer involute angles on inner surface of CV')
+        
+    for i, key in enumerate(keys):
+        y = np.r_[i+1, i+1]
+        try:
+            angles = HT_angles(theta, geo, key)
+            if involute == 'i':
+                x = np.r_[angles['2_i'], angles['1_i']]
+            elif involute == 'o':
+                x = np.r_[angles['2_o'], angles['1_o']]
+            ax.plot(x,y)
+            ax.text(np.mean(x),y[0]+0.01,key,ha='center',va='bottom')
+        except KeyError:
+            pass
+    ax.set_ylim(0,len(keys)+1)
+    plt.show()
+      
 def SA(theta, geo, poly=False, forces=False):
     h=geo.h
     rb=geo.rb 
@@ -602,63 +705,7 @@ def S1_forces(theta, geo, poly = False):
         exact_dict.update(poly_dict)
         return exact_dict
 
-def HT_angles(theta, geo, key):
-    """
-    Return the heat transfer bounding angles for the given control volume
-    
-    Parameters
-    ----------
-    theta : float
-        Crank angle in the range [:math:`0,2\pi`]
-    geo : geoVals instance
-    key : string
-        Key for the control volume following the scroll compressor naming conventions
-    
-    Returns
-    -------
-    dict with the keys:
-        '1_i': maximum involute angle on the inner involute of the wrap that forms the outer wall of the CV
-        '2_i': minimum involute angle on the inner involute of the wrap that forms the outer wall of the CV
-        '1_o': maximum involute angle on the outer involute of the wrap that forms the inner wall of the CV
-        '2_o': minimum involute angle on the outer involute of the wrap that forms the inner wall of the CV
-        
-    """
-    ##TODO: Offset considerations to the 
-    if key == 's1':
-        return {'1_i':geo.phi_ie,
-                '2_i':geo.phi_ie-theta,
-                '1_o':phi_s_sa(theta, geo),
-                '2_o':geo.phi_oe-pi-theta}
-    elif key == 's2':
-        return {'1_i':geo.phi_ie,
-                '2_i':geo.phi_ie-theta,
-                '1_o':phi_s_sa(theta, geo),
-                '2_o':geo.phi_oe - pi - theta}
-    elif key.startswith('c1') or key.startswith('c2'):
-        alpha = int(key.split('.')[1])
-        return {'1_i':geo.phi_ie - theta - geo.phi_i0 - (alpha-1)*2*pi, 
-                '2_i':geo.phi_ie - theta - geo.phi_i0 - alpha*2*pi,
-                '1_o':phi_s_sa(theta, geo) - (alpha-1)*2*pi,
-                '2_o':geo.phi_oe - pi - theta - alpha*2*pi
-                }
-    elif key == 'd1':
-        pass
-    elif key == 'd2':
-        pass
-    
-def plot_HT_angles(theta, geo, keys, involute):
-    
-    fig = plt.figure()
-    ax = fig.add_axes((0.15,0.15,0.8,0.8))
-    for i, key in enumerate(keys):
-        y = np.r_[i+1, i+1]
-        angles = HT_angles(theta, geo, key)
-        if involute == 'i':
-            x = np.r_[angles['2_i'], angles['1_i']]
-        elif involute == 'o':
-            x = np.r_[angles['2_o'], angles['1_o']]
-        ax.plot(x,y)
-    plt.show()
+
     
 def S2(theta, geo, poly = False, theta_0_volume = 1e-9):
     """

@@ -25,6 +25,8 @@ cpdef tuple _coords_inv_d(double phi, geoVals geo, double theta, flag = *)
 
 cpdef int getNc(double theta, geoVals geo)
 
+cpdef HT_angles(double theta, geoVals geo, bytes key)
+
 cpdef tuple SA(double theta, geoVals geo, bint poly=*, bint forces=*)
 
 cpdef tuple S1(double theta, geoVals geo, bint poly = *, double theta_0_volume = *)
@@ -88,6 +90,8 @@ cpdef DD(double theta, geoVals geo, bint poly=?, bint forces=?)
                 V_ddd=cython.double,
                 dV_ddd=cython.double)
 cpdef DDD(double theta, geoVals geo, bint poly=?, bint forces=?) 
+
+cpdef phi_s_sa(double theta,geoVals geo)
 
 @cython.locals(iter=cython.int,phi_os=cython.double,phi_o0=cython.double,phi_ie=cython.double,phi_i0=cython.double,change=cython.double,eps=cython.double,f=cython.double,x1=cython.double,x2=cython.double,x3=cython.double,y1=cython.double,y2=cython.double,phi=cython.double,alpha=cython.double)
 cdef double phi_d_dd(double theta, geoVals geo)

@@ -39,3 +39,46 @@ cdef class _Scroll(object):
             return flow_models.IsentropicNozzle(FP.A,FP.State_up,FP.State_down)
         except ZeroDivisionError:
             return 0.0
+        
+    cpdef double involute_heat_transfer(self, double hc, double hs, double  rb, 
+                                  double phi1, double phi2, double phi0, 
+                                  double T_scroll, double T_CV, double dT_dphi, 
+                                  double phim):
+        """
+        This function evaluates the anti-derivative of 
+        the differential of involute heat transfer, and returns the amount of scroll-
+        wall heat transfer in kW
+        
+        Parameters
+        ----------
+        hc : float
+            Heat transfer coefficient [kW/m2/K]
+        hs : float
+            Scroll wrap height [m]
+        rb : float
+            Base circle radius [m]
+        phi1 : float
+            Larger involute angle [rad]
+        phi2 : float
+            Smaller involute angle [rad]
+        phi0 : float
+            Initial involute angle [rad]
+        T_scroll : float
+            Lump temperature of the scroll wrap [K]
+        T_CV : float
+            Temperature of the gas in the CV [K]
+        dT_dphi : float
+            Derivative of the temperature along the scroll wrap [K/rad]
+        phim : float
+            Mean involute angle of wrap used for heat transfer [rad]
+        
+        Notes
+        -----
+        ``phi1`` and ``phi2`` are defined such that ``phi1`` is always the
+        larger involute angle in value
+        """
+        term1=hc*hs*rb*( (phi1*phi1/2.0-phi0*phi1)*(T_scroll-T_CV)
+            +dT_dphi*(phi1*phi1*phi1/3.0-(phi0+phim)*phi1*phi1/2.0+phi0*phim*phi1))
+        term2=hc*hs*rb*( (phi2*phi2/2.0-phi0*phi2)*(T_scroll-T_CV)
+            +dT_dphi*(phi2*phi2*phi2/3.0-(phi0+phim)*phi2*phi2/2.0+phi0*phim*phi2))
+        return term1-term2;

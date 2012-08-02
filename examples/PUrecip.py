@@ -24,10 +24,7 @@ from time import clock
 # remove the current location from the python path and use the 
 # site-packages version of PDSim
 import sys, os
-current_path = os.path.abspath(os.curdir)
-if current_path in sys.path and os.path.exists(os.path.join('PDSim','__init__.py')):
-    i = sys.path.index(current_path)
-    sys.path.pop(i)
+sys.path.insert(0,os.path.abspath('..'))
 
 #Here we import the things from PDSim we need
 from PDSim.flow.flow import FlowPath
@@ -190,6 +187,7 @@ def Compressor():
     recip.add_flow(FlowPath(key1='outlet.1',key2='A',MdotFcn=recip.Discharge))
     
     t1=clock()
+    recip.EulerN = 4000
     recip.solve(key_inlet='inlet.1',
                 key_outlet='outlet.2',
                 endcycle_callback=recip.endcycle_callback, # Provided by PDSimCore
@@ -197,9 +195,11 @@ def Compressor():
                 lump_energy_balance_callback = recip.lump_energy_balance_callback,
                 valves_callback =recip.valves_callback,
                 solver_method = 'Euler',
-                OneCycle = False
+                OneCycle = False,
+                UseNR = True
                 )
     print 'time taken',clock()-t1,'s'
+    
     
     debug_plots(recip)
     

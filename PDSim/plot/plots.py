@@ -161,7 +161,7 @@ class PlotNotebook(wx.Panel):
             axes.set_ylabel(r'Valve lift [m]')
         
     def temperature_pressure(self, event = None):
-        if not hasattr(self.Sim,'__hasLiquid__') or not Comp.__hasLiquid__:
+        if not hasattr(self.Sim,'__hasLiquid__') or not self.Sim.__hasLiquid__:
             #Fluid T-p plot
             axes = notebook.add('T-P phase').gca()
             Fluid=Comp.CVs[0].State.Fluid

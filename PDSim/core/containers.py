@@ -111,7 +111,7 @@ class ControlVolumeCollection(collections.OrderedDict):
         for CV,v1,v2 in zip(self._exists_CV, array1, array2):
             CV.State.update({name1:v1,name2:v2})
      
-    def volumes(self,theta):
+    def volumes(self,theta, as_dict = False):
         """
         Each control volume class must define a function V_dV (through a pointer) 
         that defines the volume and derivative of volume with respect to the 
@@ -122,6 +122,10 @@ class ControlVolumeCollection(collections.OrderedDict):
         If the parameter V_dV_kwargs is passed to the class constructor, these keyword 
         arguments will be unpacked into the volume function call.  Useful for passing 
         a flag to a given function
+        Parameters
+        ----------
+        as_dict : boolean, optional
+            If ``True``, return the volumes and derivatives of volumes as a dictionary
         """
             
         def func(CV):
@@ -129,7 +133,13 @@ class ControlVolumeCollection(collections.OrderedDict):
         #Loop over the control volumes that exist 
         V_dV=map(func,self.exists_CV)
         V,dV=zip(*V_dV)
-        return listm(V),listm(dV)
+        if not as_dict:
+            return listm(V),listm(dV)
+        else:
+            V_dict = {key:_V for key,_V in zip(self.exists_keys,V)}
+            dV_dict = {key:_dV for key,_dV in zip(self.exists_keys,dV)}
+            return V_dict, dV_dict
+            
 
 def rebuildCV(d):
     CV = ControlVolume(d.pop('key'),d.pop('V_dV'),d.pop('State'))

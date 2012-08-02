@@ -1,25 +1,25 @@
 ##--- package imports
 from PDSim.core.containers import ControlVolume
 from PDSim.flow.flow import FlowPath
-from ..core.core import PDSimCore
+from PDSim.core.core import PDSimCore
 from PDSim.misc._listmath import listm
-import scroll_geo
 from PDSim.flow import flow_models
-from ..plot.plots import debug_plots
+from PDSim.plot.plots import debug_plots
+import scroll_geo
 
 ##--- non-package imports
-from scipy.optimize import fsolve
-from CoolProp.CoolProp import UseSinglePhaseLUT
+from scipy.optimize import fsolve, newton
+from CoolProp.CoolProp import UseSinglePhaseLUT, Props
 from CoolProp import State
 from math import pi,cos
 from _scroll import _Scroll
 import copy
 
-class Scroll(PDSimCore):
+class Scroll(PDSimCore, _Scroll):
     """
-    This is a Python class that extends functionality in the GeometryCore.cpp SWIGGed C++ code
+    This is a python class that implements functionality for a scroll compressor
     
-    It is inherited from the PDModelCore class
+    It is inherited from the PDSimCore class
     """
     def __init__(self):
         PDSimCore.__init__(self)
@@ -72,19 +72,22 @@ class Scroll(PDSimCore):
         
         The tube volume can either be given by the keyword argument V_tube 
         (so you can easily have more than one injection tube), or it can be 
-        provided by setting the attribute V_inj_tube and NOT providing the V_tube
-        argument
+        provided by setting the Scroll class attribute V_inj_tube 
+        and NOT providing the V_tube argument
         """
         if V_tube is None:
             return self.V_inj_tube, 0.0
         else:
             return V_tube, 0.0
         
-    def V_sa(self,theta,full_output=False):
+    def V_sa(self, theta, full_output=False):
         """
         Wrapper around the Cython code for sa calcs
         
-        theta: angle in range [0,2*pi]
+        Parameters
+        ----------
+        theta: float
+             angle in range [0,2*pi]
         
         Returns
         -------
@@ -414,8 +417,12 @@ class Scroll(PDSimCore):
             
             if alpha < nCmax - 1:
                 #Leakage between compression chambers along a path
-                self.add_flow(FlowPath(key1=keyc1,key2='c1.'+str(alpha+1),MdotFcn=flankFunc))
-                self.add_flow(FlowPath(key1=keyc2,key2='c2.'+str(alpha+1),MdotFcn=flankFunc))
+                self.add_flow(FlowPath(key1=keyc1,
+                                       key2='c1.'+str(alpha+1),
+                                       MdotFcn=flankFunc))
+                self.add_flow(FlowPath(key1=keyc2,
+                                       key2='c2.'+str(alpha+1),
+                                       MdotFcn=flankFunc))
                 
             elif alpha==nCmax:
                 #Leakage between the discharge region and the innermost chamber
@@ -425,31 +432,160 @@ class Scroll(PDSimCore):
 #    def RadialLeak(self, geo, phi_max, phi_min):
 #        flowVec->A[*count]=(geo->delta_radial)*(geo->rb)*(1.0/2.0*(phi_max*phi_max-phi_min*phi_min)-(geo->phi.phi_fi0)*(phi_max-phi_min))
     
-    def heat_transfer_callback(self,theta,**kwargs):
+    def heat_transfer_coefficient(self, key):
         
-#        def func(CV):
-#            #Join them all into one tuple
-#            V_dV,HTangles=CV.V_dV(theta,full_output=True,**CV.V_dV_kwargs)
-#            return V_dV+(HTangles,)
-#        #Loop over the control volumes that exist 
-#        V_dV_HTangles=map(func,self.CVs.exists_CV)
-#        V,dV,HTangles=zip(*V_dV_HTangles)
-#        def calcHT(V_dV_HTangles):
-#            V=V_dV_HTangles[0]
-#            HTangles=V_dV_HTangles[2]
-#            if None in HTangles.values():
-#                return 0.0
-#            phi_1_i=HTangles['1_i']
-#            phi_2_i=HTangles['2_i']
-#            phi_1_o=HTangles['1_o']
-#            phi_2_o=HTangles['2_o']
-#            
-#            A_plate = V/self.geo.h
-#            A_wall_in = self.geo.h * self.geo.rb * ( (phi_1_i**2-phi_2_i**2)/2.0 - self.geo.phi_i0*(phi_1_i-phi_2_i) )
-#            A_wall_out = self.geo.h * self.geo.rb * ( (phi_1_o**2 - phi_2_o**2)/2.0 -self.geo.phi_o0*(phi_1_o-phi_2_o) )
-#            return 0.0
-#        Q=map(calcHT,V_dV_HTangles)
-        return listm([0.0]*self.CVs.Nexist)
+#        Pr=Pr_mix(Ref,Liq,T_avg,p_avg,xL_avg); //[-]
+#        Re=4.0*mdot/2.0/(PI*mu_mix(Ref,Liq,T_avg,p_avg,xL_avg)*Dh); //[-]
+#        hc=0.023*k_mix(Ref,Liq,T_avg,p_avg,xL_avg)/Dh*pow(Re,0.8)*pow(Pr,0.4); //[kW/m^2-K]
+#        // Jang and Jeong correction for spiral geometry
+#        f=scroll->States.omega/(2*PI);
+#        Amax=scroll->geo.ro;
+#        Ubar=scroll->massFlow.mdot_tot/(4*scroll->geo.ro*scroll->geo.hs*rho);
+#        St=f*Amax/Ubar;
+#        hc*=1.0+8.48*(1-exp(-5.35*St));
+#        // Tagri and Jayaraman correction for transverse oscillation
+#        r_c=scroll->geo.rb*(0.5*phi_1_i+0.5*phi_2_i-scroll->geo.phi.phi_fi0);
+#        hc*=1.0+1.77*Dh/r_c;
+        return 1.0
+
+    def wrap_heat_transfer(self, **kwargs):
+        """
+        This function evaluates the anti-derivative of 
+        the differential of wall heat transfer, and returns the amount of scroll-
+        wall heat transfer in kW
+        
+        Parameters
+        ----------
+        hc : float
+            Heat transfer coefficient [kW/m2/K]
+        hs : float
+            Scroll wrap height [m]
+        rb : float
+            Base circle radius [m]
+        phi1 : float
+            Larger involute angle [rad]
+        phi2 : float
+            Smaller involute angle [rad]
+        phi0 : float
+            Initial involute angle [rad]
+        T_scroll : float
+            Lump temperature of the scroll wrap [K]
+        T_CV : float
+            Temperature of the gas in the CV [K]
+        dT_dphi : float
+            Derivative of the temperature along the scroll wrap [K/rad]
+        phim : float
+            Mean involute angle of wrap used for heat transfer [rad]
+        
+        Notes
+        -----
+        ``phi1`` and ``phi2`` are defined such that ``phi1`` is always the
+        larger involute angle in value
+        """
+        #Use the compiled version from the cython code
+        return _Scroll.involute_heat_transfer(self,**kwargs)
+    
+#        term1=hc*hs*rb*( (phi1*phi1/2.0-phi0*phi1)*(T_scroll-T_CV)
+#            +dT_dphi*(phi1*phi1*phi1/3.0-(phi0+phim)*phi1*phi1/2.0+phi0*phim*phi1))
+#        term2=hc*hs*rb*( (phi2*phi2/2.0-phi0*phi2)*(T_scroll-T_CV)
+#            +dT_dphi*(phi2*phi2*phi2/3.0-(phi0+phim)*phi2*phi2/2.0+phi0*phim*phi2))
+#        return term1-term2;
+    
+    def heat_transfer_callback(self, theta, **kwargs):
+        """
+        The scroll simulation heat transfer callback for HT to the fluid in the 
+        chambers
+        
+        ``heat_transfer_callback`` for ``PDSimCore.derivs`` must be of the 
+        form::
+        
+            heat_transfer_callback(theta, **kwargs)
+            
+        but we need to get the inlet and outlet states to get the linear 
+        temperature profile in the scroll wrap. Thus we wrap the callback 
+        we would like to call in this function that allows us to determine
+        the inlet and outlet state dynamically.
+        """
+        State_inlet = self.Tubes.Nodes[self.key_inlet]
+        State_outlet = self.Tubes.Nodes[self.key_outlet]
+        return self._heat_transfer_callback(theta, State_inlet, State_outlet, **kwargs)
+    
+    def _heat_transfer_callback(self, theta, State_inlet, State_outlet, HTC_tune = 0.0, **kwargs):
+        
+        # dT_dphi is generally negative because as you move to the 
+        # outside of the scroll (larger phi), the temperature goes down because
+        # you are moving towards the suction temperature
+        # dT_dphi is positive in expander mode
+        Tsuction = State_inlet.T
+        Tdischarge = State_outlet.T
+        dT_dphi = (Tsuction - Tdischarge) / (self.geo.phi_ie - self.geo.phi_os)
+        phim = 0.5*self.geo.phi_ie + 0.5*self.geo.phi_os
+        
+        def calcHT(key):
+            try:
+                ## If HT is turned off, quit
+                if HTC_tune <= 0.0:
+                    return 0.0
+                    
+                #Get the bounding angles for the control volume
+                HTangles = scroll_geo.HT_angles(theta, self.geo, key)
+                
+                phi_1_i=HTangles['1_i']
+                phi_2_i=HTangles['2_i']
+                phi_1_o=HTangles['1_o']
+                phi_2_o=HTangles['2_o']
+    
+                #print 'calculate HTC'
+                #TODO: calculate HTC
+                hc = 1.0 #[kW/m2/K]
+                
+                # The heat transfer rate of the inner involute on 
+                # the outer wrap of the chamber
+                Q_outer_wrap = self.wrap_heat_transfer(hc = hc, 
+                                                   hs = self.geo.h, 
+                                                   rb = self.geo.rb, 
+                                                   phi1 = phi_1_i, 
+                                                   phi2 = phi_2_i, 
+                                                   phi0 = self.geo.phi_i0, 
+                                                   T_scroll = self.Tlumps[0],
+                                                   T_CV = self.CVs[key].State.T, 
+                                                   dT_dphi = dT_dphi, 
+                                                   phim = phim)
+                
+                # The heat transfer rate of the outer involute on 
+                # the inner wrap of the chamber
+                Q_inner_wrap = self.wrap_heat_transfer(hc = hc, 
+                                                   hs = self.geo.h, 
+                                                   rb = self.geo.rb, 
+                                                   phi1 = phi_1_o, 
+                                                   phi2 = phi_2_o, 
+                                                   phi0 = self.geo.phi_o0,
+                                                   T_scroll = self.Tlumps[0],
+                                                   T_CV = self.CVs[key].State.T, 
+                                                   dT_dphi = dT_dphi, 
+                                                   phim = phim)
+                
+                #A_wall_in = self.geo.h * self.geo.rb * ( (phi_1_i**2-phi_2_i**2)/2.0 - self.geo.phi_i0*(phi_1_i-phi_2_i) )
+                #A_wall_out = self.geo.h * self.geo.rb * ( (phi_1_o**2 - phi_2_o**2)/2.0 -self.geo.phi_o0*(phi_1_o-phi_2_o) )
+                #return A_wall_in + A_wall_out
+                return HTC_tune *(Q_outer_wrap + Q_inner_wrap)
+            
+            except KeyError:
+                if key == 'sa':
+                    #sa is treated as having no heat transfer
+                    return 0.0
+                elif key == 'ddd':
+                    # ddd is a combination of the heat transfer in the d1, d2, and
+                    # dd chambers
+                    return calcHT('d1') + calcHT('d2') + calcHT('dd')
+                elif key == 'dd':
+                    # dd chamber
+                    return self.heat_transfer_coefficient(key)
+                else:
+                    raise KeyError('CV '+key+' not matched')
+            
+        Q=map(calcHT, self.CVs.exists_keys)
+        return listm(Q)
         
     def step_callback(self,t,h,Itheta,**kwargs):
         """
@@ -461,7 +597,7 @@ class Scroll(PDSimCore):
         #This gets called at every step, or partial step
         self.theta=t
         
-        def IsAtMerge(eps_d1_higher=0.005,eps_dd_higher=0.0001):
+        def IsAtMerge(eps_d1_higher=0.00005,eps_dd_higher=0.00001):
             if self.CVs['d1'].State.p>self.CVs['dd'].State.p and abs(self.CVs['d1'].State.p/self.CVs['dd'].State.p-1)<eps_d1_higher:
                 print 'Merged with d1 higher'
                 return True
@@ -526,6 +662,10 @@ class Scroll(PDSimCore):
                 rhod1=self.CVs['d1'].State.rho
                 rhod2=self.CVs['d2'].State.rho
                 rhodd=self.CVs['dd'].State.rho
+                #Density
+                pd1=self.CVs['d1'].State.p
+                pd2=self.CVs['d2'].State.p
+                pdd=self.CVs['dd'].State.p
                 #Internal energy
                 ud1=self.CVs['d1'].State.u
                 ud2=self.CVs['d2'].State.u
@@ -542,13 +682,19 @@ class Scroll(PDSimCore):
                 
                 Vddd=Vd1+Vd2+Vdd
                 m=rhod1*Vd1+rhod2*Vd2+rhodd*Vdd
-                u_before=ud1*rhod1*Vd1+ud2*rhod2*Vd2+udd*rhodd*Vdd
+                U_before=ud1*rhod1*Vd1+ud2*rhod2*Vd2+udd*rhodd*Vdd
                 rhoddd=m/Vddd
+                #guess the mixed temperature as a volume-weighted average
                 T=(Td1*Vd1+Td2*Vd2+Tdd*Vdd)/Vddd
-                self.CVs['ddd'].State.update({'T':T,'D':rhoddd})
-                u_after=self.CVs['ddd'].State.u*self.CVs['ddd'].State.rho*Vddd
+                p=(pd1*Vd1+pd2*Vd2+pdd*Vdd)/Vddd
+                #Must conserve mass and internal energy (instantaneous mixing process)
+                Fluid = self.CVs['ddd'].State.Fluid
+                T_u = newton(lambda x: Props('U','T',x,'D',rhoddd,Fluid)-U_before/m,T)
                 
-                DeltaU=m*(u_before-u_after)
+                self.CVs['ddd'].State.update({'T':T_u,'D':rhoddd})
+                U_after=self.CVs['ddd'].State.u*self.CVs['ddd'].State.rho*Vddd
+                
+                DeltaU=m*(U_before-U_after)
                 if abs(DeltaU)>1e-5:
                     raise ValueError('Internal energy not sufficiently conserved in merging process')
                 
@@ -578,9 +724,9 @@ class Scroll(PDSimCore):
         
     def mechanical_losses(self):
         print 'temporary mechanical losses'
-        return 0.2 #[kW]
+        return 0.3 #[kW]
     
-    def ambient_heat_transfer(self,Tshell):
+    def ambient_heat_transfer(self, Tshell):
         """
         The amount of heat transfer from the compressor to the ambient
         """
@@ -589,15 +735,27 @@ class Scroll(PDSimCore):
     def lump_energy_balance_callback(self):
         
         #For the single lump
-        # terms are positive if heat transfer is TO the lump
+        # HT terms are positive if heat transfer is TO the lump
         Qnet=0.0
         for Tube in self.Tubes:
             Qnet-=Tube.Q
         Qnet+=self.mechanical_losses()-self.ambient_heat_transfer(self.Tlumps[0])
+        # Heat transfer with the gas in the working chambers.  mean_Q is positive
+        # if heat is transfered to the gas in the working chamber, so flip the 
+        # sign for the lump
+        Qnet -= self.HTProcessed.mean_Q
+        
+        #Want to return a list
         return [Qnet]
     
     def TubeCode(self,Tube,**kwargs):
-        Tube.Q = flow_models.IsothermalWallTube(Tube.mdot,Tube.State1,Tube.State2,Tube.fixed,Tube.L,Tube.ID,T_wall=self.Tlumps[0])
+        Tube.Q = flow_models.IsothermalWallTube(Tube.mdot,
+                                                Tube.State1,
+                                                Tube.State2,
+                                                Tube.fixed,
+                                                Tube.L,
+                                                Tube.ID,
+                                                T_wall=self.Tlumps[0])
         
     def InjectionTubeFM(self,FlowPath,**kwargs):
         FlowPath.A=pi*0.005**2/4.0
@@ -734,7 +892,7 @@ class Scroll(PDSimCore):
         
     def Injection_to_Comp(self,FlowPath,phi,inner_outer,**kwargs):
         """
-        Function to calculate flow rate with injection line and chamber
+        Function to calculate flow rate between injection line and chamber
         
         Parameters
         ----------

@@ -5,11 +5,14 @@ from CoolProp.State import State
 import numpy as np
 from math import pi
 import textwrap
+#from PDSim.misc.scipylike import trapz
 from scipy.integrate import trapz, simps
 from scipy.optimize import newton
 import copy
 import pylab
 from time import clock
+
+import matplotlib.pyplot as plt
 
 ##--  Package imports  --
 from PDSim.flow._sumterms import setcol, getcol
@@ -81,6 +84,11 @@ class PDSimCore(object):
     def __init__(self,stateVariables=None):
         """
         Initialization of the PD Core
+        
+        Parameters
+        ----------
+        stateVariables : mutable object [list or tuple], optional
+            list of keys for the state variables to be used.  Current options are 'T','D' or 'T','M'.  Default state variables are 'T','M'
         """
         #Initialize the containers to be empty
         self.Valves=[]
@@ -91,15 +99,15 @@ class PDSimCore(object):
         self.Tlumps=np.zeros((1,1))
         self.steps=[]
         self.__hasValves__=False
-        if isinstance(stateVariables,list):
-            self.stateVariables=stateVariables
+        if isinstance(stateVariables,(list,tuple)):
+            self.stateVariables=list(stateVariables)
         else:
-            self.stateVariables=['T','D']
+            self.stateVariables=['T','M']
         self._want_abort = False
     
     def __get_from_matrices(self,i):
         """
-        Get values back from the matrices
+        Get values back from the matrices and reconstruct the state variable list
         """
         
         if self.__hasLiquid__==True:
@@ -117,27 +125,39 @@ class PDSimCore(object):
                     VarList+=getcol(self.rho,i,exists_indices)
                 elif s=='M':
                     #VarList+=list(self.rho[exists_indices,i]*self.V_)
-                    VarList+=list(getcol(self.rho,i,exists_indices)*self.V_)
+                    VarList+=getcol(self.m,i,exists_indices)
                 else:
                     raise KeyError
             if self.__hasValves__:
                 VarList+=list(self.xValves[:,i])
             return listm(VarList)
         
+    def __statevars_to_dict(self,x):
+        d={}
+        for iS,s in enumerate(self.stateVariables):
+            x_=listm(x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)])
+            if s=='T':
+                d['T']=x_
+            elif s=='D':
+                d['D']=x_
+            elif s=='M':
+                d['M']=x_
+        return d
+        
     def __put_to_matrices(self,x,i):
         """
-        Take a stacked set of T,rho,xL or T,rho and put back in numpy arrays
+        Take a state variable list and put back in numpy matrices
         """
         exists_indices=self.CVs.exists_indices
         Nexist = self.CVs.Nexist
         Ns = len(self.stateVariables)
         if self.__hasLiquid__==True:
-            raise ValueError
+            raise NotImplementedError
             self.T[:,i]=x[0:self.NCV]
             self.m[:,i]=x[self.NCV:2*self.NCV]
             self.xL[:,i]=x[2*self.NCV:3*self.NCV]
         else: #(self.__hasLiquid__==False)
-            for iS,s in enumerate(self.stateVariables):
+            for iS, s in enumerate(self.stateVariables):
                 x_=listm(x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)])
                 if s=='T':
                     setcol(self.T, i, exists_indices, x_)
@@ -147,12 +167,17 @@ class PDSimCore(object):
                     setcol(self.m, i, exists_indices, x_)
             #Left over terms are for the valves
             if self.__hasValves__:
-                setcol(self.xValves, i, range(len(self.Valves)*2), listm(x[Ns*Nexist::]))
+                setcol(self.xValves, i, 
+                       range(len(self.Valves)*2), 
+                       listm(x[Ns*Nexist::])
+                       )
         
+        setcol(self.rho, i, exists_indices, self.rho_)
+        setcol(self.m, i, exists_indices, self.rho_*self.V_)
         setcol(self.V, i, exists_indices, self.V_)
         setcol(self.dV, i, exists_indices, self.dV_)
         setcol(self.p, i, exists_indices, self.p_)
-        if hasattr(self,'h_'):
+        if hasattr(self,'h_') and len(self.h_) == len(exists_indices):
             setcol(self.h, i, exists_indices, self.h_)
         setcol(self.Q, i, exists_indices, self.Q_)
     
@@ -241,6 +266,18 @@ class PDSimCore(object):
             self.FlowsProcessed.integrated_mdot[Tube.key2]-=mdot_i1
             self.FlowsProcessed.integrated_mdoth[Tube.key1]-=mdoth_i2
             self.FlowsProcessed.integrated_mdoth[Tube.key2]-=mdoth_i1
+        
+    def __postprocess_HT(self):    
+        self.HTProcessed=struct()
+        r = range(self.Ntheta)
+        self.HTProcessed.summed_Q = np.zeros((self.Ntheta,))
+        #Make a copy of Q and replace NAN with zeros
+        _Q = self.Q[:] 
+        _Q[np.isnan(_Q)] = 0.0
+        
+        for i in range(self.Ntheta):
+            self.HTProcessed.summed_Q[i] = np.sum(_Q[:, i])
+        self.HTProcessed.mean_Q = trapz(self.HTProcessed.summed_Q[r], self.t[r])/(self.t[self.Ntheta-1]-self.t[0])
             
     def add_flow(self,FlowPath):
         #Add FlowPath instance to the list of flow paths
@@ -348,6 +385,7 @@ class PDSimCore(object):
             self.T[self.CVs.exists_indices, 0] = self.CVs.T
             self.p[self.CVs.exists_indices, 0] = self.CVs.p
             self.rho[self.CVs.exists_indices, 0] = self.CVs.rho
+            self.m[self.CVs.exists_indices, 0] = self.CVs.rho*V
         else:
             x0_ = copy.copy(x0)
             #x0 is provided
@@ -408,9 +446,8 @@ class PDSimCore(object):
             
             #Call the step callback if provided
             if step_callback is not None:
-                CVchanged = False
-                disable, h = step_callback(t0, h, Itheta, CVchanged = CVchanged)
-                if CVchanged:
+                disable, h = step_callback(t0, h, Itheta)
+                if disable:
                     print 'CV have changed'
                     xold = self.__get_from_matrices(Itheta)
             
@@ -598,13 +635,12 @@ class PDSimCore(object):
         gamma5=-9.0/50.0
         gamma6=2.0/55.0
         
-         #One call to build the flows at start
+        
+         #Get the beginning of the cycle configured
         x_state.extend([0.0]*len(self.Valves)*2)
         xold = listm(x_state[:])
-        self.theta=t0
-        self.derivs(t0, xold, heat_transfer_callback, valves_callback)
-        self.FlowStorage.append(self.Flows.get_deepcopy())
         self.__put_to_matrices(xold, 0)
+        
         
         #t is the independent variable here, where t takes on values in the bounded range [tmin,tmax]
         while (t0<tmax):
@@ -624,7 +660,11 @@ class PDSimCore(object):
                     #Call it to figure out whether to use the adaptive method or not
                     #Pass it a copy of the compressor class and the current step size
                     #The function can modify anything in the class to change flags, existence, merge, etc.
-                    disableAdaptive,h=step_callback(t0,h,Itheta)
+                    disableAdaptive, h=step_callback(t0, h, Itheta)
+                    x = self.__get_from_matrices(Itheta)
+                    
+                    if disableAdaptive and np.all(np.isfinite(x)):
+                        xold = self.__get_from_matrices(Itheta)
                 else:
                     disableAdaptive=False
                     
@@ -632,9 +672,6 @@ class PDSimCore(object):
                     #Step is too small, just use the minimum step size
                     h = 1.0*hmin
                     disableAdaptive = True
-                    
-                xold=self.__get_from_matrices(Itheta)
-                
                     
                 if not UseCashKarp:
                     ## Using RKF constants ##
@@ -678,7 +715,7 @@ class PDSimCore(object):
                     f5=self.derivs(t0+h,xnew4,heat_transfer_callback,valves_callback);
                     xnew5=xold+h*(1631.0/55296*f1+175.0/512.0*f2+575.0/13824.0*f3+44275.0/110592.0*f4+253.0/4096.0*f5)
                     
-                    f6=self.derivs(t0+7.0/8.0*h,xnew5,heat_transfer_callback,valves_callback)
+                    f6=self.derivs(t0+7/8*h,xnew5,heat_transfer_callback,valves_callback)
                     
                     #Updated values at the next step using 5-th order
                     xnew=xold+h*(37/378*f1 + 250/621*f3 + 125/594*f4 + 512/1771*f6)
@@ -694,7 +731,7 @@ class PDSimCore(object):
                         # Take a smaller step next time, try again on this step
                         # But only if adaptive mode is on
 #                        print 'downsizing', h,
-                        h *= step_relax*(eps_allowed/max_error)**(0.25)
+                        h *= step_relax*(eps_allowed/max_error)**(0.3)
 #                        print h, eps_allowed, max_error
                         stepAccepted=False
                     else:
@@ -704,17 +741,14 @@ class PDSimCore(object):
                 else:
                     stepAccepted = True
             
-            # Step has been accepted (or adaptive disabled), write values back to matrices
-            self.t[Itheta+1]=t0+h
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
-            self.p_ = listm(self.CVs.p)
-            self.__put_to_matrices(xnew, Itheta+1)
-            t0+=h
-            Itheta+=1
+            #Store at the current index (first run at index 0)
+            self.t[Itheta] = t0
+            self.__put_to_matrices(xold, Itheta)
             self.FlowStorage.append(self.Flows.get_deepcopy())
             
-            #Some debugging information
-            #print t0,h,hmin
+            t0+=h
+            Itheta+=1
+            xold = xnew
             
             #The error is already below the threshold
             if (max_error < eps_allowed and disableAdaptive == False):
@@ -732,6 +766,83 @@ class PDSimCore(object):
         self.Ntheta = Itheta
         self.__post_cycle()
         
+    def __calc_boundary_work(self):
+        
+        def delimit_vector(x0, y0):
+            """
+            Break vectors into continuous chunks of real values as needed
+            
+            All the trailing NAN values have been removed already
+            """
+            real_bounds = []
+            nan_bounds = []
+            
+            if not np.any(np.isnan(y0)):
+                return [x0],[y0]
+            
+            if np.isnan(y0[0]):
+                nan_bounds += [0]
+            else:
+                real_bounds += [0]
+                
+            if np.isfinite(y0[-1]):
+                real_bounds += [len(y0)-1]
+            else:
+                nan_bounds += [len(y0)-1]
+                
+            for i in range(len(y0)-1):
+                if np.isnan(y0[i])==[False] and np.isnan(y0[i+1])==[True]:
+                    real_bounds+=[i]
+                    nan_bounds+=[i+1]
+                elif np.isnan(y0[i])==[True] and np.isnan(y0[i+1])==[False]:
+                    nan_bounds += [i]
+                    real_bounds += [i+1]
+            
+            nan_bounds=sorted(nan_bounds)
+            real_bounds=sorted(real_bounds)
+            
+            #Check that all the NAN chunks are all NAN in fact        
+            for i in range(0,len(nan_bounds),2):
+                L = nan_bounds[i]
+                R = nan_bounds[i+1]+1
+                if not np.all(np.isnan(y0[L:R])):
+                    raise ValueError('All the elements in NAN chunk are not NAN')
+            
+            x_list,y_list = [],[]
+            #Calculate the 
+            for i in range(0,len(real_bounds),2):
+                L = real_bounds[i]
+                R = real_bounds[i+1]+1
+                x_list.append(x0[L:R])
+                y_list.append(y0[L:R])
+            
+            return x_list, y_list
+        
+        def Wdot_one_CV(CVindex):
+            """ calculate the p-v work for one CV """
+            t = self.t[0:self.Ntheta]
+            y0 = self.p[CVindex, 0:self.Ntheta]
+            x0 = self.V[CVindex, 0:self.Ntheta]
+            
+#            if np.any(np.isnan(y0)):
+#                import pylab
+#                pylab.plot(x0,y0)
+#                pylab.show()
+                
+            x0, y0 = delimit_vector(x0, y0)
+            
+            summer=0.0
+            for x_chunk, y_chunk in zip(x0, y0):
+                summer += -trapz(y_chunk, x_chunk)*self.omega/(2*pi)
+            #print 'index',CVindex,'Nchunk',len(x0), summer
+            return summer
+            
+        self.Wdot_pv = 0.0
+        for CVindex in range(self.p.shape[0]):
+            self.Wdot_pv+=Wdot_one_CV(CVindex)
+            
+        print 'Wdot_pv', self.Wdot_pv
+        
     def __post_cycle(self):
         """
         This stuff all happens at the end of the cycle.  It is a private method not meant to be called externally
@@ -739,13 +850,27 @@ class PDSimCore(object):
         for name in self.temp_vectors_list:
             delattr(self,name)
             
-        self.Wdot_pv = 0.0
-        for CVindex in range(self.p.shape[0]):
-            y = self.p[CVindex,0:self.Ntheta]
-            x = self.V[CVindex,0:self.Ntheta]
-            self.Wdot_pv += -trapz(y, x)*self.omega/(2*pi)
+        self.__calc_boundary_work()
+        
+#        self.Wdot_pv = 0.0
+#        for CVindex in range(self.p.shape[0]):
+#            y0 = self.p[CVindex, 0:self.Ntheta]
+#            x0 = self.V[CVindex, 0:self.Ntheta]
+#            #remove any NAN values found
+#            y = y0[np.isfinite(y0)]
+#            x = x0[np.isfinite(x0)]
+#            if not len(x) == len(y):
+#                print 'lengths not the same', len(x), len(y)
+#                
+#            import pylab
+#            pylab.plot(x,y)
+#            pylab.show()
+#            print CVindex,-trapz(y, x)*self.omega/(2*pi)
+#            self.Wdot_pv += -trapz(y, x)*self.omega/(2*pi)
+#        print 'Wdot_pv', self.Wdot_pv
             
         self.__postprocess_flows()
+        self.__postprocess_HT()
     
     def check_abort(self):
         #If you received an abort request, set a flag
@@ -754,6 +879,39 @@ class PDSimCore(object):
             self._want_abort = True
             
         return self._want_abort
+        
+    def precond_solve(self,**kwargs):
+        """
+        A preconditioned solve
+        
+        All remaining keyword arguments are passed on to the PDSimCore.solve
+        function
+        """
+        
+        OneCycle_oldval = kwargs.get('OneCycle', False)
+        
+        #Run it with OneCycle turned on
+        kwargs['OneCycle'] = True
+        self.solve(**kwargs)
+        
+        for key, State in self.Tubes.Nodes.iteritems():
+            if key == self.key_inlet:
+                 IS = State
+            if key == self.key_outlet:
+                 OS = State
+        
+        #Using Wdot_pv (boundary work), calculate a good guess for the outlet enthalpy
+        h2 = IS.h + self.Wdot_pv/self.mdot
+        
+        T2 = newton(lambda T: Props('H','T',T,'P',OS.p,OS.Fluid)-h2, OS.T+30)
+        
+        #Now run using the old value
+        kwargs['OneCycle'] = OneCycle_oldval
+        kwargs['x0']  = [T2, 0.5*T2+0.5*self.Tamb]
+        
+        #Run using the 
+        if not OneCycle_oldval:
+            self.solve(**kwargs)
         
     def solve(self,
               key_inlet = None,
@@ -768,6 +926,9 @@ class PDSimCore(object):
               Abort = None,
               pipe_abort = None,
               UseNR = True,
+              alpha = 0.5,
+              plot_every_cycle = False,
+              x0 = None,
               **kwargs):
         """
         This is the driving function for the PDSim model.  It can be extended through the 
@@ -787,8 +948,29 @@ class PDSimCore(object):
             should be run again.  It returns a flag(``redo`` that is ``True`` if the cycle 
             should be run again, or ``False`` if the cycle iterations have reached convergence.).  
             This callback does not take any inputs
+        heat_transfer_callback : function
+        lump_energy_balance_callback : function
+        valves_callback : function
+        solver_method : string
+        OneCycle : boolean
+            If ``True``, stop after just one rotation.  Useful primarily for 
+            debugging purposes
+        Abort : function
+            A function that may be called to determine whether to stop running.  
+            If calling Abort() returns ``True``, stop running 
+        pipe_abort : 
+        UseNR : boolean
+            If ``True``, use a multi-dimensional solver to determine the initial state of
+        alpha : float
+            Use a range of ``(1-alpha)*dx, (1+alpha)*dx`` for line search if needed
+        plot_every_cycle : boolean
+            If ``True``, make the plots after every cycle (primarily for debug purposes)
+        x0 : list
+            The starting values for the solver that modifies the discharge temperature and lump temperatures
         """
         
+        if x0 is None:
+            x0 = [340, 360]
         # Set up a pipe for accepting a value of True which will abort the run
         # Typically used from the GUI
         self.pipe_abort = pipe_abort
@@ -885,14 +1067,16 @@ class PDSimCore(object):
                                 /self.FlowsProcessed.integrated_mdot[key_outlet])
                     p = self.Tubes.Nodes[key_outlet].p
                     Fluid = self.Tubes.Nodes[key_outlet].Fluid
-                    # Multimply the residual on the discharge temperature by the capacitance rate
-                    # to get all the residuals in units of kW
+                    # Multiply the residual on the discharge temperature 
+                    # by the capacitance rate to get all the residuals in 
+                    # units of kW
                     C_outlet = self.Tubes.Nodes[key_outlet].cp*mdot_out
                     self.resid_Td = C_outlet*(Props('T','H',h_outlet,'P',p,Fluid) - self.Td)
                 else:
                     raise KeyError
-                      
-                #debug_plots(self)
+                
+                if plot_every_cycle:
+                    debug_plots(self)
                 
                 #If the abort function returns true, quit this loop
                 if (Abort is not None and Abort()) or OneCycle:
@@ -911,22 +1095,68 @@ class PDSimCore(object):
             
             if UseNR:
                 self.x_state = Broyden(OBJECTIVE_CYCLE, self.x_state, Nfd = 1, dx = 0.01*np.array(self.x_state), itermax = 50, ytol = 1e-4)
-                print self.x_state
                 if self.x_state[0] is None:
                     return None
             else:
                 diff_old = None
                 x_state_prior = None
                 
+                init_state_counter = 0
                 while True:
-                    x_state_old = listm(self.x_state).copy()
-                    OBJECTIVE_CYCLE(x_state_old)
-                    x_state_new = listm(self.x_state).copy()
-                    
-                    try:    
-                        diff = (x_state_old - x_state_new) / x_state_old
-                        diff_abs = [abs(dx) for dx in (x_state_old - x_state_new)/x_state_old]
+                    # This block runs the first time through 
+                    # (when old state is not defined)
+                    # This means taking a full step
+                    if x_state_prior is None or init_state_counter < 10:
+                        x_state_prior = listm(self.x_state).copy()
+                        errors = OBJECTIVE_CYCLE(x_state_prior)
+                        if errors is None:
+                            break
+                        else:
+                            errors *= 100
+                            x_state_new = listm(self.x_state).copy()
+                            RSSE_prior = np.sqrt(np.sum(np.power(errors, 2)))
+                    try:  
+                        
+                        if init_state_counter >= 10:
+                            dx = x_state_new - x_state_prior
+                            print textwrap.dedent(
+                            """
+                            ****************************
+                            Starting a rough line search
+                            ****************************
+                            """
+                            )
+                            # If you are not getting good convergence, 
+                            # use a rough linear search
+                            _w, _error = [0.0], [RSSE_prior]
+                            for w in [0.5, 1.0, 1.5, 2.0, 2.5]:
+                                x = x_state_prior + w*dx
+                                errors  = OBJECTIVE_CYCLE(x)*100
+                                RSSE = np.sqrt(np.sum(np.power(errors, 2)))
+                                _w.append(w)
+                                _error.append(RSSE)
+                                print 'w',w,'RSSE',RSSE
+                            f = plt.figure()
+                            ax=f.add_axes((0.15,0.15,0.8,0.8))
+                            ax.plot(_w, _error)
+                            plt.show()
+                            i = _error.index(min(_error))
+                            
+                        else:
+                            if errors is not None:
+                                diff = (x_state_prior - x_state_new) / x_state_prior * 100
+                                diff_abs = [abs(dx) for dx in diff]
+                                RSSE = np.sqrt(np.sum(np.power(errors, 2)))
+                                print 'Cycle #',init_state_counter,'RSSE',RSSE
+                            if init_state_counter > 10:
+                                print 'init_state_counter > 10'
+                                debug_plots(self)
                     except IndexError:
+                        # You will get an IndexError if the length of the x_state
+                        # list changes due to different CV being in existence at
+                        # the beginning and end of the rotation.  Can be caused
+                        # by a volume ratio that puts the discharge angle right
+                        # before the end of the rotation
                         continue
                     
                     def all_negative(yvec):
@@ -936,20 +1166,13 @@ class PDSimCore(object):
                         return True
                     
                     print 'diff', diff
-                    if max(diff_abs) < 1e-4:
+                    if max(diff_abs) < 1e-1:
                         break
-#                    elif diff_old is not None and all_negative(diff * diff_old):
-#                        #If the signs are opposite for all of the diffs, weight the next step
-#                        print 'Weighting old and new initial states'
-#                        print 'new', diff, x_state_old
-#                        print 'old', diff_old, x_state_prior
-#                        self.x_state = (x_state_prior + x_state_old)/2
                     else:
                         self.x_state = x_state_new
                     
-#                    diff_old = diff.copy()
-#                    x_state_prior = x_state_old.copy()
-                        
+                    #Increment the counter for the inner loop
+                    init_state_counter += 1
                     
             # (3) After convergence of the inner loop, check the energy balance on the lumps
             if lump_energy_balance_callback is not None:
@@ -967,7 +1190,7 @@ class PDSimCore(object):
         
         #end of OJECTIVE
         
-        x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,[360.0,390.0],dx=0.3,ytol=0.001,itermax=30)
+        x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,x0, dx=1.0, ytol=0.001, itermax=30)
         print 'Solution is', x_soln,'Td, Tlumps'
         
         del self.resid_Td, self.x_state
@@ -1011,6 +1234,7 @@ class PDSimCore(object):
         self.t = self.t[  0:self.Ntheta]
         self.T = self.T[:,0:self.Ntheta]
         self.p = self.p[:,0:self.Ntheta]
+        self.Q = self.Q[:,0:self.Ntheta]
         self.m = self.m[:,0:self.Ntheta]
         self.rho = self.rho[:,0:self.Ntheta]
         self.V = self.V[:,0:self.Ntheta]
@@ -1062,7 +1286,15 @@ class PDSimCore(object):
         if self.__hasLiquid__==True:
             raise NotImplementedError
         else:
-            self.CVs.updateStates('T',x[0:self.CVs.Nexist],'D',x[self.CVs.Nexist:2*self.CVs.Nexist])
+            d = self.__statevars_to_dict(x)
+            T = d['T']
+            if 'D' in d:
+                rho = d['D']
+            elif 'M' in d:
+                rho = d['M']/V
+            else:
+                raise KeyError
+            self.CVs.updateStates('T',T,'D',rho)
         
         ## Calculate properties and property derivatives
         ## needed for differential equations
@@ -1113,7 +1345,7 @@ class PDSimCore(object):
         
         dmdtheta=summerdm
         dxLdtheta=1.0/m*(summerdxL-xL*dmdtheta)
-        dTdtheta=1/(m*cv)*(-1.0*T*dpdT*(dV-v*dmdtheta)-m*dudxL*dxLdtheta-h*dmdtheta+Q/self.omega+summerdT)
+        dTdtheta=1.0/(m*cv)*(-1.0*T*dpdT*(dV-v*dmdtheta)-m*dudxL*dxLdtheta-h*dmdtheta+Q/self.omega+summerdT)
         drhodtheta = 1.0/V*(dmdtheta-rho*dV)
         
         if self.__hasLiquid__==True:
@@ -1123,7 +1355,16 @@ class PDSimCore(object):
             f[2*self.NCV:3*self.NCV]=dxLdtheta
             return f
         else:
-            f=list(dTdtheta)+list(drhodtheta)
+            f=[]
+            for var in self.stateVariables:
+                if var == 'T':
+                    f += list(dTdtheta)
+                elif var == 'D':
+                    f += list(drhodtheta)
+                elif var == 'M':
+                    f += list(dmdtheta)
+                else:
+                    raise KeyError
             if self.__hasValves__==True:
                 f+=f_valves
             return listm(f)
@@ -1160,15 +1401,13 @@ class PDSimCore(object):
             A return value of ``True`` means that convergence of the cycle has been achieved
         """
         
-        #debug_plots(self)
-        
         #old and new CV keys
         LHS,RHS=[],[]
-        errorT,error_rho,newT,new_rho,oldT,old_rho={},{},{},{},{},{}
+        errorT,error_rho,error_mass,newT,new_rho,new_mass,oldT,old_rho,old_mass={},{},{},{},{},{},{},{},{}
         
         for key in self.CVs.exists_keys:
             # Get the 'becomes' field.  If a list, parse each fork of list. If a single key convert 
-            # into a list so you can use the same code  
+            # into a list so you can use the same code below 
             if not isinstance(self.CVs[key].becomes,list):
                 becomes=[self.CVs[key].becomes]
             else:
@@ -1181,26 +1420,26 @@ class PDSimCore(object):
                 # There can't be any overlap between keys
                 if newkey in newT:
                     raise KeyError
-                #What the temperature and density were at the start of the rotation
+                #What the state variables were at the start of the rotation
                 oldT[newkey]=self.T[Inew, 0]
                 old_rho[newkey]=self.rho[Inew, 0]
                 #What they are at the end of the rotation
                 newT[newkey]=self.T[Iold,self.Itheta-1]
                 new_rho[newkey]=self.rho[Iold,self.Itheta-1]
+                
                 errorT[newkey]=(oldT[newkey]-newT[newkey])/newT[newkey]
                 error_rho[newkey]=(old_rho[newkey]-new_rho[newkey])/new_rho[newkey]
                 #Update the list of keys for setting the exist flags
                 LHS.append(key)
                 RHS.append(newkey)
-                #Update the CV with the new value - use the copy of the CVs from before
-                #newCV.State.update({'T':self.T[Iold,self.Itheta],'D':self.rho[Iold,self.Itheta]})
+                
             
-        errorTlist = [errorT[key] for key in self.CVs.keys() if key in newT]
-        errorrholist = [error_rho[key] for key in self.CVs.keys() if key in new_rho]
-        newTlist = [newT[key] for key in self.CVs.keys() if key in newT]
+        error_T_list = [errorT[key] for key in self.CVs.keys() if key in newT]
+        error_rho_list = [error_rho[key] for key in self.CVs.keys() if key in new_rho]
+        
+        new_T_list = [newT[key] for key in self.CVs.keys() if key in newT]
         new_rho_list = [new_rho[key] for key in self.CVs.keys() if key in new_rho]
-        errorT_abs = [abs(err) for err in errorTlist]
-        error_rho_abs = [abs(err) for err in errorrholist]
+        
         
         #Reset the exist flags for the CV - this should handle all the possibilities
         #Turn off the LHS CV
@@ -1211,8 +1450,35 @@ class PDSimCore(object):
             self.CVs[key].exists=True
             
         self.CVs.rebuild_exists()
+
+        # Error values are based on density and temperature independent of 
+        # selection of state variables 
+        error_list = []
+        for var in ['T','D']:
+            if var == 'T':
+                error_list += error_T_list
+            elif var == 'D':
+                error_list += error_rho_list
+            elif var == 'M':
+                error_list += error_mass_list
+            else:
+                raise KeyError
+            
+        V, dV=self.CVs.volumes(0.0, as_dict = True)
+        new_mass_list = [new_rho[key]*V[key] for key in self.CVs.exists_keys]
         
-        return errorTlist + errorrholist, newTlist + new_rho_list
+        new_list = []
+        for var in self.stateVariables:
+            if var == 'T':
+                new_list += new_T_list
+            elif var == 'D':
+                new_list += new_rho_list
+            elif var == 'M':
+                new_list += new_mass_list
+            else:
+                raise KeyError
+        
+        return error_list, new_list
     
 if __name__=='__main__':
     print 'This is the base class that is inherited by other compressor types.  Running this file doesn\'t do anything'
