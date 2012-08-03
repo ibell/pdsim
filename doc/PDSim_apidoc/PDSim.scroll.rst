@@ -24,4 +24,12 @@ scroll Package
     :members:
     :undoc-members:
     :show-inheritance:
+    
+:mod:`_scroll` Module
+------------------
+
+.. automodule:: PDSim.scroll._scroll
+    :members:
+    :undoc-members:
+    :show-inheritance:
 

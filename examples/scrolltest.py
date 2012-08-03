@@ -1,4 +1,6 @@
 
+from __future__ import division
+
 # If being run from the folder that contains the PDSim source tree, 
 # remove the current location from the python path and use the 
 # site-packages version of PDSim
@@ -39,7 +41,30 @@ def Compressor():
     
 #    for th in np.linspace(0,2*pi,10):
 #        scroll_geo.plot_HT_angles(th, ScrollComp.geo, ['s1','c1.1','c1.2','d1'], 'o')
-    #scroll_geo.plot_HT_angles(pi, ScrollComp.geo, ['s1','c1.1','c1.2','d1'], 'o')
+    
+#    radial_pairs = scroll_geo.radial_leakage_pairs(ScrollComp.geo)
+#    th = 0.55*2*pi
+#    
+#    plotScrollSet(th,ScrollComp.geo)
+#    ax = plt.gca()
+#    for key1, key2 in radial_pairs:
+#        try:
+#            phi_min, phi_max = scroll_geo.radial_leakage_angles(th, ScrollComp.geo,key1,key2)
+#            phi = np.linspace(phi_min, phi_max, 50)
+#            print key1, key2, phi_min, phi_max
+#            
+#            
+#            x,y = scroll_geo.coords_inv(phi, ScrollComp.geo, th, flag="fi")
+#            ax.plot(x,y)
+#            ax.plot(x[0],y[0],'o')
+#            ax.plot(x[-1],y[-1],'o')
+#            x,y = scroll_geo.coords_inv(phi[len(phi)//2], ScrollComp.geo, th, flag="fi")
+#            ax.text(x,y,key1+'-'+key2,ha='center',va='center')
+#            
+#        except KeyError:
+#            print 'no match for',key1,key2
+#            pass
+#    plt.show()    
     
     Injection = False
         
@@ -83,7 +108,7 @@ def Compressor():
         
     if Injection:
         #Tube is a meter long with ID of 0.01 m
-        f = 0.6
+        f = 0.7
         p = f*outletState.p+(1-f)*inletState.p
         Tsat = CP.Props('T', 'P', p, 'Q', 1.0, Ref)
         T = Tsat + 3.0
@@ -101,8 +126,6 @@ def Compressor():
     ScrollComp.auto_add_CVs(inletState, outletState)
     ScrollComp.auto_add_leakage(flankFunc = ScrollComp.FlankLeakage, 
                                 radialFunc = ScrollComp.RadialLeakage)
-    
-    print "still missing radial leakage terms"
     
     ScrollComp.add_flow(FlowPath(key1='inlet.2', key2='sa', MdotFcn=ScrollComp.Inlet_sa,
                                  MdotFcn_kwargs = dict(X_d = 0.4)

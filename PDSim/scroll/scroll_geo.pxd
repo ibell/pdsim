@@ -19,9 +19,11 @@ cdef class geoVals:
 cpdef double fxA(double rb, double phi, double phi0)
 cpdef double fyA(double rb, double phi, double phi0)
 
-cpdef tuple coords_inv(phi_vec,geoVals geo, double theta, flag = *) 
+cpdef tuple coords_inv(phi_vec,geoVals geo, double theta, flag = *)
 cpdef tuple _coords_inv_np(np.ndarray phi, geoVals geo, double theta, flag = *)
 cpdef tuple _coords_inv_d(double phi, geoVals geo, double theta, flag = *)
+
+cpdef tuple radial_leakage_angles(double theta, geoVals geo, bytes key1, bytes key2)
 
 cpdef int getNc(double theta, geoVals geo)
 

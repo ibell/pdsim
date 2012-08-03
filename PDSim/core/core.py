@@ -91,14 +91,25 @@ class PDSimCore(object):
             list of keys for the state variables to be used.  Current options are 'T','D' or 'T','M'.  Default state variables are 'T','M'
         """
         #Initialize the containers to be empty
+        
+        #: The Valves container class
         self.Valves=[]
+        #: A :class:`ControlVolumeCollection <PDSim.core.containers.ControlVolumeCollection>` instance
+        #: that contains all the control volumes in the machine
         self.CVs=ControlVolumeCollection()
+        #: The :class:`FlowPathCollection <PDSim.flow.flow.FlowPathCollection>` 
+        #: instance
         self.Flows=FlowPathCollection()
+        #: A :class:`list` that contains copies of the 
+        #: :class:`FlowPathCollection <PDSim.flow.flow.FlowPathCollection>` 
+        #: at each crank angle
         self.FlowStorage=[]
+        
         self.Tubes=TubeCollection()
         self.Tlumps=np.zeros((1,1))
         self.steps=[]
         self.__hasValves__=False
+        
         if isinstance(stateVariables,(list,tuple)):
             self.stateVariables=list(stateVariables)
         else:
@@ -1141,6 +1152,8 @@ class PDSimCore(object):
                             ax.plot(_w, _error)
                             plt.show()
                             i = _error.index(min(_error))
+                            x_state_new = x_state_prior + _w[i]*dx
+                            init_state_counter = 0
                             
                         else:
                             if errors is not None:

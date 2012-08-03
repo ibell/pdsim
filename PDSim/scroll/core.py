@@ -392,9 +392,36 @@ class Scroll(PDSimCore, _Scroll):
                                       discharge_becomes=disc_becomes_c2,
                                       becomes=becomes_c2))
     
-    def auto_add_leakage(self,flankFunc,radialFunc,):
+    def auto_add_leakage(self,flankFunc,radialFunc):
+        """
+        Add all the leakage terms for the compressor
         
-        # First do the flank leakage terms since they are easier to handle
+        Parameters
+        ----------
+        flankFunc : function
+            The function to be used for the flank leakage path
+        radialFunc : function
+            The function to be used for the radial leakage path
+        """
+        
+        #Do the flank leakages
+        self.auto_add_flank_leakage(flankFunc)
+        #Do the radial leakages
+        self.auto_add_radial_leakage(radialFunc)
+        
+    def auto_add_radial_leakage(self, radialFunc):
+        pairs = scroll_geo.radial_leakage_pairs(self.geo)
+        
+        #Loop over all the radial leakage pairs possible for the given geometry
+        for pair in pairs:
+            self.add_flow(FlowPath(key1=pair[0],
+                                   key2=pair[1],
+                                   MdotFcn=radialFunc
+                                   )
+                          )
+        
+    def auto_add_flank_leakage(self, flankFunc):
+        
         # Always a s1-c1 leakage and s2-c2 leakage
         self.add_flow(FlowPath(key1='s1',key2='c1.1',MdotFcn=flankFunc))
         self.add_flow(FlowPath(key1='s2',key2='c2.1',MdotFcn=flankFunc))
@@ -428,9 +455,6 @@ class Scroll(PDSimCore, _Scroll):
                 #Leakage between the discharge region and the innermost chamber
                 self.add_flow(FlowPath(key1=keyc1,key2='ddd',MdotFcn=flankFunc))
                 self.add_flow(FlowPath(key1=keyc2,key2='ddd',MdotFcn=flankFunc))
-    
-#    def RadialLeak(self, geo, phi_max, phi_min):
-#        flowVec->A[*count]=(geo->delta_radial)*(geo->rb)*(1.0/2.0*(phi_max*phi_max-phi_min*phi_min)-(geo->phi.phi_fi0)*(phi_max-phi_min))
     
     def heat_transfer_coefficient(self, key):
         
@@ -485,12 +509,6 @@ class Scroll(PDSimCore, _Scroll):
         #Use the compiled version from the cython code
         return _Scroll.involute_heat_transfer(self,**kwargs)
     
-#        term1=hc*hs*rb*( (phi1*phi1/2.0-phi0*phi1)*(T_scroll-T_CV)
-#            +dT_dphi*(phi1*phi1*phi1/3.0-(phi0+phim)*phi1*phi1/2.0+phi0*phim*phi1))
-#        term2=hc*hs*rb*( (phi2*phi2/2.0-phi0*phi2)*(T_scroll-T_CV)
-#            +dT_dphi*(phi2*phi2*phi2/3.0-(phi0+phim)*phi2*phi2/2.0+phi0*phim*phi2))
-#        return term1-term2;
-    
     def heat_transfer_callback(self, theta, **kwargs):
         """
         The scroll simulation heat transfer callback for HT to the fluid in the 
@@ -510,7 +528,7 @@ class Scroll(PDSimCore, _Scroll):
         State_outlet = self.Tubes.Nodes[self.key_outlet]
         return self._heat_transfer_callback(theta, State_inlet, State_outlet, **kwargs)
     
-    def _heat_transfer_callback(self, theta, State_inlet, State_outlet, HTC_tune = 0.0, **kwargs):
+    def _heat_transfer_callback(self, theta, State_inlet, State_outlet, HTC_tune = 1.0, **kwargs):
         
         # dT_dphi is generally negative because as you move to the 
         # outside of the scroll (larger phi), the temperature goes down because
@@ -823,10 +841,34 @@ class Scroll(PDSimCore, _Scroll):
             return mdot
         except ZeroDivisionError:
             return 0.0
-        
+    
+    def RadialLeakage(self,FlowPath,**kwargs):
+        """
+        Calculate the radial leakge flow rate
+        """
+        #Calculate the area
+        #Arc length of the upstream part of the flow path
+        try:
+            FlowPath.A= scroll_geo.radial_leakage_area(self.theta,self.geo,FlowPath.key1,FlowPath.key2)
+        except KeyError:
+            print FlowPath.key1,FlowPath.key2,'caused a KeyError'
+            return 0.0
+            
+        try:
+            return flow_models.FrictionCorrectedIsentropicNozzle(
+                                 FlowPath.A,
+                                 FlowPath.State_up,
+                                 FlowPath.State_down,
+                                 self.geo.delta_radial,
+                                 Type = 'radial',
+                                 t = self.geo.t
+                                 )
+        except ZeroDivisionError:
+            return 0.0
+            
     def FlankLeakage(self,FlowPath,**kwargs):
         """
-        This function 
+        Calculate the flank leakge flow rate
         """
         #Calculate the area
         FlowPath.A=self.geo.h*self.geo.delta_flank
@@ -966,5 +1008,3 @@ class Scroll(PDSimCore, _Scroll):
         except ZeroDivisionError:
             return 0.0
         
-    def RadialLeakage(self,FlowPath,**kwargs):
-        assert (1==0)

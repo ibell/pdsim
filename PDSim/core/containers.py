@@ -15,7 +15,6 @@ class ControlVolumeCollection(collections.OrderedDict):
     """
     def __init__(self):
         collections.OrderedDict.__init__(self)
-        #delattr(collections.OrderedDict,'__reduce__')
         
     def __reduce__(self):
         return rebuildCVCollection,(self.__getstate__(),)
@@ -47,8 +46,10 @@ class ControlVolumeCollection(collections.OrderedDict):
     
     @property
     def Nodes(self):
+        """
+        A list of all the nodes associated with the control volumes
+        """
         return self._Nodes
-    
     
     def index(self,key):
         return self._keys.index(key)
@@ -75,30 +76,51 @@ class ControlVolumeCollection(collections.OrderedDict):
             
     @property
     def T(self):
+        """
+        Temperature for each CV that exists
+        """
         return [CV.State.get_T() for CV in self._exists_CV]
     
     @property
     def p(self):
+        """
+        Pressure for each CV that exists
+        """
         return [CV.State.get_p() for CV in self._exists_CV]
     
     @property
     def rho(self):
+        """
+        Density for each CV that exists
+        """
         return [CV.State.get_rho() for CV in self._exists_CV]
     
     @property
     def h(self):
+        """
+        Enthalpy for each CV that exists
+        """
         return [CV.State.get_h() for CV in self._exists_CV]
     
     @property
     def cp(self):
+        """
+        Specific heat at constant volume for each CV that exists
+        """
         return [CV.State.get_cp() for CV in self._exists_CV]
     
     @property
     def cv(self):
+        """
+        Specific heat at constant volume for each CV that exists
+        """
         return [CV.State.get_cv() for CV in self._exists_CV]
     
     @property
     def dpdT(self):
+        """
+        Derivative of pressure with respect to temperature at constant volume for each CV that exists
+        """
         return [CV.State.get_dpdT() for CV in self._exists_CV]
     ## ---- End property callbacks --------
     
@@ -122,10 +144,16 @@ class ControlVolumeCollection(collections.OrderedDict):
         If the parameter V_dV_kwargs is passed to the class constructor, these keyword 
         arguments will be unpacked into the volume function call.  Useful for passing 
         a flag to a given function
+        
         Parameters
         ----------
         as_dict : boolean, optional
             If ``True``, return the volumes and derivatives of volumes as a dictionary
+            
+        Returns
+        -------
+        A tuple of volumes and derivatives of volumes as listm instances
+        
         """
             
         def func(CV):
@@ -151,8 +179,7 @@ class ControlVolume(object):
     """
     This is a class that contains all the code for a given control volume.  
     
-    It includes the code for calculation of volumes and others.  Some functions 
-    must be overloaded on instantiation
+    It includes the code for calculation of volumes and others.
     """
     
     def __init__(self, key, VdVFcn, initialState, exists=True,

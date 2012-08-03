@@ -38,7 +38,7 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.autosummary',
               'matplotlib.sphinxext.plot_directive']
 
-autodoc_default_flags = ['members','no-inherited-members','show-inheritance']
+autodoc_default_flags = ['members','no-inherited-members','show-inheritance','private-members']
 
 intersphinx_mapping = {'CoolProp': ('http://coolprop.sourceforge.net', None),
                        'matplotlib':('http://matplotlib.sourceforge.net', None),
@@ -111,7 +111,8 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'haiku'
+## html_theme = 'haiku'
+html_theme = 'sphinxdoc'
 
 #html_style = 'scipy.css'
 

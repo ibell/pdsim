@@ -26,9 +26,9 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
     ----------
     mdot : float
         mass flow rate [kg/s]
-    State1 : :class:`CoolProp.State.State` instance
+    State1 : :class:`State <CoolProp.State.State>` instance
         State number 1 for the Tube
-    State2 : State instance
+    State2 : :class:`State <CoolProp.State.State>` instance
         State number 2 for the Tube
     fixed : int, ``1`` or ``2``
         Which node is fixed
@@ -341,9 +341,9 @@ cpdef IsentropicNozzle(double A, State State_up, State State_down, bint full_out
     
     A : double
         Throat area of the nozzle [m\ :math:`^2`\ ]
-    State_up : :class:`CoolProp.State.State` instance
+    State_up : :class:`State <CoolProp.State.State>` instance
         Upstream ``State`` instance
-    State_down : :class:`CoolProp.State.State` instance
+    State_down : :class:`State <CoolProp.State.State>` instance
         Downstream ``State`` instance
     full_output : bool
         Outputs just mdot (full_output=False), or mdot,others if full_output=True
@@ -401,12 +401,12 @@ cpdef FrictionCorrectedIsentropicNozzle(double A, State State_up, State State_do
     Parameters
     ----------
     A : float
-        Flow area at the minimum area [m\ :math:`^2`\ ], equal to :math:`\delta_{flank}h` for flank, 
+        Flow area at the minimum area [\ :math:`m^2`\ ], equal to :math:`\delta_{flank}h` for flank, 
         and :math:`s_r\delta_{radial}` for radial leakage.  Intended for scroll
         compressor, but can be used with other compressors
-    State_up : :class:`CoolProp.State.State` instance
+    State_up : :class:`State <CoolProp.State.State>` instance
         The State instance corresponding to the upstream side of the flow path
-    State_down : :class:`CoolProp.State.State` instance
+    State_down : :class:`State <CoolProp.State.State>` instance
         The State instance corresponding to the downstream side of the flow path
     delta : float
         Gap width in meters
@@ -425,7 +425,7 @@ cpdef FrictionCorrectedIsentropicNozzle(double A, State State_up, State State_do
     -----
     If Type is 'radial', t must be provided
     
-    If Type is 'scroll', ro must be provided
+    If Type is 'flank', ro must be provided
         
     Implements the frictionally-corrected method of 
     Bell et al., *A Computationally Efficient Hybrid Leakage Model for Modeling Leakage in Positive Displacement Compressors*, "2012 International Compressor Engineering Conference at Purdue University

@@ -7,12 +7,13 @@ import cython
 import time #(temporary)
  
 #This is a list of all the members in geoVals
-geoValsvarlist=['h','phi_i0','phi_is','phi_ie','phi_e','phi_o0','ro','rb','phi_os','phi_oe','t',
-'xa_arc1','ya_arc1','ra_arc1','t1_arc1','t2_arc1',
-'xa_arc2','ya_arc2','ra_arc2','t1_arc2','t2_arc2',
-'b_line', 't1_line', 't2_line', 'm_line',
-'x0_wall','y0_wall','r_wall',
-'delta_radial', 'delta_flank']
+geoValsvarlist=['h','phi_i0','phi_is','phi_ie','phi_e',
+                'phi_o0','ro','rb','phi_os','phi_oe','t',
+                'xa_arc1','ya_arc1','ra_arc1','t1_arc1','t2_arc1',
+                'xa_arc2','ya_arc2','ra_arc2','t1_arc2','t2_arc2',
+                'b_line', 't1_line', 't2_line', 'm_line',
+                'x0_wall','y0_wall','r_wall',
+                'delta_radial', 'delta_flank']
  
 def rebuild_geoVals(d):
     geo = geoVals()
@@ -419,6 +420,224 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
     else:
         raise AttributeError('Type not understood, should be one of 2Arc or ArcLineArc')
 
+def radial_leakage_area(theta, geo, key1, key2, location = 'up'):
+    """
+    Get the flow area of the flow path for a given radial flow pair
+    
+    Parameters
+    ----------
+    theta : float
+        crank angle in the range [0, :math:`2\pi`] 
+    geo : geoVals instance
+    key1 : string
+    key2 : string
+    location : string, one of ['up','mid','down'], optional
+        What part of the wrap is used to determine the area.
+    
+    Returns
+    -------
+    Area in [\ :math:`m^2`\ ]
+    
+    """
+    #Get the bounding angles
+    phi_min,phi_max = radial_leakage_angles(theta,geo,key1,key2)
+    if location =='up':
+        phi_0 = geo.phi_i0
+    elif location == 'down':
+        phi_0 = geo.phi_o0
+    elif location == 'mid':
+        phi_0 = (geo.phi_i0+geo.phi_o0)/2
+    else:
+        raise KeyError
+    A = geo.delta_radial*geo.rb*((phi_max**2-phi_min**2)/2-phi_0*(phi_max-phi_min))
+    return A
+    
+def radial_leakage_angles(theta, geo, key1, key2):
+    """
+    Get the angles for a given radial flow pair
+    
+    Parameters
+    ----------
+    theta : float
+        crank angle in the range [0, :math:`2\pi`] 
+    geo : geoVals instance
+    key1 : string
+    key2 : string
+    location : string, one of ['up','mid','down'], optional
+        What part of the wrap is used to determine the area.
+    
+    Returns
+    -------
+    tuple of values with (``phi_min``, ``phi_max``)
+    
+    Raises
+    ------
+    ``KeyError`` if keys are invalid or undefined at the given crank angle 
+    
+    """
+    cython.declare(phi_min = cython.double, 
+                   phi_max = cython.double, 
+                   sort = cython.list,
+                   alpha = cython.long,
+                   Nc = cython.long)
+    phi_min = 9999999.0
+    phi_max = 9999999.0
+    Nc = getNc(theta,geo)
+    sort = sorted((key1,key2))
+    #These are always in existence
+    if (sort == sorted(('s2','sa')) or
+        sort == sorted(('s1','sa'))):
+            phi_max = geo.phi_ie
+            phi_min = max(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0)
+    #suction chambers only in contact with each other beyond theta = pi
+    elif sort == sorted(('s2','s1')) and phi_max > 1000:
+        if theta > pi:
+            phi_max = phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0
+            phi_min = geo.phi_ie - theta
+            #Ensure that at the very least phi_max is greater than  phi_min
+            phi_max = max(phi_min, phi_max)
+        else:
+            #They are the same so there is no flow area
+            phi_max = geo.phi_ie - theta + 0.0000001
+            phi_min = geo.phi_ie - theta
+    
+    elif Nc == 0 and phi_max > 1000:
+        if (sort == sorted(('d2','s1')) or
+            sort == sorted(('d1','s2'))):
+                phi_max = geo.phi_ie - theta
+                phi_min = geo.phi_ie - theta - pi
+        elif sort == sorted(('d2','d1')):
+                phi_max = geo.phi_ie - theta - pi
+                phi_min = geo.phi_is
+        else:
+            print 'Nc: {Nc:d}'.format(Nc=Nc)
+            raise KeyError('Nc: {Nc:d}'.format(Nc=Nc))
+    
+    if Nc >= 1 and phi_max > 1000:
+        if (sort == sorted(('c2.1','sa')) or
+            sort == sorted(('c1.1','sa'))):
+                phi_max = max(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
+                phi_min = min(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
+        elif (sort == sorted(('c2.1','s1')) or
+              sort == sorted(('c1.1','s2'))):
+                phi_max = min(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
+                phi_min = geo.phi_ie - theta - pi
+        elif sort == sorted(('c2.1','c1.1')):
+                phi_max = geo.phi_ie - theta - pi
+                phi_min = geo.phi_ie - theta - 2*pi
+        elif Nc == 1 and (sort == sorted(('c2.1','d1')) or
+                          sort == sorted(('c1.1','d2'))):
+                phi_max = geo.phi_ie - theta - 2*pi
+                phi_min = geo.phi_is
+        elif Nc == 1:
+            print 'Nc: {Nc:d} key1: {k1:s} key2: {k2:s}'.format(Nc=Nc,k1=key1,k2=key2)
+            raise KeyError
+                
+    #Nc > 1
+    if Nc > 1 and phi_max > 1000: 
+        for alpha in range(2, Nc+1):
+            if (sort == sorted(('c2.'+str(alpha),'c1.'+str(alpha-1))) or
+                sort == sorted(('c1.'+str(alpha),'c2.'+str(alpha-1)))):
+                phi_max = geo.phi_ie - theta - 2*pi*(alpha-1)
+                phi_min = geo.phi_ie - theta - 2*pi*(alpha-1) - pi
+                break
+            elif sort == sorted(('c2.'+str(alpha),'c1.'+str(alpha))):
+                phi_max = geo.phi_ie - theta - 2*pi*(alpha-1) - pi
+                phi_min = geo.phi_ie - theta - 2*pi*(alpha)
+                break
+        if phi_max > 1000:
+            if (sort == sorted(('c2.'+str(Nc),'d1')) or
+                sort == sorted(('c1.'+str(Nc),'d2'))):
+                phi_max = geo.phi_ie - theta - 2*pi*Nc
+                phi_min = geo.phi_is
+    
+    if phi_max > 1000 or phi_min > 1000:
+        raise KeyError ('For the pair ('+key1+','+key2+') there were no angles found')
+    if phi_min > phi_max:
+        raise ValueError ('For the keys ('+key1+','+key2+') there were no angles found (error because '+str(phi_max)+' < '+str(phi_min)+')')
+    return (phi_min, phi_max)
+
+def radial_leakage_pairs(geo):
+    """
+    Returns a list of all possible pairings for the radial leakages 
+    
+    Parameters
+    ----------
+    None
+    
+    Returns
+    -------
+    A list of tuples with the entries of (``key1``,``key2``) where ``key1`` and 
+    ``key2`` are the keys for the control volumes
+        
+    Notes
+    -----
+    See page 125 of Bell, Ian, "Theoretical and Experimental Analysis of Liquid
+    Flooded Compression in Scroll Compressors", PhD. Thesis, Purdue University,
+    http://docs.lib.purdue.edu/herrick/2/
+    
+    Different analysis is used for 0, 1, >1 sets of compression chambers.  
+    But you know from the geometry the maximum number of pairs of compression
+    chambers, and can therefore determine the possible pairings *a priori*.
+    
+    """
+    def remove_duplicates(pairs):
+        #Sort each element of the list
+        pairs = [sorted(pair) for pair in pairs]
+        
+        seen = set()
+        # Keep any elements that are unique
+        #
+        # Sets cannot have duplicates, so adding a value to a set that is already
+        # there returns a False value and allows for treating the terms
+        return [ x for x in pairs if str( x ) not in seen and not seen.add( str( x ) )]
+    
+    # You are guaranteed to have a rotational angle between 0 and 2*pi radians
+    # where you lose a compression chamber            
+    Nc_max = nC_Max(geo)
+    Nc_min = Nc_max - 1
+    
+    #These are always there
+    pairs = [('s1','sa'),
+             ('s2','sa'),
+             ('s1','s2')
+             ]
+    for Nc in [Nc_max, Nc_min]:
+        if Nc == 0:
+            pairs += [('d2','s1'),
+                      ('d1','s2'),
+                      ('d2','d1')]
+        elif Nc == 1:
+            pairs += [('c2.1','sa'),
+                      ('c1.1','sa'),
+                      ('c2.1','s1'),
+                      ('c1.1','s2'),
+                      ('c1.1','c2.1')]
+            if Nc == Nc_max:
+                pairs += [('d2','c1.1'),
+                          ('d1','c2.1'),
+                          ]
+        elif Nc > 1:
+            pairs += [('c2.1','sa'),
+                      ('c1.1','sa'),
+                      ('c2.1','s1'),
+                      ('c1.1','s2'),
+                      ('c2.1','c1.1'),
+                      ]
+            #Nc is > 1, so alpha is in the range 2, Nc inclusive
+            for alpha in range(2,Nc+1):
+                pairs += [('c2.'+str(alpha),'c1.'+str(alpha-1)),
+                          ('c1.'+str(alpha),'c2.'+str(alpha-1)),
+                          ('c1.'+str(alpha),'c2.'+str(alpha)),
+                          ]
+            pairs += [
+                      ('d2','c1.'+str(Nc)),
+                      ('d1','c2.'+str(Nc)),
+                      ]
+    
+    return remove_duplicates(pairs)
+    
+
 def HT_angles(theta, geo, key):
     """
     Return the heat transfer bounding angles for the given control volume
@@ -453,6 +672,8 @@ def HT_angles(theta, geo, key):
     
     The keys s2, c2.x, and d2 have as their outer wrap the orbiting scroll
     
+    "Minimum", and "Maximum" refer to absolute values of the angles
+    
     Raises
     ------
     If key is not valid, raises a KeyError
@@ -484,6 +705,7 @@ def HT_angles(theta, geo, key):
     else:
         raise KeyError
     
+
 def plot_HT_angles(theta, geo, keys, involute):
     """
     Plot an involute bound angle graph for each CV for checking of  

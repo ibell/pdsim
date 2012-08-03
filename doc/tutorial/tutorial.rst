@@ -21,11 +21,6 @@ Optional:
 
 Getting the necessary files
 ---------------------------
-
-First go to `GIT <http://sourceforge.net/p/pdsim/git>`_ repository on Sourceforge.  There you can see the path to the repository.
-
-.. image:: page001.png
-    :width: 8in
     
 Somewhere on your computer, right-click on a folder as below and select *Git Clone...*
     
