@@ -41,7 +41,7 @@ class Scroll(PDSimCore, _Scroll):
         class when pickling
         """
         py_dict = self.__dict__.copy()
-        #py_dict.update(_Scroll.__cdict__(self))
+        py_dict.update(_Scroll.__cdict__(self))
         return py_dict
 
     def __setstate__(self, d):
@@ -64,7 +64,8 @@ class Scroll(PDSimCore, _Scroll):
     
     @property
     def Vratio(self):
-        return (3*pi-2*self.geo.phi_ie+self.geo.phi_i0+self.geo.phi_o0)/(-2*self.geo.phi_os-3*pi+self.geo.phi_i0+self.geo.phi_o0)
+        return ((3*pi-2*self.geo.phi_ie+self.geo.phi_i0+self.geo.phi_o0)
+                /(-2*self.geo.phi_os-3*pi+self.geo.phi_i0+self.geo.phi_o0))
     
     def V_injection(self, theta, V_tube = None):
         """
@@ -583,14 +584,11 @@ class Scroll(PDSimCore, _Scroll):
                                                    dT_dphi = dT_dphi, 
                                                    phim = phim)
                 
-                #A_wall_in = self.geo.h * self.geo.rb * ( (phi_1_i**2-phi_2_i**2)/2.0 - self.geo.phi_i0*(phi_1_i-phi_2_i) )
-                #A_wall_out = self.geo.h * self.geo.rb * ( (phi_1_o**2 - phi_2_o**2)/2.0 -self.geo.phi_o0*(phi_1_o-phi_2_o) )
-                #return A_wall_in + A_wall_out
                 return HTC_tune *(Q_outer_wrap + Q_inner_wrap)
             
             except KeyError:
                 if key == 'sa':
-                    #sa is treated as having no heat transfer
+                    # sa is treated as having no heat transfer
                     return 0.0
                 elif key == 'ddd':
                     # ddd is a combination of the heat transfer in the d1, d2, and
@@ -599,6 +597,9 @@ class Scroll(PDSimCore, _Scroll):
                 elif key == 'dd':
                     # dd chamber
                     return self.heat_transfer_coefficient(key)
+                elif key.startswith('inj'):
+                    # injection chambers are treated as having no heat transfer
+                    return 0.0
                 else:
                     raise KeyError('CV '+key+' not matched')
             
@@ -849,7 +850,10 @@ class Scroll(PDSimCore, _Scroll):
         #Calculate the area
         #Arc length of the upstream part of the flow path
         try:
-            FlowPath.A= scroll_geo.radial_leakage_area(self.theta,self.geo,FlowPath.key1,FlowPath.key2)
+            FlowPath.A= scroll_geo.radial_leakage_area(self.theta,
+                                                       self.geo,
+                                                       FlowPath.key1,
+                                                       FlowPath.key2)
         except KeyError:
             print FlowPath.key1,FlowPath.key2,'caused a KeyError'
             return 0.0

@@ -1,18 +1,23 @@
 ##-- Non-package imports  --
 from __future__ import division
-from CoolProp.CoolProp import Props
-from CoolProp.State import State
+
 import numpy as np
 from math import pi
 import textwrap
-#from PDSim.misc.scipylike import trapz
+
 from scipy.integrate import trapz, simps
 from scipy.optimize import newton
 import copy
 import pylab
 from time import clock
+from cPickle import loads, dumps
 
+## matplotlib imports
 import matplotlib.pyplot as plt
+
+##   Coolprop imports
+from CoolProp.CoolProp import Props
+from CoolProp.State import State
 
 ##--  Package imports  --
 from PDSim.flow._sumterms import setcol, getcol
@@ -291,6 +296,14 @@ class PDSimCore(object):
         self.HTProcessed.mean_Q = trapz(self.HTProcessed.summed_Q[r], self.t[r])/(self.t[self.Ntheta-1]-self.t[0])
             
     def add_flow(self,FlowPath):
+        """
+        Add a flow path to the model
+        
+        Parameters
+        ----------
+        FlowPath : :class:`FlowPath <PDSim.flow.flow.FlowPath>`  instance
+            An initialized flow path 
+        """
         #Add FlowPath instance to the list of flow paths
         self.Flows.append(FlowPath)
         
@@ -318,19 +331,19 @@ class PDSimCore(object):
         Parameters
         ----------
         Tube : Tube instance
-            An initialized Tube.  See :class:`PDSim.core.Core.Tube`
+            An initialized Tube.  See :class:`PDSim.core.core.Tube`
         """
         #Add it to the list
         self.Tubes.append(Tube)
         
     def add_valve(self,Valve):
         """
-        Add a valve to the model.  Alternatively call PDSimCore.Valve.append(Tube)
+        Add a valve to the model.  Alternatively call PDSimCore.Valves.append(Tube)
         
         Parameters
         ----------
         Valve : ValveModel instance
-            An initialized Tube.  See :class:`PDSim.flow.FlowModels.ValveModel`
+            An initialized Tube.  See :class:`PDSim.flow.flow_models.ValveModel`
         """
         #Add it to the list
         self.Valves.append(Valve)
@@ -851,8 +864,6 @@ class PDSimCore(object):
         self.Wdot_pv = 0.0
         for CVindex in range(self.p.shape[0]):
             self.Wdot_pv+=Wdot_one_CV(CVindex)
-            
-        print 'Wdot_pv', self.Wdot_pv
         
     def __post_cycle(self):
         """
@@ -862,28 +873,18 @@ class PDSimCore(object):
             delattr(self,name)
             
         self.__calc_boundary_work()
-        
-#        self.Wdot_pv = 0.0
-#        for CVindex in range(self.p.shape[0]):
-#            y0 = self.p[CVindex, 0:self.Ntheta]
-#            x0 = self.V[CVindex, 0:self.Ntheta]
-#            #remove any NAN values found
-#            y = y0[np.isfinite(y0)]
-#            x = x0[np.isfinite(x0)]
-#            if not len(x) == len(y):
-#                print 'lengths not the same', len(x), len(y)
-#                
-#            import pylab
-#            pylab.plot(x,y)
-#            pylab.show()
-#            print CVindex,-trapz(y, x)*self.omega/(2*pi)
-#            self.Wdot_pv += -trapz(y, x)*self.omega/(2*pi)
-#        print 'Wdot_pv', self.Wdot_pv
             
         self.__postprocess_flows()
         self.__postprocess_HT()
     
     def check_abort(self):
+        """
+        A callback for use with the graphical user interface to force solver to quit
+        
+        It will check the Scroll.pipe_abort pipe for a ``True`` value, and if it
+        finds one, it will set the Scroll._want_abort value to ``True`` which 
+        will be read by the main execution thread 
+        """
         #If you received an abort request, set a flag
         if self.pipe_abort.poll() and self.pipe_abort.recv():
             print 'received an abort request'
@@ -895,7 +896,7 @@ class PDSimCore(object):
         """
         A preconditioned solve
         
-        All remaining keyword arguments are passed on to the PDSimCore.solve
+        All keyword arguments are passed on to the PDSimCore.solve
         function
         """
         
@@ -903,7 +904,9 @@ class PDSimCore(object):
         
         #Run it with OneCycle turned on
         kwargs['OneCycle'] = True
+        #Scroll_copy = loads(dumps(self,-1))
         self.solve(**kwargs)
+        
         
         for key, State in self.Tubes.Nodes.iteritems():
             if key == self.key_inlet:
@@ -944,6 +947,10 @@ class PDSimCore(object):
         """
         This is the driving function for the PDSim model.  It can be extended through the 
         use of the callback functions
+        
+        It is highly recommended to call this function using keyword arguments like::
+        
+            solve(key_inlet = 'inlet', key_outlet = 'outlet', ....)
         
         Parameters
         ----------
@@ -1117,7 +1124,7 @@ class PDSimCore(object):
                     # This block runs the first time through 
                     # (when old state is not defined)
                     # This means taking a full step
-                    if x_state_prior is None or init_state_counter < 10:
+                    if x_state_prior is None or init_state_counter < 15:
                         x_state_prior = listm(self.x_state).copy()
                         errors = OBJECTIVE_CYCLE(x_state_prior)
                         if errors is None:
@@ -1128,7 +1135,7 @@ class PDSimCore(object):
                             RSSE_prior = np.sqrt(np.sum(np.power(errors, 2)))
                     try:  
                         
-                        if init_state_counter >= 10:
+                        if init_state_counter >= 15:
                             dx = x_state_new - x_state_prior
                             print textwrap.dedent(
                             """
@@ -1178,8 +1185,8 @@ class PDSimCore(object):
                                 return False
                         return True
                     
-                    print 'diff', diff
-                    if max(diff_abs) < 1e-1:
+                    #print 'diff', diff
+                    if RSSE < 1e-3:
                         break
                     else:
                         self.x_state = x_state_new
@@ -1235,7 +1242,7 @@ class PDSimCore(object):
         h1 = inletState.h
         h2 = outletState.h
         s1 = inletState.s
-        print h1, h2
+
         T2s = newton(lambda T: Props('S','T',T,'P',outletState.p,outletState.Fluid)-s1,inletState.T+30)
         h2s = Props('H','T',T2s,'P',outletState.p,outletState.Fluid)
         self.eta_a = (h2s-h1)/(h2-h1)

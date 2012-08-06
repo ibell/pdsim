@@ -36,7 +36,6 @@ pyx_list = [
             "PDSim/misc/_listmath.pyx",
             "PDSim/recip/_recip.pyx",
             "PDSim/scroll/_scroll.pyx"
-            #"PDSim/core/_core.pyx",
             ]
 
 # Try to remove the generated files in the source tree 
@@ -67,7 +66,7 @@ for pyx_file in pyx_list:
        
 setup(
   name = 'PDSim',
-  version = '0.0.1',
+  version = '1.0.0',
   author = "Ian Bell",
   author_email='ian.h.bell@gmail.com',
   url='http://pdsim.sourceforge.net',

@@ -10,7 +10,7 @@ from math import pi
 # If the following line is uncommented, python will try to use a local version
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
-sys.path.insert(0, os.path.abspath('..'))
+#sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo
@@ -64,7 +64,7 @@ def Compressor():
 #        except KeyError:
 #            print 'no match for',key1,key2
 #            pass
-#    plt.show()    
+#    plt.show() 
     
     Injection = False
         

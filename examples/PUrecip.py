@@ -20,11 +20,10 @@ from __future__ import division
 from math import pi, cos, sin
 from time import clock
 
-# If being run from the folder that contains the PDSim source tree, 
-# remove the current location from the python path and use the 
-# site-packages version of PDSim
-import sys, os
-sys.path.insert(0,os.path.abspath('..'))
+# If the following line is uncommented, python will try to use a local version
+# of PDSim.  This is handy for debugging purposes.  Generally you want this line 
+# commented out
+#sys.path.insert(0, os.path.abspath('..'))
 
 #Here we import the things from PDSim we need
 from PDSim.flow.flow import FlowPath

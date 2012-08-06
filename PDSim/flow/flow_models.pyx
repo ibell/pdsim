@@ -1,3 +1,6 @@
+
+#cython: embedsignature=True
+
 from __future__ import division
 from CoolProp.State import State
 

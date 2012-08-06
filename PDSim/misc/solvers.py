@@ -1,3 +1,5 @@
+#cython: embedsignature=True
+
 from __future__ import division
 import numpy as np
 from numpy.linalg import inv
@@ -40,6 +42,32 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 2, w=1.0, wJ=1.0, itermax=
     Broyden's method
     
     If f returns ``None``, then the computation is stopped, and a list the size of x0 is returned with all ``None`` values
+    
+    Parameters
+    ----------
+    f : function
+        Must have a signature of the form::
+         
+            (x0,*args) --> array
+            
+        that returns an array-like object the same shape as ``x0``
+        
+    x0 : array-like
+        Initial values for the solver
+    args : tuple
+        Positional arguments to pass to the objective function 
+    ytol : float
+        The allowed root-sum-square-error
+    itermax : int
+        maximum number of iterations allowed
+    Nfd : int
+        The number of finite difference steps to be used at the beginning
+    w : float
+        relaxation factor
+    wJ : float
+        relaxation factor for updating of Jacobian matrix
+    JustOneStep : boolean
+        If ``True``, stop after one step
     """
     x0=np.array(x0,dtype=np.float)
     x1=x0.copy()
@@ -80,7 +108,6 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 2, w=1.0, wJ=1.0, itermax=
                 A0[:,i]=(array(fplus)-F0)/epsilon[i]
             #Get the difference vector
             x1=x0-w*np.dot(inv(A0),F0)
-            print x1,w*np.dot(inv(A0),F0)
             #Just do one step and stop
             if JustOneStep==True:
                 return x1

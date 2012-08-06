@@ -7,7 +7,8 @@ subprocess.call(['python','setup.py','build_ext','--inplace'])
 os.chdir(this_location)
 
 #When this module is imported, run sphinx-apidoc for GUI and PDSim.  It is fast.
-if raw_input(r'run sphinx-apidoc (y/[n])? ') == 'y':
+print 'Use of sphinx-apidoc is disabled'
+if 0: #raw_input(r'run sphinx-apidoc (y/[n])? ') == 'y':
     print 'Building API documentation'
     print subprocess.check_output(['sphinx-apidoc','-f','-o','GUI_apidoc','../GUI'])
     import PDSim

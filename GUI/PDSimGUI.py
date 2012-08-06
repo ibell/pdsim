@@ -1,7 +1,6 @@
 # -*- coding: latin-1 -*-
 
 
-
 #Imports from wx package
 import wx,os,sys
 from wx.lib.mixins.listctrl import CheckListCtrlMixin, ColumnSorterMixin, ListCtrlAutoWidthMixin
@@ -76,7 +75,7 @@ class Run1(Process):
         sys.stderr = redir
         
         if isinstance(self.sim, Recip):
-            self.sim.solve(key_inlet='inlet.1',key_outlet='outlet.2',
+            self.sim.precond_solve(key_inlet='inlet.1',key_outlet='outlet.2',
             endcycle_callback=self.sim.endcycle_callback,
             heat_transfer_callback=self.sim.heat_transfer_callback,
             lump_energy_balance_callback = self.sim.lump_energy_balance_callback,
@@ -87,7 +86,7 @@ class Run1(Process):
             pipe_abort = self.pipe_abort
             )
         elif isinstance(self.sim, Scroll):
-            self.sim.solve(key_inlet='inlet.1',key_outlet='outlet.2',
+            self.sim.precond_solve(key_inlet='inlet.1',key_outlet='outlet.2',
             step_callback = self.sim.step_callback,
             endcycle_callback=self.sim.endcycle_callback,
             heat_transfer_callback=self.sim.heat_transfer_callback,

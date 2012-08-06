@@ -96,13 +96,9 @@ class FlowPathCollection(_FlowPathCollection):
             FlowPath.calculate(hdict = hdict)
             
     def sumterms(self,Core):
-        
-        #Cached versions of the CV existence information
-        exists_keys=Core.CVs.exists_keys #A list of the keys corresponding to the CV that exist
-        omega=Core.omega
-        
+
         #Call the Cython-version of the summer
-        summerdm,summerdT = sumterms_helper(self,exists_keys,omega)
+        summerdm,summerdT = sumterms_helper(self,Core.CVs.exists_keys,Core.omega)
         
         return listm(summerdT),listm(summerdm)
 
