@@ -1,4 +1,6 @@
-
+## This file is meant for experimentation with PDSim features and may not
+## work for you.  Caveat emptor!!
+#
 from __future__ import division
 
 # If being run from the folder that contains the PDSim source tree, 
@@ -10,7 +12,7 @@ from math import pi
 # If the following line is uncommented, python will try to use a local version
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
-#sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo
@@ -28,7 +30,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import time
 
-def Compressor():
+def Compressor(f = None):
     
     ScrollComp=Scroll()
     #This runs if the module code is run directly
@@ -66,15 +68,20 @@ def Compressor():
 #            pass
 #    plt.show() 
     
-    Injection = False
+    Injection = True
+    
+    if f is None:
+        Injection = False
         
     Ref='R404A'
-    #State.debug(10)
-#    State.set_1phase_LUT_params(Ref,10,10,250,500,200,3000)
-#    State.LUT(True)
     
-    inletState = State.State(Ref,{'T':300,'P':300})
-    outletState = State.State(Ref,{'T':400,'P':1200})
+    Te = -10 + 273.15
+    Tc =  43 + 273.15
+    Tin = Tc + 20
+    pe = CP.Props('P','T',Te,'Q',1.0,Ref)
+    pc = CP.Props('P','T',Tc,'Q',1.0,Ref)
+    inletState = State.State(Ref,{'T':Tin,'P':pe})
+    outletState = State.State(Ref,{'T':400,'P':pc})
     
     mdot_guess = inletState.rho*ScrollComp.Vdisp*ScrollComp.omega/(2*pi)
     
@@ -208,5 +215,6 @@ if __name__=='__main__':
         profiler.run("Compressor()")
         profiler.print_stats()
     else:
-        Compressor()
+        for f in [0.6,0.65,0.7,0.75,0.8]:
+            Compressor(f)
 

@@ -4,7 +4,7 @@ from __future__ import division
 import matplotlib.pyplot as plt
 import numpy as np
 import cython
-import time #(temporary)
+from PDSim.scroll.plots import plotScrollSet
  
 #This is a list of all the members in geoVals
 geoValsvarlist=['h','phi_i0','phi_is','phi_ie','phi_e',
@@ -420,6 +420,40 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
     else:
         raise AttributeError('Type not understood, should be one of 2Arc or ArcLineArc')
 
+def plot_injection_ports(theta, geo, phi, ax):
+    """
+    Plot the injection ports
+    
+    Parameters
+    ---------- 
+    theta : float
+        crank angle in the range [0, :math:`2\pi`] 
+    geo : geoVals instance
+    phi : float
+        Involute angle in radians
+        
+    Notes
+    -----
+    Assumes the ports to be symmetric
+    """
+    #Plot the injection ports (symmetric)
+    plotScrollSet(theta, geo, axis = ax)
+    
+    #Common terms
+    rport = geo.t/2.0
+    t = np.linspace(0,2*pi,100)
+    
+    #Involute angle along the outer involute of the scroll wrap
+    x, y = coords_inv(phi, geo, theta, 'fo')
+    nx, ny = coords_norm(phi, geo, theta, 'fo')
+    xc,yc = x-nx*rport,y-ny*rport
+    ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
+    
+    x, y = coords_inv(phi+pi, geo, theta, 'fi')
+    nx, ny = coords_norm(phi+pi, geo, theta, 'fi')
+    xc,yc = x-nx*rport,y-ny*rport
+    ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
+        
 def radial_leakage_area(theta, geo, key1, key2, location = 'up'):
     """
     Get the flow area of the flow path for a given radial flow pair
@@ -589,7 +623,7 @@ def radial_leakage_pairs(geo):
         # Keep any elements that are unique
         #
         # Sets cannot have duplicates, so adding a value to a set that is already
-        # there returns a False value and allows for treating the terms
+        # there returns a False value
         return [ x for x in pairs if str( x ) not in seen and not seen.add( str( x ) )]
     
     # You are guaranteed to have a rotational angle between 0 and 2*pi radians

@@ -1637,6 +1637,14 @@ class MainFrame(wx.Frame):
             print 'Recip-type compressor'
             self.rebuild(default_configs.get_recip_defaults())
         
+    def OnChangeOptionInjection(self, event = None):
+        ITB = self.MTB.InputsTB
+        if self.OptionsInjection.IsChecked():
+            ITB.AddPage(pdsim_panels.InjectionInputsPanel(ITB),"Injection")
+        else:
+            ITB.GetPage(ITB.GetPageCount()-1).Destroy()
+            ITB.RemovePage(ITB.GetPageCount()-1)
+        
     def make_menu_bar(self):
         #################################
         ####       Menu Bar         #####
@@ -1669,9 +1677,13 @@ class MainFrame(wx.Frame):
         self.Type.AppendSeparator()
         self.Type.AppendItem(self.TypeCompressor)
         self.Type.AppendItem(self.TypeExpander)
-        
         self.MenuBar.Append(self.Type, "Type")
         
+        self.Options = wx.Menu()
+        self.OptionsInjection = wx.MenuItem(self.Type, -1, "Refrigerant Injection", "", wx.ITEM_CHECK)
+        self.Options.AppendItem(self.OptionsInjection)
+        self.MenuBar.Append(self.Options, "Options")
+        self.Bind(wx.EVT_MENU,self.OnChangeOptionInjection,self.OptionsInjection)
         
         if self.config_parser.get('Globals', 'Type') == 'recip':
             self.TypeRecip.Check(True)

@@ -12,7 +12,8 @@ from libc.math cimport M_PI as pi
 cdef class _Scroll(object):
     
     cpdef dict __cdict__(self):
-        return dict(theta = self.theta, geo = self.geo)
+        return dict(theta = self.theta, 
+                    geo = self.geo)
     
     cpdef double SA_S(self, _FlowPath FP):
         FP.A=scroll_geo.Area_s_sa(self.theta,self.geo)

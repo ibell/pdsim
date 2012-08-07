@@ -174,7 +174,7 @@ def rebuildCV(d):
     for item in d:
         setattr(CV,item,d[item])
     return CV
-    
+
 class ControlVolume(object):
     """
     This is a class that contains all the code for a given control volume.  
@@ -188,13 +188,15 @@ class ControlVolume(object):
         self.State=initialState
         self.exists=exists
         self.key=key
+        
         self.V_dV=VdVFcn
+        
         self.V_dV_kwargs=VdVFcn_kwargs #Keyword-arguments that can get passed to volume function
         self.discharge_becomes=discharge_becomes if discharge_becomes is not None else key
         self.becomes=becomes if becomes is not None else key
     
     def __reduce__(self):
-        return rebuildCV,(self.__getstate__().copy(),)
+        return rebuildCV,(self.__getstate__().copy(),)  
     
     def __getstate__(self):
         d=self.__dict__

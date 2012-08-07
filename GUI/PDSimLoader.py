@@ -85,7 +85,7 @@ def ScrollBuilder(scroll):
     
     scroll.auto_add_CVs(scroll.inletState, outletState)
     scroll.auto_add_leakage(flankFunc = scroll.FlankLeakage, 
-                                radialFunc = scroll.RadialLeakage)
+                            radialFunc = scroll.RadialLeakage)
     
     scroll.add_tube( Tube(key1='inlet.1',key2='inlet.2',L=0.03,ID=0.02,
                              mdot=mdot_guess, 
@@ -97,7 +97,8 @@ def ScrollBuilder(scroll):
                              State2=outletState.copy(),
                              fixed=2,TubeFcn=scroll.TubeCode) )
     
-    scroll.add_flow(FlowPath(key1='inlet.2',key2='sa',MdotFcn=scroll.Inlet_sa))
+    scroll.add_flow(FlowPath(key1='inlet.2',key2='sa',
+                             MdotFcn=scroll.Inlet_sa))
     scroll.add_flow(FlowPath(key1='sa',key2='s1',MdotFcn=scroll.SA_S))
     scroll.add_flow(FlowPath(key1='sa',key2='s2',MdotFcn=scroll.SA_S))
     

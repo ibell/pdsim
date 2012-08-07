@@ -10,7 +10,27 @@ import codecs
 import numpy as np
 import os
 import itertools
+import matplotlib as mpl
+from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as WXCanvas
+from matplotlib.backends.backend_wxagg import NavigationToolbar2Wx as WXToolbar
 from multiprocessing import Process
+from PDSim.scroll import scroll_geo
+
+class PlotPanel(wx.Panel):
+    def __init__(self, parent, **kwargs):
+        wx.Panel.__init__(self, parent, size = (300,200), **kwargs)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        self.figure = mpl.figure.Figure(dpi=100, figsize=(2, 2))
+#        self.figure.set_figwidth(2.0)
+#        self.figure.set_figheight(2.0)
+        self.canvas = WXCanvas(self, -1, self.figure)
+#        self.canvas.resize(200,200)
+        self.toolbar = WXToolbar(self.canvas)
+        self.toolbar.Realize()
+        sizer.Add(self.canvas)
+        sizer.Add(self.toolbar)
+        self.SetSizer(sizer)
+        sizer.Layout()
 
 class PDPanel(wx.Panel):
     """
@@ -646,7 +666,8 @@ class StateChooser(wx.Dialog):
             self.rho.SetValue(str(rho))
         except ValueError:
             return
-   
+
+    
 class StatePanel(wx.Panel):
     """
     This is a generic Panel that has the ability to select a state given by 
@@ -700,7 +721,62 @@ class StatePanel(wx.Panel):
             self.p.SetValue(str(p))
             self.rho.SetValue(str(rho))
         SCfrm.Destroy()
+
+class InjectionViewerDialog(wx.Dialog):
+    def __init__(self, geo, phi):
+        wx.Dialog.__init__(self, parent = None)
         
+        PP = PlotPanel(self)
+        PP.ax = PP.figure.add_axes((0,0,1,1))
+        scroll_geo.plot_injection_ports(0,geo,phi,PP.ax)
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(PP)
+        sizer.Layout()
+        
+class InjectionElementPanel(wx.Panel):
+    """
+    A panel with the injection values for one injection port
+    """
+    def __init__(self, parent):
+        wx.Panel.__init__(self,parent)
+        
+        state = StatePanel(self)
+        self.Llabel,self.Lval = LabeledItem(self, label='Length of injection line',value='1.0')
+        self.IDlabel,self.IDval = LabeledItem(self, label='Inner diameter of injection line',value='0.01')
+        self.philabel,self.phival = LabeledItem(self, label='Involute angle',value='3.14159')
+        self.btn = wx.Button(self, label='View')
+        self.btn.Bind(wx.EVT_BUTTON, self.OnView)
+        
+        sizer = wx.FlexGridSizer(cols = 3)
+        sizer.AddMany([self.Llabel,self.Lval])
+        sizer.AddSpacer(10)
+        sizer.AddMany([self.IDlabel,self.IDval])
+        sizer.AddSpacer(10)
+        sizer.AddMany([self.philabel,self.phival])
+        sizer.Add(self.btn)
+        sizer.Add(state)
+        sizer.Layout()
+        
+    def OnView(self, event):
+        geo = self.GetTopLevelParent().MTB.InputsTB.panels[0].Scroll.geo
+        dlg = InjectionViewerDialog(geo,float(self.phival.GetValue()))
+        dlg.ShowModal()
+        
+class InjectionInputsPanel(PDPanel):
+    """
+    The container panel for all the injection ports and injection data 
+    """ 
+    def __init__(self, parent):
+        PDPanel.__init__(self,parent)
+        
+        self.InjectionElement = InjectionElementPanel(self)
+        
+        sizer = wx.FlexGridSizer(cols = 2)
+        sizer.Add(self.InjectionElement)
+        sizer.Layout()
+        
+            
 class StateInputsPanel(PDPanel):
     
     def __init__(self, parent, configfile,**kwargs):

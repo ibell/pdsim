@@ -115,6 +115,9 @@ class PDSimCore(object):
         self.steps=[]
         self.__hasValves__=False
         
+        #: A storage of the initial state vector
+        self.xstate_init = None
+        
         if isinstance(stateVariables,(list,tuple)):
             self.stateVariables=list(stateVariables)
         else:
@@ -187,15 +190,15 @@ class PDSimCore(object):
                        range(len(self.Valves)*2), 
                        listm(x[Ns*Nexist::])
                        )
-        
-        setcol(self.rho, i, exists_indices, self.rho_)
-        setcol(self.m, i, exists_indices, self.rho_*self.V_)
-        setcol(self.V, i, exists_indices, self.V_)
-        setcol(self.dV, i, exists_indices, self.dV_)
-        setcol(self.p, i, exists_indices, self.p_)
+        if hasattr(self,'rho_') and len(self.rho_) == len(exists_indices):
+            setcol(self.rho, i, exists_indices, self.rho_)
+            setcol(self.m, i, exists_indices, self.rho_*self.V_)
+            setcol(self.V, i, exists_indices, self.V_)
+            setcol(self.dV, i, exists_indices, self.dV_)
+            setcol(self.p, i, exists_indices, self.p_)
         if hasattr(self,'h_') and len(self.h_) == len(exists_indices):
             setcol(self.h, i, exists_indices, self.h_)
-        setcol(self.Q, i, exists_indices, self.Q_)
+            setcol(self.Q, i, exists_indices, self.Q_)
     
     def __postprocess_flows(self):
         """
@@ -294,7 +297,22 @@ class PDSimCore(object):
         for i in range(self.Ntheta):
             self.HTProcessed.summed_Q[i] = np.sum(_Q[:, i])
         self.HTProcessed.mean_Q = trapz(self.HTProcessed.summed_Q[r], self.t[r])/(self.t[self.Ntheta-1]-self.t[0])
-            
+    
+    def reset_initial_state(self):
+        
+        for k,CV in self.CVs.iteritems():
+            if k in self.exists_CV_init:
+                CV.exists = True
+            else:
+                CV.exists = False
+
+        self.CVs.rebuild_exists()
+        self.x_state = self.xstate_init
+        self.__put_to_matrices(self.xstate_init, 0)
+        #Reset the temporary variables
+        self.xstate_init = None
+        self.exists_CV_init = None
+                
     def add_flow(self,FlowPath):
         """
         Add a flow path to the model
@@ -904,7 +922,8 @@ class PDSimCore(object):
         
         #Run it with OneCycle turned on
         kwargs['OneCycle'] = True
-        #Scroll_copy = loads(dumps(self,-1))
+#        Scroll_copy = loads(dumps(self,-1))
+#        Scroll_copy.solve(**kwargs)
         self.solve(**kwargs)
         
         
@@ -917,14 +936,15 @@ class PDSimCore(object):
         #Using Wdot_pv (boundary work), calculate a good guess for the outlet enthalpy
         h2 = IS.h + self.Wdot_pv/self.mdot
         
+        #Find temperature as a function of enthalpy
         T2 = newton(lambda T: Props('H','T',T,'P',OS.p,OS.Fluid)-h2, OS.T+30)
         
-        #Now run using the old value
-        kwargs['OneCycle'] = OneCycle_oldval
-        kwargs['x0']  = [T2, 0.5*T2+0.5*self.Tamb]
-        
-        #Run using the 
+        #Now run using the old value 
         if not OneCycle_oldval:
+            kwargs['OneCycle'] = OneCycle_oldval
+            kwargs['x0']  = [T2, 0.5*T2+0.5*self.Tamb]
+            kwargs['reset_initial_state'] = True
+            #kwargs['state0'] = self.xstate_init
             self.solve(**kwargs)
         
     def solve(self,
@@ -943,6 +963,8 @@ class PDSimCore(object):
               alpha = 0.5,
               plot_every_cycle = False,
               x0 = None,
+              reset_initial_state = False,
+              LS_start = 18,
               **kwargs):
         """
         This is the driving function for the PDSim model.  It can be extended through the 
@@ -985,6 +1007,10 @@ class PDSimCore(object):
             If ``True``, make the plots after every cycle (primarily for debug purposes)
         x0 : list
             The starting values for the solver that modifies the discharge temperature and lump temperatures
+        reset_initial_state : boolean
+            If ``True``, use the stored initial state from the previous call to ``solve``
+        LS_start : int
+            Number of conventional steps to be taken when not using newton-raphson prior to entering into a line search
         """
         
         if x0 is None:
@@ -1013,11 +1039,15 @@ class PDSimCore(object):
         if Abort is None and pipe_abort is not None:
             Abort = self.check_abort
         
-        # (2) Run a cycle with the given values for the temperatures
-        self.__pre_cycle()
-        #x_state only includes the values for the chambers, the valves start closed
-        #Since indexed, yields a copy
-        self.x_state = self.__get_from_matrices(0)[0:len(self.stateVariables)*self.CVs.N]
+        if reset_initial_state is not None and reset_initial_state:
+            self.reset_initial_state()
+            self.__pre_cycle(self.xstate_init)
+        else:
+            # (2) Run a cycle with the given values for the temperatures
+            self.__pre_cycle()
+            #x_state only includes the values for the chambers, the valves start closed
+            #Since indexed, yields a copy
+            self.x_state = self.__get_from_matrices(0)[0:len(self.stateVariables)*self.CVs.N]
             
         def OBJECTIVE_ENERGY_BALANCE(Td_Tlumps):
             print Td_Tlumps,'Td,Tlumps inputs'
@@ -1037,9 +1067,15 @@ class PDSimCore(object):
                 tube.TubeFcn(tube)
             
             def OBJECTIVE_CYCLE(x_state):
+                #The first time this function is run, save the initial state
+                # and the existence of the CV
+                if self.xstate_init is None:
+                    self.xstate_init = x_state
+                    self.exists_CV_init = self.CVs.exists_keys
                 #Convert numpy array to listm
                 x_state = listm(x_state)
                 print 'x_state is', x_state
+                
                 
                 t1 = clock()
                 if solver_method == 'Euler':
@@ -1112,7 +1148,12 @@ class PDSimCore(object):
             #! End of OBJECTIVE_CYCLE
             
             if UseNR:
-                self.x_state = Broyden(OBJECTIVE_CYCLE, self.x_state, Nfd = 1, dx = 0.01*np.array(self.x_state), itermax = 50, ytol = 1e-4)
+                self.x_state = Broyden(OBJECTIVE_CYCLE, 
+                                       self.x_state, 
+                                       Nfd = 1, 
+                                       dx = 0.01*np.array(self.x_state), 
+                                       itermax = 50, 
+                                       ytol = 1e-4)
                 if self.x_state[0] is None:
                     return None
             else:
@@ -1124,7 +1165,7 @@ class PDSimCore(object):
                     # This block runs the first time through 
                     # (when old state is not defined)
                     # This means taking a full step
-                    if x_state_prior is None or init_state_counter < 15:
+                    if x_state_prior is None or init_state_counter < LS_start:
                         x_state_prior = listm(self.x_state).copy()
                         errors = OBJECTIVE_CYCLE(x_state_prior)
                         if errors is None:
@@ -1135,7 +1176,7 @@ class PDSimCore(object):
                             RSSE_prior = np.sqrt(np.sum(np.power(errors, 2)))
                     try:  
                         
-                        if init_state_counter >= 15:
+                        if init_state_counter >= LS_start:
                             dx = x_state_new - x_state_prior
                             print textwrap.dedent(
                             """
@@ -1168,9 +1209,9 @@ class PDSimCore(object):
                                 diff_abs = [abs(dx) for dx in diff]
                                 RSSE = np.sqrt(np.sum(np.power(errors, 2)))
                                 print 'Cycle #',init_state_counter,'RSSE',RSSE
-                            if init_state_counter > 10:
-                                print 'init_state_counter > 10'
-                                debug_plots(self)
+#                            if init_state_counter > LS_start:
+#                                print 'init_state_counter > '10'
+#                                debug_plots(self)
                     except IndexError:
                         # You will get an IndexError if the length of the x_state
                         # list changes due to different CV being in existence at
