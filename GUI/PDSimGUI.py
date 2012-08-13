@@ -1,6 +1,5 @@
 # -*- coding: latin-1 -*-
 
-
 #Imports from wx package
 import wx,os,sys
 from wx.lib.mixins.listctrl import CheckListCtrlMixin, ColumnSorterMixin, ListCtrlAutoWidthMixin
@@ -31,6 +30,7 @@ from PDSim.plot.plots import PlotNotebook
 import PDSim
 
 import pdsim_panels
+import pdsim_plugins
 import recip_panels
 import scroll_panels
 import default_configs
@@ -61,7 +61,7 @@ class RedirectText2Pipe(object):
         return None
 
 class Run1(Process):
-    def __init__(self,pipe_std, pipe_abort, pipe_results, simulation):
+    def __init__(self, pipe_std, pipe_abort, pipe_results, simulation):
         Process.__init__(self)
         self.pipe_std = pipe_std
         self.pipe_abort = pipe_abort
@@ -86,16 +86,18 @@ class Run1(Process):
             pipe_abort = self.pipe_abort
             )
         elif isinstance(self.sim, Scroll):
-            self.sim.precond_solve(key_inlet='inlet.1',key_outlet='outlet.2',
-            step_callback = self.sim.step_callback,
-            endcycle_callback=self.sim.endcycle_callback,
-            heat_transfer_callback=self.sim.heat_transfer_callback,
-            lump_energy_balance_callback = self.sim.lump_energy_balance_callback, 
-            OneCycle=False,
-            UseNR = False,
-            solver_method = self.sim.cycle_integrator_type,
-            pipe_abort = self.pipe_abort
-            )
+            self.sim.precond_solve(
+                                   key_inlet='inlet.1',
+                                   key_outlet='outlet.2',
+                                   step_callback = self.sim.step_callback,
+                                   endcycle_callback=self.sim.endcycle_callback,
+                                   heat_transfer_callback=self.sim.heat_transfer_callback,
+                                   lump_energy_balance_callback = self.sim.lump_energy_balance_callback, 
+                                   solver_method = self.sim.cycle_integrator_type,
+                                   OneCycle=False,
+                                   UseNR = False, #Use Newton-Raphson ND solver to determine the initial state if True
+                                   pipe_abort = self.pipe_abort
+                                   )
         else:
             raise TypeError
         
@@ -350,9 +352,8 @@ class InputsToolBook(wx.Toolbook):
                          )
         
         
-        for Name, index, panel in zip(['Geometry','Mass Flow && Valves','Mechanical','State Points'],indices,self.panels):
+        for Name, index, panel in zip(['Geometry','Mass Flow - Valves','Mechanical','State Points'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
-            
             
     def set_params(self, simulation):
         """
@@ -1366,7 +1367,7 @@ class MainFrame(wx.Frame):
         self.workers = None
         self.WTM = None
         
-        #A thread-safe queue for the processing of the results 
+        #: A thread-safe queue for the processing of the results 
         self.results_list = Queue()
         
         # Bind the idle event handler that will always run and
@@ -1422,7 +1423,17 @@ class MainFrame(wx.Frame):
             dlg = wx.MessageDialog(None,"Warning: scroll compressor is not fully implemented yet.  Results are experimental")
             dlg.ShowModal()
             dlg.Destroy()
-        
+    
+    def register_plugin(self, plugin):
+        if isinstance(plugin, pdsim_plugins.PDSimPlugin):
+            if not hasattr(self,'plugins_list'):
+                self.plugins_list = []
+            self.plugins_list.append(plugin)
+        else:
+            dlg = wx.MessageDialog(None,"Tried to add plugin but it is not an instance or subclass of the PDSimPlugin class")
+            dlg.ShowModal()
+            dlg.Destroy()
+            
     def build_recip(self):
         #Instantiate the recip class
         recip=Recip()
@@ -1441,6 +1452,10 @@ class MainFrame(wx.Frame):
         self.MTB.SolverTB.set_params(scroll)
         #Build the model the rest of the way
         ScrollBuilder(scroll)
+        #Apply any plugins in use
+        if hasattr(self,'plugins_list') and self.plugins_list:
+            for plugin in self.plugins_list:
+                plugin.apply(scroll)
         return scroll
     
     def run_simulation(self, sim):
@@ -1640,10 +1655,15 @@ class MainFrame(wx.Frame):
     def OnChangeOptionInjection(self, event = None):
         ITB = self.MTB.InputsTB
         if self.OptionsInjection.IsChecked():
-            ITB.AddPage(pdsim_panels.InjectionInputsPanel(ITB),"Injection")
+            injection_panel = pdsim_panels.InjectionInputsPanel(ITB)
+            ITB.AddPage(injection_panel,"Injection")
+            
+            injection_plugin = pdsim_plugins.ScrollInjectionPlugin(injection_panel)
+            self.register_plugin(injection_plugin)
         else:
             ITB.GetPage(ITB.GetPageCount()-1).Destroy()
             ITB.RemovePage(ITB.GetPageCount()-1)
+            #self.unregister_plugin()
         
     def make_menu_bar(self):
         #################################

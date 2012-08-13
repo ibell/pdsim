@@ -203,7 +203,10 @@ class Scroll(PDSimCore, _Scroll):
             HTangles = {'1_i':None,'2_i':None,'1_o':None,'2_o':None}
             return scroll_geo.DD(theta,self.geo)[0:2],HTangles
         else:
-            return scroll_geo.DD(theta,self.geo)[0:2]
+            if self.__before_discharge1__==True and theta<self.theta_d:
+                return scroll_geo.DDD(theta,self.geo)[0:2]
+            else:
+                return scroll_geo.DD(theta,self.geo)[0:2]
         
     def V_ddd(self,theta,alpha=1,full_output=False):
         """
@@ -267,8 +270,6 @@ class Scroll(PDSimCore, _Scroll):
         self.geo.phi_oe=phi_oe
         self.geo.ro=rb*pi-Thickness
         self.geo.t=Thickness
-        
-        
         
         #Set the flags to ensure all parameters are fresh
         self.__Setscroll_geo__=True
@@ -529,7 +530,7 @@ class Scroll(PDSimCore, _Scroll):
         State_outlet = self.Tubes.Nodes[self.key_outlet]
         return self._heat_transfer_callback(theta, State_inlet, State_outlet, **kwargs)
     
-    def _heat_transfer_callback(self, theta, State_inlet, State_outlet, HTC_tune = 1.0, **kwargs):
+    def _heat_transfer_callback(self, theta, State_inlet, State_outlet, HTC_tune = 0.0, **kwargs):
         
         # dT_dphi is generally negative because as you move to the 
         # outside of the scroll (larger phi), the temperature goes down because
@@ -631,7 +632,8 @@ class Scroll(PDSimCore, _Scroll):
         if t<self.theta_d<t+h and self.__before_discharge2__==False:
             #Take a step almost up to the discharge angle
             disable=True
-            h=self.theta_d-t-1e-8
+            h=self.theta_d-t-1e-10
+            print 'theta_d', self.theta_d,h
             self.__before_discharge2__=True
         elif self.__before_discharge2__==True:
             #At the discharge angle
@@ -663,11 +665,11 @@ class Scroll(PDSimCore, _Scroll):
             self.p[self.CVs.exists_indices,Itheta]=self.CVs.p
             self.m[self.CVs.exists_indices,Itheta]=listm(self.CVs.rho)*V
             self.rho[self.CVs.exists_indices,Itheta]=listm(self.CVs.rho)
-
+            
             # Adaptive makes steps of h/4 3h/8 12h/13 and h/2 and h
             # Make sure step does not hit any *right* at theta_d
             # That is why it is 2.2e-8 rather than 2.0e-8
-            h=2.2e-8
+            h=2.2e-10
             disable=True
        
         elif self.CVs['d1'].exists and IsAtMerge():
@@ -797,7 +799,10 @@ class Scroll(PDSimCore, _Scroll):
             return flankFunc(FlowPath)
             
     def D_to_DD(self,FlowPath,**kwargs):
-        FlowPath.A=scroll_geo.Area_d_dd(self.theta,self.geo)
+        if self.__before_discharge1__:
+            FlowPath.A = 0.0
+        else:
+            FlowPath.A=scroll_geo.Area_d_dd(self.theta,self.geo)
         try:
             return flow_models.IsentropicNozzle(FlowPath.A,
                                                 FlowPath.State_up,

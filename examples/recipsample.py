@@ -1,21 +1,12 @@
 from __future__ import division
 from math import pi
 from time import clock
-
-# If being run from the folder that contains the PDSim source tree, 
-# remove the current location from the python path and use the 
-# site-packages version of PDSim
 import sys, os
-try:
-    # if you can import listmath
-    import PDSim.misc._listmath
-except ImportError:
-    current_path = os.path.abspath(os.curdir)
-    if current_path in sys.path:
-        i = sys.path.index(current_path)
-        sys.path.pop(i)
-    else:
-        raise ImportError('_listmath was not found and PDSim folder not found on the path')
+
+# If the following line is uncommented, python will try to use a local version
+# of PDSim.  This is handy for debugging purposes.  Generally you want this line 
+# commented out
+sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow import FlowPath
 from PDSim.flow import flow_models
@@ -58,13 +49,10 @@ def Compressor():
     
     Ref='R410A'
     inletState=State.State(Ref,dict(T=289.15, D=33.1))
-    outletState=State.State(Ref,{'T':400,'P':inletState.p*2.5})
+    p_outlet = inletState.p*2.5
+    T2s = recip.isentropic_outlet_temp(inletState,p_outlet)
+    outletState=State.State(Ref,{'T':T2s,'P':p_outlet})
     mdot_guess = inletState.rho*recip.Vdisp()*recip.omega/(2*pi)
-    
-#    CP.set_1phase_LUT_params(Ref,40,40,inletState.T-50,outletState.T+50,inletState.p*0.8,outletState.p*1.8)
-#    CP.UseSinglePhaseLUT(True)
-#    State.set_1phase_LUT_params(Ref,40,40,inletState.T-50,outletState.T+50,inletState.p*0.8,outletState.p*1.8)
-#    State.LUT(True)
     
     #First add the control volumes.
     recip.add_CV( ControlVolume(key='A',
@@ -128,27 +116,23 @@ def Compressor():
           )
     recip.add_valve(recip.discharge_valve)
 
-    recip.EulerN = 3000
+    recip.EulerN = 5000
     recip.HeunN = 3000
     recip.RK45_eps = 1e-10
     t1=clock()
     
-    
-#    import cPickle
-#    recip = cPickle.loads(cPickle.dumps(recip,-1))
-    
-    recip.solve(key_inlet='inlet.1',key_outlet='outlet.2',
+    recip.precond_solve(key_inlet='inlet.1',key_outlet='outlet.2',
                 endcycle_callback=recip.endcycle_callback,
                 heat_transfer_callback=recip.heat_transfer_callback,
                 lump_energy_balance_callback = recip.lump_energy_balance_callback,
                 valves_callback =recip.valves_callback,
                 solver_method = 'Euler',
-                OneCycle = False
+                OneCycle = False,
+                UseNR = True,
                 )
     print 'time taken', clock()-t1
     
-    
-    #debug_plots(recip)
+    debug_plots(recip)
     
 if __name__=='__main__':    
     Compressor()

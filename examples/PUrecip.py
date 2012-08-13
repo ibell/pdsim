@@ -19,6 +19,7 @@ For illustrative purposes only!
 from __future__ import division
 from math import pi, cos, sin
 from time import clock
+import os, sys
 
 # If the following line is uncommented, python will try to use a local version
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
@@ -193,7 +194,7 @@ def Compressor():
                 heat_transfer_callback=recip.heat_transfer_callback,
                 lump_energy_balance_callback = recip.lump_energy_balance_callback,
                 valves_callback =recip.valves_callback,
-                solver_method = 'Euler',
+                solver_method = 'Heun',
                 OneCycle = False,
                 UseNR = True
                 )

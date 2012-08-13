@@ -37,7 +37,7 @@ def MultiDimNewtRaph(f,x0,dx=1e-6,args=(),ytol=1e-5,w=1.0,JustOneStep=False):
             return x
     return x
         
-def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 2, w=1.0, wJ=1.0, itermax=10, JustOneStep=False):
+def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, w=1.0, wJ=1.0, itermax=10, JustOneStep=False):
     """
     Broyden's method
     

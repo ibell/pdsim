@@ -118,6 +118,9 @@ class PDSimCore(object):
         #: A storage of the initial state vector
         self.xstate_init = None
         
+        #: A storage of the initial valves vector
+        
+        
         if isinstance(stateVariables,(list,tuple)):
             self.stateVariables=list(stateVariables)
         else:
@@ -198,6 +201,7 @@ class PDSimCore(object):
             setcol(self.p, i, exists_indices, self.p_)
         if hasattr(self,'h_') and len(self.h_) == len(exists_indices):
             setcol(self.h, i, exists_indices, self.h_)
+        if hasattr(self,'Q_') and len(self.Q_) == len(exists_indices):            
             setcol(self.Q, i, exists_indices, self.Q_)
     
     def __postprocess_flows(self):
@@ -249,8 +253,10 @@ class PDSimCore(object):
 
         for key in keys:
             # Empty container numpy arrays
-            self.FlowsProcessed.summed_mdot[key]=np.zeros((self.Itheta,))
-            self.FlowsProcessed.summed_mdoth[key]=np.zeros((self.Itheta,))
+            self.FlowsProcessed.summed_mdot[key]=np.zeros((self.Ntheta,))
+            self.FlowsProcessed.summed_mdoth[key]=np.zeros((self.Ntheta,))
+            
+            assert self.Ntheta == len(self.FlowStorage)
             for i in range(self.Ntheta):
                 mdot,mdoth=sum_flows(key,self.FlowStorage[i])
                 self.FlowsProcessed.summed_mdot[key][i]=mdot
@@ -298,6 +304,9 @@ class PDSimCore(object):
             self.HTProcessed.summed_Q[i] = np.sum(_Q[:, i])
         self.HTProcessed.mean_Q = trapz(self.HTProcessed.summed_Q[r], self.t[r])/(self.t[self.Ntheta-1]-self.t[0])
     
+    def isentropic_outlet_temp(self, inletState, p_outlet):
+        return Props('T','S',inletState.s,'P',p_outlet,inletState.Fluid)
+    
     def reset_initial_state(self):
         
         for k,CV in self.CVs.iteritems():
@@ -308,7 +317,10 @@ class PDSimCore(object):
 
         self.CVs.rebuild_exists()
         self.x_state = self.xstate_init
-        self.__put_to_matrices(self.xstate_init, 0)
+        x = listm(self.xstate_init)
+        if self.__hasValves__:
+            x.extend([0.0]*len(self.Valves)*2)
+        self.__put_to_matrices(x, 0)
         #Reset the temporary variables
         self.xstate_init = None
         self.exists_CV_init = None
@@ -450,7 +462,7 @@ class PDSimCore(object):
         Parameters
         ----------
         N : integer
-            Number of steps
+            Number of steps taken.  There will be N+1 entries in the state matrices
         x_state : listm
             The initial values of the variables (only the state variables)
         tmin : float, optional
@@ -477,14 +489,14 @@ class PDSimCore(object):
         
         #Step variables
         t0=tmin
-        h=(tmax-tmin)/(N-1)
+        h=(tmax-tmin)/(N)
         
         #Get the beginning of the cycle configured
         x_state.extend([0.0]*len(self.Valves)*2)
         xold = listm(x_state[:])
         self.__put_to_matrices(xold, 0)
         
-        for Itheta in range(N-1):
+        for Itheta in range(N):
             
             #Call the step callback if provided
             if step_callback is not None:
@@ -508,15 +520,30 @@ class PDSimCore(object):
             xold = xnew
             
         #Run this at the end at index N-1
-        self.t[N-1]=2*pi
-        self.derivs(tmax, xnew, heat_transfer_callback, valves_callback)
-        self.__put_to_matrices(xnew, N-1)
+        #Run this at the end
+        V,dV=self.CVs.volumes(t0)
+        #Stored at the old value
+        self.t[N]=t0
+        
+        self.__put_to_matrices(xnew, N)
+        
+        #ensure you end up at the right place
+        assert abs(t0-tmax)<1e-10
+        
+        self.derivs(t0,xold,heat_transfer_callback,valves_callback)
         self.FlowStorage.append(self.Flows.get_deepcopy())
         
-        # last index is Itheta, number of steps is Itheta+1
-        print 'Itheta steps taken', N
+        if sorted(self.stateVariables) == ['D','T']:
+            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+        elif sorted(self.stateVariables) == ['M','T']:
+            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
+        else:
+            raise NotImplementedError
+        
+        # last index is Itheta, number of entries in FlowStorage is Ntheta
+        print 'Number of steps taken', N
         self.Itheta = N
-        self.Ntheta = N
+        self.Ntheta = N+1
         self.__post_cycle()
         
     def cycle_Heun(self,N,x_state, tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
@@ -526,7 +553,7 @@ class PDSimCore(object):
         Parameters
         ----------
         N : integer
-            Number of steps
+            Number of steps to take (N+1 entries in the state vars matrices)
         x_state : listm
             The initial values of the variables (only the state variables)
         tmin : float
@@ -554,14 +581,11 @@ class PDSimCore(object):
         #Start at an index of 0
         Itheta=0
         t0=tmin
-        h=(tmax-tmin)/(N-1)
+        h=(tmax-tmin)/(N)
         
-         #One call to build the flows at start
+        #Get the beginning of the cycle configured
         x_state.extend([0.0]*len(self.Valves)*2)
         xold = listm(x_state[:])
-        self.theta=t0
-        self.derivs(t0, xold, heat_transfer_callback, valves_callback)
-        self.FlowStorage.append(self.Flows.get_deepcopy())
         self.__put_to_matrices(xold, 0)
     
         for Itheta in range(N):
@@ -574,24 +598,38 @@ class PDSimCore(object):
             f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
             xtemp=xold+h*f1
             
+            #Stored at the starting value of the step
+            self.t[Itheta]=t0+h
+            self.__put_to_matrices(xold,Itheta)
+            self.FlowStorage.append(self.Flows.get_deepcopy())
+            
             #Step 2: Evaluated at predicted step
             f2=self.derivs(t0+h,xtemp,heat_transfer_callback,valves_callback)
             xnew = xold + h/2.0*(f1 + f2)
             
-            self.t[Itheta+1]=t0+h
-            self.__put_to_matrices(xnew,Itheta+1)
             t0+=h
-            Itheta+=1
-            self.FlowStorage.append(self.Flows.get_deepcopy())
+            xold = xnew
             
+        #ensure you end up at the right place
+        assert abs(t0-tmax)<1e-10
+        
         #Run this at the end
         V,dV=self.CVs.volumes(t0)
-        self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+        #Stored at the old value
+        self.t[N]=t0
+        self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+        self.__put_to_matrices(xnew,N)
+        self.FlowStorage.append(self.Flows.get_deepcopy())
+        if sorted(self.stateVariables) == ['D','T']:
+            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+        elif sorted(self.stateVariables) == ['M','T']:
+            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
+        else:
+            raise NotImplementedError
         
-        # last index is Itheta, number of steps is Itheta+1
-        print 'Itheta steps taken',Itheta+1
-        self.Itheta = Itheta
-        self.Ntheta = N
+        print 'Number of steps taken', N,'len(FlowStorage)',len(self.FlowStorage)
+        self.Itheta = N
+        self.Ntheta = N+1
         self.__post_cycle()
         return
         
@@ -677,12 +715,10 @@ class PDSimCore(object):
         gamma5=-9.0/50.0
         gamma6=2.0/55.0
         
-        
-         #Get the beginning of the cycle configured
+        #Get the beginning of the cycle configured
         x_state.extend([0.0]*len(self.Valves)*2)
         xold = listm(x_state[:])
         self.__put_to_matrices(xold, 0)
-        
         
         #t is the independent variable here, where t takes on values in the bounded range [tmin,tmax]
         while (t0<tmax):
@@ -782,10 +818,17 @@ class PDSimCore(object):
                         stepAccepted = True
                 else:
                     stepAccepted = True
-            
-            #Store at the current index (first run at index 0)
+                
+            #This block is for saving of values
+            #
+            #Store crank angle at the current index (first run at Itheta=0)
             self.t[Itheta] = t0
+            # Re-evaluate derivs at the starting value for the step in order 
+            # to use the correct values in the storage containers
+            self.derivs(t0, xold, heat_transfer_callback, valves_callback)
+            # Store the values for volumes and state vars in the matrices
             self.__put_to_matrices(xold, Itheta)
+            # Store the flows for the beginning of the step
             self.FlowStorage.append(self.Flows.get_deepcopy())
             
             t0+=h
@@ -798,14 +841,30 @@ class PDSimCore(object):
                 #Take a bigger step next time, since eps_allowed>max_error
                 h *= step_relax*(eps_allowed/max_error)**(0.2)
 #                print h, eps_allowed, max_error
-        #Run this at the end
+        
+        #Run this at the end of the rotation
         V,dV=self.CVs.volumes(t0)
-        self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+        #Store crank angle at the last index (first run at Itheta=0)
+        self.t[Itheta] = t0
+        # Re-evaluate derivs at the starting value for the step in order 
+        # to use the correct values in the storage containers
+        self.derivs(t0, xold, heat_transfer_callback, valves_callback)
+        # Store the values for volumes and state vars in the matrices
+        self.__put_to_matrices(xold, Itheta)
+        # Store the flows for the end
+        self.FlowStorage.append(self.Flows.get_deepcopy())
+
+        if sorted(self.stateVariables) == ['D','T']:
+            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+        elif sorted(self.stateVariables) == ['M','T']:
+            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
+        else:
+            raise NotImplementedError
         
         # last index is Itheta, number of steps is Itheta+1
         print 'Itheta steps taken', Itheta+1
         self.Itheta=Itheta
-        self.Ntheta = Itheta
+        self.Ntheta = Itheta+1
         self.__post_cycle()
         
     def __calc_boundary_work(self):
@@ -865,11 +924,6 @@ class PDSimCore(object):
             t = self.t[0:self.Ntheta]
             y0 = self.p[CVindex, 0:self.Ntheta]
             x0 = self.V[CVindex, 0:self.Ntheta]
-            
-#            if np.any(np.isnan(y0)):
-#                import pylab
-#                pylab.plot(x0,y0)
-#                pylab.show()
                 
             x0, y0 = delimit_vector(x0, y0)
             
@@ -922,10 +976,7 @@ class PDSimCore(object):
         
         #Run it with OneCycle turned on
         kwargs['OneCycle'] = True
-#        Scroll_copy = loads(dumps(self,-1))
-#        Scroll_copy.solve(**kwargs)
         self.solve(**kwargs)
-        
         
         for key, State in self.Tubes.Nodes.iteritems():
             if key == self.key_inlet:
@@ -1013,8 +1064,7 @@ class PDSimCore(object):
             Number of conventional steps to be taken when not using newton-raphson prior to entering into a line search
         """
         
-        if x0 is None:
-            x0 = [340, 360]
+        
         # Set up a pipe for accepting a value of True which will abort the run
         # Typically used from the GUI
         self.pipe_abort = pipe_abort
@@ -1048,7 +1098,10 @@ class PDSimCore(object):
             #x_state only includes the values for the chambers, the valves start closed
             #Since indexed, yields a copy
             self.x_state = self.__get_from_matrices(0)[0:len(self.stateVariables)*self.CVs.N]
-            
+        
+        if x0 is None:
+            x0 = [self.Tubes.Nodes[key_outlet].T, self.Tubes.Nodes[key_outlet].T]
+                
         def OBJECTIVE_ENERGY_BALANCE(Td_Tlumps):
             print Td_Tlumps,'Td,Tlumps inputs'
             # Td_Tlumps is a list (or listm or np.ndarray)
@@ -1072,10 +1125,10 @@ class PDSimCore(object):
                 if self.xstate_init is None:
                     self.xstate_init = x_state
                     self.exists_CV_init = self.CVs.exists_keys
+                    
                 #Convert numpy array to listm
                 x_state = listm(x_state)
                 print 'x_state is', x_state
-                
                 
                 t1 = clock()
                 if solver_method == 'Euler':
@@ -1106,7 +1159,7 @@ class PDSimCore(object):
                                     valves_callback=valves_callback,
                                     **kwargs)
                 else:
-                    raise AttributeError
+                    raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
                 t2 = clock()
                 print 'Elapsed time for cycle is {0:g} s'.format(t2-t1)
                 
@@ -1292,6 +1345,7 @@ class PDSimCore(object):
         self.Wdot = self.mdot*(h2-h1)-self.Qamb
         
         #Resize all the matrices to keep only the real data
+        print 'Ntheta is', self.Ntheta
         self.t = self.t[  0:self.Ntheta]
         self.T = self.T[:,0:self.Ntheta]
         self.p = self.p[:,0:self.Ntheta]
@@ -1461,7 +1515,7 @@ class PDSimCore(object):
             ``True`` if cycle should be run again with updated inputs, ``False`` otherwise.
             A return value of ``True`` means that convergence of the cycle has been achieved
         """
-        
+        assert self.Ntheta - 1 == self.Itheta
         #old and new CV keys
         LHS,RHS=[],[]
         errorT,error_rho,error_mass,newT,new_rho,new_mass,oldT,old_rho,old_mass={},{},{},{},{},{},{},{},{}
@@ -1485,16 +1539,15 @@ class PDSimCore(object):
                 oldT[newkey]=self.T[Inew, 0]
                 old_rho[newkey]=self.rho[Inew, 0]
                 #What they are at the end of the rotation
-                newT[newkey]=self.T[Iold,self.Itheta-1]
-                new_rho[newkey]=self.rho[Iold,self.Itheta-1]
+                newT[newkey]=self.T[Iold,self.Itheta]
+                new_rho[newkey]=self.rho[Iold,self.Itheta]
                 
                 errorT[newkey]=(oldT[newkey]-newT[newkey])/newT[newkey]
                 error_rho[newkey]=(old_rho[newkey]-new_rho[newkey])/new_rho[newkey]
                 #Update the list of keys for setting the exist flags
                 LHS.append(key)
                 RHS.append(newkey)
-                
-            
+        
         error_T_list = [errorT[key] for key in self.CVs.keys() if key in newT]
         error_rho_list = [error_rho[key] for key in self.CVs.keys() if key in new_rho]
         
@@ -1538,7 +1591,7 @@ class PDSimCore(object):
                 new_list += new_mass_list
             else:
                 raise KeyError
-        
+    
         return error_list, new_list
     
 if __name__=='__main__':

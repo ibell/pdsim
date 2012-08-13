@@ -245,6 +245,148 @@ class PDPanel(wx.Panel):
             
         return d,desc
     
+class ChangeParamsDialog(wx.Dialog):
+    def __init__(self, params, **kwargs):
+        wx.Dialog.__init__(self, None, **kwargs)
+    
+        self.params = params
+        sizer = wx.FlexGridSizer(cols = 2)
+        self.labels = []
+        self.values = []
+        self.attrs = []
+    
+        for p in self.params:
+            l, v = LabeledItem(self,
+                               label = p['desc'],
+                               value = str(p['value'])
+                               )
+            self.labels.append(l)
+            self.values.append(v)
+            self.attrs.append(p['attr'])
+            
+            sizer.AddMany([l,v])
+            
+        self.SetSizer(sizer)
+        min_width = min([l.GetSize()[0] for l in self.labels])
+        for l in self.labels:
+            l.SetMinSize((min_width,-1))
+        sizer.Layout()
+        self.Fit()
+        
+         #Bind a key-press event to all objects to get Esc 
+        children = self.GetChildren()
+        for child in children:
+            child.Bind(wx.EVT_KEY_UP,  self.OnKeyPress)
+    
+    def get_values(self):
+        params = []
+        for l,v,k in zip(self.labels, self.values, self.attrs):
+            params += [dict(desc = l.GetLabel(),
+                           attr = k,
+                           value = float(v.GetValue())
+                        )]
+        return params
+            
+    def OnAccept(self, event = None):
+        self.EndModal(wx.ID_OK)
+        
+    def OnKeyPress(self,event = None):
+        """ cancel if Escape key is pressed or accept if Enter """
+        event.Skip()
+        if event.GetKeyCode() == wx.WXK_ESCAPE:
+            self.EndModal(wx.ID_CANCEL)
+        elif event.GetKeyCode() == wx.WXK_RETURN:
+            self.EndModal(wx.ID_OK)
+    
+    def CancelValues(self, event = None):
+        self.EndModal(wx.ID_CANCEL)
+            
+class MassFlowOption(wx.Panel):
+    def __init__(self,
+                 parent,
+                 key1, 
+                 key2,
+                 label = 'NONE',
+                 types = None,
+                 ):
+        """
+        A wx.Panel for selecting the flow model and associated parameters
+        
+        Should not be instantiated directly, rather subclassed in order to provide the list of dictionaries
+        of flow models for a given type of machine
+        """
+        wx.Panel.__init__(self, parent)
+        
+        self.key1 = key1
+        self.key2 = key2
+        
+        options = self.model_options()
+        
+        self.label = wx.StaticText(self, label=label)
+        self.choices = wx.ComboBox(self)
+        
+        for option in options:
+            self.choices.Append(option['desc'])
+        self.choices.SetSelection(0)
+        self.choices.SetEditable(False)
+        self.options_list = options
+        
+        self.params = wx.Button(self, label='Params...')
+        if not 'params' in option or not option['params']:
+            self.params.Enable(False)
+            
+        else:
+            TTS = self.dict_to_tooltip_string(option['params'])
+            self.params.SetToolTipString(TTS)
+            self.params_dict = option['params']
+            
+            self.params.Bind(wx.EVT_BUTTON, self.OnChangeParams)
+        
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.Add(self.label)
+        sizer.Add(self.choices)
+        sizer.Add(self.params)
+        self.SetSizer(sizer)
+        sizer.Layout()
+    
+    def OnChangeParams(self, event):
+        """
+        Open a dialog to change the values
+        """
+        dlg = ChangeParamsDialog(self.params_dict)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.params_dict = dlg.get_values()
+            TTS = self.dict_to_tooltip_string(self.params_dict)
+            self.params.SetToolTipString(TTS)
+        dlg.Destroy()
+        
+    def dict_to_tooltip_string(self, params):
+        s = ''
+        for param in params:
+            s += param['desc'] + ': ' + str(param['value']) + '\n'
+        return s
+    
+    def get_function_name(self):
+        for option in self.options_list:
+            if option['desc'] == self.choices.GetStringSelection():
+                return option['function_name']
+        raise AttributeError
+        
+    def model_options(self):
+        """
+        This function should return a list of dictionaries.  
+        In each dictionary, the following terms must be defined:
+        
+        * desc : string
+            Very terse description of the term 
+        * function_name : function
+            the function in the main machine class to be called
+        * params : list of dictionaries
+        
+        MUST be implemented in the sub-class
+        """
+        raise NotImplementedError
+    
 class ParaSelectDialog(wx.Dialog):
     def __init__(self):
         wx.Dialog.__init__(self, None, title = "State Chooser",)
@@ -722,61 +864,6 @@ class StatePanel(wx.Panel):
             self.rho.SetValue(str(rho))
         SCfrm.Destroy()
 
-class InjectionViewerDialog(wx.Dialog):
-    def __init__(self, geo, phi):
-        wx.Dialog.__init__(self, parent = None)
-        
-        PP = PlotPanel(self)
-        PP.ax = PP.figure.add_axes((0,0,1,1))
-        scroll_geo.plot_injection_ports(0,geo,phi,PP.ax)
-        
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(PP)
-        sizer.Layout()
-        
-class InjectionElementPanel(wx.Panel):
-    """
-    A panel with the injection values for one injection port
-    """
-    def __init__(self, parent):
-        wx.Panel.__init__(self,parent)
-        
-        state = StatePanel(self)
-        self.Llabel,self.Lval = LabeledItem(self, label='Length of injection line',value='1.0')
-        self.IDlabel,self.IDval = LabeledItem(self, label='Inner diameter of injection line',value='0.01')
-        self.philabel,self.phival = LabeledItem(self, label='Involute angle',value='3.14159')
-        self.btn = wx.Button(self, label='View')
-        self.btn.Bind(wx.EVT_BUTTON, self.OnView)
-        
-        sizer = wx.FlexGridSizer(cols = 3)
-        sizer.AddMany([self.Llabel,self.Lval])
-        sizer.AddSpacer(10)
-        sizer.AddMany([self.IDlabel,self.IDval])
-        sizer.AddSpacer(10)
-        sizer.AddMany([self.philabel,self.phival])
-        sizer.Add(self.btn)
-        sizer.Add(state)
-        sizer.Layout()
-        
-    def OnView(self, event):
-        geo = self.GetTopLevelParent().MTB.InputsTB.panels[0].Scroll.geo
-        dlg = InjectionViewerDialog(geo,float(self.phival.GetValue()))
-        dlg.ShowModal()
-        
-class InjectionInputsPanel(PDPanel):
-    """
-    The container panel for all the injection ports and injection data 
-    """ 
-    def __init__(self, parent):
-        PDPanel.__init__(self,parent)
-        
-        self.InjectionElement = InjectionElementPanel(self)
-        
-        sizer = wx.FlexGridSizer(cols = 2)
-        sizer.Add(self.InjectionElement)
-        sizer.Layout()
-        
-            
 class StateInputsPanel(PDPanel):
     
     def __init__(self, parent, configfile,**kwargs):
@@ -858,3 +945,58 @@ class StateInputsPanel(PDPanel):
         StateString = 'inletState = State,'+State_.Fluid+','+str(State_.T)+','+str(State_.rho)
         DischargeString = 'discharge = Discharge,'+str(self.DischargeValue.GetValue())+','+self.cmbDischarge.GetStringSelection()
         return StateString+'\n'+DischargeString+'\n'
+
+
+class InjectionViewerDialog(wx.Dialog):
+    def __init__(self, geo, phi):
+        wx.Dialog.__init__(self, parent = None)
+        
+        PP = PlotPanel(self)
+        PP.ax = PP.figure.add_axes((0,0,1,1))
+        scroll_geo.plot_injection_ports(0,geo,phi,PP.ax)
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(PP)
+        sizer.Layout()
+        
+class InjectionElementPanel(wx.Panel):
+    """
+    A panel with the injection values for one injection port
+    """
+    def __init__(self, parent):
+        wx.Panel.__init__(self,parent)
+        
+        self.state = StatePanel(self)
+        self.Llabel,self.Lval = LabeledItem(self, label='Length of injection line',value='1.0')
+        self.IDlabel,self.IDval = LabeledItem(self, label='Inner diameter of injection line',value='0.01')
+        self.philabel,self.phival = LabeledItem(self, label='Involute angle',value='3.14159')
+        self.btn = wx.Button(self, label='View')
+        self.btn.Bind(wx.EVT_BUTTON, self.OnView)
+        
+        sizer = wx.FlexGridSizer(cols = 3)
+        sizer.AddMany([self.Llabel,self.Lval])
+        sizer.AddSpacer(10)
+        sizer.AddMany([self.IDlabel,self.IDval])
+        sizer.AddSpacer(10)
+        sizer.AddMany([self.philabel,self.phival])
+        sizer.Add(self.btn)
+        sizer.Add(self.state)
+        sizer.Layout()
+        
+    def OnView(self, event):
+        geo = self.GetTopLevelParent().MTB.InputsTB.panels[0].Scroll.geo
+        dlg = InjectionViewerDialog(geo,float(self.phival.GetValue()))
+        dlg.ShowModal()
+        
+class InjectionInputsPanel(PDPanel):
+    """
+    The container panel for all the injection ports and injection data 
+    """ 
+    def __init__(self, parent):
+        PDPanel.__init__(self,parent)
+        
+        self.InjectionElement = InjectionElementPanel(self)
+        
+        sizer = wx.FlexGridSizer(cols = 2)
+        sizer.Add(self.InjectionElement)
+        sizer.Layout()

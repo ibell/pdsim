@@ -8,6 +8,9 @@ import matplotlib as mpl
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as WXCanvas
 from matplotlib.backends.backend_wxagg import NavigationToolbar2Wx as WXToolbar
 from PDSim.scroll.plots import plotScrollSet, ScrollAnimForm
+from PDSim.flow.flow import FlowPath
+from PDSim.core.core import Tube
+from CoolProp import State as CPState
 
 LabeledItem = pdsim_panels.LabeledItem
 
@@ -174,7 +177,57 @@ class GeometryPanel(pdsim_panels.PDPanel):
         scroll.geo.delta_flank = float(self.delta_flank.GetValue())
         scroll.geo.delta_radial = float(self.delta_radial.GetValue())
         
+class FlankLeakageFlowChoice(pdsim_panels.MassFlowOption):
+    
+    def __init__(self,parent,**kwargs):
+        pdsim_panels.MassFlowOption.__init__(self,parent,**kwargs)
+    
+    def model_options(self):
+        return [
+                dict(desc = 'Hybrid leakage model',
+                     function_name = 'FlankLeakage',)
+                ]
         
+class RadialLeakageFlowChoice(pdsim_panels.MassFlowOption):
+    
+    def __init__(self,parent,**kwargs):
+        pdsim_panels.MassFlowOption.__init__(self,parent,**kwargs)
+    
+    def model_options(self):
+        return [
+                dict(desc = 'Hybrid leakage model',function_name = 'RadialLeakage')
+                ]
+
+class SuctionFlowChoice(pdsim_panels.MassFlowOption):
+    
+    def __init__(self,parent,**kwargs):
+        pdsim_panels.MassFlowOption.__init__(self,parent,**kwargs)
+    
+    def model_options(self):
+        return [
+                dict(desc = 'Isentropic nozzle',
+                     function_name = 'SA_S',
+                     params = [dict(attr = 'X_d',
+                                    value = 0.3,
+                                    desc = 'Tuning factor')]
+                     )
+                ]
+                
+class InletFlowChoice(pdsim_panels.MassFlowOption):
+    
+    def __init__(self,parent,**kwargs):
+        pdsim_panels.MassFlowOption.__init__(self,parent,**kwargs)
+        
+    def model_options(self):
+        return [
+                dict(desc = 'Isentropic nozzle',
+                     function_name = 'Inlet_sa',
+                     params = [dict(attr = 'X_d',
+                                    value = 0.3,
+                                    desc = 'Tuning factor')]
+                     )
+                ]
+                
 class MassFlowPanel(pdsim_panels.PDPanel):
     
     def __init__(self, parent, configfile,**kwargs):
@@ -187,6 +240,10 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         self.items1 = [
         dict(attr='d_discharge'),
         dict(attr='d_suction'),
+        dict(attr='inlet_tube_length'),
+        dict(attr='inlet_tube_ID'),
+        dict(attr='outlet_tube_length'),
+        dict(attr='outlet_tube_ID')
         ]
         box_sizer = wx.BoxSizer(wx.VERTICAL)
         box_sizer.Add(wx.StaticText(self,-1,"Required Inputs"))
@@ -195,13 +252,97 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
         self.ConstructItems(self.items1,sizer,self.configdict,self.descdict)
 
-        box_sizer.Add(sizer)        
+        box_sizer.Add(sizer)  
+        
+        box_sizer.AddSpacer(10)
+        box_sizer.Add(wx.StaticText(self,-1,"Flow Models"))
+        box_sizer.Add(wx.StaticLine(self,-1,(25, 50), (300,1)))
+#        self.flankflow = FlankLeakageFlowChoice(parent = self,
+#                                           label = 'Flank leakage')
+#        self.radialflow = RadialLeakageFlowChoice(parent = self,
+#                                           label = 'Radial leakage')
+        self.suctionflow1 = SuctionFlowChoice(parent = self,
+                                              key1 = 'sa',
+                                              key2 = 's1',
+                                              label = 'Flow to suction chamber #1')
+        self.suctionflow2 = SuctionFlowChoice(parent = self,
+                                              key1 = 'sa',
+                                              key2 = 's2',
+                                              label = 'Flow to suction chamber #2')    
+        self.inletflow = InletFlowChoice(parent = self,
+                                         key1 = 'inlet.2',
+                                         key2 = 'sa',
+                                         label = 'Flow into shell',
+                                         )
+        
+        self.flows = [self.suctionflow1, self.suctionflow2, self.inletflow]
+#        self.flows = [self.flankflow,self.radialflow,self.suctionflow,self.inletflow]
+        
+        box_sizer.AddMany(self.flows)
+        
+        self.resize_flows(self.flows)
         
         self.SetSizer(box_sizer)
         box_sizer.Layout()
         
         self.items=self.items1
-
+        
+    def resize_flows(self, flows):
+        min_width = max([flow.label.GetSize()[0] for flow in flows])
+        for flow in flows:
+            flow.label.SetMinSize((min_width,-1))
+            
+    def post_set_params(self, simulation):
+        #Create and add each of the flow paths
+        for flow in self.flows:
+            func_name = flow.get_function_name()
+            func = getattr(simulation, func_name)
+            
+            param_dict = {p['attr']:p['value'] for p in flow.params_dict}
+            simulation.add_flow(FlowPath(key1 = flow.key1,
+                                         key2 = flow.key2,
+                                         MdotFcn = func,
+                                         MdotFcn_kwargs = param_dict)
+                                )
+            
+        if callable(simulation.Vdisp):
+            Vdisp = simulation.Vdisp()
+        else:
+            Vdisp = simulation.Vdisp
+        
+        #Set omega and inlet state 
+        parent = self.GetParent() #InputsToolBook
+        for child in parent.GetChildren():
+            if hasattr(child,'Name') and child.Name == 'StatePanel':
+                child.set_params(simulation)
+                child.post_set_params(simulation)
+                        
+        Vdot = Vdisp*simulation.omega/(2*pi)
+        
+        outletState=CPState.State(simulation.inletState.Fluid,{'T':400,'P':simulation.discharge_pressure})
+        
+        simulation.auto_add_leakage(flankFunc = simulation.FlankLeakage, 
+                                    radialFunc = simulation.RadialLeakage)
+            
+        #Create and add each of the inlet and outlet tubes
+        simulation.add_tube( Tube(key1='inlet.1',
+                                  key2='inlet.2',
+                                  L=simulation.inlet_tube_length, 
+                                  ID=simulation.inlet_tube_ID,
+                                  mdot=simulation.inletState.copy().rho*Vdot, 
+                                  State1=simulation.inletState.copy(),
+                                  fixed=1, 
+                                  TubeFcn=simulation.TubeCode) )
+    
+        simulation.add_tube( Tube(key1='outlet.1',
+                                  key2='outlet.2',
+                                  L=simulation.outlet_tube_length,
+                                  ID=simulation.outlet_tube_ID,
+                                  mdot=outletState.copy().rho*Vdot, 
+                                  State2=outletState.copy(),
+                                  fixed=2,
+                                  TubeFcn=simulation.TubeCode) )
+        
         
 class MechanicalLossesPanel(pdsim_panels.PDPanel):
     
