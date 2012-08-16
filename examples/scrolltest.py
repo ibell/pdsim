@@ -30,10 +30,10 @@ import numpy as np
 from matplotlib import pyplot as plt
 import time
 
-Injection = False
+Injection = True
 
 def Compressor(f = None):
-    
+    global Injection
     ScrollComp=Scroll()
     #This runs if the module code is run directly
     ScrollComp.set_scroll_geo(104.8e-6, 2.2, 0.004, 0.005) #Set the scroll wrap geometry
@@ -72,16 +72,20 @@ def Compressor(f = None):
         
     Ref='R404A'
     
-#    Te = -10 + 273.15
-#    Tc =  43 + 273.15
-#    Tin = Tc + 20
-#    pe = CP.Props('P','T',Te,'Q',1.0,Ref)
-#    pc = CP.Props('P','T',Tc,'Q',1.0,Ref)
-#    inletState = State.State(Ref,{'T':Tin,'P':pe})
-#    outletState = State.State(Ref,{'T':400,'P':pc})
+    Te = -10 + 273.15
+    Tc =  43 + 273.15
+    Tin = Tc + 20
+    DT_sc = 7
+    pe = CP.Props('P','T',Te,'Q',1.0,Ref)
+    pc = CP.Props('P','T',Tc,'Q',1.0,Ref)
+    inletState = State.State(Ref,{'T':Tin,'P':pe})
+    T2s = ScrollComp.isentropic_outlet_temp(inletState,pc)
+    outletState = State.State(Ref,{'T':T2s,'P':pc})
     
-    inletState = State.State(Ref,{'T':300.0,'P':300.0})
-    outletState = State.State(Ref,{'T':400.0,'P':1200.0})    
+#    inletState = State.State(Ref,{'T':300.0,'P':300.0})
+#    p_outlet = inletState.p*4.0
+#    T2s = ScrollComp.isentropic_outlet_temp(inletState,p_outlet)
+#    outletState = State.State(Ref,{'T':T2s,'P':p_outlet})    
     
     mdot_guess = inletState.rho*ScrollComp.Vdisp*ScrollComp.omega/(2*pi)
     
@@ -95,7 +99,6 @@ def Compressor(f = None):
     if Injection:
         phi = ScrollComp.geo.phi_oe-pi-2*pi+0.01
         #Tube is a meter long with ID of 0.01 m
-        f = 0.7
         p = f*outletState.p+(1-f)*inletState.p
         Tsat = CP.Props('T', 'P', p, 'Q', 1.0, Ref)
         T = Tsat + 3.0
@@ -111,8 +114,8 @@ def Compressor(f = None):
                           )
     
     ScrollComp.auto_add_CVs(inletState, outletState)
-#    ScrollComp.auto_add_leakage(flankFunc = ScrollComp.FlankLeakage, 
-#                                radialFunc = ScrollComp.RadialLeakage)
+    ScrollComp.auto_add_leakage(flankFunc = ScrollComp.FlankLeakage, 
+                                radialFunc = ScrollComp.RadialLeakage)
     
     ScrollComp.add_flow(FlowPath(key1='inlet.2', 
                                  key2='sa', 
@@ -188,8 +191,16 @@ def Compressor(f = None):
     
     if Injection:
         print ScrollComp.FlowsProcessed.mean_mdot
+        ha = CP.Props('H','T',Tc-DT_sc,'P',pc,'R404A')
+        hb = CP.Props('H','T',Tsat,'Q',0.0,'R404A')
+        hc = CP.Props('H','T',Tsat,'Q',1.0,'R404A')
         
+        ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
+        print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
+    
     debug_plots(ScrollComp)
+    
+    return ScrollComp
     
 if __name__=='__main__':
         
@@ -201,8 +212,14 @@ if __name__=='__main__':
         profiler.print_stats()
     else:
         if Injection:
-            for f in [0.6,0.65,0.7,0.75,0.8]:
-                Compressor(f)
+            Compressor(0.3)
+            FP = open('results.csv','w')
+            for f in np.linspace(0.2,0.8,5):
+                S = Compressor(f)
+                x_sim = str(S.FlowsProcessed.mean_mdot['injection.1']/S.FlowsProcessed.mean_mdot['inlet.1']) 
+                x_cycle = str(S.injection_massflow_ratio)
+                FP.write('f, '+str(f)+','+str(S.FlowsProcessed.mean_mdot['injection.1'])+','+str(S.FlowsProcessed.mean_mdot['inlet.1'])+','+x_sim+','+x_cycle+'\n')
+            FP.close()       
         else:
             Compressor()
 

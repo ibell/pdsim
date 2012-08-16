@@ -633,7 +633,6 @@ class Scroll(PDSimCore, _Scroll):
             #Take a step almost up to the discharge angle
             disable=True
             h=self.theta_d-t-1e-10
-            print 'theta_d', self.theta_d,h
             self.__before_discharge2__=True
         elif self.__before_discharge2__==True:
             #At the discharge angle
@@ -779,7 +778,7 @@ class Scroll(PDSimCore, _Scroll):
                                                 T_wall=self.Tlumps[0])
         
     def InjectionTubeFM(self,FlowPath,**kwargs):
-        FlowPath.A=pi*0.005**2/4.0
+        FlowPath.A=pi*0.02**2/4.0
         try:
             return flow_models.IsentropicNozzle(FlowPath.A,
                                                 FlowPath.State_up,
@@ -1008,7 +1007,7 @@ class Scroll(PDSimCore, _Scroll):
             return 0.0
         #3. Find the distance of the scroll from the point on the involute
         #   where the port is tangent
-        FlowPath.A = pi*0.005**2/4.0
+        FlowPath.A = pi*(self.geo.t)**2/4.0
         try:
             mdot = flow_models.IsentropicNozzle(FlowPath.A,
                                                 FlowPath.State_up,

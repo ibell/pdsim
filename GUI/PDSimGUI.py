@@ -375,7 +375,31 @@ class InputsToolBook(wx.Toolbook):
         items = [] 
         for panel in self.panels:
             items += panel.items
+            more_items = panel.get_additional_parametric_terms()
+            if more_items is not None:
+                items += more_items
         return items
+    
+    def apply_additional_parametric_terms(self, sim, attrs, vals, items):
+        """
+        Apply parametric terms for each panel
+        
+        Parameters
+        ----------
+        sim : The simulation instance
+        attrs : list of strings
+            Attributes that are included in the parametric table
+        vals : the values corresponding to each attr in attrs
+        items : the list of dictionaries of item data in para table
+        
+        """
+        for panel in self.panels:
+            #Collect all the additional terms that apply to the panel
+            panel_items = [item for item in items if 'parent' in item and item['parent'] == panel]
+            # Returns the remaining attrs, vals
+            attrs, vals = panel.apply_additional_parametric_terms(sim, attrs, vals, panel_items)
+        
+        return attrs, vals
     
 class IntegratorChoices(wx.Choicebook):
     def __init__(self, parent, **kwargs):

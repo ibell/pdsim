@@ -1248,10 +1248,10 @@ class PDSimCore(object):
                                 _w.append(w)
                                 _error.append(RSSE)
                                 print 'w',w,'RSSE',RSSE
-                            f = plt.figure()
-                            ax=f.add_axes((0.15,0.15,0.8,0.8))
-                            ax.plot(_w, _error)
-                            plt.show()
+#                            f = plt.figure()
+#                            ax=f.add_axes((0.15,0.15,0.8,0.8))
+#                            ax.plot(_w, _error)
+#                            plt.show()
                             i = _error.index(min(_error))
                             x_state_new = x_state_prior + _w[i]*dx
                             init_state_counter = 0

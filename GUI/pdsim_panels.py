@@ -245,6 +245,42 @@ class PDPanel(wx.Panel):
             
         return d,desc
     
+    def get_additional_parametric_terms(self):
+        """
+        Provide additional parametric terms to the parametric table builder
+        
+        This function, when implemented in the derived class, will provide 
+        additional terms to the parametric table builder.  If unimplemented, will
+        just return ``None``.
+        
+        The format of the returned list should be a list of dictionaries with
+        the terms:
+            
+            parent : a reference to this panel
+            attr : the attribute in the simulation that will be linked with this term
+            text : the label for the term
+            
+        Notes
+        -----
+        ``attr`` need not be actually the term that will ultimately be set in the simulation model
+        
+        It will be parsed by the apply_additional_parametric_term() function 
+        below
+        """
+        pass
+    
+    def apply_additional_parametric_terms(self, sim, attrs, vals, items):
+        """
+        
+        Returns
+        -------
+        list of items that were unmatched
+        
+        Raises
+        ------
+        """
+        return attrs, vals
+    
 class ChangeParamsDialog(wx.Dialog):
     def __init__(self, params, **kwargs):
         wx.Dialog.__init__(self, None, **kwargs)
@@ -591,9 +627,10 @@ class ParametricPanel(PDPanel):
         #Column index 1 is the list of parameters
         self.ParaList.GetColumn(1)
         for Irow in range(self.ParaList.GetItemCount()):
+            #Loop over all the rows that are checked
             if self.ParaList.IsChecked(Irow):
                 
-                #Build the recip or the scroll
+                #Build the recip or the scroll using the GUI parameters
                 if Main.SimType == 'recip':
                     sim = Main.build_recip()
                 elif Main.SimType == 'scroll':
@@ -601,15 +638,32 @@ class ParametricPanel(PDPanel):
                 else:
                     raise AttributeError
                     
+                vals, Names = [], []
                 for Icol in range(self.ParaList.GetColumnCount()-1):
-                    val = self.ParaList.GetStringItem(Irow, Icol)
-                    Name = self.ParaList.GetColumn(Icol+1).Text
-                    setattr(sim,self._get_attr(Name),float(val))
+                    vals.append(self.ParaList.GetStringItem(Irow, Icol))
+                    Names.append(self.ParaList.GetColumn(Icol+1).Text)
+                    
+                attrs = [self._get_attr(Name) for Name in Names]
+                
+                # Run the special handler for any additional terms that are
+                # not handled in the conventional way using self.items in the 
+                # panel.  This is meant for optional terms primarily
+                #
+                # apply_additional_parametric_terms returns a tuple of attrs, vals for the terms that were unmatched
+                attrs, vals = Main.MTB.InputsTB.apply_additional_parametric_terms(sim, attrs, vals, self.variables)
+                    
+                for val, attr in zip(vals, attrs):
+                    # Actually set it
+                    setattr(sim, attr, float(val))
                     #Run the post_set_params for all the panels
                     Main.MTB.InputsTB.post_set_params(sim)
-            #Add an index for the run so that it can be sorted properly
-            sim.run_index = Irow + 1
-            sims.append(sim)
+                
+                #Add an index for the run so that it can be sorted properly
+                sim.run_index = Irow + 1
+                #Add sim to the list
+                sims.append(sim)
+        
+        #Actually run the batch with the sims that have been built
         Main.run_batch(sims)
         
     def post_prep_for_configfile(self):
@@ -636,6 +690,10 @@ class ParametricPanel(PDPanel):
     def _get_attr(self, Name):
         """
         Returns the attribute name corresponding to the given name
+        
+        Raises
+        ------
+        ``KeyError`` if not found
         """
         for item in self.variables:
             if item['text'] == Name:
@@ -945,7 +1003,67 @@ class StateInputsPanel(PDPanel):
         StateString = 'inletState = State,'+State_.Fluid+','+str(State_.T)+','+str(State_.rho)
         DischargeString = 'discharge = Discharge,'+str(self.DischargeValue.GetValue())+','+self.cmbDischarge.GetStringSelection()
         return StateString+'\n'+DischargeString+'\n'
-
+    
+    def get_additional_parametric_terms(self):
+        return [dict(attr = 'suction_pressure',
+                     text = 'Suction pressure [kPa]',
+                     parent = self),
+                dict(attr = 'suction_sat_temp',
+                     text = 'Suction saturated temperature (dew) [K]',
+                     parent = self),
+                dict(attr = 'suction_temp',
+                     text = 'Suction temperature [K]',
+                     parent = self),
+                dict(attr = 'suction_superheat',
+                     text = 'Superheat [K]',
+                     parent = self),
+                ]
+    
+    def apply_additional_parametric_terms(self, sim, attrs, vals, panel_items):
+        panel_attrs = [panel_item['attr'] for panel_item in panel_items]
+        # First check about the suction state; if two suction related terms are 
+        # provided, use them to fix the inlet state
+        suct_params = [(par,val) for par,val in zip(attrs,vals) if par.startswith('suction')]
+        num_suct_params = len(suct_params)
+        
+        if num_suct_params>0:
+            #Unzip the parameters (List of tuples -> tuple of lists)
+            suct_attrs, suct_vals = zip(*suct_params)
+            
+        if num_suct_params == 2:
+            # Remove all the entries that correspond to the suction state - 
+            # we need them and don't want to set them in the conventional way
+            for a in suct_attrs:
+                i = attrs.index(a)
+                vals.pop(i)
+                attrs.pop(i)
+            
+            #Temperature and pressure provided
+            if 'suction_temp' in suct_attrs and 'suction_pressure' in suct_attrs:
+                suction_temp = suct_vals[suct_attrs.index('suction_temp')]
+                suction_pressure = suct_vals[suct_attrs.index('suction_pressure')]
+                sim.inletState = State(sim.inletState.Fluid, dict(T=suction_temp, P=suction_pressure))
+            #Dew temperature and superheat provided
+            elif 'suction_sat_temp' in suct_attrs and 'suction_superheat' in suct_attrs:
+                suction_sat_temp = suct_vals[suct_attrs.index('suction_sat_temp')]
+                suction_superheat = suct_vals[suct_attrs.index('suction_superheat')]
+                T = suction_sat_temp + suction_superheat
+                p = CP.Props('P','T',suction_sat_temp,'Q',1.0,sim.inletState.Fluid)
+                sim.inletState = State(sim.inletState.Fluid, dict(T=T, P=p))
+            else:
+                raise ValueError('Invalid combination of suction states: '+str(suct_attrs))
+            
+            print 'Need to update Tubes so they use this new state!!!!!'
+            print 'Need to update Tubes so they use this new state!!!!!'
+            print 'Need to update Tubes so they use this new state!!!!!'
+            print 'Need to update Tubes so they use this new state!!!!!'
+            
+        elif num_suct_params == 1:
+            raise NotImplementedError('only one param provided')
+        elif num_suct_params >2:
+            raise ValueError ('Only two inlet state parameters can be provided in parametric table')
+        
+        return attrs, vals
 
 class InjectionViewerDialog(wx.Dialog):
     def __init__(self, geo, phi):
