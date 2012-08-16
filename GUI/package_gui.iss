@@ -8,7 +8,6 @@
 AppId={{1AF0FB4A-5551-4567-8DC4-3293B6503557}
 AppName=PDSim GUI
 AppVersion=1.0
-;AppVerName=CoolProp 1.0
 AppPublisher=Bell Thermal Consultants
 AppPublisherURL=http://pdsim.sf.net
 AppSupportURL=http://pdsim.sf.net
@@ -16,7 +15,7 @@ AppUpdatesURL=http://pdsim.sf.net
 DefaultDirName={pf}\PDSim
 DefaultGroupName=PDSim
 AllowNoIcons=yes
-OutputBaseFilename=setup
+OutputBaseFilename=SetupPDSimGUI
 Compression=lzma
 SolidCompression=yes
 

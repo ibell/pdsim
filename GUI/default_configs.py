@@ -92,7 +92,7 @@ discharge = Discharge,2.0,Pressure ratio [-]
 Term1 = Term,Rotational speed [rad/s],250.0;300.0
 
 [SolverInputsPanel]
-Cycle = Cycle,Heun,7000
+Cycle = Cycle,RK45,1e-7
 
 [OutputDataPanel]
 selected  = selected,['run_index'; 'mdot'; 'eta_v'; 'eta_a']
