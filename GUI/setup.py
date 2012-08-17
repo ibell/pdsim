@@ -87,10 +87,13 @@ setup(
 # to clean up your folders or to do some particular post-compilation
 # actions.
 
-import os
-import subprocess
-subprocess.call(['upx','PDSimGUI/*.*'])
-subprocess.call(['C:\Program Files (x86)\Inno Setup 5\Compil32.exe','/cc','package_gui.iss'])
+if sys.platform.startswith('win'):
+    #Further windows packaging things
+    import subprocess
+    #Compress the files if UPX is found on the system path
+    subprocess.call(['upx','PDSimGUI/*.*'])
+    #Make an installer using InnoSetup
+    subprocess.call(['C:\Program Files (x86)\Inno Setup 5\Compil32.exe','/cc','package_gui.iss'])
 
 # And we are done. That's a setup script :-D
 

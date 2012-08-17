@@ -33,7 +33,7 @@ import pdsim_panels
 import pdsim_plugins
 import recip_panels
 import scroll_panels
-import default_configs
+import default_configs 
 
 
 class InfiniteList(object):
@@ -256,12 +256,9 @@ class RedirectedWorkerThread(Thread):
             wx.CallAfter(self.stdout_target_.WriteText, self.name+": Process is done")
             if sim is not None:
                 #Get a unique identifier for the model run for pickling purposes
-                curdir = os.path.abspath(os.curdir)
-                temp_folder = os.path.join(curdir,'_tmp_')
-                
-                # Make the temporary folder if doesn't exist
-                if not os.path.exists(temp_folder):
-                    os.mkdir(temp_folder)
+                home = os.getenv('USERPROFILE') or os.getenv('HOME')
+                temp_folder = os.path.join(home,'.pdsim-temp')
+                os.mkdir(temp_folder)
                 
                 identifier = 'PDSim recip ' + time.strftime('%Y-%m-%d-%H-%M-%S')+'_t'+self.name.split('-')[1]
                 file_path = os.path.join(temp_folder, identifier + '.mdl')
@@ -1186,7 +1183,10 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             self.rebuild()
         
     def OnLoadRuns(self, event = None):
-        FD = wx.FileDialog(None,"Load Runs",defaultDir='_tmp_',
+        home = os.getenv('USERPROFILE') or os.getenv('HOME')
+        temp_folder = os.path.join(home,'.pdsim-temp')
+        
+        FD = wx.FileDialog(None,"Load Runs",defaultDir = temp_folder,
                            wildcard = 'PDSim Runs (*.mdl)|*.mdl',
                            style=wx.FD_OPEN|wx.FD_MULTIPLE|wx.FD_FILE_MUST_EXIST)
         if wx.ID_OK == FD.ShowModal():
@@ -1442,11 +1442,6 @@ class MainFrame(wx.Frame):
         
         self.worker=None
         self.Layout() 
-        
-        if self.SimType == 'scroll':
-            dlg = wx.MessageDialog(None,"Warning: scroll compressor is not fully implemented yet.  Results are experimental")
-            dlg.ShowModal()
-            dlg.Destroy()
     
     def register_plugin(self, plugin):
         if isinstance(plugin, pdsim_plugins.PDSimPlugin):
