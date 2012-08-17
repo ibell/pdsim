@@ -617,7 +617,7 @@ class Scroll(PDSimCore, _Scroll):
         #This gets called at every step, or partial step
         self.theta=t
         
-        def IsAtMerge(eps_d1_higher=0.00005,eps_dd_higher=0.00001):
+        def IsAtMerge(eps_d1_higher=0.005,eps_dd_higher=0.00001):
             if self.CVs['d1'].State.p>self.CVs['dd'].State.p and abs(self.CVs['d1'].State.p/self.CVs['dd'].State.p-1)<eps_d1_higher:
                 print 'Merged with d1 higher'
                 return True

@@ -319,7 +319,8 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                         
         Vdot = Vdisp*simulation.omega/(2*pi)
         
-        outletState=CPState.State(simulation.inletState.Fluid,{'T':400,'P':simulation.discharge_pressure})
+        T2s = simulation.isentropic_outlet_temp(simulation.inletState, simulation.discharge_pressure)
+        outletState=CPState.State(simulation.inletState.Fluid,{'T':T2s,'P':simulation.discharge_pressure})
         
         simulation.auto_add_leakage(flankFunc = simulation.FlankLeakage, 
                                     radialFunc = simulation.RadialLeakage)

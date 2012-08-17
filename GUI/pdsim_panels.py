@@ -269,7 +269,7 @@ class PDPanel(wx.Panel):
         """
         pass
     
-    def apply_additional_parametric_terms(self, sim, attrs, vals, items):
+    def apply_additional_parametric_terms(self, attrs, vals, items):
         """
         
         Returns
@@ -630,14 +630,6 @@ class ParametricPanel(PDPanel):
             #Loop over all the rows that are checked
             if self.ParaList.IsChecked(Irow):
                 
-                #Build the recip or the scroll using the GUI parameters
-                if Main.SimType == 'recip':
-                    sim = Main.build_recip()
-                elif Main.SimType == 'scroll':
-                    sim = Main.build_scroll()
-                else:
-                    raise AttributeError
-                    
                 vals, Names = [], []
                 for Icol in range(self.ParaList.GetColumnCount()-1):
                     vals.append(self.ParaList.GetStringItem(Irow, Icol))
@@ -649,8 +641,19 @@ class ParametricPanel(PDPanel):
                 # not handled in the conventional way using self.items in the 
                 # panel.  This is meant for optional terms primarily
                 #
+                # It can set terms in the GUI so that they can be loaded back by the 
+                # simulation builder
+                #
                 # apply_additional_parametric_terms returns a tuple of attrs, vals for the terms that were unmatched
-                attrs, vals = Main.MTB.InputsTB.apply_additional_parametric_terms(sim, attrs, vals, self.variables)
+                attrs, vals = Main.MTB.InputsTB.apply_additional_parametric_terms(attrs, vals, self.variables)
+                
+                #Build the recip or the scroll using the GUI parameters
+                if Main.SimType == 'recip':
+                    sim = Main.build_recip()
+                elif Main.SimType == 'scroll':
+                    sim = Main.build_scroll()
+                else:
+                    raise AttributeError
                     
                 for val, attr in zip(vals, attrs):
                     # Actually set it
@@ -866,7 +869,6 @@ class StateChooser(wx.Dialog):
             self.rho.SetValue(str(rho))
         except ValueError:
             return
-
     
 class StatePanel(wx.Panel):
     """
@@ -898,6 +900,15 @@ class StatePanel(wx.Panel):
         T = float(self.T.GetValue())
         rho = float(self.rho.GetValue())
         return State(Fluid,dict(T=T,D=rho))
+    
+    def set_state(self,Fluid,**kwargs):
+        #Create a state instance
+        S  = State(Fluid,kwargs)
+        #Load up the textboxes
+        self.Fluid.SetValue(S.Fluid)
+        self.T.SetValue(str(S.T))
+        self.rho.SetValue(str(S.rho))
+        self.p.SetValue(str(S.p))
     
     def UseChooser(self,event=None):
         """
@@ -1019,12 +1030,19 @@ class StateInputsPanel(PDPanel):
                      parent = self),
                 ]
     
-    def apply_additional_parametric_terms(self, sim, attrs, vals, panel_items):
+    def apply_additional_parametric_terms(self, attrs, vals, panel_items):
+        """
+        Set parametric terms for the state panel based on parameters obtained
+        from the parametric table
+        """
         panel_attrs = [panel_item['attr'] for panel_item in panel_items]
         # First check about the suction state; if two suction related terms are 
         # provided, use them to fix the inlet state
         suct_params = [(par,val) for par,val in zip(attrs,vals) if par.startswith('suction')]
         num_suct_params = len(suct_params)
+        
+        #Get a copy of the state from the StatePanel
+        inletState = self.SuctionState.GetState()
         
         if num_suct_params>0:
             #Unzip the parameters (List of tuples -> tuple of lists)
@@ -1042,21 +1060,16 @@ class StateInputsPanel(PDPanel):
             if 'suction_temp' in suct_attrs and 'suction_pressure' in suct_attrs:
                 suction_temp = suct_vals[suct_attrs.index('suction_temp')]
                 suction_pressure = suct_vals[suct_attrs.index('suction_pressure')]
-                sim.inletState = State(sim.inletState.Fluid, dict(T=suction_temp, P=suction_pressure))
+                self.SuctionState.set_state(inletState.Fluid,T=suction_temp, P=suction_pressure)
             #Dew temperature and superheat provided
             elif 'suction_sat_temp' in suct_attrs and 'suction_superheat' in suct_attrs:
                 suction_sat_temp = suct_vals[suct_attrs.index('suction_sat_temp')]
                 suction_superheat = suct_vals[suct_attrs.index('suction_superheat')]
-                T = suction_sat_temp + suction_superheat
-                p = CP.Props('P','T',suction_sat_temp,'Q',1.0,sim.inletState.Fluid)
-                sim.inletState = State(sim.inletState.Fluid, dict(T=T, P=p))
+                suction_temp = suction_sat_temp + suction_superheat
+                suction_pressure = CP.Props('P','T',suction_sat_temp,'Q',1.0,inletState.Fluid)
+                self.SuctionState.set_state(inletState.Fluid,T=suction_temp, P=suction_pressure)
             else:
                 raise ValueError('Invalid combination of suction states: '+str(suct_attrs))
-            
-            print 'Need to update Tubes so they use this new state!!!!!'
-            print 'Need to update Tubes so they use this new state!!!!!'
-            print 'Need to update Tubes so they use this new state!!!!!'
-            print 'Need to update Tubes so they use this new state!!!!!'
             
         elif num_suct_params == 1:
             raise NotImplementedError('only one param provided')

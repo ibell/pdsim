@@ -10,13 +10,10 @@ Pre-Requisites
 
 Requirements:
 
-- `TortoiseGit <http://code.google.com/p/tortoisegit/>`_
-- `Python(x,y) <http://code.google.com/p/pythonxy/>`_ (Version 2.7.2.3 used here).  Under Packages, you need to ensure that you have cython, wxpython, matplotlib, nose, scipy, numpy checked, and under Other, you want SciTE, WinMerge, MinGW and SWIG.
-- `CoolProp` - see installation instructions in :ref:`CoolProp installation <install-PDSim>`
+- `TortoiseGit <http://code.google.com/p/tortoisegit/>`_ Download an installer and install
+- `Python(x,y) <http://code.google.com/p/pythonxy/>`_ (Version 2.7.2.3 used here).  Download and install the full installation.  When you go to install, you need to ensure that under Packages, you have cython, wxpython, matplotlib, nose, scipy, numpy checked, and under Other, you want SciTE, WinMerge, MinGW and SWIG.
+- `CoolProp` - see installation instructions in :ref:`CoolProp installation <install-PDSim>`.  The easiest solution is just to download and run the nightly build from http://sourceforge.net/projects/coolprop/files/CoolProp/Nightly/
 - A C++ compiler.  If you installed MinGW from Python(x,y), you are are all set. Otherwise you can get a copy of `Microsoft Visual Studio 2008 C++ Express <http://www.microsoft.com/visualstudio/en-us/products/2008-editions/express>`_ for free and it works great
-
-Optional:
-
 - `Eclipse + pydev <http://www.eclipse.org/downloads/>`_ (pick the Eclipse IDE for C/C++ development because it is the smallest) - An integrated design environment for writing Python code.  Once Eclipse is installed, you will want the Pydev plugin.  Once Eclipse is open, go to the menu Help-->Install New Software... Click *Add...* and add http://pydev.org/updates to the sources.  Then go back and you should be able to install pydev.  Don't install mylyn integration.
 
 Getting the necessary files
@@ -35,8 +32,9 @@ Saving the files is successful
     
 .. image:: page004.png
 
-You will then need to install the PDSim module files.  To do this open a command
-line prompt (Start button -> type ``cmd`` into the search box).  Change the directory to the directory where you installed the files.  If you have installed MinGW as recommened above, you can install PDSim by running::
+You will then need to install the PDSim module files.  The easiest solution is just to download a nightly build from http://sourceforge.net/projects/pdsim/files/Nightly/ (select the newest file), download and install it.
+
+If you want to install PDSim from source, open a command line prompt (Start button -> type ``cmd`` into the search box).  Change the directory to the directory where you installed the files.  If you have installed MinGW as recommended above, you can install PDSim by running::
 
     python setup.py build --compiler=mingw32 install
     
@@ -51,11 +49,34 @@ which should ultimately yield something like
 .. image:: page018.png
 
 Make sure that the last line says something like ``Writing C:\Python27\Lib\site-packages\PDSim-0.0.1-py2.7.egg-info``.  This means the files have been installed properly.
+
+Checking installed files
+------------------------
+
+If you start a command prompt and run the command ``python``, you can try to import each of the required python packages using the code below.  This will allow you to check whether all the necessary files are included, and where they have been installed to.  If none of the following commands give you errors, you are ready to proceed.
+
+.. ipython::
+
+    In [0]: import CoolProp,matplotlib,Cython,PDSim,wx,numpy,scipy
+    
+    In [0]: print CoolProp.__file__; print CoolProp.__version__
+    
+    In [0]: print matplotlib.__file__; print matplotlib.__version__
+    
+    In [0]: print Cython.__file__; print Cython.__version__
+    
+    In [0]: print PDSim.__file__; print PDSim.__version__
+    
+    In [0]: print wx.__file__; print wx.version()
+    
+    In [0]: print numpy.__file__; print numpy.__version__
+    
+    In [0]: print scipy.__file__; print scipy.__version__
     
 Running the sample files
 ------------------------
 
-You have python on your computer because you installed Python(x,y).  Assuming the installation went as expected, you should be able to just browse to the folder you installed the source files and double click on the file PURecip.py and you should get a window that looks something like this:
+You have python on your computer because you installed Python(x,y).  Assuming the installation went as expected, you should be able to just browse to the folder you installed the source files, go into the ``examples`` sub-folder and double click on the file PURecip.py and you should get a window that looks something like this:
  
 .. image:: page005.png
 
@@ -75,9 +96,25 @@ Doing this a few times allows you to see that at the end of the rotation there i
 
 .. image:: page009.png
 
-Code Development
-----------------
-If you want to use Eclipse to do development (recommended), you will need to set up a project.  So let's go ahead and do that.  First open Eclipse - you probably won't see any projects on the left side.  If you right click in the Pydev package explorer, you can go to New... --> Project...
+Code Development in Eclipse
+---------------------------
+
+Setup
+^^^^^
+The first time you start up Eclipse you may have to do a bit of configuration.  For your information, eclipse installs some files in HOME/.eclipse where HOME is the path to your home folder (``c:\Users\username`` on Windows 7)
+
+Eclipse may ask you for a default workspace folder, just select the default and tell it to remember your choice.  This is simply where it will default to create a new project, but it's not that important and I almost never make projects in the default folder anyway.
+
+Eclipse might not find your python installation by default, but is relatively straightforward to set up a new interpreter.  To check and/or set your python interpreter, go to Window->Preferences in the top menu.  Then expand pydev by clicking the arrow left to pydev and select ``Interpreter - Python``.  If you see your python interpreter there, you are all set and go to the next section.
+
+.. image:: page009a.png
+    :width: 8in
+    
+If you do not see your interpreter listed, you can try to click the ``Auto Config`` button and it will try to find python automatically and set up the paths.  Click the ok and give it a while to parse all your packages installed.
+
+Using Eclipse
+^^^^^^^^^^^^^
+Now you will need to set up a project.  So let's go ahead and do that.  First open Eclipse - you probably won't see any projects on the left side.  If you right click in the Pydev package explorer, you can go to New... --> Project...
 
 .. image:: page011.png
     :width: 8in
@@ -94,7 +131,7 @@ Don't check any of the other projects
 
 .. image:: page014.png
 
-You can then double-click PURecip.py to open it in the editor.
+You can browse to the examples folder then double-click PURecip.py to open it in the editor.
 
 .. image:: page015.png
     :width: 8in
@@ -104,4 +141,4 @@ Once you have opened PURecip.py, you need to configure pydev to run the file.  L
 .. image:: page016.png
     :width: 8in
 
-Which should run the example file.  You can also run the sample recip and scroll compressors by the same method.
+Which should run the example file.  You can also run the sample recip and scroll compressors in the same folder by the same method.

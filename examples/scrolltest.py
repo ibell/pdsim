@@ -12,7 +12,7 @@ from math import pi
 # If the following line is uncommented, python will try to use a local version
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
-sys.path.insert(0, os.path.abspath('..'))
+#sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo
@@ -30,7 +30,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import time
 
-Injection = True
+Injection = False
 
 def Compressor(f = None):
     global Injection
@@ -73,7 +73,7 @@ def Compressor(f = None):
     Ref='R404A'
     
     Te = -10 + 273.15
-    Tc =  43 + 273.15
+    Tc =  13 + 273.15
     Tin = Tc + 20
     DT_sc = 7
     pe = CP.Props('P','T',Te,'Q',1.0,Ref)
@@ -81,6 +81,7 @@ def Compressor(f = None):
     inletState = State.State(Ref,{'T':Tin,'P':pe})
     T2s = ScrollComp.isentropic_outlet_temp(inletState,pc)
     outletState = State.State(Ref,{'T':T2s,'P':pc})
+    print 'pc',pc
     
 #    inletState = State.State(Ref,{'T':300.0,'P':300.0})
 #    p_outlet = inletState.p*4.0
@@ -175,17 +176,19 @@ def Compressor(f = None):
     ScrollComp.RK45_eps = 1e-7
     ScrollComp.EulerN = 20000
     ScrollComp.HeunN = 6000
-    
-    ScrollComp.precond_solve(key_inlet='inlet.1',key_outlet='outlet.2',
-                 step_callback=ScrollComp.step_callback, 
-                 endcycle_callback=ScrollComp.endcycle_callback,
-                 heat_transfer_callback=ScrollComp.heat_transfer_callback,
-                 lump_energy_balance_callback=ScrollComp.lump_energy_balance_callback,
-                 solver_method='RK45',
-                 UseNR = False, #Use Newton-Raphson ND solver to determine the initial state
-                 OneCycle = False,
-                 plot_every_cycle= False
-                 )
+    try:
+        ScrollComp.precond_solve(key_inlet='inlet.1',key_outlet='outlet.2',
+                     step_callback=ScrollComp.step_callback, 
+                     endcycle_callback=ScrollComp.endcycle_callback,
+                     heat_transfer_callback=ScrollComp.heat_transfer_callback,
+                     lump_energy_balance_callback=ScrollComp.lump_energy_balance_callback,
+                     solver_method='RK45',
+                     UseNR = False, #Use Newton-Raphson ND solver to determine the initial state
+                     OneCycle = True,
+                     plot_every_cycle= False
+                     )
+    except:
+        debug_plots(ScrollComp)
 
     print 'time taken',clock()-t1
     

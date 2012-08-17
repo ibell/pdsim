@@ -76,7 +76,8 @@ def ScrollBuilder(scroll):
     if hasattr(scroll,'pre_solve'):
         scroll.pre_solve()
     
-    outletState=CPState.State(scroll.inletState.Fluid,{'T':400,'P':scroll.discharge_pressure})
+    T2s = scroll.isentropic_outlet_temp(scroll.inletState, scroll.discharge_pressure)
+    outletState=CPState.State(scroll.inletState.Fluid,{'T':T2s,'P':scroll.discharge_pressure})
     
     scroll.auto_add_CVs(scroll.inletState, outletState)
     

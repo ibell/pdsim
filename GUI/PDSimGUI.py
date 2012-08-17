@@ -258,7 +258,12 @@ class RedirectedWorkerThread(Thread):
                 #Get a unique identifier for the model run for pickling purposes
                 home = os.getenv('USERPROFILE') or os.getenv('HOME')
                 temp_folder = os.path.join(home,'.pdsim-temp')
-                os.mkdir(temp_folder)
+                try:
+                    os.mkdir(temp_folder)
+                except OSError:
+                    pass
+                except WindowsError:
+                    pass
                 
                 identifier = 'PDSim recip ' + time.strftime('%Y-%m-%d-%H-%M-%S')+'_t'+self.name.split('-')[1]
                 file_path = os.path.join(temp_folder, identifier + '.mdl')
@@ -377,13 +382,12 @@ class InputsToolBook(wx.Toolbook):
                 items += more_items
         return items
     
-    def apply_additional_parametric_terms(self, sim, attrs, vals, items):
+    def apply_additional_parametric_terms(self, attrs, vals, items):
         """
         Apply parametric terms for each panel
         
         Parameters
         ----------
-        sim : The simulation instance
         attrs : list of strings
             Attributes that are included in the parametric table
         vals : the values corresponding to each attr in attrs
@@ -394,7 +398,7 @@ class InputsToolBook(wx.Toolbook):
             #Collect all the additional terms that apply to the panel
             panel_items = [item for item in items if 'parent' in item and item['parent'] == panel]
             # Returns the remaining attrs, vals
-            attrs, vals = panel.apply_additional_parametric_terms(sim, attrs, vals, panel_items)
+            attrs, vals = panel.apply_additional_parametric_terms(attrs, vals, panel_items)
         
         return attrs, vals
     
@@ -1684,6 +1688,27 @@ class MainFrame(wx.Frame):
             ITB.RemovePage(ITB.GetPageCount()-1)
             #self.unregister_plugin()
         
+    def OnFlushTemporaryFolder(self, events):
+        """
+        Event that fires on menu item to flush out temporary files.
+        
+        Checks to see if temp folder exists, if so, removes it
+        """
+        import shutil
+        home = os.getenv('USERPROFILE') or os.getenv('HOME')
+        temp_folder = os.path.join(home,'.pdsim-temp')
+        
+        if os.path.exists(temp_folder):
+            dlg = wx.MessageDialog(None,'Ok to remove all the temporary files',style = wx.OK|wx.CANCEL)
+            if dlg.ShowModal() == wx.ID_OK:    
+                shutil.rmtree(temp_folder)
+                print 'removed the folder',temp_folder 
+            dlg.Destroy()
+        else:
+            dlg = wx.MessageDialog(None,'Temporary folder does not exist', style = wx.OK)
+            dlg.ShowModal()
+            dlg.Destroy()
+            
     def make_menu_bar(self):
         #################################
         ####       Menu Bar         #####
@@ -1695,13 +1720,16 @@ class MainFrame(wx.Frame):
         self.File = wx.Menu()
         self.menuFileOpen = wx.MenuItem(self.File, -1, "Open Config from file...\tCtrl+O", "", wx.ITEM_NORMAL)
         self.menuFileSave = wx.MenuItem(self.File, -1, "Save config to file...\tCtrl+S", "", wx.ITEM_NORMAL)
+        self.menuFileFlush = wx.MenuItem(self.File, -1, "Flush out temporary files...\tCtrl+S", "", wx.ITEM_NORMAL)
         self.menuFileQuit = wx.MenuItem(self.File, -1, "Quit\tCtrl+Q", "", wx.ITEM_NORMAL)
         self.File.AppendItem(self.menuFileOpen)
         self.File.AppendItem(self.menuFileSave)
+        self.File.AppendItem(self.menuFileFlush)
         self.File.AppendItem(self.menuFileQuit)
         self.MenuBar.Append(self.File, "File")
         self.Bind(wx.EVT_MENU,self.OnConfigOpen,self.menuFileOpen)
         self.Bind(wx.EVT_MENU,self.OnConfigSave,self.menuFileSave)
+        self.Bind(wx.EVT_MENU,self.OnFlushTemporaryFolder,self.menuFileFlush)
         self.Bind(wx.EVT_MENU,self.OnQuit,self.menuFileQuit)
         
         self.Type = wx.Menu()
