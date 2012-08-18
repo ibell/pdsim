@@ -16,6 +16,78 @@ from matplotlib.backends.backend_wxagg import NavigationToolbar2Wx as WXToolbar
 from multiprocessing import Process
 from PDSim.scroll import scroll_geo
 
+import quantities as pq
+
+length_units = {
+                'Meter': pq.length.m,
+                'Micrometer' : pq.length.um,
+                'Centimeter' : pq.length.cm,
+                'Inch' : pq.length.inch,
+                }
+
+area_units = {
+                'Square Meter': pq.length.m**2,
+                'Square Micrometer' : pq.length.um**2,
+                'Square Centimeter' : pq.length.cm**2,
+                'Square Inch' : pq.length.inch**2,
+                }
+
+volume_units = {
+                'Cubic Meter': pq.length.m**3,
+                'Cubic Micrometer' : pq.length.um**3,
+                'Cubic Centimeter' : pq.length.cm**3,
+                'Cubic Inch' : pq.length.inch**3,
+                }
+
+class UnitConvertor(wx.Dialog):
+    def __init__(self, value, default_units, type = None, TextCtrl = None):
+        wx.Dialog.__init__(self, None, title='Convert units')
+        
+        self.default_units = default_units
+        if default_units in length_units or type == 'length':
+            self.unit_dict = length_units
+        elif default_units in area_units or type == 'area':
+            self.unit_dict = area_units
+        elif default_units in volume_units or type == 'volume':
+            self.unit_dict = volume_units
+            
+        self.txt = wx.TextCtrl(self, value=str(value))
+        self.units = wx.ComboBox(self)
+        self.units.AppendItems(sorted(self.unit_dict.keys()))
+        self.units.SetEditable(False)
+        if default_units in self.units.GetStrings():
+            self.units.SetStringSelection(default_units)
+        else:
+            raise KeyError
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.Add(self.txt)
+        sizer.Add(self.units)
+        self.SetSizer(sizer)
+        self.Fit()
+        self._old_units = default_units
+        
+        self.Bind(wx.EVT_COMBOBOX, self.OnSwitchUnits, self.units)
+        
+    def OnSwitchUnits(self, event):
+        old = float(self.txt.GetValue()) * self.unit_dict[self._old_units]
+        new_units_str = self.units.GetStringSelection()
+        new_units = self.unit_dict[new_units_str]
+        old.units = new_units
+        self._old_units = new_units_str
+        self.txt.SetValue(str(old.magnitude))
+    
+    def OnAccept(self):    
+        if TextCtrl is not None:
+            TextCtrl.SetValue
+            
+    def get_value(self):
+        """
+        Return a string with value in the original units
+        """
+        old = float(self.txt.GetValue()) * self.unit_dict[self._old_units]
+        old.units = self.unit_dict[self.default_units]
+        return str(old.magnitude)
+        
 class PlotPanel(wx.Panel):
     def __init__(self, parent, **kwargs):
         wx.Panel.__init__(self, parent, size = (300,200), **kwargs)
@@ -128,6 +200,17 @@ class PDPanel(wx.Panel):
             textbox=wx.TextCtrl(self,-1,str(val))
             sizer.Add(textbox, 1, wx.EXPAND)
             item.update(dict(textbox=textbox,label=label))
+            
+            caption = item['text']
+            if caption.find(']')>=0 and caption.find(']')>=0: 
+                units = caption.split('[',1)[1].split(']',1)[0]
+                if units == 'm':
+                    textbox.default_units = 'Meter'
+                elif units == 'm²':
+                    textbox.default_units = 'Square Meter'
+                elif units == 'm³':
+                    textbox.default_units = 'Cubic Meter'
+                self.Bind(wx.EVT_CONTEXT_MENU,self.OnChangeUnits,textbox)                
         
     def warn_unmatched_attr(self, attr):
         print "didn't match attribute", attr
@@ -281,6 +364,19 @@ class PDPanel(wx.Panel):
         """
         return attrs, vals
     
+    def BindChangeUnits(self, TextCtrl):
+        self.Bind(wx.EVT_KEY_DOWN, self.OnChangeUnits, TextCtrl)
+        
+    def OnChangeUnits(self, event):
+        TextCtrl = event.GetEventObject()
+        dlg = UnitConvertor(value = float(TextCtrl.GetValue()),
+                            default_units = TextCtrl.default_units
+                            )
+        
+        dlg.ShowModal()
+        TextCtrl.SetValue(dlg.get_value())
+        dlg.Destroy()
+        
 class ChangeParamsDialog(wx.Dialog):
     def __init__(self, params, **kwargs):
         wx.Dialog.__init__(self, None, **kwargs)
@@ -976,7 +1072,7 @@ class StateInputsPanel(PDPanel):
         box_sizer.Add(sizer)
         
         self.SetSizer(box_sizer)
-        sizer.Layout()
+        sizer.Layout()  
         
     def OnChangeDischarge(self, event):
         p_suction = self.SuctionState.GetState().p
@@ -1060,14 +1156,19 @@ class StateInputsPanel(PDPanel):
             if 'suction_temp' in suct_attrs and 'suction_pressure' in suct_attrs:
                 suction_temp = suct_vals[suct_attrs.index('suction_temp')]
                 suction_pressure = suct_vals[suct_attrs.index('suction_pressure')]
-                self.SuctionState.set_state(inletState.Fluid,T=suction_temp, P=suction_pressure)
+                self.SuctionState.set_state(inletState.Fluid,
+                                            T=suction_temp, 
+                                            P=suction_pressure)
+                
             #Dew temperature and superheat provided
             elif 'suction_sat_temp' in suct_attrs and 'suction_superheat' in suct_attrs:
                 suction_sat_temp = suct_vals[suct_attrs.index('suction_sat_temp')]
                 suction_superheat = suct_vals[suct_attrs.index('suction_superheat')]
                 suction_temp = suction_sat_temp + suction_superheat
                 suction_pressure = CP.Props('P','T',suction_sat_temp,'Q',1.0,inletState.Fluid)
-                self.SuctionState.set_state(inletState.Fluid,T=suction_temp, P=suction_pressure)
+                self.SuctionState.set_state(inletState.Fluid,
+                                            T=suction_temp, 
+                                            P=suction_pressure)
             else:
                 raise ValueError('Invalid combination of suction states: '+str(suct_attrs))
             
@@ -1079,6 +1180,9 @@ class StateInputsPanel(PDPanel):
         return attrs, vals
 
 class InjectionViewerDialog(wx.Dialog):
+    """
+    A dialog with simple plot of the locations of the injection ports
+    """
     def __init__(self, geo, phi):
         wx.Dialog.__init__(self, parent = None)
         
@@ -1089,6 +1193,7 @@ class InjectionViewerDialog(wx.Dialog):
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(PP)
         sizer.Layout()
+        self.Fit()
         
 class InjectionElementPanel(wx.Panel):
     """
@@ -1131,3 +1236,12 @@ class InjectionInputsPanel(PDPanel):
         sizer = wx.FlexGridSizer(cols = 2)
         sizer.Add(self.InjectionElement)
         sizer.Layout()
+        
+if __name__=='__main__':
+    app = wx.App(False)
+
+    dlg = UnitConvertor(1.0,'Meter',type ='length')
+    dlg.ShowModal()
+    dlg.Destroy()
+    
+    app.MainLoop()

@@ -74,13 +74,18 @@ class Run1(Process):
         sys.stdout = redir
         sys.stderr = redir
         
+        if hasattr(self.sim,'OneCycle'):
+            OneCycle = self.sim.OneCycle
+        else:
+            OneCycle = False
+            
         if isinstance(self.sim, Recip):
             self.sim.precond_solve(key_inlet='inlet.1',key_outlet='outlet.2',
             endcycle_callback=self.sim.endcycle_callback,
             heat_transfer_callback=self.sim.heat_transfer_callback,
             lump_energy_balance_callback = self.sim.lump_energy_balance_callback,
             valves_callback =self.sim.valves_callback, 
-            OneCycle=False,
+            OneCycle=OneCycle,
             UseNR = True,
             solver_method = self.sim.cycle_integrator_type,
             pipe_abort = self.pipe_abort
@@ -94,7 +99,7 @@ class Run1(Process):
                                    heat_transfer_callback=self.sim.heat_transfer_callback,
                                    lump_energy_balance_callback = self.sim.lump_energy_balance_callback, 
                                    solver_method = self.sim.cycle_integrator_type,
-                                   OneCycle=False,
+                                   OneCycle=OneCycle,
                                    UseNR = False, #Use Newton-Raphson ND solver to determine the initial state if True
                                    pipe_abort = self.pipe_abort
                                    )
@@ -485,6 +490,14 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         self.IC = IntegratorChoices(self)
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Insert(0,self.IC)
+        sizer.AddSpacer(10)
+        
+        sizer_advanced = wx.FlexGridSizer(cols = 2)
+        sizer.Add(wx.StaticText(self,label='Advanced/Debug options'))
+        sizer.Add(wx.StaticLine(self, -1, (25, 50), (300,1)))
+        self.OneCycle = wx.CheckBox(self,label = "Just run one cycle - not the full solution")
+        sizer_advanced.AddMany([self.OneCycle])
+        sizer.Add(sizer_advanced)
         sizer.Layout()
     
         # Loads all the parameters from the config file - 
@@ -505,6 +518,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         
     def post_set_params(self, simulation):
         self.IC.set_sim(simulation)
+        simulation.OneCycle = self.OneCycle.IsChecked()
             
     def supply_parametric_term(self):
         pass
@@ -1677,7 +1691,7 @@ class MainFrame(wx.Frame):
         
     def OnChangeOptionInjection(self, event = None):
         ITB = self.MTB.InputsTB
-        if self.OptionsInjection.IsChecked():
+        if self.PluginsInjection.IsChecked():
             injection_panel = pdsim_panels.InjectionInputsPanel(ITB)
             ITB.AddPage(injection_panel,"Injection")
             
@@ -1709,6 +1723,32 @@ class MainFrame(wx.Frame):
             dlg.ShowModal()
             dlg.Destroy()
             
+    def load_plugins(self, PluginsMenu):
+        import glob
+        self.plugins_list = []
+        for py_file in glob.glob(os.path.join('plugins','*.py')):
+            fname = py_file.split(os.path.sep,1)[1].split('.')[0]
+            mods = __import__('plugins.'+fname)
+            mod = getattr(mods,fname)
+            for term in dir(mod):
+                thing = getattr(mod,term)
+                try:
+                    if issubclass(thing, pdsim_plugins.PDSimPlugin):
+                        #Create a menu item for the plugin
+                        menuItem = wx.MenuItem(self.Type, -1, thing.short_description, "", wx.ITEM_CHECK)
+                        PluginsMenu.AppendItem(menuItem)
+                        #Instantiate the plugin
+                        plugin = thing()
+                        #Give the plugin a link to the main 
+                        plugin.set_GUI(self)
+                        #Append an instance of the plugin
+                        self.plugins_list.append(plugin)
+                        #Activate the plugin when clicked
+                        self.Bind(wx.EVT_MENU, plugin.activate, menuItem)
+                except TypeError:
+                    pass
+        print self.plugins_list
+        
     def make_menu_bar(self):
         #################################
         ####       Menu Bar         #####
@@ -1746,11 +1786,12 @@ class MainFrame(wx.Frame):
         self.Type.AppendItem(self.TypeExpander)
         self.MenuBar.Append(self.Type, "Type")
         
-        self.Options = wx.Menu()
-        self.OptionsInjection = wx.MenuItem(self.Type, -1, "Refrigerant Injection", "", wx.ITEM_CHECK)
-        self.Options.AppendItem(self.OptionsInjection)
-        self.MenuBar.Append(self.Options, "Options")
-        self.Bind(wx.EVT_MENU,self.OnChangeOptionInjection,self.OptionsInjection)
+        
+        self.Plugins = wx.Menu()
+        self.load_plugins(self.Plugins)
+        
+        self.MenuBar.Append(self.Plugins, "Plugins")
+        
         
         if self.config_parser.get('Globals', 'Type') == 'recip':
             self.TypeRecip.Check(True)
@@ -1811,7 +1852,7 @@ if __name__ == '__main__':
     freeze_support()
     
     app = wx.App(False)
-    wx.InitAllImageHandlers()
+    
     
     if '--nosplash' not in sys.argv:
         Splash=MySplashScreen()
@@ -1820,4 +1861,5 @@ if __name__ == '__main__':
     
     frame = MainFrame() 
     frame.Show(True) 
+    
     app.MainLoop()
