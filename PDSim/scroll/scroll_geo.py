@@ -868,7 +868,7 @@ def S1(theta, geo, poly=False, theta_0_volume=1e-9):
         (cx_poly,cy_poly)=polycentroid(np.r_[xi,xo,xi[0]], np.r_[yi,yo,yi[0]])
         return Vs,dVs,V_poly
 
-def S1_forces(theta, geo, poly = False):
+def S1_forces(theta, geo, poly = False, theta_0_volume=1e-9):
     
     h=geo.h
     rb=geo.rb 
@@ -894,6 +894,11 @@ def S1_forces(theta, geo, poly = False):
     
     VIc=h*rb*ro/2.0
     dVIc=0.0
+    
+    #Add the small volume to avoid division by zero at theta=0
+    VO += theta_0_volume
+    VIa += theta_0_volume
+    VIb += theta_0_volume
         
     Vs=VO-(VIa+VIb-VIc)
     dVs=dVO-(dVIa+dVIb-dVIc)
@@ -919,9 +924,10 @@ def S1_forces(theta, geo, poly = False):
     fx_p=-rb*h*(sin(B+phi_e)-(B-phi_o0+phi_e-pi)*cos(B+phi_e)+sin(theta-phi_e)-(theta+phi_o0-phi_e+pi)*cos(theta-phi_e))
     fy_p=rb*h*((B-phi_o0+phi_e-pi)*sin(B+phi_e)+cos(B+phi_e)-(theta+phi_o0-phi_e+pi)*sin(theta-phi_e)-cos(theta-phi_e))
     M_O=(h*rb**2*(B-theta-2*phi_o0+2*phi_e-2*pi)*(B+theta))/2
-    
+    fz_p = Vs/h
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
+                      fz_p = fz_p,
                       M_O = M_O,
                       cx = cx,
                       cy = cy
@@ -935,7 +941,10 @@ def S1_forces(theta, geo, poly = False):
         phi=np.linspace(phi_ie-pi+B,phi_ie-pi-theta,2000)
         (xo,yo)=coords_inv(phi, geo, theta, 'oo')
         V_poly=h*polyarea(np.r_[xi,xo,xi[0]], np.r_[yi,yo,yi[0]])
-        (cx_poly,cy_poly)=polycentroid(np.r_[xi,xo,xi[0]], np.r_[yi,yo,yi[0]])
+        if V_poly>0.0:
+            (cx_poly,cy_poly)=polycentroid(np.r_[xi,xo,xi[0]], np.r_[yi,yo,yi[0]])
+        else:
+            (cx_poly,cy_poly)=(xi[0],yi[0])
         ############### Numerical Force Calculations ###########
         phi=np.linspace(phi_ie-pi+B,phi_ie-pi-theta,2000)
         nx=np.zeros_like(phi)
@@ -960,8 +969,6 @@ def S1_forces(theta, geo, poly = False):
                          )
         exact_dict.update(poly_dict)
         return exact_dict
-
-
     
 def S2(theta, geo, poly = False, theta_0_volume = 1e-9):
     """
@@ -984,12 +991,9 @@ def S2(theta, geo, poly = False, theta_0_volume = 1e-9):
     dVdTheta : float
     V_poly : float (only if ``poly = True``)
     """
-    if not poly:
-        return S1(theta, geo, theta_0_volume = theta_0_volume)
-    else:
-        return S1(theta, geo, poly = True, theta_0_volume = theta_0_volume)
+    return S1(theta, geo, theta_0_volume = theta_0_volume)
         
-def S2_forces(theta,geo,poly=False):
+def S2_forces(theta,geo,poly=False, theta_0_volume = 1e-9):
     """
     Force terms for S2 chamber
     
@@ -999,7 +1003,7 @@ def S2_forces(theta,geo,poly=False):
         The crank angle in the range [:math:`0,2\pi`]
     geo : geoVals instance
         The geometry class
-    poly : boolean
+    poly : boolean, optional
         If true, also output the polygon calculations to the dict (SLOW!!)
     
     Returns
@@ -1027,7 +1031,7 @@ def S2_forces(theta,geo,poly=False):
     phi_i0=geo.phi_i0
     ro=rb*(pi-phi_i0+phi_o0)
     
-    S1_terms = S1_forces(theta,geo)
+    S1_terms = S1_forces(theta,geo, theta_0_volume = theta_0_volume)
     cx_s1 = S1_terms['cx']
     cy_s1 = S1_terms['cy']
     
@@ -1036,9 +1040,11 @@ def S2_forces(theta,geo,poly=False):
     fx_p=-rb*h*(sin(theta-phi_e)-(theta+phi_i0-phi_e)*cos(theta-phi_e)+cos(phi_e)*(phi_i0-phi_e)+sin(phi_e))
     fy_p=-rb*h*((theta+phi_i0-phi_e)*sin(theta-phi_e)+cos(theta-phi_e)+sin(phi_e)*(phi_i0-phi_e)-cos(phi_e))
     M_O=(h*rb**2*theta*(theta+2*phi_i0-2*phi_e))/2
+    fz_p = S1_terms['fz_p'] #By symmetry
     
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
+                      fz_p = fz_p,
                       M_O = M_O,
                       cx = cx,
                       cy = cy
@@ -1066,7 +1072,26 @@ def S2_forces(theta,geo,poly=False):
         exact_dict.update(poly_dict)
         return exact_dict
 
-def C1(theta, alpha, geo, poly=False, forces=False):
+def C1(theta, alpha, geo, poly=False):
+    """
+    Volume terms for C1,alpha chamber
+    
+    Parameters
+    ----------
+    theta : float
+        The crank angle in the range [:math:`0,2\pi`]
+    alpha : int
+        The index of the compression chamber ( 1=outermost chamber )
+    geo : geoVals instance
+        The geometry class
+    poly : boolean, optional
+        If true, also output the polygon calculations to the dict (SLOW!!)
+    
+    Returns
+    -------
+    values : tuple
+        A tuple with volume,derivative of volume and volume from polygon(if requested)
+    """
     h=geo.h
     rb=geo.rb
     phi_ie=geo.phi_ie
@@ -1078,16 +1103,66 @@ def C1(theta, alpha, geo, poly=False, forces=False):
     ##################### Analytic Calculations ####################
     V=-pi*h*rb*ro*(2*theta+4*alpha*pi-2*phi_ie-pi+phi_i0+phi_o0)
     dV=-2.0*pi*h*rb*ro
-    if forces==True:
-        psi=rb/3.0*(3.0*theta**2+6.0*phi_o0*theta+3.0*phi_o0**2+pi**2-15.0+(theta+phi_o0)*(12.0*pi*alpha-6.0*phi_ie)+3.0*phi_ie**2+12.0*pi*alpha*(pi*alpha-phi_ie))/(2.0*theta+phi_o0-2.0*phi_ie+phi_i0+4.0*pi*alpha-pi)
-        cx=-2.0*rb*cos(theta-phi_ie)-psi*sin(theta-phi_ie)
-        cy=+2.0*rb*sin(theta-phi_ie)-psi*cos(theta-phi_ie) 
-        fx_p= 2.0*pi*rb*h*cos(theta-phi_e)
-        fy_p=-2.0*pi*rb*h*sin(theta-phi_e)
-        M_O=-2*pi*h*rb*rb*(theta+phi_o0-phi_e+2*pi*alpha)
     
-    if poly==True:
+    if not poly:
+        return V,dV
+    else:
         ##################### Polygon Calculations #####################
+        phi=np.linspace(geo.phi_ie-theta-2*pi*alpha,geo.phi_ie-theta-2*pi*(alpha-1), 1000)
+        (xi,yi)=coords_inv(phi, geo, theta, 'fi')
+        phi=np.linspace( geo.phi_ie-theta-2*pi*(alpha-1)-pi,geo.phi_ie-theta-2*pi*alpha-pi,1000)
+        (xo,yo)=coords_inv(phi, geo, theta, 'oo')
+        V_poly=h*polyarea(np.r_[xi,xo], np.r_[yi,yo])
+        return V,dV,V_poly
+
+def C1_forces(theta, alpha, geo, poly = False):
+    """
+    Force terms for C1,alpha chamber
+    
+    Parameters
+    ----------
+    theta : float
+        The crank angle in the range [:math:`0,2\pi`]
+    alpha : int
+        The index of the compression chamber ( 1=outermost chamber )
+    geo : geoVals instance
+        The geometry class
+    poly : boolean, optional
+        If true, also output the polygon calculations to the dict (SLOW!!)
+    
+    Returns
+    -------
+    values : dictionary
+        A dictionary with fields for the analytic and numerical solutions (if requested)
+    
+    """
+    h=geo.h
+    rb=geo.rb
+    phi_ie=geo.phi_ie
+    phi_e=geo.phi_ie
+    phi_o0=geo.phi_o0
+    phi_i0=geo.phi_i0
+    ro=rb*(pi-phi_i0+phi_o0)
+    
+    psi=rb/3.0*(3.0*theta**2+6.0*phi_o0*theta+3.0*phi_o0**2+pi**2-15.0+(theta+phi_o0)*(12.0*pi*alpha-6.0*phi_ie)+3.0*phi_ie**2+12.0*pi*alpha*(pi*alpha-phi_ie))/(2.0*theta+phi_o0-2.0*phi_ie+phi_i0+4.0*pi*alpha-pi)
+    cx=-2.0*rb*cos(theta-phi_ie)-psi*sin(theta-phi_ie)
+    cy=+2.0*rb*sin(theta-phi_ie)-psi*cos(theta-phi_ie) 
+    fx_p= 2.0*pi*rb*h*cos(theta-phi_e)
+    fy_p=-2.0*pi*rb*h*sin(theta-phi_e)
+    M_O=-2*pi*h*rb*rb*(theta+phi_o0-phi_e+2*pi*alpha)
+    fz_p = C1(theta,alpha,geo)[0]/h
+    exact_dict = dict(fx_p = fx_p,
+                      fy_p = fy_p,
+                      fz_p = fz_p,
+                      M_O = M_O,
+                      cx = cx,
+                      cy = cy
+                      )
+    
+    if not poly:
+        return exact_dict
+    else:
+         ##################### Polygon Calculations #####################
         phi=np.linspace(geo.phi_ie-theta-2*pi*alpha,geo.phi_ie-theta-2*pi*(alpha-1), 1000)
         (xi,yi)=coords_inv(phi, geo, theta, 'fi')
         phi=np.linspace( geo.phi_ie-theta-2*pi*(alpha-1)-pi,geo.phi_ie-theta-2*pi*alpha-pi,1000)
@@ -1111,38 +1186,86 @@ def C1(theta, alpha, geo, poly=False, forces=False):
         rOy=yo-geo.ro*sin(phi_e-pi/2-theta)
         rOy=(rOy[1:L]+rOy[0:L-1])/2
         MO_poly=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
-    else:
-        (V_poly,cx_poly,cy_poly,fxp_poly,fyp_poly,MO_poly)=(None,None,None,None,None,None)
+        poly_dict = dict(fxp_poly = fxp_poly,
+                         fyp_poly = fyp_poly,
+                         MO_poly = MO_poly,
+                         cx_poly = cx_poly,
+                         cy_poly = cy_poly
+                         )
+        exact_dict.update(poly_dict)
+        return exact_dict
     
-    if forces==False and poly==False:
-        return V,dV
-    elif forces==False and poly==True:
-        return V,dV,V_poly
-    else:
-        return (V,dV,cx,cy,fx_p,fy_p,M_O,V_poly,cx_poly,cy_poly,fxp_poly,fyp_poly,MO_poly)
+def C2(theta, alpha, geo, poly=False):
+    """
+    Volume terms for C2,alpha chamber
+    
+    Parameters
+    ----------
+    theta : float
+        The crank angle in the range [:math:`0,2\pi`]
+    alpha : int
+        The index of the compression chamber ( 1=outermost chamber )
+    geo : geoVals instance
+        The geometry class
+    poly : boolean, optional
+        If true, also output the polygon calculations to the dict (SLOW!!)
+    
+    Returns
+    -------
+    values : tuple
+        A tuple with volume,derivative of volume and volume from polygon(if requested)
+    """
+    
+    #Use the symmetry - chambers have the same volumes and derivative of volume
+    return C1(theta,alpha,geo,poly)
+    
+def C2_forces(theta,alpha,geo,poly=False):
+    """
+    Force terms for C2,alpha chamber
+    
+    Parameters
+    ----------
+    theta : float
+        The crank angle in the range [:math:`0,2\pi`]
+    alpha : int
+        The index of the compression chamber ( 1=outermost chamber )
+    geo : geoVals instance
+        The geometry class
+    poly : boolean, optional
+        If true, also output the polygon calculations to the dict (SLOW!!)
+    
+    Returns
+    -------
+    values : dictionary
+        A dictionary with fields for the analytic and numerical solutions (if requested)
+    """
 
-def C2(theta, alpha, geo, poly=False, forces=False):
+    h=geo.h
+    rb=geo.rb
+    phi_ie=geo.phi_ie
+    phi_e=geo.phi_ie
+    phi_o0=geo.phi_o0
+    phi_i0=geo.phi_i0
+    ro=geo.ro
     
-    if forces==False and poly==False:
-        return C1(theta,alpha,geo)
+    C1_dict = C1_forces(theta,alpha,geo,poly)
+    cxc1 = C1_dict['cx']
+    cyc1 = C1_dict['cy']
+    (cx,cy)=(-cxc1+ro*cos(phi_ie-pi/2-theta),-cyc1+ro*sin(phi_ie-pi/2-theta))
+    fx_p= 2.0*pi*rb*h*cos(theta-phi_e)
+    fy_p=-2.0*pi*rb*h*sin(theta-phi_e)
+    M_O=2*pi*h*rb*rb*(theta+phi_i0-phi_e+2*pi*alpha-pi)
+    
+    exact_dict = dict(fx_p = fx_p,
+                      fy_p = fy_p,
+                      M_O = M_O,
+                      cx = cx,
+                      cy = cy
+                      )
+    
+    if not poly:
+        return exact_dict
     else:
-        h=geo.h
-        rb=geo.rb
-        phi_ie=geo.phi_ie
-        phi_e=geo.phi_ie
-        phi_o0=geo.phi_o0
-        phi_i0=geo.phi_i0
-        ro=rb*(pi-phi_i0+phi_o0)
-        
-        ro=geo.ro
-        phi_ie=geo.phi_ie
-        (Vc1,dVc1,cxc1,cyc1,fx_pc1,fy_pc1,M_Oc1,V_polyc1,cx_polyc1,cy_polyc1,fxp_polyc1,fyp_polyc1,M_Oc1_poly)=C1(theta,alpha,geo)
-        (cx,cy)=(-cxc1+ro*cos(phi_ie-pi/2-theta),-cyc1+ro*sin(phi_ie-pi/2-theta))
-        fx_p= 2.0*pi*rb*h*cos(theta-phi_e)
-        fy_p=-2.0*pi*rb*h*sin(theta-phi_e)
-        M_O=2*pi*h*rb*rb*(theta+phi_i0-phi_e+2*pi*alpha-pi)
-    
-    if poly==True:
         ##################### Force Calculations #########################
         phi=np.linspace( geo.phi_ie-theta-2*pi*(alpha),geo.phi_ie-theta-2*pi*(alpha-1),1000)
         (xo,yo)=coords_inv(phi, geo, theta, 'oi')
@@ -1150,13 +1273,18 @@ def C2(theta, alpha, geo, poly=False, forces=False):
         ny=np.zeros_like(phi)
         (nx,ny)=coords_norm(phi,geo,theta,'oi')
         L=len(xo)
+        
         dA=h*np.sqrt(np.power(xo[1:L]-xo[0:L-1],2)+np.power(yo[1:L]-yo[0:L-1],2))
         fxp_poly=np.sum(dA*(nx[1:L]+nx[0:L-1])/2.0)
         fyp_poly=np.sum(dA*(ny[1:L]+ny[0:L-1])/2.0)
-    else:
-        (V_poly,cx_poly,cy_poly,fxp_poly,fyp_poly,MO_poly)=(None,None,None,None,None,None)
-        
-    return (Vc1,dVc1,cx,cy,fx_p,fy_p,fxp_poly,fyp_poly)
+        poly_dict = dict(fxp_poly = fxp_poly,
+                         fyp_poly = fyp_poly,
+#                         MO_poly = MO_poly,
+#                         cx_poly = cx_poly,
+#                         cy_poly = cy_poly
+                         )
+        exact_dict.update(poly_dict)
+        return exact_dict
 
 def D1(theta, geo, poly = False):
     cython.declare(Nc = cython.double)
@@ -1267,9 +1395,11 @@ def D1_forces(theta, geo, poly = False):
     fx_p=rb*hs*(sin(theta-phi_e)+(-theta-phi_o0+phi_e-2*pi*Nc-pi)*cos(theta-phi_e)-sin(phi_os)-(phi_o0-phi_os)*cos(phi_os))
     fy_p=-rb*hs*((-theta-phi_o0+phi_e-2*pi*Nc-pi)*sin(theta-phi_e)-cos(theta-phi_e)-(phi_os-phi_o0)*sin(phi_os)-cos(phi_os))
     M_O=(hs*rb**2*(theta-phi_os+2*phi_o0-phi_e+2*pi*Nc+pi)*(theta+phi_os-phi_e+2*pi*Nc+pi))/2.0
+    fz_p = Vd1/hs
     
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
+                      fz_p = fz_p,
                       M_O = M_O,
                       cx = cx,
                       cy = cy
@@ -1284,7 +1414,10 @@ def D1_forces(theta, geo, poly = False):
         phi=np.linspace(phi_ie-theta-2.0*pi*Nc-pi,phi_os,1000)
         (xo,yo)=coords_inv(phi, geo, theta, "oo")
         V_poly=hs*polyarea(np.r_[xi,xo], np.r_[yi,yo])
-        (cx_poly,cy_poly)=polycentroid(np.r_[xi,xo,xi[0]], np.r_[yi,yo,yi[0]])
+        if V_poly>0:
+            (cx_poly,cy_poly)=polycentroid(np.r_[xi,xo,xi[0]], np.r_[yi,yo,yi[0]])
+        else:
+            (cx_poly,cy_poly)=(xi[0], yi[0])
         ##################### Force Calculations #########################
         phi=np.linspace(phi_os,phi_ie-theta-2.0*pi*Nc-pi,1000)
         (xo,yo)=coords_inv(phi, geo, theta, "oo")

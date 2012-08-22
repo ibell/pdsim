@@ -1,7 +1,7 @@
 # -*- coding: latin-1 -*-
 
 #Imports from wx package
-import wx,os,sys
+import wx
 from wx.lib.mixins.listctrl import CheckListCtrlMixin, ColumnSorterMixin, ListCtrlAutoWidthMixin
 from wx.lib.embeddedimage import PyEmbeddedImage
 import wx.lib.agw.pybusyinfo as PBI
@@ -9,6 +9,7 @@ from wx.lib.wordwrap import wordwrap
 wx.SetDefaultPyEncoding('latin-1') 
 
 #Provided by python
+import os, sys
 import codecs
 from operator import itemgetter
 from math import pi
@@ -34,7 +35,6 @@ import pdsim_plugins
 import recip_panels
 import scroll_panels
 import default_configs 
-
 
 class InfiniteList(object):
     """
@@ -1492,7 +1492,8 @@ class MainFrame(wx.Frame):
         #Apply any plugins in use
         if hasattr(self,'plugins_list') and self.plugins_list:
             for plugin in self.plugins_list:
-                plugin.apply(scroll)
+                if plugin.is_activated():
+                    plugin.apply(scroll)
         return scroll
     
     def run_simulation(self, sim):
@@ -1747,7 +1748,6 @@ class MainFrame(wx.Frame):
                         self.Bind(wx.EVT_MENU, plugin.activate, menuItem)
                 except TypeError:
                     pass
-        print self.plugins_list
         
     def make_menu_bar(self):
         #################################

@@ -39,17 +39,45 @@ volume_units = {
                 'Cubic Inch' : pq.length.inch**3,
                 }
 
+pressure_units = {
+                  'kPa' : pq.kPa,
+                  'psia' : pq.psi
+                  }
+rev = pq.UnitQuantity('revolution', 2*np.pi*pq.radians, symbol='rev')
+
+rotational_speed_units ={
+                         'Radians per second': pq.radians/pq.sec,
+                         'Radians per minute': pq.radians/pq.min,
+                         'Revolutions per second': rev/pq.sec,
+                         'Revolutions per minute': rev/pq.min,
+                         }
+
+temperature_units = {
+                     'Kelvin' : np.nan,
+                     'Celsius' : np.nan,
+                     'Fahrenheit' : np.nan,
+                     'Rankine': np.nan
+                     }
+
 class UnitConvertor(wx.Dialog):
     def __init__(self, value, default_units, type = None, TextCtrl = None):
         wx.Dialog.__init__(self, None, title='Convert units')
         
         self.default_units = default_units
+        self.__is_temperature__ = False
         if default_units in length_units or type == 'length':
             self.unit_dict = length_units
         elif default_units in area_units or type == 'area':
             self.unit_dict = area_units
         elif default_units in volume_units or type == 'volume':
             self.unit_dict = volume_units
+        elif default_units in rotational_speed_units or type == 'rotational_speed':
+            self.unit_dict = rotational_speed_units
+        elif default_units in pressure_units or type == 'pressure':
+            self.unit_dict = pressure_units
+        elif default_units in temperature_units or type == 'temperature':
+            self.unit_dict = temperature_units
+            self.__is_temperature__ = True
             
         self.txt = wx.TextCtrl(self, value=str(value))
         self.units = wx.ComboBox(self)
@@ -69,24 +97,63 @@ class UnitConvertor(wx.Dialog):
         self.Bind(wx.EVT_COMBOBOX, self.OnSwitchUnits, self.units)
         
     def OnSwitchUnits(self, event):
-        old = float(self.txt.GetValue()) * self.unit_dict[self._old_units]
-        new_units_str = self.units.GetStringSelection()
-        new_units = self.unit_dict[new_units_str]
-        old.units = new_units
-        self._old_units = new_units_str
-        self.txt.SetValue(str(old.magnitude))
-    
-    def OnAccept(self):    
-        if TextCtrl is not None:
-            TextCtrl.SetValue
+        if not self.__is_temperature__:
+            old = float(self.txt.GetValue()) * self.unit_dict[self._old_units]
+            new_units_str = self.units.GetStringSelection()
+            new_units = self.unit_dict[new_units_str]
+            old.units = new_units
+            self._old_units = new_units_str
+            self.txt.SetValue(str(old.magnitude))
+        else:
+            old_val = float(self.txt.GetValue())
+            new_units_str = self.units.GetStringSelection()
+            new_val = self._temperature_convert(self._old_units, old_val, new_units_str)
+            self._old_units = new_units_str
+            self.txt.SetValue(str(new_val))
             
     def get_value(self):
         """
-        Return a string with value in the original units
+        Return a string with value in the original units for use in calling function to dialog
         """
-        old = float(self.txt.GetValue()) * self.unit_dict[self._old_units]
-        old.units = self.unit_dict[self.default_units]
-        return str(old.magnitude)
+        if not self.__is_temperature__:
+            old = float(self.txt.GetValue()) * self.unit_dict[self._old_units]
+            old.units = self.unit_dict[self.default_units]
+            return str(old.magnitude)
+        else:
+            old_val = float(self.txt.GetValue())
+            return str(self._temperature_convert(self._old_units, old_val, self.default_units))
+    
+    def _temperature_convert(self, old, old_val, new):
+        """
+        Internal method to convert temperature
+        
+        Parameters
+        ----------
+        old : string
+        old_val : float
+        new : string
+        """
+        #convert old value to Celsius
+        # also see: http://en.wikipedia.org/wiki/Temperature
+        if old == 'Fahrenheit':
+            celsius_val = (old_val-32)*5.0/9.0
+        elif old == 'Kelvin':
+            celsius_val = old_val-273.15
+        elif old == 'Rankine':
+            celsius_val = (old_val-491.67)*5.0/9.0
+        elif old == 'Celsius':
+            celsius_val = old_val
+            
+        #convert celsius to new value
+        if new == 'Celsius':
+            return celsius_val
+        elif new == 'Fahrenheit':
+            return celsius_val*9.0/5.0+32.0
+        elif new == 'Kelvin':
+            return celsius_val+273.15
+        elif new == 'Rankine':
+            return (celsius_val+273.15)*9.0/5.0
+        
         
 class PlotPanel(wx.Panel):
     def __init__(self, parent, **kwargs):
@@ -210,7 +277,9 @@ class PDPanel(wx.Panel):
                     textbox.default_units = 'Square Meter'
                 elif units == 'm³':
                     textbox.default_units = 'Cubic Meter'
-                self.Bind(wx.EVT_CONTEXT_MENU,self.OnChangeUnits,textbox)                
+                elif units == 'rad/s':
+                    textbox.default_units = 'Radians per second'
+                self.Bind(wx.EVT_CONTEXT_MENU,self.OnChangeUnits,textbox)      
         
     def warn_unmatched_attr(self, attr):
         print "didn't match attribute", attr
@@ -817,7 +886,10 @@ def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True, toolti
     return label,thing
 
 class StateChooser(wx.Dialog):
-    def __init__(self,Fluid,T,rho,parent=None,id=-1):
+    """
+    A dialog used to select the state
+    """
+    def __init__(self,Fluid,T,rho,parent=None,id=-1,Fluid_fixed = False):
         wx.Dialog.__init__(self,parent,id,"State Chooser",size=(300,250))
         
         class StateChoices(wx.Choicebook):
@@ -827,6 +899,8 @@ class StateChooser(wx.Dialog):
                 self.pageT_dTsh=wx.Panel(self)
                 self.AddPage(self.pageT_dTsh,'Saturation Temperature and Superheat')
                 self.Tsatlabel1, self.Tsat1 = LabeledItem(self.pageT_dTsh,label="Saturation Temperature [K]",value='290')
+                self.Tsat1.default_units = 'Kelvin'
+                self.Tsat1.Bind(wx.EVT_CONTEXT_MENU,self.OnChangeUnits)
                 self.DTshlabel1, self.DTsh1 = LabeledItem(self.pageT_dTsh,label="Superheat [K]",value='11.1')
                 sizer=wx.FlexGridSizer(cols=2,hgap=3,vgap=3)
                 sizer.AddMany([self.Tsatlabel1, self.Tsat1,self.DTshlabel1, self.DTsh1])
@@ -835,10 +909,23 @@ class StateChooser(wx.Dialog):
                 self.pageT_p=wx.Panel(self)
                 self.AddPage(self.pageT_p,'Temperature and Absolute Pressure')
                 self.Tlabel1, self.T1 = LabeledItem(self.pageT_p,label="Temperature [K]",value='300')
+                self.T1.default_units = 'Kelvin'
+                self.T1.Bind(wx.EVT_CONTEXT_MENU,self.OnChangeUnits)
                 self.plabel1, self.p1 = LabeledItem(self.pageT_p,label="Pressure [kPa]",value='300')
+                self.p1.default_units = 'kPa'
+                self.p1.Bind(wx.EVT_CONTEXT_MENU,self.OnChangeUnits)
                 sizer=wx.FlexGridSizer(cols=2,hgap=3,vgap=3)
                 sizer.AddMany([self.Tlabel1, self.T1,self.plabel1, self.p1])
                 self.pageT_p.SetSizer(sizer)
+            
+            def OnChangeUnits(self, event):
+                TextCtrl = event.GetEventObject()
+                dlg = UnitConvertor(value = float(TextCtrl.GetValue()),
+                                    default_units = TextCtrl.default_units
+                                    )
+                dlg.ShowModal()
+                TextCtrl.SetValue(dlg.get_value())
+                dlg.Destroy()
         
         sizer=wx.BoxSizer(wx.VERTICAL)
         self.Fluidslabel = wx.StaticText(self,-1,'Fluid: ')
@@ -846,6 +933,8 @@ class StateChooser(wx.Dialog):
         self.Fluids.AppendItems(sorted(CoolProp.__fluids__))
         self.Fluids.SetEditable(False)
         self.Fluids.SetValue(Fluid)
+        if Fluid_fixed:
+            self.Fluids.Enable(False)
         
         hs = wx.BoxSizer(wx.HORIZONTAL)
         hs.AddMany([self.Fluidslabel,self.Fluids])
@@ -965,6 +1054,8 @@ class StateChooser(wx.Dialog):
             self.rho.SetValue(str(rho))
         except ValueError:
             return
+        
+
     
 class StatePanel(wx.Panel):
     """
@@ -972,9 +1063,10 @@ class StatePanel(wx.Panel):
     Fluid, temperature and density by selecting the desired set of inputs in a
     dialog which can be Tsat and DTsh or T & p.
     """
-    def __init__(self,parent,id=-1,Fluid='R404A',T=283.15,rho=5.74):
+    def __init__(self,parent,id=-1,Fluid='R404A',T=283.15,rho=5.74, Fluid_fixed = False):
         wx.Panel.__init__(self,parent,id)
         
+        self._Fluid_fixed = Fluid_fixed
         p = CP.Props('P','T',T,'D',rho,str(Fluid))
         sizer=wx.FlexGridSizer(cols=2,hgap=4,vgap=4)
         self.Fluidlabel, self.Fluid = LabeledItem(self,label="Fluid",value=str(Fluid),enabled=False)
@@ -1017,7 +1109,7 @@ class StatePanel(wx.Panel):
         rho = float(self.rho.GetValue())
         
         #Instantiate the chooser Dialog
-        SCfrm=StateChooser(Fluid=Fluid,T=T,rho=rho)
+        SCfrm=StateChooser(Fluid=Fluid,T=T,rho=rho,Fluid_fixed = self._Fluid_fixed)
         
         #If they clicked accept
         if wx.ID_OK == SCfrm.ShowModal():
@@ -1176,7 +1268,6 @@ class StateInputsPanel(PDPanel):
             raise NotImplementedError('only one param provided')
         elif num_suct_params >2:
             raise ValueError ('Only two inlet state parameters can be provided in parametric table')
-        
         return attrs, vals
 
 class InjectionViewerDialog(wx.Dialog):
@@ -1202,7 +1293,17 @@ class InjectionElementPanel(wx.Panel):
     def __init__(self, parent):
         wx.Panel.__init__(self,parent)
         
-        self.state = StatePanel(self)
+        #Inputs Toolbook
+        ITB = self.GetTopLevelParent().MTB.InputsTB
+        Fluid = None
+        for panel in ITB.panels:
+            if panel.Name == 'StatePanel':
+                Fluid = panel.SuctionState.GetState().Fluid
+                break
+        if Fluid is None:
+            raise ValueError('StatePanel not found in Inputs Toolbook')
+        
+        self.state = StatePanel(self, Fluid=Fluid, Fluid_fixed = True, )
         self.Llabel,self.Lval = LabeledItem(self, label='Length of injection line',value='1.0')
         self.IDlabel,self.IDval = LabeledItem(self, label='Inner diameter of injection line',value='0.01')
         self.philabel,self.phival = LabeledItem(self, label='Involute angle',value='3.14159')

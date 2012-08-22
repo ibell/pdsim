@@ -221,7 +221,7 @@ class Scroll(PDSimCore, _Scroll):
         else:
             return scroll_geo.DDD(theta,self.geo)[0:2]        
         
-    def set_scroll_geo(self,Vdisp,Vratio,Thickness,OrbitingRadius,phi_i0=0.0,phi_os=0.3):
+    def set_scroll_geo(self,Vdisp,Vratio,Thickness,OrbitingRadius,phi_i0=0.0,phi_os=0.3, phi_is = pi):
         """
         Provide the following parameters.  The rest will be calculated by the geometry code
         
@@ -236,11 +236,9 @@ class Scroll(PDSimCore, _Scroll):
         
         phi_i0
         phi_os
+        phi_is
         """
         
-        phi_i0=0
-        phi_is=pi
-        phi_os=0.3
         ## Determine the geometry by using the imposed parameters for the scroll wraps
         def f(x,phi_i0,phi_os,Vdisp_goal,Vratio_goal,t_goal,ro_goal):
             phi_ie=x[0]
@@ -744,7 +742,7 @@ class Scroll(PDSimCore, _Scroll):
         
     def mechanical_losses(self):
         print 'temporary mechanical losses'
-        return 0.3 #[kW]
+        return 1.0 #[kW]
     
     def ambient_heat_transfer(self, Tshell):
         """
@@ -1015,4 +1013,23 @@ class Scroll(PDSimCore, _Scroll):
             return mdot
         except ZeroDivisionError:
             return 0.0
+        
+    #Name gets mangled in the core base class, so un-mangle it
+    def _PDSimCore__post_solve(self):
+        """
+        {\eta _{motor}} = \frac{{{{\dot W}_{shaft}}}}{{{{\dot W}_{shaft}} + {{\dot W}_{motor}}}}
+        {\eta _{motor}}\left( {{{\dot W}_{shaft}} + {{\dot W}_{motor}}} \right) = {{\dot W}_{shaft}}
+        {{\dot W}_{motor}} = \frac{{{{\dot W}_{shaft}}}}{{{\eta _{motor}}}} - {{\dot W}_{shaft}}
+        """
+        #Call the base class function
+        PDSimCore._PDSimCore__post_solve(self)
+        
+        #Motor losses
+        self.Wdot_motor = self.Wdot*(1/self.eta_motor-1)
+        
+        #Electrical Power
+        self.Wdot_electrical = self.Wdot + self.Wdot_motor
+        
+        #Overall isentropic efficiency
+        self.eta_oi = self.Wdot_i/self.Wdot_electrical
         

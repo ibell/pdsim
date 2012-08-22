@@ -32,13 +32,16 @@ cpdef HT_angles(double theta, geoVals geo, bytes key)
 cpdef tuple SA(double theta, geoVals geo, bint poly=*, bint forces=*)
 
 cpdef tuple S1(double theta, geoVals geo, bint poly = *, double theta_0_volume = *)
-cpdef dict S1_forces(double theta, geoVals geo, bint poly = *)
+cpdef dict S1_forces(double theta, geoVals geo, bint poly = *, double theta_0_volume =*)
 
 cpdef tuple S2(double theta, geoVals geo, bint poly = *, double theta_0_volume = *)
-cpdef dict S2_forces(double theta, geoVals geo, bint poly = *)
+cpdef dict S2_forces(double theta, geoVals geo, bint poly = *, double theta_0_volume =*)
 
-cpdef C1(double theta, double alpha, geoVals geo, bint poly=?, bint forces=?)
-cpdef C2(double theta, double alpha, geoVals geo, bint poly=?, bint forces=?)
+cpdef tuple C1(double theta, int alpha, geoVals geo, bint poly=*)
+cpdef dict C1_forces(double theta, int alpha, geoVals geo, bint poly = *)
+
+cpdef tuple C2(double theta, int alpha, geoVals geo, bint poly=*)
+cpdef dict C2_forces(double theta, int alpha, geoVals geo, bint poly = *)
 
 cpdef tuple D1(double theta, geoVals geo, bint poly=*)
 cpdef dict D1_forces(double theta, geoVals geo, bint poly = *)

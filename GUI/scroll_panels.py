@@ -49,6 +49,9 @@ class GeometryPanel(pdsim_panels.PDPanel):
         dict(attr='Vratio'),
         dict(attr='t'),
         dict(attr='ro'),
+        dict(attr='phi_fi0'),
+        dict(attr='phi_fis'),
+        dict(attr='phi_fos'),
         dict(attr='delta_flank'),
         dict(attr='delta_radial')
         ]
@@ -149,8 +152,15 @@ class GeometryPanel(pdsim_panels.PDPanel):
         Vratio=float(self.Vratio.GetValue())
         t=float(self.t.GetValue())
         ro=float(self.ro.GetValue())
+        phi_i0 = float(self.phi_fi0.GetValue())
+        phi_is = float(self.phi_fis.GetValue())
+        phi_os = float(self.phi_fos.GetValue())
         
-        self.Scroll.set_scroll_geo(Vdisp,Vratio,t,ro) #Set the scroll wrap geometry
+        #Set the scroll wrap geometry
+        self.Scroll.set_scroll_geo(Vdisp,Vratio,t,ro,
+                                   phi_i0 = phi_i0, 
+                                   phi_os = phi_os,
+                                   phi_is = phi_is,) 
         self.Scroll.set_disc_geo('2Arc', r2='PMP')
         
         self.phi_i0.SetValue(str(self.Scroll.geo.phi_i0))

@@ -7,6 +7,7 @@ from PDSim.flow.flow import FlowPath
 from PDSim.core.core import Tube
 from PDSim.core.containers import ControlVolume
 from math import pi
+import wx
 
 class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
     
@@ -16,19 +17,27 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
         """
         A plugin that adds the injection ports for the scroll compressor
         """
+        self._activated = False
         
     def activate(self, event = None):
-        #Add the panel to the inputs panel
+        #: The inputs toolbook that contains all the input panels
         ITB = self.GUI.MTB.InputsTB
-        injection_panel = pdsim_panels.InjectionInputsPanel(ITB)
-        ITB.AddPage(injection_panel,"Injection")
         
-        #Call the base-class activate function
-        pdsim_plugins.PDSimPlugin.activate(event)
+        if not self._activated:
+            #Add the panel to the inputs panel
+            self.injection_panel = pdsim_panels.InjectionInputsPanel(ITB)
+            ITB.AddPage(self.injection_panel,"Injection")
+            self._activated = True
+        else:
+            page_names = [ITB.GetPageText(I) for I in range(ITB.GetPageCount())]
+            I = page_names.index("Injection")
+            ITB.RemovePage(I)
+            self.injection_panel.Destroy()
+            self._activated = False
             
     def apply(self, ScrollComp, **kwargs):
         """
-        Add the necessary things
+        Add the necessary things for the scroll compressor injection
         
         Parameters
         ----------

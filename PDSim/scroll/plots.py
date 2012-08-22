@@ -860,8 +860,6 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
         
     if lw is None:
         lw=1.0
-        
-    
     
     xarc1=geo.xa_arc1+geo.ra_arc1*cos(np.linspace(geo.t2_arc1,geo.t1_arc1,100))
     yarc1=geo.ya_arc1+geo.ra_arc1*sin(np.linspace(geo.t2_arc1,geo.t1_arc1,100))

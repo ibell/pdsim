@@ -36,13 +36,55 @@ def Compressor(f = None):
     global Injection
     ScrollComp=Scroll()
     #This runs if the module code is run directly
-    ScrollComp.set_scroll_geo(104.8e-6, 2.2, 0.004, 0.005) #Set the scroll wrap geometry
+    ScrollComp.set_scroll_geo(104.8e-6, 1.61, 0.004, 0.005) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2='PMP')
     ScrollComp.geo.delta_flank = 15e-6
     ScrollComp.geo.delta_radial = 15e-6
     ScrollComp.omega = 3600/60*2*pi
     ScrollComp.Tamb = 298.0
     
+    M_O,cx,cy,fx,fy,fz,tt,fyp,fxp=[],[],[],[],[],[],[],[],[]
+        
+    for th in np.linspace(0,2*pi,200):
+        tt.append(th)
+        F = scroll_geo.S1_forces(th,geo=ScrollComp.geo,poly=True)
+        fxp.append(F['fxp_poly'])
+        fyp.append(F['fyp_poly'])
+        fx.append(F['fx_p'])
+        fy.append(F['fy_p'])
+        fz.append(F['fz_p'])
+        cx.append(F['cx'])
+        cy.append(F['cy'])
+        M_O.append(F['M_O'])
+            
+    for th in np.linspace(0,scroll_geo.theta_d(ScrollComp.geo)-0.001,100):
+        tt.append(th+2*pi)
+        F = scroll_geo.C1_forces(th,alpha=1,geo=ScrollComp.geo,poly=True)
+        fxp.append(F['fxp_poly'])
+        fyp.append(F['fyp_poly'])
+        fx.append(F['fx_p'])
+        fy.append(F['fy_p'])
+        fz.append(F['fz_p'])
+        cx.append(F['cx'])
+        cy.append(F['cy'])
+        M_O.append(F['M_O'])
+          
+    for th in np.linspace(scroll_geo.theta_d(ScrollComp.geo)+0.001,2*pi,100):
+        tt.append(th+2*pi)
+        F = scroll_geo.D1_forces(th,geo=ScrollComp.geo,poly=True)
+        fxp.append(F['fxp_poly'])
+        fyp.append(F['fyp_poly'])
+        fx.append(F['fx_p'])
+        fy.append(F['fy_p'])
+        fz.append(F['fz_p'])
+        cx.append(F['cx'])
+        cy.append(F['cy'])
+        M_O.append(F['M_O'])
+    
+    import pylab
+    pylab.plot(fx,fy,'-',cxp,fyp,'s',mfc='none')
+    pylab.show()
+    return
 #    radial_pairs = scroll_geo.radial_leakage_pairs(ScrollComp.geo)
 #    th = 0.55*2*pi
 #    
