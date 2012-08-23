@@ -1,6 +1,36 @@
 import quantities as pq
 from math import pi,sqrt,log
 
+def thrust_bearing(**kwargs):
+    """
+    
+    Notes
+    -----
+    To derive the speed of contact of the orbiting scroll
+    
+    .. math::
+    
+        x = {r_o}\cos \left( {{\phi _{ie}} - \frac{\pi }{2} - \theta } \right)\\
+
+    .. math::
+    
+        y = {r_o}\sin \left( {{\phi _{ie}} - \frac{\pi }{2} - \theta } \right)\\
+    
+    .. math::
+    
+        \frac{{dx}}{{d\theta }} = {r_o}\sin \left( {{\phi _{ie}} - \frac{\pi }{2} - \theta } \right)\omega \\
+    
+    .. math::
+    
+        \frac{{dy}}{{d\theta }} =  - {r_o}\cos \left( {{\phi _{ie}} - \frac{\pi }{2} - \theta } \right)\omega \\
+
+    .. math::
+    
+        \left| v \right| = \sqrt {{{\left( {\frac{{dx}}{{d\theta }}} \right)}^2} + {{\left( {\frac{{dy}}{{d\theta }}} \right)}^2}}  = {r_o}\omega 
+    """
+    
+    pass
+
 def journal_bearing(**kwargs):
     
     """

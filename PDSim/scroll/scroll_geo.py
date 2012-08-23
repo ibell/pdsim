@@ -1287,6 +1287,23 @@ def C2_forces(theta,alpha,geo,poly=False):
         return exact_dict
 
 def D1(theta, geo, poly = False):
+    """
+    Volume terms for D1
+    
+    Parameters
+    ----------
+    theta : float
+        The crank angle in the range [:math:`0,2\pi`]
+    geo : geoVals instance
+        The geometry class
+    poly : boolean, optional
+        If true, also output the polygon calculations to the dict (SLOW!!)
+    
+    Returns
+    -------
+    values : tuple
+        A tuple with volume,derivative of volume and volume from polygon(if requested)
+    """
     cython.declare(Nc = cython.double)
     
     hs=geo.h
@@ -1444,45 +1461,110 @@ def D1_forces(theta, geo, poly = False):
         exact_dict.update(poly_dict)
         return exact_dict
 
-def D2(theta, geo, poly=False, forces=False):
+def D2(theta, geo, poly=False):
+    """
+    Volume terms for D2 chamber
     
-    if forces==False and poly==False:
-        return D1(theta,geo)
-    else:
-        raise AttributeError("Code not update")
-        h=geo.h
-        rb=geo.rb
-        phi_ie=geo.phi_ie
-        phi_e=geo.phi_ie
-        phi_o0=geo.phi_o0
-        phi_i0=geo.phi_i0
-        phi_is=geo.phi_is
-        phi_os=geo.phi_os
-        ro=rb*(pi-phi_i0+phi_o0)
+    Parameters
+    ----------
+    theta : float
+        The crank angle in the range [:math:`0,2\pi`]
+    geo : geoVals instance
+        The geometry class
+    poly : boolean, optional
+        If true, also output the polygon calculations to the dict (SLOW!!)
+    
+    Returns
+    -------
+    values : tuple
+        A tuple with volume,derivative of volume and volume from polygon(if requested)
+    """
+    #Is the same as the D1 chamber by symmetry
+    return D1(theta,geo,poly)
+
+def D2_forces(theta, geo, poly = False):
+
+    hs=geo.h
+    rb=geo.rb
+    phi_ie=geo.phi_ie
+    phi_e=geo.phi_ie
+    phi_o0=geo.phi_o0
+    phi_i0=geo.phi_i0
+    phi_is=geo.phi_is
+    phi_os=geo.phi_os
+    ro=rb*(pi-phi_i0+phi_o0)
         
-        Nc=getNc(theta,geo=geo)
-        (Vd1,dVd1,cxd1,cyd1,fx_pd1,fy_pd1,M_Od1,cd1,V_polyd1,cx_polyd1,cy_polyd1,fxp_polyd1,fyp_polyd1,M_Od1_poly)=D1(theta,geo)
-        fx_p=-h*rb*(-sin(theta-phi_e)+(theta+phi_i0-phi_e+2*pi*Nc)*cos(theta-phi_e)+sin(phi_os)-(phi_os-phi_i0+pi)*cos(phi_os))
-        fy_p=h*rb*((theta+phi_i0-phi_e+2*pi*Nc)*sin(theta-phi_e)+cos(theta-phi_e)-(-phi_os+phi_i0-pi)*sin(phi_os)+cos(phi_os))
-        M_O=-(h*rb**2*(theta-phi_os+2*phi_i0-phi_e+2*pi*Nc-pi)*(theta+phi_os-phi_e+2*pi*Nc+pi))/2
-        
-        (cx,cy)=(-cxd1+ro*cos(phi_ie-pi/2-theta),-cyd1+ro*sin(phi_ie-pi/2-theta))
+    Nc=getNc(theta,geo=geo)
+
+    phi2=phi_ie-theta-2.0*pi*Nc
+    phi1=phi_os+pi
+    VO=hs*rb**2/6.0*((phi2-phi_i0)**3-(phi1-phi_i0)**3)
+    dVO=-hs*rb**2/2.0*((phi2-phi_i0)**2)
     
-    if poly==True:
-        phi=np.linspace(phi_os+pi,phi_ie-theta-2.0*pi*Nc,1000)
-        (xo,yo)=coords_inv(phi, geo, theta, "oi")
-        nx=np.zeros_like(phi)
-        ny=np.zeros_like(phi)
-        (nx,ny)=coords_norm(phi,geo,theta,"oi")
-        L=len(xo)
-        dA=h*np.sqrt(np.power(xo[1:L]-xo[0:L-1],2)+np.power(yo[1:L]-yo[0:L-1],2))
-        fxp_poly=np.sum(dA*(nx[1:L]+nx[0:L-1])/2.0)
-        fyp_poly=np.sum(dA*(ny[1:L]+ny[0:L-1])/2.0)
+    phi2=phi_ie-theta-2.0*pi*Nc-pi
+    phi1=phi_os
+    VIa=hs*rb**2/6.0*((phi2-phi_o0)**3-(phi1-phi_o0)**3)
+    dVIa=-hs*rb**2/2.0*((phi2-phi_o0)**2)
+    
+    VIb=hs*rb*ro/2.0*((phi_os-phi_o0)*sin(theta+phi_os-phi_ie)+cos(theta+phi_os-phi_ie))
+    dVIb=hs*rb*ro/2.0*((phi_os-phi_o0)*cos(theta+phi_os-phi_ie)-sin(theta+phi_os-phi_ie))
+    
+    VIc=hs*rb*ro/2.0
+    dVIc=0.0
+    
+    VId= hs*rb*ro/2.0*((phi_os-phi_i0+pi)*sin(theta+phi_os-phi_ie)+cos(theta+phi_os-phi_ie)+1)
+    dVId=hs*rb*ro/2.0*((phi_os-phi_i0+pi)*cos(theta+phi_os-phi_ie)-sin(theta+phi_os-phi_ie))
+    
+    VI=VIa+VIb+VIc+VId
+    dVI=dVIa+dVIb+dVIc+dVId
+    
+    Vd1=VO-VI
+    dVd1=dVO-dVI
+
+    cx_O=hs/VO*(fxA(rb,phi2,phi_i0)-fxA(rb,phi1,phi_i0))
+    cy_O=hs/VO*(fyA(rb,phi2,phi_i0)-fyA(rb,phi1,phi_i0))
+    cx_Ia=hs/VIa*(fxA(rb,phi2,phi_o0)-fxA(rb,phi1,phi_o0))
+    cy_Ia=hs/VIa*(fyA(rb,phi2,phi_o0)-fyA(rb,phi1,phi_o0))
+    cx_Ib=1.0/3.0*(-ro*sin(theta-phi_ie)+rb*(phi_os-phi_o0)*sin(phi_os)+rb*cos(phi_os))
+    cy_Ib=1.0/3.0*(-ro*cos(theta-phi_ie)-rb*(phi_os-phi_o0)*cos(phi_os)+rb*sin(phi_os))
+    cx_Ic=1.0/3.0*((rb*(-theta+phi_ie-phi_o0-2*pi*Nc-pi)-ro)*sin(theta-phi_ie)-rb*cos(theta-phi_ie))
+    cy_Ic=1.0/3.0*((rb*(-theta+phi_ie-phi_o0-2*pi*Nc-pi)-ro)*cos(theta-phi_ie)+rb*sin(theta-phi_ie))
+    cx_Id=(rb*(2*phi_os-phi_o0-phi_i0+pi)*sin(phi_os)-2*(ro*sin(theta-phi_ie)-rb*cos(phi_os)))/3.0
+    cy_Id=(-2*(ro*cos(theta-phi_ie)-rb*sin(phi_os))-rb*(2*phi_os-phi_o0-phi_i0+pi)*cos(phi_os))/3.0
+    cx_I=-(cx_Ia*VIa+cx_Ib*VIb+cx_Ic*VIc+cx_Id*VId)/VI+ro*cos(phi_ie-pi/2.0-theta)
+    cy_I=-(cy_Ia*VIa+cy_Ib*VIb+cy_Ic*VIc+cy_Id*VId)/VI+ro*sin(phi_ie-pi/2.0-theta)
+    
+    cxd1=(cx_O*VO-cx_I*VI)/Vd1
+    cyd1=(cy_O*VO-cy_I*VI)/Vd1
+    
+    fx_p=-hs*rb*(-sin(theta-phi_e)+(theta+phi_i0-phi_e+2*pi*Nc)*cos(theta-phi_e)+sin(phi_os)-(phi_os-phi_i0+pi)*cos(phi_os))
+    fy_p=hs*rb*((theta+phi_i0-phi_e+2*pi*Nc)*sin(theta-phi_e)+cos(theta-phi_e)-(-phi_os+phi_i0-pi)*sin(phi_os)+cos(phi_os))
+    M_O=-(hs*rb**2*(theta-phi_os+2*phi_i0-phi_e+2*pi*Nc-pi)*(theta+phi_os-phi_e+2*pi*Nc+pi))/2
+    
+    (cx,cy)=(-cxd1+ro*cos(phi_ie-pi/2-theta),-cyd1+ro*sin(phi_ie-pi/2-theta))
+    fz_p = Vd1/hs
+    
+    exact_dict = dict(fx_p = fx_p,
+                      fy_p = fy_p,
+                      fz_p = fz_p,
+                      M_O = M_O,
+                      cx = cx,
+                      cy = cy
+                      )
+    
+    if not poly:
+        return exact_dict
     else:
-        fxp_poly=None
-        fyp_poly=None
-    
-    return Vd1,dVd1,cx,cy,fx_p,fy_p,fxp_poly,fyp_poly
+#        phi=np.linspace(phi_os+pi,phi_ie-theta-2.0*pi*Nc,1000)
+#        (xo,yo)=coords_inv(phi, geo, theta, "oi")
+#        nx=np.zeros_like(phi)
+#        ny=np.zeros_like(phi)
+#        (nx,ny)=coords_norm(phi,geo,theta,"oi")
+#        L=len(xo)
+#        dA=h*np.sqrt(np.power(xo[1:L]-xo[0:L-1],2)+np.power(yo[1:L]-yo[0:L-1],2))
+#        fxp_poly=np.sum(dA*(nx[1:L]+nx[0:L-1])/2.0)
+#        fyp_poly=np.sum(dA*(ny[1:L]+ny[0:L-1])/2.0)
+        return exact_dict
     
 def DD(theta, geo, poly=False, forces=False):
     

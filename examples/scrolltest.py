@@ -12,7 +12,7 @@ from math import pi
 # If the following line is uncommented, python will try to use a local version
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
-#sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo
@@ -247,18 +247,32 @@ def Compressor(f = None):
     
     #debug_plots(ScrollComp)
     
+    ScrollComp.calculate_force_terms(orbiting_back_pressure = pe)
     import pylab
-    Fz = (ScrollComp.p-pe)*ScrollComp.V/ScrollComp.geo.h
-    Fz[0,:]=0
-    Fz[np.isnan(Fz)]=0
-    summed_Fz = np.sum(Fz,axis = 0) #kN
-    mean_Fz = np.trapz(summed_Fz, ScrollComp.t)/(2*pi)
     V = ScrollComp.geo.ro*ScrollComp.omega
-    mu = 0.03
-    Wdot_loss_thrust = mean_Fz*V*mu
-    pylab.plot(ScrollComp.t,Fz.T,ScrollComp.t,summed_Fz,'-',ScrollComp.t,mean_Fz*(1+0*ScrollComp.t),'--') #kN
+    mu = 0.08
+    Wdot_loss_thrust = ScrollComp.forces.mean_Fz*V*mu
+    pylab.plot(ScrollComp.t,ScrollComp.forces.Fz.T,
+               ScrollComp.t,ScrollComp.forces.summed_Fz,'-',
+               ScrollComp.t,ScrollComp.forces.mean_Fz*(1+0*ScrollComp.t),'--') #kN
     pylab.show()
     print 'Thrust bearing loss is',Wdot_loss_thrust*1000,'W'
+    
+    pylab.plot(ScrollComp.t,ScrollComp.forces.Fr.T,
+               ScrollComp.t,ScrollComp.forces.mean_Fr*(1+0*ScrollComp.t),'--') #kN
+    pylab.show()
+    
+    from PDSim.core.bearings import journal_bearing
+    JB = journal_bearing(r_b = 0.02,
+                    L = 0.04,
+                    omega = ScrollComp.omega,
+                    W = ScrollComp.forces.mean_Fr*1000,
+                    design = 'friction',
+                    eta_0 = 0.17
+                    )
+    
+    print 'Crank pin journal loss is',JB['Wdot_loss'],'W'
+        
     return ScrollComp
     
 if __name__=='__main__':

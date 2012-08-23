@@ -46,6 +46,9 @@ cpdef dict C2_forces(double theta, int alpha, geoVals geo, bint poly = *)
 cpdef tuple D1(double theta, geoVals geo, bint poly=*)
 cpdef dict D1_forces(double theta, geoVals geo, bint poly = *)
 
+cpdef tuple D2(double theta, geoVals geo, bint poly=*)
+cpdef dict D2_forces(double theta, geoVals geo, bint poly = *)
+
 @cython.locals(hs=cython.double,
 				xa1=cython.double,
 				ya1=cython.double,

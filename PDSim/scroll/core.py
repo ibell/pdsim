@@ -6,14 +6,19 @@ from PDSim.misc._listmath import listm
 from PDSim.flow import flow_models
 from PDSim.plot.plots import debug_plots
 import scroll_geo
+from _scroll import _Scroll
 
 ##--- non-package imports
+
 from scipy.optimize import fsolve, newton
 from CoolProp.CoolProp import UseSinglePhaseLUT, Props
 from CoolProp import State
 from math import pi,cos
-from _scroll import _Scroll
+import numpy as np
 import copy
+
+class struct(object):
+    pass
 
 class Scroll(PDSimCore, _Scroll):
     """
@@ -1032,4 +1037,113 @@ class Scroll(PDSimCore, _Scroll):
         
         #Overall isentropic efficiency
         self.eta_oi = self.Wdot_i/self.Wdot_electrical
+        
+    def calculate_force_terms(self,
+                              orbiting_back_pressure=None):
+        """
+        Calculate the force profiles, mean forces, moments, etc.
+        
+        Parameters
+        ----------
+        orbiting_back_pressure : float, or class instance
+            If a class instance, must provide a function __call__ that takes as its first input the Scroll class
+        
+        
+        """
+        
+        self.forces = struct()
+        
+        ####################################################
+        #############  Normal force components #############
+        ####################################################
+        #The force of the in each chamber pushes the orbiting scroll away
+        self.forces.Fz = self.p*self.V/self.geo.h
+        if isinstance(orbiting_back_pressure, float):
+            #The back gas pressure on the orbiting scroll pushes the scroll back down
+            self.forces.Fz -= orbiting_back_pressure*self.V/self.geo.h
+        else:
+            raise NotImplementedError('calculate_force_terms must get a float back pressure for now')
+        
+        # The Isa chamber doesn't contribute to the total force upwards
+        # so zero out its elements in the force matrix
+        Isa = self.CVs.index('sa')
+        self.forces.Fz[Isa,:] = 0.0
+        
+        #Remove all the NAN placeholders
+        self.forces.Fz[np.isnan(self.forces.Fz)]=0
+        #Sum the terms
+        self.forces.summed_Fz = np.sum(self.forces.Fz,axis = 0) #kN    
+        #Calculate the mean axial force
+        self.forces.mean_Fz = np.trapz(self.forces.summed_Fz, self.t)/(2*pi)
+        
+        ####################################################
+        #############  "Radial" force components ###########
+        ####################################################
+        self.forces.Fx = np.zeros((self.CVs.N,len(self.t)))
+        self.forces.Fy = np.zeros_like(self.forces.Fx)
+        self.forces.Fr = np.zeros_like(self.forces.Fx)
+        # A map of CVkey to function to be called to get force components
+        # All functions in this map use the same call signature and are "boring"
+        # Each function returns a dictionary of terms
+        func_map = dict(s1 = scroll_geo.S1_forces,
+                        s2 = scroll_geo.S2_forces,
+                        d1 = scroll_geo.D1_forces,
+                        d2 = scroll_geo.D2_forces,
+                        )
+        for CVkey in self.CVs.keys():
+            if CVkey in func_map:
+                #Calculate the force components for each crank angle
+                #Early bind the function
+                func = func_map[CVkey]
+                # Calculate the geometric parts for each chamber
+                # They are divided by the pressure in the chamber
+                geo_components = [func(theta,self.geo) for theta in self.t]
+            elif CVkey.startswith('c1'):
+                #Early bind the function
+                func = scroll_geo.C1_forces
+                #Get the key for the CV
+                alpha = int(CVkey.split('.')[1])
+                # Calculate the geometric parts for each chamber
+                # They are divided by the pressure in the chamber
+                geo_components = [func(theta,alpha,self.geo) for theta in self.t]
+            elif CVkey.startswith('c2'):
+                #Early bind the function
+                func = scroll_geo.C2_forces
+                #Get the key for the CV
+                alpha = int(CVkey.split('.')[1])
+                # Calculate the geometric parts for each chamber
+                # They are divided by the pressure in the chamber
+                geo_components = [func(theta,alpha,self.geo) for theta in self.t]
+            else:
+                geo_components = []
+                
+            if geo_components:
+                I = self.CVs.index(CVkey)
+                p = self.p[I,:]
+                self.forces.Fx[I,:] = [comp['fx_p'] for comp in geo_components]*p
+                self.forces.Fy[I,:] = [comp['fy_p'] for comp in geo_components]*p
+                import pylab
+                pylab.plot(self.forces.Fx[I,:],self.forces.Fy[I,:])
+                
+            #Remove all the NAN placeholders
+            self.forces.Fx[np.isnan(self.forces.Fx)]=0
+            self.forces.Fy[np.isnan(self.forces.Fy)]=0
+            #Sum the terms
+            self.forces.summed_Fx = np.sum(self.forces.Fx,axis = 0) #kN
+            self.forces.summed_Fy = np.sum(self.forces.Fy,axis = 0) #kN    
+            #Calculate the radial force on the crank pin at each crank angle
+            self.forces.Fr = np.sqrt(np.power(self.forces.summed_Fx,2)+np.power(self.forces.summed_Fy,2))
+            #Calculate the mean axial force
+            self.forces.mean_Fr = np.trapz(self.forces.Fr, self.t)/(2*pi)
+
+        pylab.show()
+                
+                
+                
+        
+        
+        
+        
+        
+        
         
