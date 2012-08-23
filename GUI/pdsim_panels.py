@@ -1193,6 +1193,21 @@ class StateInputsPanel(PDPanel):
             p_suction = self.SuctionState.GetState().p
             p_ratio = float(self.DischargeValue.GetValue())
             simulation.discharge_pressure = p_ratio * p_suction
+        #Set the state variables in the simulation
+        simulation.suction_pressure = self.SuctionState.GetState().p
+        simulation.suction_temp = self.SuctionState.GetState().T
+         
+        Fluid = self.SuctionState.GetState().Fluid
+        if self.SuctionState.GetState().p < CP.Props(Fluid,'pcrit'):
+            #If subcritical, also calculate the superheat and sat_temp
+            p = simulation.suction_pressure
+            simulation.suction_sat_temp = CP.Props('T', 'P', p, 'Q', 1.0, Fluid)
+            simulation.suction_superheat = simulation.suction_temp-simulation.suction_sat_temp
+        else:
+            #Otherwise remove the parameters
+            del simulation.suction_sat_temp
+            del simulation.suction_superheat
+            
         
     def post_prep_for_configfile(self):
         """

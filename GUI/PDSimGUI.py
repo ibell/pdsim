@@ -1714,7 +1714,8 @@ class MainFrame(wx.Frame):
         temp_folder = os.path.join(home,'.pdsim-temp')
         
         if os.path.exists(temp_folder):
-            dlg = wx.MessageDialog(None,'Ok to remove all the temporary files',style = wx.OK|wx.CANCEL)
+            N = len(glob.glob(os.path.join(temp_folder,'*.*')))
+            dlg = wx.MessageDialog(None,'There are '+str(N)+' files in the temporary folder.\n\nPress Ok to remove all the temporary files',style = wx.OK|wx.CANCEL)
             if dlg.ShowModal() == wx.ID_OK:    
                 shutil.rmtree(temp_folder)
                 print 'removed the folder',temp_folder 

@@ -82,7 +82,7 @@ def Compressor(f = None):
         M_O.append(F['M_O'])
     
     import pylab
-    pylab.plot(fx,fy,'-',cxp,fyp,'s',mfc='none')
+    pylab.plot(fx,fy,'-',fxp,fyp,'s',mfc='none')
     pylab.show()
     return
 #    radial_pairs = scroll_geo.radial_leakage_pairs(ScrollComp.geo)
