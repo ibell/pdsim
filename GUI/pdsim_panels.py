@@ -1207,7 +1207,6 @@ class StateInputsPanel(PDPanel):
             #Otherwise remove the parameters
             del simulation.suction_sat_temp
             del simulation.suction_superheat
-            
         
     def post_prep_for_configfile(self):
         """

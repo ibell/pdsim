@@ -42,49 +42,50 @@ def Compressor(f = None):
     ScrollComp.geo.delta_radial = 15e-6
     ScrollComp.omega = 3600/60*2*pi
     ScrollComp.Tamb = 298.0
+    ScrollComp.eta_motor = 0.9
     
-    M_O,cx,cy,fx,fy,fz,tt,fyp,fxp=[],[],[],[],[],[],[],[],[]
-        
-    for th in np.linspace(0,2*pi,200):
-        tt.append(th)
-        F = scroll_geo.S1_forces(th,geo=ScrollComp.geo,poly=True)
-        fxp.append(F['fxp_poly'])
-        fyp.append(F['fyp_poly'])
-        fx.append(F['fx_p'])
-        fy.append(F['fy_p'])
-        fz.append(F['fz_p'])
-        cx.append(F['cx'])
-        cy.append(F['cy'])
-        M_O.append(F['M_O'])
-            
-    for th in np.linspace(0,scroll_geo.theta_d(ScrollComp.geo)-0.001,100):
-        tt.append(th+2*pi)
-        F = scroll_geo.C1_forces(th,alpha=1,geo=ScrollComp.geo,poly=True)
-        fxp.append(F['fxp_poly'])
-        fyp.append(F['fyp_poly'])
-        fx.append(F['fx_p'])
-        fy.append(F['fy_p'])
-        fz.append(F['fz_p'])
-        cx.append(F['cx'])
-        cy.append(F['cy'])
-        M_O.append(F['M_O'])
-          
-    for th in np.linspace(scroll_geo.theta_d(ScrollComp.geo)+0.001,2*pi,100):
-        tt.append(th+2*pi)
-        F = scroll_geo.D1_forces(th,geo=ScrollComp.geo,poly=True)
-        fxp.append(F['fxp_poly'])
-        fyp.append(F['fyp_poly'])
-        fx.append(F['fx_p'])
-        fy.append(F['fy_p'])
-        fz.append(F['fz_p'])
-        cx.append(F['cx'])
-        cy.append(F['cy'])
-        M_O.append(F['M_O'])
-    
-    import pylab
-    pylab.plot(fx,fy,'-',fxp,fyp,'s',mfc='none')
-    pylab.show()
-    return
+#    M_O,cx,cy,fx,fy,fz,tt,fyp,fxp=[],[],[],[],[],[],[],[],[]
+#        
+#    for th in np.linspace(0,2*pi,200):
+#        tt.append(th)
+#        F = scroll_geo.S1_forces(th,geo=ScrollComp.geo,poly=True)
+#        fxp.append(F['fxp_poly'])
+#        fyp.append(F['fyp_poly'])
+#        fx.append(F['fx_p'])
+#        fy.append(F['fy_p'])
+#        fz.append(F['fz_p'])
+#        cx.append(F['cx'])
+#        cy.append(F['cy'])
+#        M_O.append(F['M_O'])
+#            
+#    for th in np.linspace(0,scroll_geo.theta_d(ScrollComp.geo)-0.001,100):
+#        tt.append(th+2*pi)
+#        F = scroll_geo.C1_forces(th,alpha=1,geo=ScrollComp.geo,poly=True)
+#        fxp.append(F['fxp_poly'])
+#        fyp.append(F['fyp_poly'])
+#        fx.append(F['fx_p'])
+#        fy.append(F['fy_p'])
+#        fz.append(F['fz_p'])
+#        cx.append(F['cx'])
+#        cy.append(F['cy'])
+#        M_O.append(F['M_O'])
+#          
+#    for th in np.linspace(scroll_geo.theta_d(ScrollComp.geo)+0.001,2*pi,100):
+#        tt.append(th+2*pi)
+#        F = scroll_geo.D1_forces(th,geo=ScrollComp.geo,poly=True)
+#        fxp.append(F['fxp_poly'])
+#        fyp.append(F['fyp_poly'])
+#        fx.append(F['fx_p'])
+#        fy.append(F['fy_p'])
+#        fz.append(F['fz_p'])
+#        cx.append(F['cx'])
+#        cy.append(F['cy'])
+#        M_O.append(F['M_O'])
+#    
+#    import pylab
+#    pylab.plot(fx,fy,'-',fxp,fyp,'s',mfc='none')
+#    pylab.show()
+#    return
 #    radial_pairs = scroll_geo.radial_leakage_pairs(ScrollComp.geo)
 #    th = 0.55*2*pi
 #    
@@ -231,6 +232,7 @@ def Compressor(f = None):
                      )
     except:
         debug_plots(ScrollComp)
+        raise
 
     print 'time taken',clock()-t1
     
@@ -243,8 +245,20 @@ def Compressor(f = None):
         ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
     
-    debug_plots(ScrollComp)
+    #debug_plots(ScrollComp)
     
+    import pylab
+    Fz = (ScrollComp.p-pe)*ScrollComp.V/ScrollComp.geo.h
+    Fz[0,:]=0
+    Fz[np.isnan(Fz)]=0
+    summed_Fz = np.sum(Fz,axis = 0) #kN
+    mean_Fz = np.trapz(summed_Fz, ScrollComp.t)/(2*pi)
+    V = ScrollComp.geo.ro*ScrollComp.omega
+    mu = 0.03
+    Wdot_loss_thrust = mean_Fz*V*mu
+    pylab.plot(ScrollComp.t,Fz.T,ScrollComp.t,summed_Fz,'-',ScrollComp.t,mean_Fz*(1+0*ScrollComp.t),'--') #kN
+    pylab.show()
+    print 'Thrust bearing loss is',Wdot_loss_thrust*1000,'W'
     return ScrollComp
     
 if __name__=='__main__':
