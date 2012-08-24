@@ -21,7 +21,7 @@ from CoolProp.State import State
 
 ##--  Package imports  --
 from PDSim.flow._sumterms import setcol, getcol
-from PDSim.flow import _flow
+from PDSim.flow import _flow,flow_models
 from PDSim.flow.flow import FlowPathCollection, FlowPath
 from containers import ControlVolumeCollection
 from PDSim.plot.plots import debug_plots
@@ -1500,6 +1500,31 @@ class PDSimCore(object):
             f+=Valve.derivs(self)
         return f
         
+    def IsentropicNozzleFM(self,FlowPath,A,**kwargs):
+        """
+        A generic isentropic nozzle flow model wrapper
+        
+        Parameters
+        ----------
+        FlowPath : FlowPath instance
+            A fully-instantiated flow path model
+        A : float
+            throat area for isentropic nozzle model [:math:`m^2`]
+            
+        Returns
+        -------
+        mdot : float
+            The mass flow through the flow path [kg/s]
+        """
+
+        try:
+            mdot = flow_models.IsentropicNozzle(A,
+                                                FlowPath.State_up,
+                                                FlowPath.State_down)
+            return mdot
+        except ZeroDivisionError:
+            return 0.0
+
     def endcycle_callback(self,eps_wrap_allowed=0.0001):
         """
         This function can be called at the end of the cycle if so desired.

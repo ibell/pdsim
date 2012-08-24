@@ -32,7 +32,7 @@ class PlotPanel(wx.Panel):
         
 class GeometryPanel(pdsim_panels.PDPanel):
     """
-    The geometry panel of the reciprocating compressor
+    The geometry panel of the scroll compressor
     Loads all parameters from the configuration file
     """
     def __init__(self,parent,configfile,**kwargs):
@@ -227,14 +227,15 @@ class InletFlowChoice(pdsim_panels.MassFlowOption):
     
     def __init__(self,parent,**kwargs):
         pdsim_panels.MassFlowOption.__init__(self,parent,**kwargs)
+        self.parent = parent
         
     def model_options(self):
-        return [
-                dict(desc = 'Isentropic nozzle',
-                     function_name = 'Inlet_sa',
+        return [dict(desc = 'Isentropic nozzle',
+                     function_name = 'IsentropicNozzleFM',
                      params = [dict(attr = 'X_d',
                                     value = 0.3,
-                                    desc = 'Tuning factor')]
+                                    desc = 'Tuning factor')
+                               ]
                      )
                 ]
                 
@@ -249,7 +250,6 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         
         self.items1 = [
         dict(attr='d_discharge'),
-        dict(attr='d_suction'),
         dict(attr='inlet_tube_length'),
         dict(attr='inlet_tube_ID'),
         dict(attr='outlet_tube_length'),
@@ -303,29 +303,60 @@ class MassFlowPanel(pdsim_panels.PDPanel):
             flow.label.SetMinSize((min_width,-1))
             
     def post_set_params(self, simulation):
-        #Create and add each of the flow paths
+        #Create and add each of the flow paths based on the flow model selection
         for flow in self.flows:
             func_name = flow.get_function_name()
+            #func is a pointer to the actual function in the simulation instance
             func = getattr(simulation, func_name)
             
             param_dict = {p['attr']:p['value'] for p in flow.params_dict}
+            if isinstance(flow, InletFlowChoice):
+                #Get the diameter from the inlet_tube_ID item
+                D = float(self._get_item_by_attr('inlet_tube_ID')['textbox'].GetValue())
+                #Apply the correction factor
+                A = pi*D**2/4 * param_dict.pop('X_d')
+                param_dict['A']=A
+                
             simulation.add_flow(FlowPath(key1 = flow.key1,
                                          key2 = flow.key2,
                                          MdotFcn = func,
-                                         MdotFcn_kwargs = param_dict)
+                                         MdotFcn_kwargs = param_dict
+                                         )
                                 )
             
+        D = float(self._get_item_by_attr('d_discharge')['textbox'].GetValue())
+        A_discharge_port = pi*D**2/4
+        
+        for _key in ['dd','ddd']:
+            simulation.add_flow(FlowPath(key1='outlet.1', 
+                                         key2=_key, 
+                                         MdotFcn=simulation.IsentropicNozzleFM,
+                                         MdotFcn_kwargs = dict(A = A_discharge_port)
+                                         )
+                                )
+    
         if callable(simulation.Vdisp):
             Vdisp = simulation.Vdisp()
         else:
             Vdisp = simulation.Vdisp
         
-        #Set omega and inlet state 
+        # Set omega and inlet state
+        # omega is set in the conventional way, so you want to make sure you 
+        # don't overwrite it with the GUI value if you are doing a parametric table
+        # state is set using the special method for additional parametric terms
+        
         parent = self.GetParent() #InputsToolBook
         for child in parent.GetChildren():
             if hasattr(child,'Name') and child.Name == 'StatePanel':
-                child.set_params(simulation)
-                child.post_set_params(simulation)
+                if hasattr(simulation,'omega'): 
+                    omega = simulation.omega
+                    child.set_params(simulation)
+                    child.post_set_params(simulation)
+                    simulation.omega = omega
+                else:
+                    child.set_params(simulation)
+                    child.post_set_params(simulation)
+                    omega = simulation.omega
                         
         Vdot = Vdisp*simulation.omega/(2*pi)
         

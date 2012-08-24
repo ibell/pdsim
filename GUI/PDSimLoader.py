@@ -81,8 +81,6 @@ def ScrollBuilder(scroll):
     
     scroll.auto_add_CVs(scroll.inletState, outletState)
     
-    scroll.add_flow(FlowPath(key1='outlet.1', key2='ddd', MdotFcn=scroll.Discharge))
-    scroll.add_flow(FlowPath(key1='outlet.1', key2='dd', MdotFcn=scroll.Discharge))
     scroll.add_flow(FlowPath(key1='d1', key2='dd', MdotFcn=scroll.D_to_DD))
     scroll.add_flow(FlowPath(key1='d2', key2='dd', MdotFcn=scroll.D_to_DD))
     

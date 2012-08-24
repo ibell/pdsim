@@ -212,6 +212,13 @@ class PDPanel(wx.Panel):
         wx.Panel.__init__(self,*args,**kwargs)
         self.name=kwargs.get('name','')
         
+    def _get_item_by_attr(self, attr):
+        if hasattr(self,'items'):
+            for item in self.items:
+                if item['attr'] == attr:
+                    return item
+        raise ValueError('_get_item_by_attr failed')
+        
     def _get_value(self,thing):
         #This first should work for wx.TextCtrl
         if hasattr(thing,'GetValue'):
@@ -809,7 +816,9 @@ class ParametricPanel(PDPanel):
                 # It can set terms in the GUI so that they can be loaded back by the 
                 # simulation builder
                 #
-                # apply_additional_parametric_terms returns a tuple of attrs, vals for the terms that were unmatched
+                # apply_additional_parametric_terms returns a tuple of attrs, vals 
+                # for the terms that were unmatched by the parametric
+                # preprocessors
                 attrs, vals = Main.MTB.InputsTB.apply_additional_parametric_terms(attrs, vals, self.variables)
                 
                 #Build the recip or the scroll using the GUI parameters
@@ -1069,14 +1078,21 @@ class StatePanel(wx.Panel):
         self._Fluid_fixed = Fluid_fixed
         p = CP.Props('P','T',T,'D',rho,str(Fluid))
         sizer=wx.FlexGridSizer(cols=2,hgap=4,vgap=4)
-        self.Fluidlabel, self.Fluid = LabeledItem(self,label="Fluid",value=str(Fluid),enabled=False)
-        self.Tlabel, self.T = LabeledItem(self,label="Temperature [K]",value=str(T),enabled=False)
-        self.plabel, self.p = LabeledItem(self,label="Pressure [kPa]",value=str(p),enabled=False)
-        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/m³]",value=str(rho),enabled=False)
+        self.Fluidlabel, self.Fluid = LabeledItem(self,label="Fluid",value=str(Fluid))
+        
+        self.Tlabel, self.T = LabeledItem(self,label="Temperature [K]",value=str(T))
+        self.plabel, self.p = LabeledItem(self,label="Pressure [kPa]",value=str(p))
+        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/m³]",value=str(rho))
         sizer.AddMany([self.Fluidlabel, self.Fluid,self.Tlabel,self.T,self.plabel,self.p,self.rholabel,self.rho])
-        self.calcbtn=wx.Button(self,-1,"Choose")
-        sizer.Add(self.calcbtn)
-        self.calcbtn.Bind(wx.EVT_BUTTON, self.UseChooser)
+        
+        
+        for box in [self.T,self.p,self.rho,self.Fluid]:
+            #Make the box not editable
+            self.Fluid.SetEditable(False)
+            #Bind events tp fire the chooser when text boxes are clicked on
+            box.Bind(wx.EVT_LEFT_DOWN,self.UseChooser)
+            box.SetToolTipString('Click on me to select the state')
+        
         self.SetSizer(sizer)
         
     def GetState(self):
@@ -1193,6 +1209,7 @@ class StateInputsPanel(PDPanel):
             p_suction = self.SuctionState.GetState().p
             p_ratio = float(self.DischargeValue.GetValue())
             simulation.discharge_pressure = p_ratio * p_suction
+            
         #Set the state variables in the simulation
         simulation.suction_pressure = self.SuctionState.GetState().p
         simulation.suction_temp = self.SuctionState.GetState().T
@@ -1283,80 +1300,6 @@ class StateInputsPanel(PDPanel):
         elif num_suct_params >2:
             raise ValueError ('Only two inlet state parameters can be provided in parametric table')
         return attrs, vals
-
-class InjectionViewerDialog(wx.Dialog):
-    """
-    A dialog with simple plot of the locations of the injection ports
-    """
-    def __init__(self, geo, phi):
-        wx.Dialog.__init__(self, parent = None)
-        
-        PP = PlotPanel(self)
-        PP.ax = PP.figure.add_axes((0,0,1,1))
-        scroll_geo.plot_injection_ports(0,geo,phi,PP.ax)
-        
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(PP)
-        sizer.Layout()
-        self.Fit()
-        
-class InjectionElementPanel(wx.Panel):
-    """
-    A panel with the injection values for one injection port
-    """
-    def __init__(self, parent):
-        wx.Panel.__init__(self,parent)
-        
-        #Inputs Toolbook
-        ITB = self.GetTopLevelParent().MTB.InputsTB
-        Fluid = None
-        for panel in ITB.panels:
-            if panel.Name == 'StatePanel':
-                Fluid = panel.SuctionState.GetState().Fluid
-                break
-        if Fluid is None:
-            raise ValueError('StatePanel not found in Inputs Toolbook')
-        
-        self.state = StatePanel(self, Fluid=Fluid, Fluid_fixed = True, )
-        self.Llabel,self.Lval = LabeledItem(self, label='Length of injection line',value='1.0')
-        self.IDlabel,self.IDval = LabeledItem(self, label='Inner diameter of injection line',value='0.01')
-        self.philabel,self.phival = LabeledItem(self, label='Involute angle',value='3.14159')
-        self.btn = wx.Button(self, label='View')
-        self.btn.Bind(wx.EVT_BUTTON, self.OnView)
-        
-        sizer = wx.FlexGridSizer(cols = 3)
-        sizer.AddMany([self.Llabel,self.Lval])
-        sizer.AddSpacer(10)
-        sizer.AddMany([self.IDlabel,self.IDval])
-        sizer.AddSpacer(10)
-        sizer.AddMany([self.philabel,self.phival])
-        sizer.Add(self.btn)
-        sizer.Add(self.state)
-        sizer.Layout()
-        
-    def OnView(self, event):
-        geo = self.GetTopLevelParent().MTB.InputsTB.panels[0].Scroll.geo
-        dlg = InjectionViewerDialog(geo,float(self.phival.GetValue()))
-        dlg.ShowModal()
-        
-class InjectionInputsPanel(PDPanel):
-    """
-    The container panel for all the injection ports and injection data 
-    """ 
-    def __init__(self, parent):
-        PDPanel.__init__(self,parent)
-        
-        self.InjectionElement = InjectionElementPanel(self)
-        
-        sizer = wx.FlexGridSizer(cols = 2)
-        sizer.Add(self.InjectionElement)
-        sizer.Layout()
         
 if __name__=='__main__':
-    app = wx.App(False)
-
-    dlg = UnitConvertor(1.0,'Meter',type ='length')
-    dlg.ShowModal()
-    dlg.Destroy()
-    
-    app.MainLoop()
+    execfile('PDSimGUI.py')

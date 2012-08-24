@@ -30,13 +30,14 @@ import numpy as np
 from matplotlib import pyplot as plt
 import time
 
-Injection = False
+Injection = True
+check_valve = False
 
 def Compressor(f = None):
     global Injection
     ScrollComp=Scroll()
     #This runs if the module code is run directly
-    ScrollComp.set_scroll_geo(104.8e-6, 1.61, 0.004, 0.005) #Set the scroll wrap geometry
+    ScrollComp.set_scroll_geo(104.8e-6, 3.48, 0.004, 0.005) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2='PMP')
     ScrollComp.geo.delta_flank = 15e-6
     ScrollComp.geo.delta_radial = 15e-6
@@ -116,7 +117,7 @@ def Compressor(f = None):
     Ref='R404A'
     
     Te = -10 + 273.15
-    Tc =  13 + 273.15
+    Tc =  43 + 273.15
     Tin = Tc + 20
     DT_sc = 7
     pe = CP.Props('P','T',Te,'Q',1.0,Ref)
@@ -152,8 +153,7 @@ def Compressor(f = None):
         ScrollComp.add_CV(ControlVolume(key ='injCV.1',
                                         VdVFcn = ScrollComp.V_injection,
                                         VdVFcn_kwargs = dict(V_tube = V_tube),
-                                        initialState = injState1,
-                                        becomes = 'injCV.1'
+                                        initialState = injState1
                                         )
                           )
     
@@ -163,8 +163,8 @@ def Compressor(f = None):
     
     ScrollComp.add_flow(FlowPath(key1='inlet.2', 
                                  key2='sa', 
-                                 MdotFcn=ScrollComp.Inlet_sa,
-                                 MdotFcn_kwargs = dict(X_d = 0.3)
+                                 MdotFcn=ScrollComp.IsentropicNozzleFM,
+                                 MdotFcn_kwargs = dict(A = pi*0.02**2/4)
                                  )
                         )
     ScrollComp.add_flow(FlowPath(key1='sa', 
@@ -186,14 +186,16 @@ def Compressor(f = None):
                                      key2 = 'injCV.1', 
                                      MdotFcn=ScrollComp.Injection_to_Comp,
                                      MdotFcn_kwargs = dict(phi = phi + pi,
-                                                           inner_outer = 'i')
+                                                           inner_outer = 'i',
+                                                           check_valve = check_valve)
                                     )
                             )
         ScrollComp.add_flow(FlowPath(key1 = 'c2.1', 
                                      key2 = 'injCV.1', 
                                      MdotFcn=ScrollComp.Injection_to_Comp,
                                      MdotFcn_kwargs = dict(phi = phi,
-                                                           inner_outer = 'o')
+                                                           inner_outer = 'o',
+                                                           check_valve = check_valve)
                                     )
                             )
         
@@ -207,10 +209,21 @@ def Compressor(f = None):
                             )
         ScrollComp.add_flow(FlowPath(key1='injection.2',
                                      key2='injCV.1',
-                                     MdotFcn=ScrollComp.InjectionTubeFM))
+                                     MdotFcn=ScrollComp.IsentropicNozzleFM,
+                                     MdotFcn_kwargs = dict(A=pi*0.02**2/4)
+                                     )
+                            )
     
-    ScrollComp.add_flow(FlowPath(key1='outlet.1',key2='ddd',MdotFcn=ScrollComp.Discharge))
-    ScrollComp.add_flow(FlowPath(key1='outlet.1',key2='dd',MdotFcn=ScrollComp.Discharge))
+    ScrollComp.add_flow(FlowPath(key1='outlet.1',key2='ddd',
+                                 MdotFcn = ScrollComp.IsentropicNozzleFM,
+                                 MdotFcn_kwargs = dict(A=pi*0.01**2/4)
+                                 )
+                        )
+    ScrollComp.add_flow(FlowPath(key1='outlet.1',key2='dd',
+                                 MdotFcn = ScrollComp.IsentropicNozzleFM,
+                                 MdotFcn_kwargs = dict(A=pi*0.01**2/4)
+                                 )
+                        )
     ScrollComp.add_flow(FlowPath(key1='d1',key2='dd',MdotFcn=ScrollComp.D_to_DD))
     ScrollComp.add_flow(FlowPath(key1='d2',key2='dd',MdotFcn=ScrollComp.D_to_DD))
 
@@ -233,7 +246,6 @@ def Compressor(f = None):
     except:
         raise
         debug_plots(ScrollComp)
-        
 
     print 'time taken',clock()-t1
     
@@ -246,49 +258,50 @@ def Compressor(f = None):
         ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
     
-    #debug_plots(ScrollComp)
+    #debug_plots(ScrollComp,plot_names=['Pressure v. crank angle'])
     
-    ScrollComp.calculate_force_terms(orbiting_back_pressure = pe)
-    import pylab
-    V = ScrollComp.geo.ro*ScrollComp.omega
-    mu = 0.08
-    Wdot_loss_thrust = ScrollComp.forces.mean_Fz*V*mu
-    pylab.plot(ScrollComp.t,ScrollComp.forces.Fz.T,
-               ScrollComp.t,ScrollComp.forces.summed_Fz,'-',
-               ScrollComp.t,ScrollComp.forces.mean_Fz*(1+0*ScrollComp.t),'--') #kN
-    pylab.show()
-    print 'Thrust bearing loss is',Wdot_loss_thrust*1000,'W'
+#    ScrollComp.calculate_force_terms(orbiting_back_pressure = pe)
     
-    pylab.plot(ScrollComp.t,ScrollComp.forces.Fr.T,
-               ScrollComp.t,ScrollComp.forces.mean_Fr*(1+0*ScrollComp.t),'--') #kN
-    pylab.show()
-    
-    from PDSim.core.bearings import journal_bearing
-    JB = journal_bearing(r_b = 0.02245/2,
-                    L = 0.027,
-                    omega = ScrollComp.omega,
-                    W = ScrollComp.forces.mean_Fr*1000,
-                    design = 'friction',
-                    eta_0 = 0.008
-                    )
-    
-    print 'Crank pin journal loss is',JB['Wdot_loss'],'W'
-    print 'Crank pin gap width is',JB['c']*1e6,'um'
-    
-    JB = journal_bearing(r_b = 0.01,
-                         L = 0.02,
-                         omega = ScrollComp.omega,
-                         W = ScrollComp.forces.mean_Fr*1000,
-                         design = 'friction',
-                         eta_0 = 0.008
-                         )
-    print 'Upper journal loss is',JB['Wdot_loss'],'W'
-    print 'Upper journal gap width is',JB['c']*1e6,'um'
+#    import pylab
+#    V = ScrollComp.geo.ro*ScrollComp.omega
+#    mu = 0.08
+#    Wdot_loss_thrust = ScrollComp.forces.mean_Fz*V*mu
+#    pylab.plot(ScrollComp.t,ScrollComp.forces.Fz.T,
+#               ScrollComp.t,ScrollComp.forces.summed_Fz,'-',
+#               ScrollComp.t,ScrollComp.forces.mean_Fz*(1+0*ScrollComp.t),'--') #kN
+#    pylab.show()
+#    print 'Thrust bearing loss is',Wdot_loss_thrust*1000,'W'
+#    
+#    pylab.plot(ScrollComp.t,ScrollComp.forces.Fr.T,
+#               ScrollComp.t,ScrollComp.forces.mean_Fr*(1+0*ScrollComp.t),'--') #kN
+#    pylab.show()
+#    
+#    from PDSim.core.bearings import journal_bearing
+#    JB = journal_bearing(r_b = 0.02245/2,
+#                    L = 0.027,
+#                    omega = ScrollComp.omega,
+#                    W = ScrollComp.forces.mean_Fr*1000,
+#                    design = 'friction',
+#                    eta_0 = 0.008
+#                    )
+#    
+#    print 'Crank pin journal loss is',JB['Wdot_loss'],'W'
+#    print 'Crank pin gap width is',JB['c']*1e6,'um'
+#    
+#    JB = journal_bearing(r_b = 0.01,
+#                         L = 0.02,
+#                         omega = ScrollComp.omega,
+#                         W = ScrollComp.forces.mean_Fr*1000,
+#                         design = 'friction',
+#                         eta_0 = 0.008
+#                         )
+#    print 'Upper journal loss is',JB['Wdot_loss'],'W'
+#    print 'Upper journal gap width is',JB['c']*1e6,'um'
         
     return ScrollComp
     
 if __name__=='__main__':
-        
+    
     profile=False
     if profile==True:
         import line_profiler as LP
@@ -297,13 +310,13 @@ if __name__=='__main__':
         profiler.print_stats()
     else:
         if Injection:
-            Compressor(0.3)
-            FP = open('results.csv','w')
-            for f in np.linspace(0.2,0.8,5):
+            FP = open('results-checkvalve-'+str(check_valve)+'.csv','w')
+            FP.write('f,mdot_injection,mdot_suction,x_sim,x_cycle\n')
+            for f in np.linspace(0.2,0.8,7):
                 S = Compressor(f)
                 x_sim = str(S.FlowsProcessed.mean_mdot['injection.1']/S.FlowsProcessed.mean_mdot['inlet.1']) 
                 x_cycle = str(S.injection_massflow_ratio)
-                FP.write('f, '+str(f)+','+str(S.FlowsProcessed.mean_mdot['injection.1'])+','+str(S.FlowsProcessed.mean_mdot['inlet.1'])+','+x_sim+','+x_cycle+'\n')
+                FP.write(str(f)+','+str(S.FlowsProcessed.mean_mdot['injection.1'])+','+str(S.FlowsProcessed.mean_mdot['inlet.1'])+','+x_sim+','+x_cycle+'\n')
             FP.close()       
         else:
             Compressor()

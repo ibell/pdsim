@@ -74,22 +74,23 @@ class Run1(Process):
         sys.stdout = redir
         sys.stderr = redir
         
-        if hasattr(self.sim,'OneCycle'):
-            OneCycle = self.sim.OneCycle
-        else:
-            OneCycle = False
+        #Set solver parameters from the GUI
+        OneCycle = self.sim.OneCycle if hasattr(self.sim,'OneCycle') else False
+        plot_every_cycle = self.sim.plot_every_cycle if hasattr(self.sim,'plot_every_cycle')  else False
             
         if isinstance(self.sim, Recip):
-            self.sim.precond_solve(key_inlet='inlet.1',key_outlet='outlet.2',
-            endcycle_callback=self.sim.endcycle_callback,
-            heat_transfer_callback=self.sim.heat_transfer_callback,
-            lump_energy_balance_callback = self.sim.lump_energy_balance_callback,
-            valves_callback =self.sim.valves_callback, 
-            OneCycle=OneCycle,
-            UseNR = True,
-            solver_method = self.sim.cycle_integrator_type,
-            pipe_abort = self.pipe_abort
-            )
+            self.sim.precond_solve(key_inlet='inlet.1',
+                                   key_outlet='outlet.2',
+                                   endcycle_callback=self.sim.endcycle_callback,
+                                   heat_transfer_callback=self.sim.heat_transfer_callback,
+                                   lump_energy_balance_callback = self.sim.lump_energy_balance_callback,
+                                   valves_callback =self.sim.valves_callback, 
+                                   OneCycle=OneCycle,
+                                   UseNR = True,
+                                   solver_method = self.sim.cycle_integrator_type,
+                                   pipe_abort = self.pipe_abort,
+                                   plot_every_cycle = plot_every_cycle
+                                   )
         elif isinstance(self.sim, Scroll):
             self.sim.precond_solve(
                                    key_inlet='inlet.1',
@@ -101,7 +102,8 @@ class Run1(Process):
                                    solver_method = self.sim.cycle_integrator_type,
                                    OneCycle=OneCycle,
                                    UseNR = False, #Use Newton-Raphson ND solver to determine the initial state if True
-                                   pipe_abort = self.pipe_abort
+                                   pipe_abort = self.pipe_abort,
+                                   plot_every_cycle = plot_every_cycle
                                    )
         else:
             raise TypeError
@@ -115,7 +117,7 @@ class Run1(Process):
             #Send simulation result back to calling thread
             print 'About to send recip back to calling thread'
             self.pipe_results.send(self.sim)
-            print 'Sent recip back to calling thread'
+            print 'Sent simulation back to calling thread'
             #Wait for an acknowledgement of receipt
             while not self.pipe_results.poll():
                 print 'Waiting for ack of recipt'
@@ -373,11 +375,11 @@ class InputsToolBook(wx.Toolbook):
         """
         for panel in self.panels:
             panel.set_params(simulation)
-            if hasattr(panel,'post_set_params'):
-                panel.post_set_params(simulation)
+        self.post_set_params(simulation)
     
     def post_set_params(self, simulation):
         for panel in self.panels:
+#            print panel,simulation.omega
             if hasattr(panel,'post_set_params'):
                 panel.post_set_params(simulation)
                 
@@ -495,11 +497,15 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         sizer.Insert(0,self.IC)
         sizer.AddSpacer(10)
         
-        sizer_advanced = wx.FlexGridSizer(cols = 2)
+        sizer_advanced = wx.FlexGridSizer(cols = 1)
         sizer.Add(wx.StaticText(self,label='Advanced/Debug options'))
         sizer.Add(wx.StaticLine(self, -1, (25, 50), (300,1)))
-        self.OneCycle = wx.CheckBox(self,label = "Just run one cycle - not the full solution")
-        sizer_advanced.AddMany([self.OneCycle])
+        self.OneCycle = wx.CheckBox(self,
+                                    label = "Just run one cycle - not the full solution")
+        self.plot_every_cycle = wx.CheckBox(self,
+                                            label = "Open the plots after each cycle (warning - very annoying but good for debug)")
+        sizer_advanced.AddMany([self.OneCycle,
+                                self.plot_every_cycle])
         sizer.Add(sizer_advanced)
         sizer.Layout()
     
@@ -522,6 +528,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
     def post_set_params(self, simulation):
         self.IC.set_sim(simulation)
         simulation.OneCycle = self.OneCycle.IsChecked()
+        simulation.plot_every_cycle = self.plot_every_cycle.IsChecked()
             
     def supply_parametric_term(self):
         pass
@@ -1504,7 +1511,7 @@ class MainFrame(wx.Frame):
         """
         Run a single simulation
         """
-        #Make single-run into a list in order to use the code
+        #Make single-run into a list in order to use the code for the batch
         self.run_batch([sim])
     
     def run_batch(self, sims):

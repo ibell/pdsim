@@ -420,7 +420,7 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
     else:
         raise AttributeError('Type not understood, should be one of 2Arc or ArcLineArc')
 
-def plot_injection_ports(theta, geo, phi, ax):
+def plot_injection_ports(theta, geo, phi, ax, inner_outer):
     """
     Plot the injection ports
     
@@ -431,10 +431,16 @@ def plot_injection_ports(theta, geo, phi, ax):
     geo : geoVals instance
     phi : float
         Involute angle in radians
+    ax : matplotlib axis instance
+    inner_outer : string
+        If ``'i'``, phi is along the inner involute of the fixed scroll
+        
+        If ``'o'``, phi is along the outer involute of the fixed scroll
         
     Notes
     -----
-    Assumes the ports to be symmetric
+    If you want symmetric injection ports, the ones on the inner involute should have a value of phi that is pi radians greater
+    
     """
     #Plot the injection ports (symmetric)
     plotScrollSet(theta, geo, axis = ax)
@@ -443,16 +449,19 @@ def plot_injection_ports(theta, geo, phi, ax):
     rport = geo.t/2.0
     t = np.linspace(0,2*pi,100)
     
-    #Involute angle along the outer involute of the scroll wrap
-    x, y = coords_inv(phi, geo, theta, 'fo')
-    nx, ny = coords_norm(phi, geo, theta, 'fo')
-    xc,yc = x-nx*rport,y-ny*rport
-    ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
-    
-    x, y = coords_inv(phi+pi, geo, theta, 'fi')
-    nx, ny = coords_norm(phi+pi, geo, theta, 'fi')
-    xc,yc = x-nx*rport,y-ny*rport
-    ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
+    if inner_outer == 'o':
+        #Involute angle along the outer involute of the scroll wrap
+        x, y = coords_inv(phi, geo, theta, 'fo')
+        nx, ny = coords_norm(phi, geo, theta, 'fo')
+        xc,yc = x-nx*rport,y-ny*rport
+        ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
+    elif inner_outer == 'i':
+        x, y = coords_inv(phi, geo, theta, 'fi')
+        nx, ny = coords_norm(phi, geo, theta, 'fi')
+        xc,yc = x-nx*rport,y-ny*rport
+        ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
+    else:
+        raise KeyError
         
 def radial_leakage_area(theta, geo, key1, key2, location = 'up'):
     """

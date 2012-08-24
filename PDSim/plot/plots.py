@@ -21,7 +21,7 @@ class Plot(wx.Panel):
         self.SetSizer(sizer)
 
 class PlotNotebook(wx.Panel):
-    def __init__(self,  Simulation, parent, id = -1):
+    def __init__(self,  Simulation, parent, id = -1,plot_names=None):
         wx.Panel.__init__(self, parent, id=id)
         self.nb = wx.aui.AuiNotebook(self)
         sizer = wx.BoxSizer()
@@ -29,6 +29,19 @@ class PlotNotebook(wx.Panel):
         self.SetSizer(sizer)
         self.build_main_page()
         self.Sim=Simulation
+        
+        if plot_names is not None:
+            for plot_name in plot_names:
+                matched = False
+                for name, func in self.plot_buttons:
+                    if name == plot_name:
+                        func()
+                        matched = True 
+                #Not matched, quit
+                if not matched:
+                    raise ValueError("Could not match the name: '"+plot_name+'"')
+                    
+                
 
     def update(self,Simulation):
         """
@@ -51,7 +64,7 @@ class PlotNotebook(wx.Panel):
         sizer = wx.BoxSizer(wx.VERTICAL)
         label1=wx.StaticText(page,label='Click on the buttons below to add plot')
         sizer.Add(label1)
-        plot_buttons=[('Volume v. crank angle',self.V_theta),
+        self.plot_buttons=[('Volume v. crank angle',self.V_theta),
                       ('Derivative of Volume v. crank angle',self.dV_dtheta),
                       ('Temperature v. crank angle',self.T_theta),
                       ('Pressure v. crank angle',self.p_theta),
@@ -63,7 +76,7 @@ class PlotNotebook(wx.Panel):
                       ('Temperature-pressure',self.temperature_pressure)
                       
                       ]
-        for value,callbackfcn in plot_buttons:
+        for value,callbackfcn in self.plot_buttons:
             btn = wx.Button(page,label=value)
             sizer.Add(btn)
             btn.Bind(wx.EVT_BUTTON,callbackfcn)
@@ -173,11 +186,11 @@ class PlotNotebook(wx.Panel):
             axes.set_xlabel('Temperature [K]')
             axes.set_ylabel(r'Pressure [kPa]')
     
-def debug_plots(Comp,plotparent=None):
+def debug_plots(Comp, plotparent=None, plot_names = None):
     #Build a new frame, not embedded
     app = wx.PySimpleApp()
     frame = wx.Frame(None,-1,'Plotter')
-    notebook = PlotNotebook(Comp,frame)
+    notebook = PlotNotebook(Comp,frame,plot_names=plot_names)
     frame.Show()
     app.MainLoop()
 

@@ -780,14 +780,6 @@ class Scroll(PDSimCore, _Scroll):
                                                 Tube.ID,
                                                 T_wall=self.Tlumps[0])
         
-    def InjectionTubeFM(self,FlowPath,**kwargs):
-        FlowPath.A=pi*0.02**2/4.0
-        try:
-            return flow_models.IsentropicNozzle(FlowPath.A,
-                                                FlowPath.State_up,
-                                                FlowPath.State_down)
-        except ZeroDivisionError:
-            return 0.0
     
     def DDD_to_S(self,FlowPath,flankFunc = None,**kwargs):
         if  flankFunc is None:
@@ -825,20 +817,6 @@ class Scroll(PDSimCore, _Scroll):
 #    def FlankLeakage(self,*args,**kwargs):
 #        return _Scroll.FlankLeakage(self,*args,**kwargs)
         
-    def Inlet_sa(self, FlowPath, X_d=1.0, **kwargs):
-        FlowPath.A=X_d*pi*0.03**2/4.0
-        return flow_models.IsentropicNozzle(FlowPath.A,
-                                            FlowPath.State_up,
-                                            FlowPath.State_down)
-        
-    def Discharge(self, FlowPath, **kwargs):
-        FlowPath.A=pi*0.01**2/4.0
-        try:
-            return flow_models.IsentropicNozzle(FlowPath.A,
-                                                FlowPath.State_up,
-                                                FlowPath.State_down)
-        except ZeroDivisionError:
-            return 0.0
         
     def SA_S(self, FlowPath, X_d=1.0,**kwargs):
         FlowPath.A=X_d*scroll_geo.Area_s_sa(self.theta, self.geo)
@@ -943,7 +921,7 @@ class Scroll(PDSimCore, _Scroll):
         else:
             return 'd1' if inner_outer == 'i' else 'd2'
         
-    def Injection_to_Comp(self,FlowPath,phi,inner_outer,**kwargs):
+    def Injection_to_Comp(self,FlowPath,phi,inner_outer,check_valve = False, **kwargs):
         """
         Function to calculate flow rate between injection line and chamber
         
@@ -954,7 +932,11 @@ class Scroll(PDSimCore, _Scroll):
         inner_outer : string ['i','o']
             'i' : involute angle corresponds to outer surface of fixed scroll
             'o' : involute angle corresponds to inner surface of orb. scroll 
-        
+        check_valve : boolean
+            If ``True``, there is an idealized check valve and flow can only go 
+            from chambers with key names that start with `injCV` to other chambers.
+            If ``False``, flow can go either direction
+            
         .. plot::
             import matplotlib.pyplot as plt
             from PDSim.scroll.plots import plotScrollSet
@@ -1007,6 +989,11 @@ class Scroll(PDSimCore, _Scroll):
             pass
         
         elif partner_key not in [FlowPath.key_up, FlowPath.key_down]:
+            return 0.0
+        # If the pressure in the injection line is below the other chamber and 
+        # you are using a theoretical check valve with instantaneous closing, 
+        # then you need to 
+        elif check_valve and FlowPath.key_down.startswith('injCV'):
             return 0.0
         #3. Find the distance of the scroll from the point on the involute
         #   where the port is tangent
@@ -1140,7 +1127,11 @@ class Scroll(PDSimCore, _Scroll):
         pylab.show()
                 
                 
-                
+    def IsentropicNozzleFM(self,*args,**kwargs):
+        """
+        A thin wrapper around the base class function for pickling purposes
+        """
+        return PDSimCore.IsentropicNozzleFM(self,*args,**kwargs)
         
         
         
