@@ -860,6 +860,35 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
         
     if lw is None:
         lw=1.0
+        
+    non_symmetric_attrs=['phi_fi0',
+                         'phi_fis',
+                         'phi_fie',
+                         'phi_fo0',
+                         'phi_fos',
+                         'phi_foe',
+                         'phi_oi0',
+                         'phi_ois',
+                         'phi_oie',
+                         'phi_oo0',
+                         'phi_oos',
+                         'phi_ooe',
+                         ]
+    # If scrolls are symmetric (any of the attrs in non_symmetric_attrs are 
+    # provided, copy the parameters
+    if any([hasattr(geo,attr) for attr in non_symmetric_attrs]):
+        geo.phi_fi0 = geo.phi_i0
+        geo.phi_fis = geo.phi_is
+        geo.phi_fie = geo.phi_ie
+        geo.phi_fo0 = geo.phi_o0
+        geo.phi_fos = geo.phi_os
+        geo.phi_foe = geo.phi_oe
+        geo.phi_oi0 = geo.phi_i0
+        geo.phi_ois = geo.phi_is
+        geo.phi_oie = geo.phi_ie
+        geo.phi_oo0 = geo.phi_o0
+        geo.phi_oos = geo.phi_os
+        geo.phi_ooe = geo.phi_oe
     
     xarc1=geo.xa_arc1+geo.ra_arc1*cos(np.linspace(geo.t2_arc1,geo.t1_arc1,100))
     yarc1=geo.ya_arc1+geo.ra_arc1*sin(np.linspace(geo.t2_arc1,geo.t1_arc1,100))
@@ -902,7 +931,6 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
         axis.plot(geo.xa_arc1,geo.ya_arc1,'^')
         axis.plot(geo.xa_arc1+geo.ra_arc1*cos(t),geo.ya_arc1+geo.ra_arc1*sin(t),'k--')
     
-    
     ## Outer Wall
     (x_wall,y_wall)=circle(geo.x0_wall,geo.y0_wall,geo.r_wall,N=200)
     
@@ -934,6 +962,7 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
         np.savetxt('xos.csv',XOS,delimiter=',')
         np.savetxt('yos.csv',YOS,delimiter=',')
     
+    pylab.show()
     return OrbScroll
 
 
@@ -1052,6 +1081,7 @@ class ScrollAnimForm(wx.Frame):
         self.Destroy()
 
 if __name__== "__main__":
+    geo = geoVals()
     Scroll2WRL('Scroll.wrl')
     plotScrollSet(pi/2,lw=1.0,saveCoords=True)
 ##     pylab.show()

@@ -976,27 +976,29 @@ class PDSimCore(object):
         
         #Run it with OneCycle turned on
         kwargs['OneCycle'] = True
-        self.solve(**kwargs)
+        solve_output = self.solve(**kwargs)
         
-        for key, State in self.Tubes.Nodes.iteritems():
-            if key == self.key_inlet:
-                 IS = State
-            if key == self.key_outlet:
-                 OS = State
-        
-        #Using Wdot_pv (boundary work), calculate a good guess for the outlet enthalpy
-        h2 = IS.h + self.Wdot_pv/self.mdot
-        
-        #Find temperature as a function of enthalpy
-        T2 = newton(lambda T: Props('H','T',T,'P',OS.p,OS.Fluid)-h2, OS.T+30)
-        
-        #Now run using the old value 
-        if not OneCycle_oldval:
-            kwargs['OneCycle'] = OneCycle_oldval
-            kwargs['x0']  = [T2, 0.5*T2+0.5*self.Tamb]
-            kwargs['reset_initial_state'] = True
-            #kwargs['state0'] = self.xstate_init
-            self.solve(**kwargs)
+        if not self._want_abort:
+            
+            for key, State in self.Tubes.Nodes.iteritems():
+                if key == self.key_inlet:
+                     IS = State
+                if key == self.key_outlet:
+                     OS = State
+                     
+            #Using Wdot_pv (boundary work), calculate a good guess for the outlet enthalpy
+            h2 = IS.h + self.Wdot_pv/self.mdot
+            
+            #Find temperature as a function of enthalpy
+            T2 = newton(lambda T: Props('H','T',T,'P',OS.p,OS.Fluid)-h2, OS.T+30)
+            
+            #Now run using the old value 
+            if not OneCycle_oldval:
+                kwargs['OneCycle'] = OneCycle_oldval
+                kwargs['x0']  = [T2, 0.5*T2+0.5*self.Tamb]
+                kwargs['reset_initial_state'] = True
+                #kwargs['state0'] = self.xstate_init
+                self.solve(**kwargs)
         
     def solve(self,
               key_inlet = None,

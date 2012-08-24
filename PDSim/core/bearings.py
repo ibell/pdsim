@@ -34,6 +34,8 @@ def thrust_bearing(**kwargs):
 def journal_bearing(**kwargs):
     
     """
+    The necessary calculations for a journal bearing
+    
     We only take keyword arguments to avoid problems with order of parameters
     Parameters must be specified by name!
     
@@ -60,9 +62,10 @@ def journal_bearing(**kwargs):
     -----
     Based on the method presented by
     
-        Raimondi, A. A., and Boyd, J. (1958) : A Solution for the Finite Journal Bearing
-and Its Application to Analysis and Design-I, -II, and -III. ASLE Trans.,
-vol. 1, no. I, I- pp. 159-174; II- pp. 175-193; III- pp. 194-209.
+        Raimondi, A. A., and Boyd, J. (1958) : A Solution for the Finite 
+        Journal Bearing and Its Application to Analysis and Design-I, -II, 
+        and -III. ASLE Trans., vol. 1, no. I, I- pp. 159-174; II- pp. 175-193; 
+        III- pp. 194-209.
     
     And further analysis presented in 
     From Hancock

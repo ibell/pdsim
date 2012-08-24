@@ -49,55 +49,11 @@ cpdef dict D1_forces(double theta, geoVals geo, bint poly = *)
 cpdef tuple D2(double theta, geoVals geo, bint poly=*)
 cpdef dict D2_forces(double theta, geoVals geo, bint poly = *)
 
-@cython.locals(hs=cython.double,
-				xa1=cython.double,
-				ya1=cython.double,
-				ra1=cython.double,
-				ta1_1=cython.double,
-				ta1_2=cython.double,
-				xa2=cython.double,
-				ya2=cython.double,
-				ra2=cython.double,
-				ta2_1=cython.double,
-				ta2_2=cython.double,
-				ro=cython.double,
-				phi_os=cython.double, 
-           		phi_o0=cython.double,
-           		phi_is=cython.double, 
-           		phi_i0=cython.double,
-           		phi_e=cython.double,
-           		rb=cython.double,
-       			om=cython.double,
-           		xoos=cython.double,
-   		     	yoos=cython.double,
-   		     	V_Oa=cython.double,
-                dV_Oa=cython.double,
-                x1l=cython.double,
-                y1l=cython.double,
-                V_Ob=cython.double,
-                dV_Ob=cython.double,
-                V_Oc=cython.double,
-                dV_Oc=cython.double,
-                V_Ia=cython.double,
-                dV_Ia=cython.double,
-                V_Ib=cython.double,
-                dV_Ib=cython.double,
-                b=cython.double,
-                D=cython.double,
-                B=cython.double,
-                B_prime=cython.double
-                )
-cpdef DD(double theta, geoVals geo, bint poly=?, bint forces=?)
+cpdef tuple DD(double theta, geoVals geo, bint poly=*, bint _locals =*)
+cpdef dict DD_forces(double theta, geoVals geo, bint poly=*)
 
-@cython.locals(V_d1=cython.double,
-                dV_d1=cython.double,
-                V_d2=cython.double,
-                dV_d2=cython.double,
-                V_dd=cython.double,
-                dV_dd=cython.double,
-                V_ddd=cython.double,
-                dV_ddd=cython.double)
-cpdef DDD(double theta, geoVals geo, bint poly=?, bint forces=?) 
+cpdef DDD(double theta, geoVals geo, bint poly=*) 
+cpdef DDD_forces(double theta, geoVals geo, bint poly=*) 
 
 cpdef phi_s_sa(double theta,geoVals geo)
 

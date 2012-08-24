@@ -1133,7 +1133,8 @@ class Scroll(PDSimCore, _Scroll):
             self.forces.summed_Fy = np.sum(self.forces.Fy,axis = 0) #kN    
             #Calculate the radial force on the crank pin at each crank angle
             self.forces.Fr = np.sqrt(np.power(self.forces.summed_Fx,2)+np.power(self.forces.summed_Fy,2))
-            #Calculate the mean axial force
+            # Calculate the mean normal force on the crank pin
+            # This assumes a quasi-steady bearing where the film is well-behaved
             self.forces.mean_Fr = np.trapz(self.forces.Fr, self.t)/(2*pi)
 
         pylab.show()

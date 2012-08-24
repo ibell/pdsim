@@ -139,7 +139,7 @@ class WorkerThreadManager(Thread):
     Runs are consumed from the 
     """
     def __init__(self, target, simulations, stdout_targets, args = None, done_callback = None, 
-                 add_results = None, Ncores = None):
+                 add_results = None, Ncores = None, main_stdout = None):
         Thread.__init__(self)
         self.target = target
         self.args = args if args is not None else tuple()
@@ -149,14 +149,14 @@ class WorkerThreadManager(Thread):
         self.stdout_targets = stdout_targets
         self.threadsList = []
         self.stdout_list = InfiniteList(stdout_targets)
+        self.main_stdout = main_stdout
         if Ncores is None:
             self.Ncores = cpu_count()-1
         else:
             self.Ncores = Ncores
         if self.Ncores<1:
             self.Ncores = 1
-        print "Want to run",len(self.simulations),"simulations in batch mode;",
-        print self.Ncores, 'cores available for computation'
+        wx.CallAfter(self.main_stdout.WriteText, "Want to run "+str(len(self.simulations))+" simulations in batch mode; "+str(self.Ncores)+' cores available for computation\n')
             
     def run(self):
         #While simulations left to be run or computation is not finished
@@ -169,18 +169,19 @@ class WorkerThreadManager(Thread):
                 t = RedirectedWorkerThread(self.target, self.stdout_list.pop(), 
                                           args = simulation+self.args, 
                                           done_callback = self.done_callback, 
-                                          add_results = self.add_results)
+                                          add_results = self.add_results,
+                                          main_stdout = self.main_stdout)
                 t.daemon = True
                 t.start()
                 self.threadsList.append(t)
-                print 'Adding thread;', len(self.threadsList),'threads active' 
+                wx.CallAfter(self.main_stdout.WriteText, 'Adding thread;' + str(len(self.threadsList)) + ' threads active\n') 
             
-            for thread_ in reversed(self.threadsList):
-                if not thread_.is_alive():
-                    print 'Joining zombie thread'
-                    thread_.join()
-                    self.threadsList.remove(thread_)
-                    print 'Thread finished; now', len(self.threadsList),'threads active'
+            for _thread in reversed(self.threadsList):
+                if not _thread.is_alive():
+                    wx.CallAfter(self.main_stdout.WriteText, 'Joining zombie thread\n')
+                    _thread.join()
+                    self.threadsList.remove(_thread)
+                    wx.CallAfter(self.main_stdout.WriteText, 'Thread finished; now '+str(len(self.threadsList))+ ' threads active\n')
     
     def abort(self):
         """
@@ -190,20 +191,21 @@ class WorkerThreadManager(Thread):
         if dlg.ShowModal() == wx.ID_OK:
             message = "Aborting in progress, please wait..."
             busy = PBI.PyBusyInfo(message, parent = None, title = "Aborting")
-            #Empty the list of simulations to go
+            #Empty the list of simulations to run
             self.simulations = []
+            
             while self.threadsList:
-                for thread_ in self.threadsList:
+                for _thread in self.threadsList:
                     #Send the abort signal
-                    thread_.abort()
+                    _thread.abort()
                     #Wait for it to finish up
-                    thread_.join()
+                    _thread.join()
             del busy
         dlg.Destroy()
         
 class RedirectedWorkerThread(Thread):
     """Worker Thread Class."""
-    def __init__(self, target, stdout_target = None,  args = None, kwargs = None, done_callback = None, add_results = None):
+    def __init__(self, target, stdout_target = None,  args = None, kwargs = None, done_callback = None, add_results = None, main_stdout = None):
         """Init Worker Thread Class."""
         Thread.__init__(self)
         self.target_ = target
@@ -212,6 +214,7 @@ class RedirectedWorkerThread(Thread):
         self._want_abort = False
         self.done_callback = done_callback
         self.add_results = add_results
+        self.main_stdout = main_stdout
         
     def run(self):
         """
@@ -300,7 +303,7 @@ class RedirectedWorkerThread(Thread):
         
     def abort(self):
         """abort worker thread."""
-        print self.name + ' Thread readying for abort'
+        wx.CallAfter(self.main_stdout.WriteText, self.name + ': Thread readying for abort\n')
         # Method for use by main thread to signal an abort
         self._want_abort = True
     
@@ -1166,7 +1169,8 @@ class OutputDataPanel(pdsim_panels.PDPanel):
                         value = getattr(sim,attr)
                         row.append(value)
                     else:
-                        raise KeyError(attr + ' is an invalid header attribute')
+                        print 'Trying to add attribute \'' + attr + '\' to output but it is not found found in simulation instance'
+                        
                 rows.append(row)
             headers = [self.column_options[attr] for attr in self.columns_selected]
             
@@ -1509,7 +1513,9 @@ class MainFrame(wx.Frame):
         """
         if self.WTM is None:
             self.MTB.SetSelection(2)
-            self.WTM = WorkerThreadManager(Run1, sims, self.get_logctrls(),args = tuple(), done_callback = self.deliver_result)
+            self.WTM = WorkerThreadManager(Run1, sims, self.get_logctrls(),args = tuple(),
+                                           done_callback = self.deliver_result,
+                                           main_stdout = self.MTB.RunTB.log_ctrl)
             self.WTM.setDaemon(True)
             self.WTM.start()
         else:
@@ -1521,7 +1527,8 @@ class MainFrame(wx.Frame):
         if sim is not None:
 #            print 'Queueing a result for further processing'
             self.results_list.put(sim)
-            print 'Result queued' 
+            wx.CallAfter(self.MTB.RunTB.log_ctrl.WriteText,'Result queued\n') 
+            
         
     ################################
     #         Event handlers       #

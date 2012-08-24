@@ -514,8 +514,8 @@ def radial_leakage_angles(theta, geo, key1, key2):
                    sort = cython.list,
                    alpha = cython.long,
                    Nc = cython.long)
-    phi_min = 9999999.0
-    phi_max = 9999999.0
+    phi_min = 9e99
+    phi_max = 9e99
     Nc = getNc(theta,geo)
     sort = sorted((key1,key2))
     #These are always in existence
@@ -524,7 +524,7 @@ def radial_leakage_angles(theta, geo, key1, key2):
             phi_max = geo.phi_ie
             phi_min = max(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0)
     #suction chambers only in contact with each other beyond theta = pi
-    elif sort == sorted(('s2','s1')) and phi_max > 1000:
+    elif sort == sorted(('s2','s1')):
         if theta > pi:
             phi_max = phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0
             phi_min = geo.phi_ie - theta
@@ -535,7 +535,7 @@ def radial_leakage_angles(theta, geo, key1, key2):
             phi_max = geo.phi_ie - theta + 0.0000001
             phi_min = geo.phi_ie - theta
     
-    elif Nc == 0 and phi_max > 1000:
+    elif Nc == 0 and phi_max>1e90:
         if (sort == sorted(('d2','s1')) or
             sort == sorted(('d1','s2'))):
                 phi_max = geo.phi_ie - theta
@@ -543,11 +543,11 @@ def radial_leakage_angles(theta, geo, key1, key2):
         elif sort == sorted(('d2','d1')):
                 phi_max = geo.phi_ie - theta - pi
                 phi_min = geo.phi_is
-        else:
+        elif theta > theta_d(geo):
             print 'Nc: {Nc:d}'.format(Nc=Nc)
             raise KeyError('Nc: {Nc:d}'.format(Nc=Nc))
     
-    if Nc >= 1 and phi_max > 1000:
+    if Nc >= 1 and phi_max > 1e90:
         if (sort == sorted(('c2.1','sa')) or
             sort == sorted(('c1.1','sa'))):
                 phi_max = max(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
@@ -563,12 +563,12 @@ def radial_leakage_angles(theta, geo, key1, key2):
                           sort == sorted(('c1.1','d2'))):
                 phi_max = geo.phi_ie - theta - 2*pi
                 phi_min = geo.phi_is
-        elif Nc == 1:
-            print 'Nc: {Nc:d} key1: {k1:s} key2: {k2:s}'.format(Nc=Nc,k1=key1,k2=key2)
+        elif Nc == 1 and theta > theta_d(geo):
+            print 'Nc: {Nc:d} key1: {k1:s} key2: {k2:s} theta: {theta:f} theta_d: {theta_d:f}'.format(Nc=Nc,k1=key1,k2=key2,theta = theta,theta_d = theta_d(geo))
             raise KeyError
                 
     #Nc > 1
-    if Nc > 1 and phi_max > 1000: 
+    if Nc > 1 and phi_max > 1e90: 
         for alpha in range(2, Nc+1):
             if (sort == sorted(('c2.'+str(alpha),'c1.'+str(alpha-1))) or
                 sort == sorted(('c1.'+str(alpha),'c2.'+str(alpha-1)))):
@@ -579,13 +579,13 @@ def radial_leakage_angles(theta, geo, key1, key2):
                 phi_max = geo.phi_ie - theta - 2*pi*(alpha-1) - pi
                 phi_min = geo.phi_ie - theta - 2*pi*(alpha)
                 break
-        if phi_max > 1000:
+        if phi_max > 1e90:
             if (sort == sorted(('c2.'+str(Nc),'d1')) or
                 sort == sorted(('c1.'+str(Nc),'d2'))):
                 phi_max = geo.phi_ie - theta - 2*pi*Nc
                 phi_min = geo.phi_is
     
-    if phi_max > 1000 or phi_min > 1000:
+    if phi_max is None or phi_min is None:
         raise KeyError ('For the pair ('+key1+','+key2+') there were no angles found')
     if phi_min > phi_max:
         raise ValueError ('For the keys ('+key1+','+key2+') there were no angles found (error because '+str(phi_max)+' < '+str(phi_min)+')')
@@ -1053,24 +1053,25 @@ def S2_forces(theta,geo,poly=False, theta_0_volume = 1e-9):
     if not poly:
         return exact_dict
     else:
-        ############### Numerical Force Calculations ###########
-        phi=np.linspace(phi_ie-theta,phi_ie,2000)
-        (xo,yo)=coords_inv(phi, geo, theta, 'oi')
-        nx=np.zeros_like(phi)
-        ny=np.zeros_like(phi)
-        (nx,ny)=coords_norm(phi,geo,theta,'oi')
-        L=len(xo)
-        dA=h*np.sqrt(np.power(xo[1:L]-xo[0:L-1],2)+np.power(yo[1:L]-yo[0:L-1],2))
-        fxp_poly=np.sum(dA*(nx[1:L]+nx[0:L-1])/2.0)
-        fyp_poly=np.sum(dA*(ny[1:L]+ny[0:L-1])/2.0)
-        poly_dict = dict(fxp_poly = fxp_poly,
-                         fyp_poly = fyp_poly,
-#                         MO_poly = MO_poly,
-#                         cx_poly = cx_poly,
-#                         cy_poly = cy_poly
-                         )
-        exact_dict.update(poly_dict)
-        return exact_dict
+        raise NotImplementedError('S2_forces polygon not implemented')
+#        ############### Numerical Force Calculations ###########
+#        phi=np.linspace(phi_ie-theta,phi_ie,2000)
+#        (xo,yo)=coords_inv(phi, geo, theta, 'oi')
+#        nx=np.zeros_like(phi)
+#        ny=np.zeros_like(phi)
+#        (nx,ny)=coords_norm(phi,geo,theta,'oi')
+#        L=len(xo)
+#        dA=h*np.sqrt(np.power(xo[1:L]-xo[0:L-1],2)+np.power(yo[1:L]-yo[0:L-1],2))
+#        fxp_poly=np.sum(dA*(nx[1:L]+nx[0:L-1])/2.0)
+#        fyp_poly=np.sum(dA*(ny[1:L]+ny[0:L-1])/2.0)
+#        poly_dict = dict(fxp_poly = fxp_poly,
+#                         fyp_poly = fyp_poly,
+##                         MO_poly = MO_poly,
+##                         cx_poly = cx_poly,
+##                         cy_poly = cy_poly
+#                         )
+#        exact_dict.update(poly_dict)
+#        return exact_dict
 
 def C1(theta, alpha, geo, poly=False):
     """
@@ -1266,25 +1267,26 @@ def C2_forces(theta,alpha,geo,poly=False):
     if not poly:
         return exact_dict
     else:
-        ##################### Force Calculations #########################
-        phi=np.linspace( geo.phi_ie-theta-2*pi*(alpha),geo.phi_ie-theta-2*pi*(alpha-1),1000)
-        (xo,yo)=coords_inv(phi, geo, theta, 'oi')
-        nx=np.zeros_like(phi)
-        ny=np.zeros_like(phi)
-        (nx,ny)=coords_norm(phi,geo,theta,'oi')
-        L=len(xo)
-        
-        dA=h*np.sqrt(np.power(xo[1:L]-xo[0:L-1],2)+np.power(yo[1:L]-yo[0:L-1],2))
-        fxp_poly=np.sum(dA*(nx[1:L]+nx[0:L-1])/2.0)
-        fyp_poly=np.sum(dA*(ny[1:L]+ny[0:L-1])/2.0)
-        poly_dict = dict(fxp_poly = fxp_poly,
-                         fyp_poly = fyp_poly,
-#                         MO_poly = MO_poly,
-#                         cx_poly = cx_poly,
-#                         cy_poly = cy_poly
-                         )
-        exact_dict.update(poly_dict)
-        return exact_dict
+        raise NotImplementedError('C2_forces polygon not implemented')
+#        ##################### Force Calculations #########################
+#        phi=np.linspace( geo.phi_ie-theta-2*pi*(alpha),geo.phi_ie-theta-2*pi*(alpha-1),1000)
+#        (xo,yo)=coords_inv(phi, geo, theta, 'oi')
+#        nx=np.zeros_like(phi)
+#        ny=np.zeros_like(phi)
+#        (nx,ny)=coords_norm(phi,geo,theta,'oi')
+#        L=len(xo)
+#        
+#        dA=h*np.sqrt(np.power(xo[1:L]-xo[0:L-1],2)+np.power(yo[1:L]-yo[0:L-1],2))
+#        fxp_poly=np.sum(dA*(nx[1:L]+nx[0:L-1])/2.0)
+#        fyp_poly=np.sum(dA*(ny[1:L]+ny[0:L-1])/2.0)
+#        poly_dict = dict(fxp_poly = fxp_poly,
+#                         fyp_poly = fyp_poly,
+##                         MO_poly = MO_poly,
+##                         cx_poly = cx_poly,
+##                         cy_poly = cy_poly
+#                         )
+#        exact_dict.update(poly_dict)
+#        return exact_dict
 
 def D1(theta, geo, poly = False):
     """
@@ -1555,6 +1557,7 @@ def D2_forces(theta, geo, poly = False):
     if not poly:
         return exact_dict
     else:
+        raise NotImplementedError('D2_forces polygon not implemented')
 #        phi=np.linspace(phi_os+pi,phi_ie-theta-2.0*pi*Nc,1000)
 #        (xo,yo)=coords_inv(phi, geo, theta, "oi")
 #        nx=np.zeros_like(phi)
@@ -1564,9 +1567,9 @@ def D2_forces(theta, geo, poly = False):
 #        dA=h*np.sqrt(np.power(xo[1:L]-xo[0:L-1],2)+np.power(yo[1:L]-yo[0:L-1],2))
 #        fxp_poly=np.sum(dA*(nx[1:L]+nx[0:L-1])/2.0)
 #        fyp_poly=np.sum(dA*(ny[1:L]+ny[0:L-1])/2.0)
-        return exact_dict
+#        return exact_dict
     
-def DD(theta, geo, poly=False, forces=False):
+def DD(theta, geo, poly=False, _locals = False):
     
     hs=geo.h
     xa1=geo.xa_arc1
@@ -1643,149 +1646,181 @@ def DD(theta, geo, poly=False, forces=False):
     V=2.0*(V_Oa+V_Ob+V_Oc-V_Ia-V_Ib)
     dV=2.0*(dV_Oa+dV_Ob+dV_Oc-dV_Ia-dV_Ib)
     
-    if forces==False and poly==False:
-        return V, dV
+    if not poly:
+        if not _locals:
+            return V,dV
+        else:
+            return V,dV,locals()
     else:
-        raise AttributeError
-    if forces==True:
-        ################## Force Components #########
-        #Arc 1
-        fx_p =-hs*geo.ra_arc1*(sin(geo.t2_arc1)-sin(geo.t1_arc1))
-        fy_p =+hs*geo.ra_arc1*(cos(geo.t2_arc1)-cos(geo.t1_arc1))
-        M_O  =-hs*geo.ra_arc1*((sin(geo.t2_arc1)-sin(geo.t1_arc1))*geo.ya_arc1+(cos(geo.t2_arc1)-cos(geo.t1_arc1))*geo.xa_arc1)
-        #Arc 2
-        fx_p+=+hs*geo.ra_arc2*(sin(geo.t2_arc2)-sin(geo.t1_arc2))
-        fy_p+=-hs*geo.ra_arc2*(cos(geo.t2_arc2)-cos(geo.t1_arc2))
-        M_O +=+hs*geo.ra_arc2*((sin(geo.t2_arc2)-sin(geo.t1_arc2))*geo.ya_arc2+(cos(geo.t2_arc2)-cos(geo.t1_arc2))*geo.xa_arc2)
-        
-        #Line
-        x1t=-geo.xa_arc1-geo.ra_arc1*cos(geo.t1_arc1)+ro*cos(om)
-        y1t=-geo.ya_arc1-geo.ra_arc1*sin(geo.t1_arc1)+ro*sin(om)
-        x2t=-geo.xa_arc2-geo.ra_arc2*cos(geo.t1_arc2)+ro*cos(om)
-        y2t=-geo.ya_arc2-geo.ra_arc2*sin(geo.t1_arc2)+ro*sin(om)
-        L=np.sqrt((x2t-x1t)**2+(y2t-y1t)**2)
-        if L>1e-12:
-            Lx=(x2t-x1t)/L
-            Ly=(y2t-y1t)/L
-            nx=-1/np.sqrt(1+Lx**2/Ly**2)
-            ny=Lx/Ly/np.sqrt(1+Lx**2/Ly**2)
-            # Make sure you get the cross product with the normal 
-            # pointing towards the scroll, otherwise flip...
-            if Lx*ny-Ly*nx<0:
-                nx*=-1
-                ny*=-1
-            fx_p+=hs*nx*L
-            fy_p+=hs*ny*L
-            rx=(x1t+x2t)/2-ro*cos(om)
-            ry=(y2t+y2t)/2-ro*sin(om)
-            M_O+=rx*hs*ny*L-ry*hs*nx*L
-        
-        #Involute portion
-        fx_p+=-hs*(-sin(phi_os)+(phi_os-phi_i0+pi)*cos(phi_os)-sin(phi_is)-(phi_i0-phi_is)*cos(phi_is))*rb
-        fy_p+=hs*((-phi_os+phi_i0-pi)*sin(phi_os)-cos(phi_os)-(phi_is-phi_i0)*sin(phi_is)-cos(phi_is))*rb
-        M_O +=-(hs*(phi_os-phi_is+pi)*(phi_os+phi_is-2*phi_i0+pi)*rb*rb)/2
-    
-    if poly==True:
-        raise AttributeError('Polygon not coded')
         ##########################################################
         ##                    POLYGON                           ##
         ##########################################################
-#        t=np.linspace(geo.t1_arc1,geo.t2_arc1,300)
-#        (x_farc1,y_farc1)=(
-#            geo.xa_arc1+geo.ra_arc1*cos(t),
-#            geo.ya_arc1+geo.ra_arc1*sin(t))
-#        (x_oarc1,y_oarc1)=(
-#           -geo.xa_arc1-geo.ra_arc1*cos(t)+geo.ro*cos(om),
-#           -geo.ya_arc1-geo.ra_arc1*sin(t)+geo.ro*sin(om))
-#        (nx_oarc1,ny_oarc1)=(-cos(t),-sin(t))
-#        
-#        t=np.linspace(geo.t1_arc2,geo.t2_arc2,300)
-#        (x_farc2,y_farc2)=(
-#            geo.xa_arc2+geo.ra_arc2*cos(t),
-#            geo.ya_arc2+geo.ra_arc2*sin(t))
-#        (x_oarc2,y_oarc2)=(
-#           -geo.xa_arc2-geo.ra_arc2*cos(t)+geo.ro*cos(om),
-#           -geo.ya_arc2-geo.ra_arc2*sin(t)+geo.ro*sin(om)) 
-#        (nx_oarc2,ny_oarc2)=(+cos(t),+sin(t))
-#        
-#        phi=np.linspace(phi_is,phi_os+pi,300)
-#        (x_finv,y_finv)=coords_inv(phi,geo,theta,'fi')
-#        (x_oinv,y_oinv)=coords_inv(phi,geo,theta,'oi')
-#        (nx_oinv,ny_oinv)=coords_norm(phi,geo,theta,'oi')
-#        
-#        x=np.r_[x_farc2[::-1],x_farc1,x_finv,x_oarc2[::-1],x_oarc1,x_oinv,x_farc2[-1]]
-#        y=np.r_[y_farc2[::-1],y_farc1,y_finv,y_oarc2[::-1],y_oarc1,y_oinv,y_farc2[-1]]
-#        (cx_poly,cy_poly)=polycentroid(x,y)
-#        V_poly=geo.h*polyarea(x, y)
-#        
-#        fxp_poly=0
-#        fyp_poly=0
-#        MO_poly=0
-#        #Arc1
-#        L=len(nx_oarc1)
-#        dA=hs*np.sqrt(np.power(x_oarc1[1:L]-x_oarc1[0:L-1],2)+np.power(y_oarc1[1:L]-y_oarc1[0:L-1],2))
-#        dfxp_poly=dA*(nx_oarc1[1:L]+nx_oarc1[0:L-1])/2.0
-#        dfyp_poly=dA*(ny_oarc1[1:L]+ny_oarc1[0:L-1])/2.0
-#        fxp_poly=np.sum(dfxp_poly)
-#        fyp_poly=np.sum(dfyp_poly)
-#        rOx=x_oarc1-geo.ro*cos(phi_e-pi/2-theta)
-#        rOx=(rOx[1:L]+rOx[0:L-1])/2
-#        rOy=y_oarc1-geo.ro*sin(phi_e-pi/2-theta)
-#        rOy=(rOy[1:L]+rOy[0:L-1])/2
-#        MO_poly=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
-#        #Arc2
-#        L=len(nx_oarc2)
-#        dA=hs*np.sqrt(np.power(x_oarc2[1:L]-x_oarc2[0:L-1],2)+np.power(y_oarc2[1:L]-y_oarc2[0:L-1],2))
-#        dfxp_poly=dA*(nx_oarc2[1:L]+nx_oarc2[0:L-1])/2.0
-#        dfyp_poly=dA*(ny_oarc2[1:L]+ny_oarc2[0:L-1])/2.0
-#        fxp_poly+=np.sum(dfxp_poly)
-#        fyp_poly+=np.sum(dfyp_poly)
-#        rOx=x_oarc2-geo.ro*cos(phi_e-pi/2-theta)
-#        rOx=(rOx[1:L]+rOx[0:L-1])/2
-#        rOy=y_oarc2-geo.ro*sin(phi_e-pi/2-theta)
-#        rOy=(rOy[1:L]+rOy[0:L-1])/2
-#        MO_poly+=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
-#        #Involute
-#        L=len(y_oinv)
-#        dA=hs*np.sqrt(np.power(x_oinv[1:L]-x_oinv[0:L-1],2)+np.power(y_oinv[1:L]-y_oinv[0:L-1],2))
-#        dfxp_poly=dA*(nx_oinv[1:L]+nx_oinv[0:L-1])/2.0
-#        dfyp_poly=dA*(ny_oinv[1:L]+ny_oinv[0:L-1])/2.0
-#        fxp_poly+=np.sum(dfxp_poly)
-#        fyp_poly+=np.sum(dfyp_poly)
-#        rOx=x_oinv-geo.ro*cos(phi_e-pi/2-theta)
-#        rOx=(rOx[1:L]+rOx[0:L-1])/2
-#        rOy=y_oinv-geo.ro*sin(phi_e-pi/2-theta)
-#        rOy=(rOy[1:L]+rOy[0:L-1])/2
-#        MO_poly+=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
-#        #Line
-#        x1t=-geo.xa_arc1-geo.ra_arc1*cos(geo.t1_arc1)+ro*cos(om)
-#        y1t=-geo.ya_arc1-geo.ra_arc1*sin(geo.t1_arc1)+ro*sin(om)
-#        x2t=-geo.xa_arc2-geo.ra_arc2*cos(geo.t1_arc2)+ro*cos(om)
-#        y2t=-geo.ya_arc2-geo.ra_arc2*sin(geo.t1_arc2)+ro*sin(om)
-#        L=np.sqrt((x2t-x1t)**2+(y2t-y1t)**2)
-#        if L>1e-12:
-#            Lx=(x2t-x1t)/L
-#            Ly=(y2t-y1t)/L
-#            nx=-1/np.sqrt(1+Lx**2/Ly**2)
-#            ny=Lx/Ly/np.sqrt(1+Lx**2/Ly**2)
-#            # Make sure you get the cross product with the normal 
-#            # pointing towards the scroll, otherwise flip...
-#            if Lx*ny-Ly*nx<0:
-#                nx*=-1
-#                ny*=-1
-#            fxp_poly+=hs*nx*L
-#            fyp_poly+=hs*ny*L
-#            rx=(x1t+x2t)/2-ro*cos(om)
-#            ry=(y2t+y2t)/2-ro*sin(om)
-#            MO_poly+=rx*hs*ny*L-ry*hs*nx*L
-    else:
-        (V_poly,cx_poly,cy_poly,fxp_poly,fyp_poly,MO_poly)=(None,None,None,None,None,None)
+        t=np.linspace(geo.t1_arc1,geo.t2_arc1,300)
+        (x_farc1,y_farc1)=(
+            geo.xa_arc1+geo.ra_arc1*cos(t),
+            geo.ya_arc1+geo.ra_arc1*sin(t))
+        (x_oarc1,y_oarc1)=(
+           -geo.xa_arc1-geo.ra_arc1*cos(t)+geo.ro*cos(om),
+           -geo.ya_arc1-geo.ra_arc1*sin(t)+geo.ro*sin(om))
         
-    return V,dV,cx,cy,fx_p,fy_p,M_O,(V_Oa,dV_Oa,V_Ob,dV_Ob),V_poly,cx_poly,cy_poly,fxp_poly,fyp_poly,MO_poly
-
-def DDD(theta, geo, poly=False, forces=False): 
+        t=np.linspace(geo.t1_arc2,geo.t2_arc2,300)
+        (x_farc2,y_farc2)=(
+            geo.xa_arc2+geo.ra_arc2*np.cos(t),
+            geo.ya_arc2+geo.ra_arc2*np.sin(t))
+        (x_oarc2,y_oarc2)=(
+           -geo.xa_arc2-geo.ra_arc2*np.cos(t)+geo.ro*cos(om),
+           -geo.ya_arc2-geo.ra_arc2*np.sin(t)+geo.ro*sin(om)) 
+        
+        phi=np.linspace(phi_is,phi_os+pi,300)
+        (x_finv,y_finv)=coords_inv(phi,geo,theta,'fi')
+        (x_oinv,y_oinv)=coords_inv(phi,geo,theta,'oi')
+        
+        x=np.r_[x_farc2[::-1],x_farc1,x_finv,x_oarc2[::-1],x_oarc1,x_oinv,x_farc2[-1]]
+        y=np.r_[y_farc2[::-1],y_farc1,y_finv,y_oarc2[::-1],y_oarc1,y_oinv,y_farc2[-1]]
+        V_poly=geo.h*polyarea(x, y)
+        if not _locals:
+            return V,dV,V_poly
+        else:
+            return V,dV,V_poly,locals()
     
-    if poly==False and forces==False:
+def DD_forces(theta,geo,poly=False):
+#    V, dV, _locals = DD(theta, geo, False, locals = True)     
+#    
+#    
+#    ################ Force Components #########
+#    #Arc 1
+#    fx_p =-hs*geo.ra_arc1*(sin(geo.t2_arc1)-sin(geo.t1_arc1))
+#    fy_p =+hs*geo.ra_arc1*(cos(geo.t2_arc1)-cos(geo.t1_arc1))
+#    M_O  =-hs*geo.ra_arc1*((sin(geo.t2_arc1)-sin(geo.t1_arc1))*geo.ya_arc1+(cos(geo.t2_arc1)-cos(geo.t1_arc1))*geo.xa_arc1)
+#    #Arc 2
+#    fx_p+=+hs*geo.ra_arc2*(sin(geo.t2_arc2)-sin(geo.t1_arc2))
+#    fy_p+=-hs*geo.ra_arc2*(cos(geo.t2_arc2)-cos(geo.t1_arc2))
+#    M_O +=+hs*geo.ra_arc2*((sin(geo.t2_arc2)-sin(geo.t1_arc2))*geo.ya_arc2+(cos(geo.t2_arc2)-cos(geo.t1_arc2))*geo.xa_arc2)
+#    
+#    #Line
+#    x1t=-geo.xa_arc1-geo.ra_arc1*cos(geo.t1_arc1)+ro*cos(om)
+#    y1t=-geo.ya_arc1-geo.ra_arc1*sin(geo.t1_arc1)+ro*sin(om)
+#    x2t=-geo.xa_arc2-geo.ra_arc2*cos(geo.t1_arc2)+ro*cos(om)
+#    y2t=-geo.ya_arc2-geo.ra_arc2*sin(geo.t1_arc2)+ro*sin(om)
+#    L=np.sqrt((x2t-x1t)**2+(y2t-y1t)**2)
+#    if L>1e-12:
+#        Lx=(x2t-x1t)/L
+#        Ly=(y2t-y1t)/L
+#        nx=-1/np.sqrt(1+Lx**2/Ly**2)
+#        ny=Lx/Ly/np.sqrt(1+Lx**2/Ly**2)
+#        # Make sure you get the cross product with the normal 
+#        # pointing towards the scroll, otherwise flip...
+#        if Lx*ny-Ly*nx<0:
+#            nx*=-1
+#            ny*=-1
+#        fx_p+=hs*nx*L
+#        fy_p+=hs*ny*L
+#        rx=(x1t+x2t)/2-ro*cos(om)
+#        ry=(y2t+y2t)/2-ro*sin(om)
+#        M_O+=rx*hs*ny*L-ry*hs*nx*L
+#    
+#    #Involute portion
+#    fx_p+=-hs*(-sin(phi_os)+(phi_os-phi_i0+pi)*cos(phi_os)-sin(phi_is)-(phi_i0-phi_is)*cos(phi_is))*rb
+#    fy_p+=hs*((-phi_os+phi_i0-pi)*sin(phi_os)-cos(phi_os)-(phi_is-phi_i0)*sin(phi_is)-cos(phi_is))*rb
+#    M_O +=-(hs*(phi_os-phi_is+pi)*(phi_os+phi_is-2*phi_i0+pi)*rb*rb)/2
+    return dict()
+
+#if poly==True:
+#    ##########################################################
+#    ##                    POLYGON                           ##
+#    ##########################################################
+#    t=np.linspace(geo.t1_arc1,geo.t2_arc1,300)
+#    (x_farc1,y_farc1)=(
+#        geo.xa_arc1+geo.ra_arc1*cos(t),
+#        geo.ya_arc1+geo.ra_arc1*sin(t))
+#    (x_oarc1,y_oarc1)=(
+#       -geo.xa_arc1-geo.ra_arc1*cos(t)+geo.ro*cos(om),
+#       -geo.ya_arc1-geo.ra_arc1*sin(t)+geo.ro*sin(om))
+#    (nx_oarc1,ny_oarc1)=(-cos(t),-sin(t))
+#    
+#    t=np.linspace(geo.t1_arc2,geo.t2_arc2,300)
+#    (x_farc2,y_farc2)=(
+#        geo.xa_arc2+geo.ra_arc2*cos(t),
+#        geo.ya_arc2+geo.ra_arc2*sin(t))
+#    (x_oarc2,y_oarc2)=(
+#       -geo.xa_arc2-geo.ra_arc2*cos(t)+geo.ro*cos(om),
+#       -geo.ya_arc2-geo.ra_arc2*sin(t)+geo.ro*sin(om)) 
+#    (nx_oarc2,ny_oarc2)=(+cos(t),+sin(t))
+#    
+#    phi=np.linspace(phi_is,phi_os+pi,300)
+#    (x_finv,y_finv)=coords_inv(phi,geo,theta,'fi')
+#    (x_oinv,y_oinv)=coords_inv(phi,geo,theta,'oi')
+#    (nx_oinv,ny_oinv)=coords_norm(phi,geo,theta,'oi')
+#    
+#    x=np.r_[x_farc2[::-1],x_farc1,x_finv,x_oarc2[::-1],x_oarc1,x_oinv,x_farc2[-1]]
+#    y=np.r_[y_farc2[::-1],y_farc1,y_finv,y_oarc2[::-1],y_oarc1,y_oinv,y_farc2[-1]]
+#    (cx_poly,cy_poly)=polycentroid(x,y)
+#    V_poly=geo.h*polyarea(x, y)
+#    
+#    fxp_poly=0
+#    fyp_poly=0
+#    MO_poly=0
+#    #Arc1
+#    L=len(nx_oarc1)
+#    dA=hs*np.sqrt(np.power(x_oarc1[1:L]-x_oarc1[0:L-1],2)+np.power(y_oarc1[1:L]-y_oarc1[0:L-1],2))
+#    dfxp_poly=dA*(nx_oarc1[1:L]+nx_oarc1[0:L-1])/2.0
+#    dfyp_poly=dA*(ny_oarc1[1:L]+ny_oarc1[0:L-1])/2.0
+#    fxp_poly=np.sum(dfxp_poly)
+#    fyp_poly=np.sum(dfyp_poly)
+#    rOx=x_oarc1-geo.ro*cos(phi_e-pi/2-theta)
+#    rOx=(rOx[1:L]+rOx[0:L-1])/2
+#    rOy=y_oarc1-geo.ro*sin(phi_e-pi/2-theta)
+#    rOy=(rOy[1:L]+rOy[0:L-1])/2
+#    MO_poly=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
+#    #Arc2
+#    L=len(nx_oarc2)
+#    dA=hs*np.sqrt(np.power(x_oarc2[1:L]-x_oarc2[0:L-1],2)+np.power(y_oarc2[1:L]-y_oarc2[0:L-1],2))
+#    dfxp_poly=dA*(nx_oarc2[1:L]+nx_oarc2[0:L-1])/2.0
+#    dfyp_poly=dA*(ny_oarc2[1:L]+ny_oarc2[0:L-1])/2.0
+#    fxp_poly+=np.sum(dfxp_poly)
+#    fyp_poly+=np.sum(dfyp_poly)
+#    rOx=x_oarc2-geo.ro*cos(phi_e-pi/2-theta)
+#    rOx=(rOx[1:L]+rOx[0:L-1])/2
+#    rOy=y_oarc2-geo.ro*sin(phi_e-pi/2-theta)
+#    rOy=(rOy[1:L]+rOy[0:L-1])/2
+#    MO_poly+=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
+#    #Involute
+#    L=len(y_oinv)
+#    dA=hs*np.sqrt(np.power(x_oinv[1:L]-x_oinv[0:L-1],2)+np.power(y_oinv[1:L]-y_oinv[0:L-1],2))
+#    dfxp_poly=dA*(nx_oinv[1:L]+nx_oinv[0:L-1])/2.0
+#    dfyp_poly=dA*(ny_oinv[1:L]+ny_oinv[0:L-1])/2.0
+#    fxp_poly+=np.sum(dfxp_poly)
+#    fyp_poly+=np.sum(dfyp_poly)
+#    rOx=x_oinv-geo.ro*cos(phi_e-pi/2-theta)
+#    rOx=(rOx[1:L]+rOx[0:L-1])/2
+#    rOy=y_oinv-geo.ro*sin(phi_e-pi/2-theta)
+#    rOy=(rOy[1:L]+rOy[0:L-1])/2
+#    MO_poly+=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
+#    #Line
+#    x1t=-geo.xa_arc1-geo.ra_arc1*cos(geo.t1_arc1)+ro*cos(om)
+#    y1t=-geo.ya_arc1-geo.ra_arc1*sin(geo.t1_arc1)+ro*sin(om)
+#    x2t=-geo.xa_arc2-geo.ra_arc2*cos(geo.t1_arc2)+ro*cos(om)
+#    y2t=-geo.ya_arc2-geo.ra_arc2*sin(geo.t1_arc2)+ro*sin(om)
+#    L=np.sqrt((x2t-x1t)**2+(y2t-y1t)**2)
+#    if L>1e-12:
+#        Lx=(x2t-x1t)/L
+#        Ly=(y2t-y1t)/L
+#        nx=-1/np.sqrt(1+Lx**2/Ly**2)
+#        ny=Lx/Ly/np.sqrt(1+Lx**2/Ly**2)
+#        # Make sure you get the cross product with the normal 
+#        # pointing towards the scroll, otherwise flip...
+#        if Lx*ny-Ly*nx<0:
+#            nx*=-1
+#            ny*=-1
+#        fxp_poly+=hs*nx*L
+#        fyp_poly+=hs*ny*L
+#        rx=(x1t+x2t)/2-ro*cos(om)
+#        ry=(y2t+y2t)/2-ro*sin(om)
+#        MO_poly+=rx*hs*ny*L-ry*hs*nx*L
+   
+def DDD(theta, geo, poly=False): 
+    
+    if not poly:
         V_d1,dV_d1=D1(theta,geo)
         V_d2,dV_d2=D2(theta,geo)
         V_dd,dV_dd=DD(theta,geo)
@@ -1793,7 +1828,17 @@ def DDD(theta, geo, poly=False, forces=False):
         dV_ddd=dV_d1+dV_d2+dV_dd
         return V_ddd,dV_ddd
     else:
-        raise AttributeError('Not coded yet')  
+        raise AttributeError('Polygons not coded for DDD chamber')
+
+def DDD_forces(theta, geo, poly=False):
+    
+    if not poly:
+        _D1_forces = D1_forces(theta,geo)
+        _D2_forces = D2_forces(theta,geo)
+        _DD_forces = DD_forces(theta,geo)
+    else:
+        raise AttributeError('Polygons not coded for DDD chamber')
+        
  
 def phi_s_sa(theta,geo):
     

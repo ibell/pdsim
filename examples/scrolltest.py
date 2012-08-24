@@ -231,8 +231,9 @@ def Compressor(f = None):
                      plot_every_cycle= False
                      )
     except:
-        debug_plots(ScrollComp)
         raise
+        debug_plots(ScrollComp)
+        
 
     print 'time taken',clock()-t1
     
@@ -263,15 +264,26 @@ def Compressor(f = None):
     pylab.show()
     
     from PDSim.core.bearings import journal_bearing
-    JB = journal_bearing(r_b = 0.02,
-                    L = 0.04,
+    JB = journal_bearing(r_b = 0.02245/2,
+                    L = 0.027,
                     omega = ScrollComp.omega,
                     W = ScrollComp.forces.mean_Fr*1000,
                     design = 'friction',
-                    eta_0 = 0.17
+                    eta_0 = 0.008
                     )
     
     print 'Crank pin journal loss is',JB['Wdot_loss'],'W'
+    print 'Crank pin gap width is',JB['c']*1e6,'um'
+    
+    JB = journal_bearing(r_b = 0.01,
+                         L = 0.02,
+                         omega = ScrollComp.omega,
+                         W = ScrollComp.forces.mean_Fr*1000,
+                         design = 'friction',
+                         eta_0 = 0.008
+                         )
+    print 'Upper journal loss is',JB['Wdot_loss'],'W'
+    print 'Upper journal gap width is',JB['c']*1e6,'um'
         
     return ScrollComp
     
