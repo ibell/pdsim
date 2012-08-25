@@ -56,7 +56,7 @@ class InjectionPortPanel(wx.Panel):
         element_sizer = wx.FlexGridSizer(cols=2)
         element_sizer.Add(wx.StaticText(self,label="Involute Angle"))
         self.phi_inj_port = wx.TextCtrl(self,value="7.141") 
-        self.phi_inj_port.SetToolTipString('If you want symmetric injection ports, the ones on the inner involute should have a value of phi that is pi radians greater')
+        self.phi_inj_port.SetToolTipString('If you want symmetric injection ports, the involute angle on the inner involute should be pi radians greater than that on the outer involute.  View the ports to be sure')
         element_sizer.Add(self.phi_inj_port)
         element_sizer.Add(wx.StaticText(self,label="Neighbor Involute"))
         self.involute = wx.ComboBox(self)
@@ -264,48 +264,78 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
         ----------
         ScrollComp : Scroll instance
         """
-        phi = float(self.injection_panel.InjectionElement.phival.GetValue())
-        L = float(self.injection_panel.InjectionElement.Lval.GetValue())
-        ID = float(self.injection_panel.InjectionElement.IDval.GetValue())
-        injState1 = self.injection_panel.InjectionElement.state.GetState().copy()
-        V_tube = L*pi*ID**2/4.0
-        ScrollComp.add_CV(ControlVolume(key ='injCV.1',
-                                        VdVFcn = ScrollComp.V_injection,
-                                        VdVFcn_kwargs = dict(V_tube = V_tube),
-                                        initialState = injState1,
-                                        becomes = 'injCV.1'
-                                        )
-                          )
         
-        #Injection flow paths
-        ScrollComp.add_flow(FlowPath(key1= 'c1.1', 
-                                     key2 = 'injCV.1', 
-                                     MdotFcn=ScrollComp.Injection_to_Comp,
-                                     MdotFcn_kwargs = dict(phi = phi + pi,
-                                                           inner_outer = 'i')
-                                    )
-                            )
-        ScrollComp.add_flow(FlowPath(key1 = 'c2.1', 
-                                     key2 = 'injCV.1', 
-                                     MdotFcn=ScrollComp.Injection_to_Comp,
-                                     MdotFcn_kwargs = dict(phi = phi,
-                                                           inner_outer = 'o')
-                                    )
-                            )
-        
-        ScrollComp.add_tube(Tube(key1='injection.1',key2='injection.2',
-                                 L=L,
-                                 ID=ID,
-                                 mdot=0.001, 
-                                 State1=ScrollComp.CVs['injCV.1'].State.copy(),
-                                 fixed=1,
-                                 TubeFcn=ScrollComp.TubeCode
-                                 )
-                            )
-        ScrollComp.add_flow(FlowPath(key1='injection.2',
-                                     key2='injCV.1',
-                                     MdotFcn=ScrollComp.IsentropicNozzleFM,
-                                     MdotFcn_kwargs = dict(A = pi*ID**2/4)
+        #IEPs are children of injection_panel that are instances of InjectionElementPanel class
+        IEPs = [child for child in self.injection_panel.Children if isinstance(child,InjectionElementPanel)]
+        for i,IEP in enumerate(IEPs):
+            L = float(IEP.Lval.GetValue())
+            ID = float(IEP.IDval.GetValue())
+            injState = IEP.state.GetState().copy()
+            V_tube = L*pi*ID**2/4.0
+            
+            CVkey = 'injCV.'+str(i+1)
+            #Add the control volume for the injection line
+            ScrollComp.add_CV(ControlVolume(key = CVkey,
+                                            VdVFcn = ScrollComp.V_injection,
+                                            VdVFcn_kwargs = dict(V_tube = V_tube),
+                                            initialState = injState,
+                                            )
+                              )
+            
+            #Add the tube for the injection line
+            ScrollComp.add_tube(Tube(key1='injection_line.'+str(i+1)+'.1',
+                                     key2='injection_line.'+str(i+1)+'.2',
+                                     L=L,
+                                     ID=ID,
+                                     mdot=0.001, 
+                                     State1=ScrollComp.CVs[CVkey].State.copy(),
+                                     fixed=1,
+                                     TubeFcn=ScrollComp.TubeCode
                                      )
-                            )
+                                )
+            
+            #Add the flow model between the injection line tube and the injection CV 
+            ScrollComp.add_flow(FlowPath(key1='injection_line.'+str(i+1)+'.2',
+                                         key2=CVkey,
+                                         MdotFcn=ScrollComp.IsentropicNozzleFM,
+                                         MdotFcn_kwargs = dict(A = pi*ID**2/4)
+                                         )
+                                )
+            
+            for child in IEP.Children:
+                if isinstance(child,InjectionPortPanel):
+                    phi,inner_outer,check_valve = child.get_values()
+                    
+                    #Figure out which CV are in contact with this location for the injection port
+                    partner_key_start = ScrollComp._get_injection_CVkey(phi, 0*pi, inner_outer)
+                    partner_key_end = ScrollComp._get_injection_CVkey(phi, 2*pi, inner_outer)
+                    
+                    #Add the CV that start and end the rotation connected to the port
+                    for partner_key in [partner_key_start, partner_key_end]:
+                        #Injection flow paths
+                        ScrollComp.add_flow(FlowPath(key1= partner_key, 
+                                                     key2 = CVkey, 
+                                                     MdotFcn=ScrollComp.Injection_to_Comp,
+                                                     MdotFcn_kwargs = dict(phi = phi,
+                                                                           inner_outer = inner_outer,
+                                                                           check_valve = check_valve)
+                                                    )
+                                            )
+        
+#    def output_dictionary(self):
+#        """
+#        Return a dictionary of column options for the plugin that should be
+#        added to the output on the OutputDataPanel
+#        
+#        This function is called before the simulation is run 
+#         
+#        Returns
+#        -------
+#        output_dict : dictionary
+#            A dict with keys that are attributes of the ScrollComp instance, and
+#            values that are the human-readable string representation of this term
+#        """
+#        return {'':
+#                }
+        
         

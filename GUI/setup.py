@@ -31,12 +31,16 @@ path = []
 
 import glob,os
 
+for plugins in glob.glob(os.path.join('plugins','*.py')):
+	include_files.append(plugins)
 for ico in glob.glob(os.path.join('ico','*.png')):
 	include_files.append(ico)
 for img in glob.glob(os.path.join('imgs','*.png')):
 	include_files.append(img)
 for cfg in glob.glob(os.path.join('configs','*.cfg')):
 	include_files.append(cfg)
+
+packages += ['quantities']
 
 # The setup for cx_Freeze is different from py2exe. Here I am going to
 # use the Python class Executable from cx_Freeze

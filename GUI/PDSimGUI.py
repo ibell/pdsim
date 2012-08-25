@@ -1146,6 +1146,9 @@ class OutputDataPanel(pdsim_panels.PDPanel):
                                'eta_oi': 'Overall isentropic efficiency [-]'
                                }
         
+        # Add all the parameters that arrive from the self.items lists from the 
+        # pdsim_panels.PDPanel instances from the SolverToolbook and the 
+        # InputsToolbook
         for var in self.variables:
             key = var['attr']
             value = var['text']
@@ -1723,7 +1726,7 @@ class MainFrame(wx.Frame):
         
         Checks to see if temp folder exists, if so, removes it
         """
-        import shutil
+        import shutil, glob
         home = os.getenv('USERPROFILE') or os.getenv('HOME')
         temp_folder = os.path.join(home,'.pdsim-temp')
         
