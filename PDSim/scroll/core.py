@@ -1069,6 +1069,8 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.Fx = np.zeros((self.CVs.N,len(self.t)))
         self.forces.Fy = np.zeros_like(self.forces.Fx)
         self.forces.Fr = np.zeros_like(self.forces.Fx)
+        self.forces.fxp = np.zeros_like(self.forces.Fx)
+        self.forces.fyp = np.zeros_like(self.forces.Fx)
         # A map of CVkey to function to be called to get force components
         # All functions in this map use the same call signature and are "boring"
         # Each function returns a dictionary of terms
@@ -1076,6 +1078,8 @@ class Scroll(PDSimCore, _Scroll):
                         s2 = scroll_geo.S2_forces,
                         d1 = scroll_geo.D1_forces,
                         d2 = scroll_geo.D2_forces,
+                        dd = scroll_geo.DD_forces,
+                        ddd = scroll_geo.DDD_forces
                         )
         for CVkey in self.CVs.keys():
             if CVkey in func_map:
@@ -1107,6 +1111,8 @@ class Scroll(PDSimCore, _Scroll):
             if geo_components:
                 I = self.CVs.index(CVkey)
                 p = self.p[I,:]
+                self.forces.fxp[I,:] = [comp['fx_p'] for comp in geo_components]
+                self.forces.fyp[I,:] = [comp['fy_p'] for comp in geo_components]
                 self.forces.Fx[I,:] = [comp['fx_p'] for comp in geo_components]*p
                 self.forces.Fy[I,:] = [comp['fy_p'] for comp in geo_components]*p
                 import pylab

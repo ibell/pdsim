@@ -49,7 +49,7 @@ cpdef dict D1_forces(double theta, geoVals geo, bint poly = *)
 cpdef tuple D2(double theta, geoVals geo, bint poly=*)
 cpdef dict D2_forces(double theta, geoVals geo, bint poly = *)
 
-cpdef tuple DD(double theta, geoVals geo, bint poly=*, bint _locals =*)
+cpdef tuple DD(double theta, geoVals geo, bint poly=*)
 cpdef dict DD_forces(double theta, geoVals geo, bint poly=*)
 
 cpdef DDD(double theta, geoVals geo, bint poly=*) 
