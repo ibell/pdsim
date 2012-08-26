@@ -60,7 +60,6 @@ def Compressor(f = None):
 #            phi = np.linspace(phi_min, phi_max, 50)
 #            print key1, key2, phi_min, phi_max
 #            
-#            
 #            x,y = scroll_geo.coords_inv(phi, ScrollComp.geo, th, flag="fi")
 #            ax.plot(x,y)
 #            ax.plot(x[0],y[0],'o')

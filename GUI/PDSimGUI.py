@@ -1707,19 +1707,6 @@ class MainFrame(wx.Frame):
             print 'Recip-type compressor'
             self.rebuild(default_configs.get_recip_defaults())
         
-    def OnChangeOptionInjection(self, event = None):
-        ITB = self.MTB.InputsTB
-        if self.PluginsInjection.IsChecked():
-            injection_panel = pdsim_panels.InjectionInputsPanel(ITB)
-            ITB.AddPage(injection_panel,"Injection")
-            
-            injection_plugin = pdsim_plugins.ScrollInjectionPlugin(injection_panel)
-            self.register_plugin(injection_plugin)
-        else:
-            ITB.GetPage(ITB.GetPageCount()-1).Destroy()
-            ITB.RemovePage(ITB.GetPageCount()-1)
-            #self.unregister_plugin()
-        
     def OnFlushTemporaryFolder(self, events):
         """
         Event that fires on menu item to flush out temporary files.
