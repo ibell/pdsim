@@ -813,7 +813,7 @@ def CoordsOrbScroll(theta,geo,shaveOn=True):
     y=y.reshape(len(y),1)
     return x,y
 
-def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor = None, show = False, **kwargs):
+def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor = None, show = False, offsetScroll = False, **kwargs):
     """
     The function that plots the scroll sets
 
@@ -840,6 +840,7 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
     shaveOn          shave the end of orb. scroll : True/[False]
     saveCoords       save the coord. of the orb. scroll to file True/[False]
     wallOn           plot the outer wall : [True] /False
+    offsetScroll     If true, scrolls are offset : True/[False]
     =============    =====================================================
         
 
@@ -861,6 +862,29 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
         
     if lw is None:
         lw=1.0
+        
+    if offsetScroll:
+        kwargs['wallOn'] = False
+        phi  = np.linspace(geo.phi_ie,geo.phi_ie+1.02*pi,1000)
+        x,y = coords_inv(phi,geo,0.0,'fi')
+        axis.plot(x,y,'k')
+        phi  = np.linspace(geo.phi_ie,geo.phi_ie+1.02*pi,1000)
+        x,y = coords_inv(phi,geo,theta,'oo')
+        axis.plot(x,y,'r--')
+        
+        # pitch (involute-involute distance for a given involute) 
+        # for 2*pi radians or one rotation is equal to 2*pi*rb, subtract 
+        # thickness of scroll to get diameter
+        # and divide by two to get radius of closing arc for offset region
+        r = (2*pi*geo.rb-geo.t)/2.0
+        
+        xee,yee = coords_inv(phi[-1],geo,0.0,'fi')
+        xse,yse = coords_inv(phi[-1]-2*pi,geo,0.0,'fo')
+        x0,y0 = (xee+xse)/2,(yee+yse)/2
+        
+        beta = math.atan2(yee-y0,xee-x0)
+        t = np.linspace(beta,beta+pi,1000)
+        pylab.plot(x0+r*np.cos(t),y0+r*np.sin(t),'k')
     
     xarc1=geo.xa_arc1+geo.ra_arc1*cos(np.linspace(geo.t2_arc1,geo.t1_arc1,100))
     yarc1=geo.ya_arc1+geo.ra_arc1*sin(np.linspace(geo.t2_arc1,geo.t1_arc1,100))

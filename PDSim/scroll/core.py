@@ -620,11 +620,18 @@ class Scroll(PDSimCore, _Scroll):
         #This gets called at every step, or partial step
         self.theta=t
         
-        def IsAtMerge(eps_d1_higher=0.005,eps_dd_higher=0.00001):
-            if self.CVs['d1'].State.p>self.CVs['dd'].State.p and abs(self.CVs['d1'].State.p/self.CVs['dd'].State.p-1)<eps_d1_higher:
+        def IsAtMerge(eps = 0.005, eps_d1_higher=0.005,eps_dd_higher=0.00001):
+            pressures = [self.CVs['d1'].State.p,
+                         self.CVs['d2'].State.p,
+                         self.CVs['dd'].State.p]
+            p_max = max(pressures)
+            p_min = min(pressures)
+            if abs(p_min/p_max-1)<eps_dd_higher:
+                return True
+            elif self.CVs['d1'].State.p>self.CVs['dd'].State.p and abs(p_min/p_max-1)<eps_d1_higher:
                 print 'Merged with d1 higher'
                 return True
-            elif self.CVs['d1'].State.p<self.CVs['dd'].State.p and abs(self.CVs['d1'].State.p/self.CVs['dd'].State.p-1)<eps_dd_higher:
+            elif self.CVs['d1'].State.p<self.CVs['dd'].State.p and abs(p_min/p_max-1)<eps_dd_higher:
                 print 'Merged with dd higher'
                 return True
             else:
@@ -816,9 +823,38 @@ class Scroll(PDSimCore, _Scroll):
 #        
 #    def FlankLeakage(self,*args,**kwargs):
 #        return _Scroll.FlankLeakage(self,*args,**kwargs)
+     
+    def SA_S1(self, FlowPath, X_d=1.0,**kwargs):
+        """
+        A wrapper for the flow between the suction area and the S1 chamber
         
+        Notes
+        -----
+        If geo.phi_ie_offset is greater than 0, the offset geometry will be 
+        used to calculate the flow area.  Otherwise the conventional analysis 
+        will be used.
+        """
+        if self.geo.phi_ie_offset > 0:
+            FlowPath.A = X_d*scroll_geo.Area_s_sa(self.theta, self.geo)
+        else:
+            FlowPath.A = X_d*scroll_geo.Area_s_sa(self.theta, self.geo)
+             
+        try:
+            mdot = flow_models.IsentropicNozzle(FlowPath.A,
+                                                FlowPath.State_up,
+                                                FlowPath.State_down)
+            return mdot
+        except ZeroDivisionError:
+            return 0.0   
+        
+    def SA_S2(self, *args, **kwargs):
+        """
+        A thin wrapper to the default suction area-suction flow
+        """
+        return self.SA_S(*args,**kwargs)
         
     def SA_S(self, FlowPath, X_d=1.0,**kwargs):
+        
         FlowPath.A=X_d*scroll_geo.Area_s_sa(self.theta, self.geo)
         try:
             mdot = flow_models.IsentropicNozzle(FlowPath.A,
@@ -1138,10 +1174,5 @@ class Scroll(PDSimCore, _Scroll):
         A thin wrapper around the base class function for pickling purposes
         """
         return PDSimCore.IsentropicNozzleFM(self,*args,**kwargs)
-        
-        
-        
-        
-        
         
         

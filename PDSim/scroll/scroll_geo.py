@@ -13,7 +13,8 @@ geoValsvarlist=['h','phi_i0','phi_is','phi_ie','phi_e',
                 'xa_arc2','ya_arc2','ra_arc2','t1_arc2','t2_arc2',
                 'b_line', 't1_line', 't2_line', 'm_line',
                 'x0_wall','y0_wall','r_wall',
-                'delta_radial', 'delta_flank']
+                'delta_radial', 'delta_flank',
+                'phi_ie_offset','delta_suction_offset']
  
 def rebuild_geoVals(d):
     geo = geoVals()
@@ -22,6 +23,10 @@ def rebuild_geoVals(d):
     return geo 
     
 class geoVals:
+    
+    def __init__(self):
+        self.phi_ie_offset = 0.0
+        
     def __reduce__(self):
         d={}
         for atr in geoValsvarlist:
@@ -813,7 +818,7 @@ def SA(theta, geo, poly=False, forces=False):
     else:
         raise ValueError('no forces or polygons for SA yet')
     
-def S1(theta, geo, poly=False, theta_0_volume=1e-9):
+def S1(theta, geo, poly=False, theta_0_volume=1e-9, use_offset = True):
     """
     Volume and derivative of volume of S1 chamber
     
@@ -824,9 +829,17 @@ def S1(theta, geo, poly=False, theta_0_volume=1e-9):
     geo : geoVals instance
         The geometry class
     poly : boolean
-        If true, also output the polygon calculation at the end of the tuple (SLOW!!)
-    theta_0_volume : float, optional
-        The offset to be added to the volume to avoid division by zero
+        If ``True``, also output the polygon calculation at the end of the tuple (SLOW!!)
+    use_offset : boolean
+        If ``True``, use the offset value from geo.phi_ie_offset, else, don't 
+        use any offset
+        
+    Notes
+    -----
+    If the parameter ``geo.phi_ie_offset`` is greater than zero, the fixed scroll 
+    inner involute is extended by this amount.  In general if an offset is used it
+    it should be exactly :math:`\pi` radians which will bring the two suction 
+    chambers together and allows for a single inlet port to the scroll set. 
     
     Returns
     -------
@@ -838,48 +851,127 @@ def S1(theta, geo, poly=False, theta_0_volume=1e-9):
     h=geo.h
     rb=geo.rb 
     phi_ie=geo.phi_ie
-    phi_e=geo.phi_ie
     phi_o0=geo.phi_o0
     phi_i0=geo.phi_i0
     ro=rb*(pi-phi_i0+phi_o0)
-    
-    b=(-phi_o0+phi_e-pi)
-    D=ro/rb*((phi_i0-phi_e)*sin(theta)-cos(theta)+1)/(phi_e-phi_i0)
-    B=1.0/2.0*(sqrt(b**2-4.0*D)-b)
-    B_prime=-ro/rb*(sin(theta)+(phi_i0-phi_ie)*cos(theta))/((phi_e-phi_i0)*sqrt(b**2-4*D))
-    
-    VO=h*rb**2/6.0*((phi_e-phi_i0)**3-(phi_e-theta-phi_i0)**3)
-    dVO=h*rb**2/2.0*((phi_e-theta-phi_i0)**2)
-    
-    VIa=h*rb**2/6.0*((phi_e-pi+B-phi_o0)**3-(phi_e-pi-theta-phi_o0)**3)
-    dVIa=h*rb**2/2.0*((phi_e-pi+B-phi_o0)**2*B_prime+(phi_e-pi-theta-phi_o0)**2)
+
+    if not use_offset:
+        phi_ie_offset = 0.0
+    else:
+        phi_ie_offset = geo.phi_ie_offset
         
-    VIb=h*rb*ro/2.0*((B-phi_o0+phi_e-pi)*sin(B+theta)+cos(B+theta))
-    dVIb=h*rb*ro*(B_prime+1)/2.0*((phi_e-pi+B-phi_o0)*cos(B+theta)-sin(B+theta))
-    
-    VIc=h*rb*ro/2.0
-    dVIc=0.0
+    if phi_ie_offset > 1e-12:
+        # Calculations for break angle seem to be messed up, rolling back to the
+        # older method which seems to work pretty well, though imperfectly.
+        # Good enough for now
         
-    Vs=VO-(VIa+VIb-VIc)
-    dVs=dVO-(dVIa+dVIb-dVIc)
+        b = (-phi_o0+phi_ie+phi_ie_offset-pi)    
+        B = -ro/rb*sin(theta)/b
+        B_prime = -ro/rb/b*cos(theta) 
+        
+    else:
+        b=(-phi_o0+phi_ie-pi)
+        D=ro/rb*((phi_i0-phi_ie)*sin(theta)-cos(theta)+1)/(phi_ie-phi_i0)
+        B=1.0/2.0*(-b+sqrt(b**2-4.0*D))
+        B_prime=-ro/rb*(sin(theta)+(phi_i0-phi_ie)*cos(theta))/((phi_ie-phi_i0)*sqrt(b**2-4*D))
     
-    #Add on the ficticious volume to correct for there actually being no volume
-    #  at theta=0
+    if phi_ie_offset > 0 and theta >= pi:
+        
+        # Beyond a crank angle of pi radians, the offset chamber is "sealed off" 
+        # besides any leakage through the channel, and don't need to find
+        # the bounding involute angle on the opposing scroll wrap.
+        # 
+        # You can just use the compression chamber volume relationship - a linear
+        # decrease in volume with the crank angle.  The compression chamber
+        # index alpha is zero because this is not a conventional compression chamber
+        # but a weird semi-compression chamber formed by the offset pocket
+        
+        Vs = -pi*h*rb*ro*(2*theta-2*phi_ie-pi+phi_i0+phi_o0)
+        dVs = -2.0*pi*h*rb*ro
+    
+    else:
+        
+        # This block of code is used whenever 
+    
+        VO=h*rb**2/6.0*((phi_ie+phi_ie_offset-phi_i0)**3-(phi_ie-theta-phi_i0)**3)
+        dVO=h*rb**2/2.0*((phi_ie-theta-phi_i0)**2)
+        
+        VIa=h*rb**2/6.0*((phi_ie+phi_ie_offset-pi+B-phi_o0)**3-(phi_ie-pi-theta-phi_o0)**3)
+        dVIa=h*rb**2/2.0*((phi_ie+phi_ie_offset-pi+B-phi_o0)**2*B_prime+(phi_ie-pi-theta-phi_o0)**2)
+            
+        VIb=h*rb*ro/2.0*((phi_ie-pi+B+phi_ie_offset-phi_o0)*sin(B+phi_ie_offset+theta)+cos(B+phi_ie_offset+theta))
+        dVIb=h*rb*ro*(B_prime+1)/2.0*((phi_ie-pi+B+phi_ie_offset-phi_o0)*cos(B+phi_ie_offset+theta)-sin(B+phi_ie_offset+theta))
+            
+        VIc=h*rb*ro/2.0
+        dVIc=0.0
+            
+        VI = VIa+VIb-VIc
+        dVI = dVIa+dVIb-dVIc
+        
+        Vs=VO-VI
+        dVs=dVO-dVI
+    
+    # Add on the ficticious volume to correct for there actually being no volume
+    # at theta=0
     Vs+=theta_0_volume
     
     if poly==False:
         return Vs,dVs
     elif poly==True:
+        
         ############### Polygon calculations ##################
-        phi=np.linspace(phi_ie-theta,phi_ie,2000)
+        phi=np.linspace(phi_ie-theta,phi_ie+phi_ie_offset,2000)
         (xi,yi)=coords_inv(phi, geo, theta, 'fi')
-        phi=np.linspace(phi_ie-pi+B,phi_ie-pi-theta,2000)
+        phi=np.linspace(phi_ie-pi+B+phi_ie_offset,phi_ie-pi-theta,2000)
         (xo,yo)=coords_inv(phi, geo, theta, 'oo')
         V_poly=h*polyarea(np.r_[xi,xo,xi[0]], np.r_[yi,yo,yi[0]])
-        (cx_poly,cy_poly)=polycentroid(np.r_[xi,xo,xi[0]], np.r_[yi,yo,yi[0]])
+
+        #################################################################
+        ######### Polygon plotting code for debugging purposes ##########
+        #################################################################
+#        if theta <= pi:
+#            import pylab
+#            plotScrollSet(theta,geo,shaveOn=False,offsetScroll=phi_ie_offset>0)
+#            pylab.gca().fill(np.r_[xi,xo,xi[0]], np.r_[yi,yo,yi[0]])
+#            pylab.gca().plot(0,0,'x')
+#            pylab.gca().plot(ro*cos(phi_ie-pi/2-theta),ro*sin(phi_ie-pi/2-theta),'o')
+#            
+#            phi=np.linspace(phi_ie+phi_ie_offset,phi_ie-theta,2000)
+#            (xo,yo)=coords_inv(phi, geo, theta, 'fi')
+#            pylab.gca().plot(xo,yo,'-',lw=2)
+#            pylab.gca().fill(np.r_[xo[::-1],0], np.r_[yo[::-1],0],'k',alpha = 0.5)
+#            print 'VO',h*polyarea(np.r_[xo[::-1],0], np.r_[yo[::-1],0]),VO
+#            
+#            #VI calc
+#            phi=np.linspace(phi_ie+phi_ie_offset-pi+B,phi_ie-pi-theta,2000)
+#            (xo,yo)=coords_inv(phi, geo, theta, 'oo')
+#            pylab.gca().plot(xo,yo,'-',lw=2)
+#            pylab.gca().fill(np.r_[xo[::-1],0], np.r_[yo[::-1],0],'g',alpha = 0.5)
+#            print 'VI', h*polyarea(np.r_[xo[::-1],0], np.r_[yo[::-1],0]), VI
+#            VI_poly = h*polyarea(np.r_[xo[::-1],0], np.r_[yo[::-1],0])
+#            
+#            phi=np.linspace(phi_ie+phi_ie_offset-pi+B,phi_ie-pi-theta,2000)
+#            (xo,yo)=coords_inv(phi, geo, theta, 'fo')
+#            pylab.gca().fill(np.r_[xo[::-1],0], np.r_[yo[::-1],0],'b',alpha = 0.3,lw=5)
+#            print 'VIa', h*polyarea(np.r_[xo[::-1],0], np.r_[yo[::-1],0]), VIa
+#            
+#            x1,y1 = 0.0,0.0
+#            x2,y2 = coords_inv(phi_ie-pi+B+phi_ie_offset, geo, theta, 'fo')
+#            x3,y3 = ro*cos(phi_ie-pi/2-theta),ro*sin(phi_ie-pi/2-theta)
+#            pylab.gca().fill(np.r_[x1,x2,x3,x1], np.r_[y1,y2,y3,y1],'r',alpha = 0.8)
+#            print 'VIb',h*polyarea(np.r_[x1,x2,x3,x1], np.r_[y1,y2,y3,y1]),VIb
+#            
+#            x1,y1 = 0.0,0.0
+#            x2,y2 = coords_inv(phi_ie-pi-theta, geo, theta, 'fo')
+#            x3,y3 = ro*cos(phi_ie-pi/2-theta),ro*sin(phi_ie-pi/2-theta)
+#            pylab.gca().fill(np.r_[x1,x2,x3,x1], np.r_[y1,y2,y3,y1],'y',alpha=0.8)
+#            print 'VIc',h*polyarea(np.r_[x1,x2,x3,x1], np.r_[y1,y2,y3,y1]), VIc
+#            
+#            pylab.show()
+            
         return Vs,dVs,V_poly
 
-def S1_forces(theta, geo, poly = False, theta_0_volume=1e-9):
+def S1_forces(theta, geo, poly = False, theta_0_volume=1e-9, use_offset = True):
     
     h=geo.h
     rb=geo.rb 
@@ -993,16 +1085,14 @@ def S2(theta, geo, poly = False, theta_0_volume = 1e-9):
         The geometry class
     poly : boolean
         If true, also output the polygon calculation at the end of the tuple (SLOW!!)
-    theta_0_volume : float, optional
-        The offset to be added to the volume to avoid division by zero
-    
+        
     Returns
     -------
     V : float
     dVdTheta : float
     V_poly : float (only if ``poly = True``)
     """
-    return S1(theta, geo, theta_0_volume = theta_0_volume)
+    return S1(theta, geo, theta_0_volume = theta_0_volume, use_offset = False)
         
 def S2_forces(theta,geo,poly=False, theta_0_volume = 1e-9):
     """
@@ -1042,7 +1132,7 @@ def S2_forces(theta,geo,poly=False, theta_0_volume = 1e-9):
     phi_i0=geo.phi_i0
     ro=rb*(pi-phi_i0+phi_o0)
     
-    S1_terms = S1_forces(theta,geo, theta_0_volume = theta_0_volume)
+    S1_terms = S1_forces(theta,geo, theta_0_volume = theta_0_volume, use_offset = False)
     cx_s1 = S1_terms['cx']
     cy_s1 = S1_terms['cy']
     
@@ -1915,9 +2005,9 @@ def phi_s_sa(theta,geo):
     phi_i0=geo.phi_i0
     ro=rb*(pi-phi_i0+phi_o0)
     
-    b=(-phi_o0+phi_ie-pi);
-    D=ro/rb*((phi_i0-phi_ie)*sin(theta)-cos(theta)+1)/(phi_ie-phi_i0);
-    B=1.0/2.0*(sqrt(b**2-4.0*D)-b);
+    b=(-phi_o0+phi_ie-pi)
+    D=ro/rb*((phi_i0-phi_ie)*sin(theta)-cos(theta)+1)/(phi_ie-phi_i0)
+    B=1.0/2.0*(sqrt(b**2-4.0*D)-b)
     return phi_ie-pi+B-phi_o0
     
 def phi_d_dd(theta,geo):
@@ -1961,8 +2051,30 @@ def Area_d_dd(theta, geo):
     x_oos,y_oos=coords_inv(geo.phi_os,geo,theta,"oo")
     return geo.h*((x_fis-x_oos)**2+(y_fis-y_oos)**2)**0.5
 
+def Area_s_s1_offset(theta, geo):
+    """
+    The area between the suction area and the s1 chamber when an offset scroll
+    wrap is employed
+    """
+    if theta>pi:
+        w = geo.ro*(1+cos(theta)) + geo.delta_suction_offset
+    else:
+        w = geo.delta_suction_offset
+    return geo.h * w
+            
 def Area_s_sa(theta,geo):
     return geo.ro*geo.h*(1-cos(theta))
     
 if __name__=='__main__':
+    """
+    xo : ro*cos(phi_ie-%pi/2-%theta)$
+    yo : ro*sin(phi_ie-%pi/2-%theta)$
+    xssa : rb*(cos(phi_ie-%pi+B+delta_phi_ie)+(phi_ie-%pi+B+delta_phi_ie-phi_o0)*sin(phi_ie-%pi+B+delta_phi_ie))$
+    yssa : rb*(sin(phi_ie-%pi+B+delta_phi_ie)-(phi_ie-%pi+B+delta_phi_ie-phi_o0)*cos(phi_ie-%pi+B+delta_phi_ie))$
+    A : -(xo*yssa-yo*xssa)/2$
+    trigsimp(%)$
+    facsum(%,[sin(B+phi_ie),cos(B+phi_ie),sin(phi_ie-%theta),
+        cos(%theta-phi_ie),[phi_ie,phi_0,theta]])$
+    trigsimp(trigreduce(expand(%)));
+    """
     print 'This is the base file with scroll geometry.  Running this file doesn\'t do anything'

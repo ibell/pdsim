@@ -37,13 +37,43 @@ def Compressor(f = None):
     global Injection
     ScrollComp=Scroll()
     #This runs if the module code is run directly
-    ScrollComp.set_scroll_geo(104.8e-6, 2.2, 0.004, 0.005) #Set the scroll wrap geometry
+    ScrollComp.set_scroll_geo(104.8e-6, 1.61, 0.004, 0.005) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2='PMP')
     ScrollComp.geo.delta_flank = 15e-6
     ScrollComp.geo.delta_radial = 15e-6
     ScrollComp.omega = 3600/60*2*pi
     ScrollComp.Tamb = 298.0
     ScrollComp.eta_motor = 0.9
+    
+    ScrollComp.geo.phi_ie_offset = pi
+    
+#    theta = np.linspace(0,2*pi,101)
+#    _Vs1 = []
+#    _Vs2 = []
+#    _Vs3 = [] 
+#    for th in theta:
+#        _Vs1.append(scroll_geo.S1(th,ScrollComp.geo)[0])
+#    ScrollComp.geo.phi_ie_offset = pi
+#    for th in theta:
+#        _Vs2.append(scroll_geo.S1(th,ScrollComp.geo)[0])
+#    _theta = np.linspace(0,pi,101)
+##    for th in _theta:
+##        _Vs3.append(scroll_geo.S1(th,ScrollComp.geo,poly=True)[2])
+#
+#    import pylab
+#    if len(_Vs3)>0:
+#        pylab.plot(theta,_Vs1,theta,_Vs2,_theta,_Vs3)
+#    else:
+#        pylab.plot(theta,_Vs1,theta,_Vs2)
+#    pylab.show()
+##    return
+#        
+#    ScrollComp.geo.phi_ie_offset = pi
+#    for th in np.linspace(0,pi,11):
+#        print scroll_geo.S1(th,ScrollComp.geo,poly=True)
+#    return
+
+    
     
 #    import pylab
 #    pylab.plot(fx,fy,'-',fxp,fyp,'s',mfc='none')
@@ -130,13 +160,13 @@ def Compressor(f = None):
                         )
     ScrollComp.add_flow(FlowPath(key1='sa', 
                                  key2='s1',
-                                 MdotFcn=ScrollComp.SA_S,
+                                 MdotFcn=ScrollComp.SA_S1,
                                  MdotFcn_kwargs = dict(X_d = 0.3)
                                  )
                         )
-    ScrollComp.add_flow(FlowPath(key1='sa', 
-                                 key2='s2', 
-                                 MdotFcn=ScrollComp.SA_S,
+    ScrollComp.add_flow(FlowPath(key1='sa',
+                                 key2='s2',
+                                 MdotFcn=ScrollComp.SA_S2,
                                  MdotFcn_kwargs = dict(X_d = 0.3)
                                  )
                         )
@@ -201,7 +231,7 @@ def Compressor(f = None):
                      lump_energy_balance_callback=ScrollComp.lump_energy_balance_callback,
                      solver_method='RK45',
                      UseNR = False, #Use Newton-Raphson ND solver to determine the initial state
-                     OneCycle = True,
+                     OneCycle = False,
                      plot_every_cycle= False
                      )
     except:
@@ -219,7 +249,7 @@ def Compressor(f = None):
         ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
     
-    #debug_plots(ScrollComp,plot_names=['Pressure v. crank angle'])
+    debug_plots(ScrollComp,plot_names=['Pressure v. crank angle'])
     
     ScrollComp.calculate_force_terms(orbiting_back_pressure = pe)
     

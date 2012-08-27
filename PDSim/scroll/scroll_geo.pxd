@@ -15,6 +15,7 @@ cdef class geoVals:
     cdef public double b_line, t1_line, t2_line, m_line
     cdef public double x0_wall,y0_wall,r_wall
     cdef public double delta_radial, delta_flank
+    cdef public double phi_ie_offset, delta_suction_offset
     
 cpdef double fxA(double rb, double phi, double phi0)
 cpdef double fyA(double rb, double phi, double phi0)
@@ -31,8 +32,8 @@ cpdef HT_angles(double theta, geoVals geo, bytes key)
 
 cpdef tuple SA(double theta, geoVals geo, bint poly=*, bint forces=*)
 
-cpdef tuple S1(double theta, geoVals geo, bint poly = *, double theta_0_volume = *)
-cpdef dict S1_forces(double theta, geoVals geo, bint poly = *, double theta_0_volume =*)
+cpdef tuple S1(double theta, geoVals geo, bint poly = *, double theta_0_volume = *, bint use_offset = *)
+cpdef dict S1_forces(double theta, geoVals geo, bint poly = *, double theta_0_volume =*, bint use_offset = *)
 
 cpdef tuple S2(double theta, geoVals geo, bint poly = *, double theta_0_volume = *)
 cpdef dict S2_forces(double theta, geoVals geo, bint poly = *, double theta_0_volume =*)
@@ -62,3 +63,4 @@ cdef double phi_d_dd(double theta, geoVals geo)
 
 cpdef double Area_d_dd(double theta, geoVals geo)
 cpdef double Area_s_sa(double theta, geoVals geo)
+cpdef double Area_s_s1_offset(double theta, geoVals geo)
