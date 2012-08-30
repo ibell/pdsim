@@ -794,7 +794,35 @@ def plot_HT_angles(theta, geo, keys, involute):
     ax.set_ylim(0,len(keys)+1)
     plt.show()
       
-def SA(theta, geo, poly=False, forces=False):
+def SA(theta, geo, poly=False, use_offset = True):
+    """
+    Volume and derivative of volume of SA chamber
+    
+    Parameters
+    ----------
+    theta : float
+        The crank angle in the range [:math:`0, 2\pi`]
+    geo : geoVals instance
+        The geometry class
+    poly : boolean
+        If ``True``, also output the polygon calculation at the end of the tuple (SLOW!!)
+    use_offset : boolean
+        If ``True``, use the offset value from geo.phi_ie_offset, else, don't 
+        use any offset
+        
+    Notes
+    -----
+    If the parameter ``geo.phi_ie_offset`` is greater than zero, the fixed scroll 
+    inner involute is extended by this amount.  In general if an offset is used it
+    it should be exactly :math:`\pi` radians which will bring the two suction 
+    chambers together and allows for a single inlet port to the scroll set. 
+    
+    Returns
+    -------
+    V : float
+    dVdTheta : float
+    V_poly : float (only if ``poly = True``)
+    """
     h=geo.h
     rb=geo.rb 
     phi_ie=geo.phi_ie 
@@ -803,20 +831,78 @@ def SA(theta, geo, poly=False, forces=False):
     phi_i0=geo.phi_i0
     oe=geo.phi_oe
     ro=rb*(pi-phi_i0+phi_o0)
+    t= rb*(phi_i0-phi_o0)
+    pt = 2*pi*rb
     
-    b=(-phi_o0+phi_ie-pi);
-    D=ro/rb*((phi_i0-phi_ie)*sin(theta)-cos(theta)+1)/(phi_ie-phi_i0);
-    B=1.0/2.0*(sqrt(b*b-4.0*D)-b);
-    B_prime=-ro/rb*(sin(theta)+(phi_i0-phi_ie)*cos(theta))/((phi_ie-phi_i0)*sqrt(b*b-4*D));
-    V_Isa=h*rb**2/6.0*(pow(phi_oe-phi_o0,3)-pow(phi_ie-pi+B-phi_o0,3));
+    if not use_offset:
+        phi_ie_offset = 0.0
+    else:
+        phi_ie_offset = geo.phi_ie_offset
     
-    V=h*pi*geo.r_wall**2-2*V_Isa;
-    dV=h*rb**2*pow(phi_ie-pi+B-phi_o0,2)*B_prime;
+    if abs(phi_ie_offset) < 1e-12:
+        b=(-phi_o0+phi_ie-pi)
+        D=ro/rb*((phi_i0-phi_ie)*sin(theta)-cos(theta)+1)/(phi_ie-phi_i0)
+        B=1.0/2.0*(sqrt(b*b-4.0*D)-b)
+        B_prime=-ro/rb*(sin(theta)+(phi_i0-phi_ie)*cos(theta))/((phi_ie-phi_i0)*sqrt(b*b-4*D))
+        V_Isa=h*rb**2/6.0*(pow(phi_oe-phi_o0,3)-pow(phi_ie-pi+B-phi_o0,3))
+        
+        V=h*pi*geo.r_wall**2-2*V_Isa
+        dV=h*rb**2*pow(phi_ie-pi+B-phi_o0,2)*B_prime
     
-    if forces==False and poly==False:
+    else:
+        """
+        The suction area is a lot smaller in the case of an offset 
+        scroll wrap because it is only the part around where the scroll
+        wraps come close to each other.  For crank angles from 0 to pi, 
+        consider the cross-section to be approximately just half the circle that
+        closes the involutes.  The diameter is the pitch minus the scroll thickness
+        
+        Beyond theta = pi, the area grows as the s1 chamber begins to compress
+        The area remaining in the chamber at theta = 2*pi becomes the s1 chamber 
+        """ 
+        
+        Dcircle = pt-t
+        Vcircle = 0.5 * (pi * Dcircle**2 / 4) * h
+        dVcircle = 0.0
+        
+        if theta <= pi:
+            V = Vcircle
+            dV = dVcircle
+        else:
+            #Using the old style of definition
+            b = (-phi_o0+phi_ie+phi_ie_offset-pi)    
+            B = -ro/rb*sin(theta)/b
+            B_prime = -ro/rb/b*cos(theta)
+            
+#            print 'theta',theta 
+            #The scroll wrap portion of the outer wall of the chamber
+            VO = h*rb**2/6.0*((phi_ie+phi_ie_offset-phi_i0)**3-(phi_ie+phi_ie_offset-(theta-pi)-phi_i0)**3)
+            dVO = h*rb**2/2.0*((phi_ie+phi_ie_offset-(theta-pi)-phi_i0)**2)
+            
+#            print 'O phi',phi_ie+phi_ie_offset,phi_ie+phi_ie_offset-(theta-pi)
+            # From the fixed origin to the fixed scroll using the same bounding angles
+            # as for the orbiting scroll
+            VIa=h*rb**2/6.0*((phi_ie-phi_o0)**3-(phi_ie-(theta-pi)-phi_o0)**3)
+            dVIa=h*rb**2/2.0*((phi_ie-(theta-pi)-phi_o0)**2)
+            
+#            print 'I phi',phi_ie,phi_ie-(theta-pi)
+            
+            VIb=h*rb*ro/2.0*((phi_ie-pi+B+phi_ie_offset-phi_o0)*sin(B+phi_ie_offset+theta)+cos(B+phi_ie_offset+theta))
+            dVIb=h*rb*ro*(B_prime+1)/2.0*((phi_ie-pi+B+phi_ie_offset-phi_o0)*cos(B+phi_ie_offset+theta)-sin(B+phi_ie_offset+theta))
+                
+            VIc=h*rb*ro/2.0
+            dVIc=0.0
+                
+            VI = VIa+VIb-VIc
+            dVI = dVIa+dVIb-dVIc
+        
+            V = Vcircle + VO - VI
+            dV = dVcircle + dVO - dVI
+         
+    if not poly:
         return V,dV
     else:
-        raise ValueError('no forces or polygons for SA yet')
+        raise ValueError('no polygons for volumes of SA yet')
     
 def S1(theta, geo, poly=False, theta_0_volume=1e-9, use_offset = True):
     """
@@ -973,6 +1059,10 @@ def S1(theta, geo, poly=False, theta_0_volume=1e-9, use_offset = True):
 
 def S1_forces(theta, geo, poly = False, theta_0_volume=1e-9, use_offset = True):
     
+    import warnings
+    if geo.phi_ie_offset>1e-12:
+        warnings.warn('S1_forces not fixed for offset scroll', RuntimeWarning)
+        
     h=geo.h
     rb=geo.rb 
     phi_ie=geo.phi_ie
@@ -2054,15 +2144,40 @@ def Area_d_dd(theta, geo):
 def Area_s_s1_offset(theta, geo):
     """
     The area between the suction area and the s1 chamber when an offset scroll
-    wrap is employed
+    wrap is employed [:math:`m^2`]
+    
+    Parameters
+    ----------
+    theta : float
+    geo : geoVals instance
+    
+    Returns
+    -------
+    A : float
+        Area [:math:`m^2`]
     """
-    if theta>pi:
+    if theta < pi:
         w = geo.ro*(1+cos(theta)) + geo.delta_suction_offset
     else:
         w = geo.delta_suction_offset
     return geo.h * w
             
 def Area_s_sa(theta,geo):
+    """
+    The area between the suction area and the s1 chamber when an offset scroll
+    wrap is not employed and the area between the suction area and the 
+    s2 chamber [:math:`m^2`]
+    
+    Parameters
+    ----------
+    theta : float
+    geo : geoVals instance
+    
+    Returns
+    -------
+    A : float
+        Area [:math:`m^2`]
+    """
     return geo.ro*geo.h*(1-cos(theta))
     
 if __name__=='__main__':

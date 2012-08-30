@@ -1165,12 +1165,20 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         
         if self.results: #as long as it isn't empty
             
+            #Remove the items on the panel
             if self.ResultsList is not None:
                 self.WriteButton.Destroy()
                 self.RemoveButton.Destroy()
+                self.PlotButton.Destroy()
                 self.ResultsList.Destroy()
                 self.GetSizer().Layout()
-                
+            
+            for attr in reversed(self.columns_selected):
+                #If the key is in any of the simulations 
+                if not any([hasattr(sim,attr) for sim in self.results]):
+                    print 'removing column_heading', attr,' since it is not found in any simulation'
+                    self.columns_selected.remove(attr)
+                        
             rows = []
             for sim in self.results: #loop over the results
                 row = []
@@ -1194,9 +1202,12 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             self.RemoveButton = wx.Button(self,label = 'Remove selected')
             self.RemoveButton.Bind(wx.EVT_BUTTON, self.OnRemoveSelected)
             
+            self.PlotButton = wx.Button(self,label = 'Plot selected')
+            self.PlotButton.Bind(wx.EVT_BUTTON, self.OnPlotSelected)
             
             #Do the layout of the panel
             sizer = self.GetSizer()
+            
             hsizer = wx.BoxSizer(wx.HORIZONTAL)
             hsizer.Add(self.ResultsList,1,wx.EXPAND)
             sizer.Add(hsizer)
@@ -1204,6 +1215,7 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             hsizer = wx.BoxSizer(wx.HORIZONTAL)
             hsizer.Add(self.WriteButton)
             hsizer.Add(self.RemoveButton)
+            hsizer.Add(self.PlotButton)
             sizer.Add(hsizer)
             
             sizer.Layout()
@@ -1215,6 +1227,9 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             self.rebuild()
         
     def OnLoadRuns(self, event = None):
+        """
+        Load a pickled run from a file
+        """
         home = os.getenv('USERPROFILE') or os.getenv('HOME')
         temp_folder = os.path.join(home,'.pdsim-temp')
         
@@ -1228,7 +1243,20 @@ class OutputDataPanel(pdsim_panels.PDPanel):
                 self.add_runs([sim])
             self.rebuild()
         FD.Destroy()
+    
+    def OnPlotSelected(self, event):
+        list_ = self.ResultsList.GetListCtrl()
         
+        indices = []
+        index = list_.GetFirstSelected()
+        sim = self.results[index]
+        self.Parent.plot_outputs(sim)
+        
+        if list_.GetNextSelected(index) != -1:
+            dlg = wx.MessageDialog(None,'Sorry, only the first selected row will be used')
+            dlg.ShowModal()
+            dlg.Destroy()
+                
     def OnRemoveSelected(self, event):
         list_ = self.ResultsList.GetListCtrl()
         

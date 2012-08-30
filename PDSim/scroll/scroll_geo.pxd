@@ -30,7 +30,7 @@ cpdef int getNc(double theta, geoVals geo)
 
 cpdef HT_angles(double theta, geoVals geo, bytes key)
 
-cpdef tuple SA(double theta, geoVals geo, bint poly=*, bint forces=*)
+cpdef tuple SA(double theta, geoVals geo, bint poly=*, bint use_offset = *)
 
 cpdef tuple S1(double theta, geoVals geo, bint poly = *, double theta_0_volume = *, bint use_offset = *)
 cpdef dict S1_forces(double theta, geoVals geo, bint poly = *, double theta_0_volume =*, bint use_offset = *)

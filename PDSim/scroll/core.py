@@ -835,7 +835,7 @@ class Scroll(PDSimCore, _Scroll):
         will be used.
         """
         if self.geo.phi_ie_offset > 0:
-            FlowPath.A = X_d*scroll_geo.Area_s_sa(self.theta, self.geo)
+            FlowPath.A = X_d*scroll_geo.Area_s_s1_offset(self.theta, self.geo)
         else:
             FlowPath.A = X_d*scroll_geo.Area_s_sa(self.theta, self.geo)
              

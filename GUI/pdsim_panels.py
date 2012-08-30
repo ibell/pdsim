@@ -716,6 +716,8 @@ class ParametricPanel(PDPanel):
         self.NTerms = 0
         self.ParamSizer = None
         self.ParamListSizer = None
+        self.ParaList = None
+        self.RunButton = None
         
         #Has no self.items, so all processing done through post_get_from_configfile
         self.get_from_configfile('ParametricPanel')
@@ -725,9 +727,9 @@ class ParametricPanel(PDPanel):
             self.ParamSizerBox = wx.StaticBox(self, label = "Parametric Terms")
             self.ParamSizer = wx.StaticBoxSizer(self.ParamSizerBox, wx.VERTICAL)
             self.GetSizer().Add(self.ParamSizer)
-            self.cmdParaBuild = wx.Button(self, label = "Build Table")
-            self.cmdParaBuild.Bind(wx.EVT_BUTTON, self.OnBuildTable)
-            self.ButtonSizer.Add(self.cmdParaBuild)
+            self.BuildButton = wx.Button(self, label = "Build Table")
+            self.BuildButton.Bind(wx.EVT_BUTTON, self.OnBuildTable)
+            self.ButtonSizer.Add(self.BuildButton)
         option = ParametricOption(self, self.variables)
         self.ParamSizer.Add(option)
         self.ParamSizer.Layout()
@@ -739,13 +741,19 @@ class ParametricPanel(PDPanel):
         term.Destroy()
         self.NTerms -= 1
         if self.NTerms == 0:
-            self.cmdParaBuild.Destroy()
-            self.GetSizer().Remove(self.ParamSizer)
+            self.BuildButton.Destroy()
+            if self.ParamSizer is not None:
+                self.GetSizer().Remove(self.ParamSizer)
+                self.ParamSizer = None
             if self.ParaList is not None:
                 self.ParaList.Destroy()
+                self.ParaList = None
+            if self.ParamListSizer is not None:
                 self.GetSizer().Remove(self.ParamListSizer)
-                self.ParamListSizer = None 
-            self.RunButton.Destroy()
+                self.ParamListSizer = None
+            if self.RunButton is not None:
+                self.RunButton.Destroy()
+                self.RunButton = None
         else:
             self.ParamSizer.Layout()
         self.GetSizer().Layout()
@@ -782,7 +790,7 @@ class ParametricPanel(PDPanel):
         self.GetSizer().Layout()
         self.Refresh() 
         
-        if not hasattr(self,'RunButton'):
+        if self.RunButton is None:
             self.RunButton = wx.Button(self, label='Run Table')
             self.RunButton.Bind(wx.EVT_BUTTON, self.OnRunTable)
             self.ButtonSizer.Add(self.RunButton)
@@ -1170,10 +1178,15 @@ class StateInputsPanel(PDPanel):
         box_sizer.Add(wx.StaticLine(self,-1,(25, 50), (300,1)))
         
         self.cmbDischarge = wx.ComboBox(self)
-        self.cmbDischarge.AppendItems(['Discharge pressure [kPa]', 'Pressure ratio [-]'])
+        self.cmbDischarge.AppendItems(['Discharge pressure [kPa]', 
+                                       'Pressure ratio [-]', 
+                                       'Saturated Temperature [K]'
+                                       ])
         self.cmbDischarge.SetStringSelection(self.Discharge_key)
         self.DischargeValue = wx.TextCtrl(self, value = self.Discharge_value)
-        self.cmbDischarge.Bind(wx.EVT_COMBOBOX, self.OnChangeDischarge)
+        self.cmbDischarge.Bind(wx.EVT_COMBOBOX, self.OnChangeDischargeVariable)
+        self.DischargeValue.Bind(wx.EVT_KILL_FOCUS,self.OnChangeDischargeValue)
+        self.DischargeValue.Bind(wx.EVT_TEXT,self.OnChangeDischargeValue)
         
         sizer = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
         sizer.AddMany([self.cmbDischarge, self.DischargeValue])
@@ -1182,17 +1195,51 @@ class StateInputsPanel(PDPanel):
         self.SetSizer(box_sizer)
         sizer.Layout()  
         
-    def OnChangeDischarge(self, event):
+        #Set the value self._discharge_pressure variable
+        self.OnChangeDischargeValue()
+        
+    def OnChangeDischargeValue(self, event = None):
+        """ 
+        Set the internal pressure when the value is changed in the TextCtrl
+        """
         p_suction = self.SuctionState.GetState().p
+        Fluid = self.SuctionState.GetState().Fluid
+        
+        if self.cmbDischarge.GetStringSelection() == 'Discharge pressure [kPa]':
+            p_disc = float(self.DischargeValue.GetValue())
+            self._discharge_pressure = p_disc
+            
+        elif self.cmbDischarge.GetStringSelection() == 'Pressure ratio [-]':
+            p_ratio = float(self.DischargeValue.GetValue())
+            self._discharge_pressure = p_ratio*p_suction
+        
+        elif self.cmbDischarge.GetStringSelection() == 'Saturated Temperature [K]':
+            Tsat = float(self.DischargeValue.GetValue())
+            self._discharge_pressure = CP.Props('P','T',Tsat,'Q',1.0,Fluid)
+
+        else:
+            raise KeyError
+        
+    def OnChangeDischargeVariable(self, event = None):
+        """
+        Fires when the combobox is selected
+        """
+        p_suction = self.SuctionState.GetState().p
+        Fluid = self.SuctionState.GetState().Fluid
 
         if self.cmbDischarge.GetStringSelection() == 'Discharge pressure [kPa]':
-            pratio = float(self.DischargeValue.GetValue())
-            p = pratio*p_suction
-            self.DischargeValue.SetValue(str(p))
+            self.DischargeValue.SetValue(str(self._discharge_pressure))
+            
         elif self.cmbDischarge.GetStringSelection() == 'Pressure ratio [-]':
-            p_disc = float(self.DischargeValue.GetValue())
+            p_disc = self._discharge_pressure
             pratio = p_disc/p_suction
             self.DischargeValue.SetValue(str(pratio))
+        
+        elif self.cmbDischarge.GetStringSelection() == 'Saturated Temperature [K]':
+            p_disc = self._discharge_pressure
+            Tsat = CP.Props('T', 'P', p_disc, 'Q', 1.0, Fluid)
+            self.DischargeValue.SetValue(str(Tsat))
+        
         else:
             raise KeyError
         
@@ -1202,19 +1249,16 @@ class StateInputsPanel(PDPanel):
         self.Discharge_value = str(value)
         
     def post_set_params(self, simulation):
+        Fluid = self.SuctionState.GetState().Fluid
+        
         simulation.inletState = self.SuctionState.GetState()
-        if self.cmbDischarge.GetStringSelection() == 'Discharge pressure [kPa]':
-            simulation.discharge_pressure = float(self.DischargeValue.GetValue())
-        elif self.cmbDischarge.GetStringSelection() == 'Pressure ratio [-]':
-            p_suction = self.SuctionState.GetState().p
-            p_ratio = float(self.DischargeValue.GetValue())
-            simulation.discharge_pressure = p_ratio * p_suction
+            
+        simulation.discharge_pressure = self._discharge_pressure
             
         #Set the state variables in the simulation
         simulation.suction_pressure = self.SuctionState.GetState().p
         simulation.suction_temp = self.SuctionState.GetState().T
-         
-        Fluid = self.SuctionState.GetState().Fluid
+        
         if self.SuctionState.GetState().p < CP.Props(Fluid,'pcrit'):
             #If subcritical, also calculate the superheat and sat_temp
             p = simulation.suction_pressure
@@ -1224,6 +1268,15 @@ class StateInputsPanel(PDPanel):
             #Otherwise remove the parameters
             del simulation.suction_sat_temp
             del simulation.suction_superheat
+            
+        #Set the state variables in the simulation
+        simulation.discharge_pratio = simulation.discharge_pressure/simulation.suction_pressure
+        
+        if simulation.discharge_pressure < CP.Props(Fluid,'pcrit'):
+            p = simulation.discharge_pressure
+            simulation.discharge_sat_temp = CP.Props('T', 'P', p, 'Q', 1.0, Fluid)
+        else:
+            del simulation.discharge_sat_temp
         
     def post_prep_for_configfile(self):
         """
@@ -1247,6 +1300,15 @@ class StateInputsPanel(PDPanel):
                 dict(attr = 'suction_superheat',
                      text = 'Superheat [K]',
                      parent = self),
+                dict(attr = 'discharge_pressure',
+                     text = 'Discharge pressure [kPa]',
+                     parent = self),
+                dict(attr = 'discharge_sat_temp',
+                     text = 'Discharge saturated temperature (dew) [K]',
+                     parent = self),
+                dict(attr = 'discharge_pratio',
+                     text = 'Discharge pressure ratio [-]',
+                     parent = self)
                 ]
     
     def apply_additional_parametric_terms(self, attrs, vals, panel_items):
@@ -1299,6 +1361,43 @@ class StateInputsPanel(PDPanel):
             raise NotImplementedError('only one param provided')
         elif num_suct_params >2:
             raise ValueError ('Only two inlet state parameters can be provided in parametric table')
+        
+        # Then check about the discharge state; only one variable is allowed
+        disc_params = [(par,val) for par,val in zip(attrs,vals) if par.startswith('discharge')]
+        num_disc_params = len(disc_params)
+        
+        if num_disc_params>0:
+            #Unzip the parameters (List of tuples -> tuple of lists)
+            disc_attrs, disc_vals = zip(*disc_params)
+            
+        if num_disc_params == 1:
+            # Remove all the entries that correspond to the discharge state - 
+            # we need them and don't want to set them in the conventional way
+            for a in disc_attrs:
+                i = attrs.index(a)
+                vals.pop(i)
+                attrs.pop(i)
+                
+            if 'discharge_pressure' in disc_attrs:
+                discharge_pressure = disc_vals[disc_attrs.index('discharge_pressure')]
+                self._discharge_pressure = discharge_pressure
+                
+            elif 'discharge_pratio' in disc_attrs:
+                discharge_pratio = disc_vals[disc_attrs.index('discharge_pratio')]
+                p_suction = self.SuctionState.GetState().p
+                self._discharge_pressure = discharge_pratio * p_suction
+        
+            elif 'discharge_sat_temp' in disc_attrs:
+                Tsat = disc_vals[disc_attrs.index('discharge_sat_temp')]
+                Fluid = inletState.Fluid
+                self._discharge_pressure = CP.Props('P','T',Tsat,'Q',1.0,Fluid)
+            
+            #Fire the event manually to update the textbox
+            self.OnChangeDischargeVariable()
+            
+        elif num_disc_params > 1:
+            raise ValueError ('Only one discharge pressure parameter can be provided in parametric table')
+            
         return attrs, vals
         
 if __name__=='__main__':

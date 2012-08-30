@@ -12,7 +12,7 @@ from math import pi
 # If the following line is uncommented, python will try to use a local version
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
-sys.path.insert(0, os.path.abspath('..'))
+#sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo
@@ -45,8 +45,12 @@ def Compressor(f = None):
     ScrollComp.Tamb = 298.0
     ScrollComp.eta_motor = 0.9
     
-    ScrollComp.geo.phi_ie_offset = pi
+    ScrollComp.geo.phi_ie_offset = 0
     
+#    print ScrollComp.V_s1(0)[0]
+#    print ScrollComp.V_sa(2*pi)[0]-ScrollComp.V_sa(0)[0]
+#    
+#    plotScrollSet(2*pi,ScrollComp.geo,shaveOn=False,offsetScroll=ScrollComp.geo.phi_ie_offset>0,show=True)
 #    theta = np.linspace(0,2*pi,101)
 #    _Vs1 = []
 #    _Vs2 = []
@@ -66,10 +70,13 @@ def Compressor(f = None):
 #    else:
 #        pylab.plot(theta,_Vs1,theta,_Vs2)
 #    pylab.show()
-##    return
+#    return
 #        
+
+    
 #    ScrollComp.geo.phi_ie_offset = pi
-#    for th in np.linspace(0,pi,11):
+#    for th in np.linspace(0,2*pi,11):
+#        plotScrollSet(th,ScrollComp.geo,shaveOn=False,offsetScroll=ScrollComp.geo.phi_ie_offset>0,show=True)
 #        print scroll_geo.S1(th,ScrollComp.geo,poly=True)
 #    return
 
@@ -235,8 +242,9 @@ def Compressor(f = None):
                      plot_every_cycle= False
                      )
     except:
-        raise
+        
         debug_plots(ScrollComp)
+        raise
 
     print 'time taken',clock()-t1
     

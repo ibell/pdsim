@@ -9,9 +9,21 @@ from Cython.Distutils import build_ext
 from Cython.Distutils.extension import Extension as CyExtension
 import sys, shutil, os
 
+version = '1.1.0'
+
+#Modify the __init__ file with this version string
+fName = os.path.join('PDSim','__init__.py')
+lines = open(fName,'r').readlines()
+fp = open(fName,'w')
+for line in lines:
+    if line.startswith('__version__'):
+        line = "__version__ = '" + version + "'"
+    fp.write(line+'\n')
+fp.close() 
+
 if len(sys.argv) == 1:
-    sys.argv+=['build_ext','--inplace']
-    #sys.argv+=['install']
+    #sys.argv+=['build_ext','--inplace']
+    sys.argv+=['install']
     
 try:
     import CoolProp
@@ -66,7 +78,7 @@ for pyx_file in pyx_list:
        
 setup(
   name = 'PDSim',
-  version = '1.0.0',
+  version = version,
   author = "Ian Bell",
   author_email='ian.h.bell@gmail.com',
   url='http://pdsim.sourceforge.net',
