@@ -384,9 +384,15 @@ class InputsToolBook(wx.Toolbook):
                 panel.post_set_params(simulation)
                 
     def collect_parametric_terms(self):
+        """
+        Collect all the terms to be added to parametric table
+        """
         items = [] 
-        for panel in self.panels:
-            items += panel.items
+        #get a list of the panels that subclass PDPanel
+        panels = [panel for panel in self.Children if isinstance(panel,pdsim_panels.PDPanel)]
+        for panel in panels:
+            if hasattr(panel,'items'):
+                items += panel.items
             more_items = panel.get_additional_parametric_terms()
             if more_items is not None:
                 items += more_items
@@ -404,7 +410,9 @@ class InputsToolBook(wx.Toolbook):
         items : the list of dictionaries of item data in para table
         
         """
-        for panel in self.panels:
+        #get a list of the panels that subclass PDPanel
+        panels = [panel for panel in self.Children if isinstance(panel,pdsim_panels.PDPanel)]
+        for panel in panels:
             #Collect all the additional terms that apply to the panel
             panel_items = [item for item in items if 'parent' in item and item['parent'] == panel]
             # Returns the remaining attrs, vals
@@ -544,19 +552,34 @@ class SolverToolBook(wx.Toolbook):
         self.AssignImageList(il)
         
         items = self.Parent.InputsTB.collect_parametric_terms()
-        #Make the recip panels.  Name should be consistent with configuration file
+        #Make the panels.  Name should be consistent with configuration file
         pane1=SolverInputsPanel(self, configfile, name = 'SolverInputsPanel')
         pane2=pdsim_panels.ParametricPanel(self, configfile, items, name='ParametricPanel')
         self.panels=(pane1,pane2)
         
         for Name,index,panel in zip(['Params','Parametric'],indices,self.panels):
-            self.AddPage(panel,Name,imageId=index)
+            self.AddPage(panel, Name, imageId=index)
             
     def set_params(self,simulat):
         for panel in self.panels:
             panel.set_params(simulat)
             if hasattr(panel,'post_set_params'):
-                panel.post_set_params(simulat)            
+                panel.post_set_params(simulat)
+    
+    def collect_parametric_terms(self):
+        """
+        Collect parametric terms from the panels in this toolbook
+        """
+        return []
+    
+    def update_parametric_terms(self, items):
+        """
+        Set parametric terms in the parametric table
+        """
+        for child in self.Children:
+            if isinstance(child,pdsim_panels.ParametricPanel):
+                child.update_parametric_terms(items)
+        
 
 class WriteOutputsPanel(wx.Panel):
     def __init__(self,parent):
@@ -1140,7 +1163,6 @@ class OutputDataPanel(pdsim_panels.PDPanel):
                                'Wdot_motor': 'Motor losses [kW]',
                                'Wdot_electrical': 'Electrical power [kW]',
                                'Wdot_mechanical': 'Mechanical losses [kW]',
-                               'Qdot_from_gas': 'Heat transfer from gas [kW]',
                                'Qamb': 'Ambient heat transfer [kW]',
                                'run_index': 'Run Index',
                                'eta_oi': 'Overall isentropic efficiency [-]'
@@ -1475,6 +1497,31 @@ class MainFrame(wx.Frame):
                 self.MTB.RunTB.log_ctrl_thread2,
                 self.MTB.RunTB.log_ctrl_thread3]
     
+    def update_parametric_terms(self):
+        """
+        Actually update the parametric terms in the parametric table options
+        """
+        para_terms = self.collect_parametric_terms()
+        self.MTB.SolverTB.update_parametric_terms(para_terms)
+        
+    def collect_parametric_terms(self):
+        """
+        This function is called to find all the parametric terms that are
+        required.
+        
+        They can be recursively found in:
+        - self.items in PDPanel instances
+        - collect_parametric_terms in PDPanel instances
+        - 
+        
+        """
+        terms = []
+        #Loop over the toolbooks and allow them to collect their own terms
+        for child in self.MTB.Children:
+            if isinstance(child,wx.Toolbook) and hasattr(child,'collect_parametric_terms'):
+                terms += child.collect_parametric_terms()
+        return terms
+        
     def rebuild(self, configfile):
         """
         Destroy everything in the main frame and recreate 
@@ -1502,16 +1549,8 @@ class MainFrame(wx.Frame):
         
         self.worker=None
         self.Layout() 
-    
-    def register_plugin(self, plugin):
-        if isinstance(plugin, pdsim_plugins.PDSimPlugin):
-            if not hasattr(self,'plugins_list'):
-                self.plugins_list = []
-            self.plugins_list.append(plugin)
-        else:
-            dlg = wx.MessageDialog(None,"Tried to add plugin but it is not an instance or subclass of the PDSimPlugin class")
-            dlg.ShowModal()
-            dlg.Destroy()
+        
+        self.load_plugins(self.PluginsMenu)
             
     def build_recip(self):
         #Instantiate the recip class
@@ -1566,7 +1605,131 @@ class MainFrame(wx.Frame):
 #            print 'Queueing a result for further processing'
             self.results_list.put(sim)
             wx.CallAfter(self.MTB.RunTB.log_ctrl.WriteText,'Result queued\n') 
+     
+    def load_plugins(self, PluginsMenu):
+        """
+        Load any plugins into the GUI that are found in plugins folder
+        
+        It is recommended that all classes and GUI elements relevant to the 
+        plugin be included in the given python file
+        """
+        import glob
+        self.plugins_list = []
+        #Look at each .py file in plugins folder
+        for py_file in glob.glob(os.path.join('plugins','*.py')):
+            #Get the root filename (/path/to/AAA.py --> AAA)
+            fname = py_file.split(os.path.sep,1)[1].split('.')[0]
             
+            mods = __import__('plugins.'+fname)
+            #Try to import the file as a module
+            mod = getattr(mods,fname)
+            for term in dir(mod):
+                thing = getattr(mod,term)
+                try:
+                    #If it is a plugin class
+                    if issubclass(thing, pdsim_plugins.PDSimPlugin):
+                        #Create a menu item for the plugin
+                        menuItem = wx.MenuItem(self.Type, -1, thing.short_description, "", wx.ITEM_CHECK)
+                        PluginsMenu.AppendItem(menuItem)
+                        #Instantiate the plugin
+                        plugin = thing()
+                        #Give the plugin a link to the main 
+                        plugin.set_GUI(self)
+                        #Append an instance of the plugin to the list of plugins
+                        self.plugins_list.append(plugin)
+                        #Bind the event to activate the plugin
+                        self.Bind(wx.EVT_MENU, plugin.activate, menuItem)
+                        
+                        # Check if this type of plugin is included in the config
+                        # file
+                        for section in self.config_parser.sections():
+                            if (section.startswith('Plugin')
+                                    and section.split(':')[1] ==  term):
+                                # If it is, activate it and check the element
+                                # in the menu
+                                plugin.activate()
+                                menuItem.Check(True)
+                                
+                                # Pass the section along to the plugin
+                                items = self.config_parser.items(section)
+                                plugin.build_from_configfile_items(items)
+                        
+                except TypeError:
+                    pass
+        
+        # Update the parametric terms in the parametric tables because the 
+        # plugins might have added terms if they are activated from the config
+        # file
+        self.update_parametric_terms()
+        
+    def make_menu_bar(self):
+        #################################
+        ####       Menu Bar         #####
+        #################################
+        
+        # Menu Bar
+        self.MenuBar = wx.MenuBar()
+        
+        self.File = wx.Menu()
+        self.menuFileOpen = wx.MenuItem(self.File, -1, "Open Config from file...\tCtrl+O", "", wx.ITEM_NORMAL)
+        self.menuFileSave = wx.MenuItem(self.File, -1, "Save config to file...\tCtrl+S", "", wx.ITEM_NORMAL)
+        self.menuFileFlush = wx.MenuItem(self.File, -1, "Flush out temporary files...\tCtrl+S", "", wx.ITEM_NORMAL)
+        self.menuFileQuit = wx.MenuItem(self.File, -1, "Quit\tCtrl+Q", "", wx.ITEM_NORMAL)
+        self.File.AppendItem(self.menuFileOpen)
+        self.File.AppendItem(self.menuFileSave)
+        self.File.AppendItem(self.menuFileFlush)
+        self.File.AppendItem(self.menuFileQuit)
+        self.MenuBar.Append(self.File, "File")
+        self.Bind(wx.EVT_MENU,self.OnConfigOpen,self.menuFileOpen)
+        self.Bind(wx.EVT_MENU,self.OnConfigSave,self.menuFileSave)
+        self.Bind(wx.EVT_MENU,self.OnFlushTemporaryFolder,self.menuFileFlush)
+        self.Bind(wx.EVT_MENU,self.OnQuit,self.menuFileQuit)
+        
+        self.Type = wx.Menu()
+        self.TypeRecip = wx.MenuItem(self.Type, -1, "Recip", "", wx.ITEM_RADIO)
+        self.TypeScroll = wx.MenuItem(self.Type, -1, "Scroll", "", wx.ITEM_RADIO)
+        self.TypeCompressor = wx.MenuItem(self.Type, -1, "Compressor mode", "", wx.ITEM_RADIO)
+        self.TypeExpander = wx.MenuItem(self.Type, -1, "Expander mode", "", wx.ITEM_RADIO)
+        self.TypeCompressor.Enable(False)
+        self.TypeExpander.Enable(False)
+        self.Type.AppendItem(self.TypeRecip)
+        self.Type.AppendItem(self.TypeScroll)
+        self.Type.AppendSeparator()
+        self.Type.AppendItem(self.TypeCompressor)
+        self.Type.AppendItem(self.TypeExpander)
+        self.MenuBar.Append(self.Type, "Type")
+        
+        
+        self.PluginsMenu = wx.Menu()
+        #self.load_plugins(self.PluginsMenu)
+        self.MenuBar.Append(self.PluginsMenu, "Plugins")
+        
+        
+        if self.config_parser.get('Globals', 'Type') == 'recip':
+            self.TypeRecip.Check(True)
+        else:
+            self.TypeScroll.Check(True)
+            
+        self.Bind(wx.EVT_MENU,self.OnChangeSimType,self.TypeScroll)
+        self.Bind(wx.EVT_MENU,self.OnChangeSimType,self.TypeRecip)
+        
+        self.Solve = wx.Menu()
+        self.SolveSolve = wx.MenuItem(self.Solve, -1, "Solve\tF5", "", wx.ITEM_NORMAL)
+        self.Solve.AppendItem(self.SolveSolve)
+        self.MenuBar.Append(self.Solve, "Solve")
+        self.Bind(wx.EVT_MENU, self.OnStart, self.SolveSolve)
+        
+        self.Help = wx.Menu()
+        #self.HelpHelp = wx.MenuItem(self.Help, -1, "Help...\tCtrl+H", "", wx.ITEM_NORMAL)
+        self.HelpAbout = wx.MenuItem(self.Help, -1, "About", "", wx.ITEM_NORMAL)
+        #self.Help.AppendItem(self.HelpHelp)
+        self.Help.AppendItem(self.HelpAbout)
+        self.MenuBar.Append(self.Help, "Help")
+        #self.Bind(wx.EVT_MENU, lambda event: self.Destroy(), self.HelpHelp)
+        self.Bind(wx.EVT_MENU, self.OnAbout, self.HelpAbout)
+        
+        #Actually set it
+        self.SetMenuBar(self.MenuBar)        
         
     ################################
     #         Event handlers       #
@@ -1618,19 +1781,36 @@ class MainFrame(wx.Frame):
 
             string_list.append(unicode(header_string,'latin-1'))
             
-            for panel in self.MTB.InputsTB.panels + self.MTB.SolverTB.panels + self.MTB.OutputsTB.panels:
-                #Skip any panels that do not subclass PDPanel
-                if not isinstance(panel,pdsim_panels.PDPanel):
+            #Do all the "conventional" panels 
+            for TB in self.MTB.Children:
+                
+                #Skip anything that isnt a toolbook
+                if not isinstance(TB,wx.Toolbook):
                     continue
                 
-                panel_string = panel.prep_for_configfile()
-                if isinstance(panel_string,str):
-                    string_list.append(unicode(panel_string,'latin-1'))
-                elif isinstance(panel_string,unicode):
-                    #Convert to a string
-                    panel_string = unicode.decode(panel_string,'latin-1')
-                    string_list.append(panel_string)
+                #Loop over the panels that are in the toolbook
+                for panel in TB.Children:
+                    
+                          
+                    #Skip any panels that do not subclass PDPanel
+                    if not isinstance(panel,pdsim_panels.PDPanel):
+                        continue
+                    
+                    #Collect the string for writing to file
+                    panel_string = panel.prep_for_configfile()
+                    if isinstance(panel_string,str):
+                        string_list.append(unicode(panel_string,'latin-1'))
+                    elif isinstance(panel_string,unicode):
+                        #Convert to a string
+                        panel_string = unicode.decode(panel_string,'latin-1')
+                        string_list.append(panel_string)
             
+            for plugin in self.plugins_list:
+                pass
+#                if plugin.is_activated():
+#                    if hasattr(plugin, ''):
+#                        pass
+                    
             fp = codecs.open(file_path,'w',encoding = 'latin-1')
             fp.write(u'\n'.join(string_list))
             fp.close()
@@ -1757,100 +1937,7 @@ class MainFrame(wx.Frame):
             dlg.ShowModal()
             dlg.Destroy()
             
-    def load_plugins(self, PluginsMenu):
-        import glob
-        self.plugins_list = []
-        for py_file in glob.glob(os.path.join('plugins','*.py')):
-            fname = py_file.split(os.path.sep,1)[1].split('.')[0]
-            mods = __import__('plugins.'+fname)
-            mod = getattr(mods,fname)
-            for term in dir(mod):
-                thing = getattr(mod,term)
-                try:
-                    if issubclass(thing, pdsim_plugins.PDSimPlugin):
-                        #Create a menu item for the plugin
-                        menuItem = wx.MenuItem(self.Type, -1, thing.short_description, "", wx.ITEM_CHECK)
-                        PluginsMenu.AppendItem(menuItem)
-                        #Instantiate the plugin
-                        plugin = thing()
-                        #Give the plugin a link to the main 
-                        plugin.set_GUI(self)
-                        #Append an instance of the plugin
-                        self.plugins_list.append(plugin)
-                        #Activate the plugin when clicked
-                        self.Bind(wx.EVT_MENU, plugin.activate, menuItem)
-                except TypeError:
-                    pass
-        
-    def make_menu_bar(self):
-        #################################
-        ####       Menu Bar         #####
-        #################################
-        
-        # Menu Bar
-        self.MenuBar = wx.MenuBar()
-        
-        self.File = wx.Menu()
-        self.menuFileOpen = wx.MenuItem(self.File, -1, "Open Config from file...\tCtrl+O", "", wx.ITEM_NORMAL)
-        self.menuFileSave = wx.MenuItem(self.File, -1, "Save config to file...\tCtrl+S", "", wx.ITEM_NORMAL)
-        self.menuFileFlush = wx.MenuItem(self.File, -1, "Flush out temporary files...\tCtrl+S", "", wx.ITEM_NORMAL)
-        self.menuFileQuit = wx.MenuItem(self.File, -1, "Quit\tCtrl+Q", "", wx.ITEM_NORMAL)
-        self.File.AppendItem(self.menuFileOpen)
-        self.File.AppendItem(self.menuFileSave)
-        self.File.AppendItem(self.menuFileFlush)
-        self.File.AppendItem(self.menuFileQuit)
-        self.MenuBar.Append(self.File, "File")
-        self.Bind(wx.EVT_MENU,self.OnConfigOpen,self.menuFileOpen)
-        self.Bind(wx.EVT_MENU,self.OnConfigSave,self.menuFileSave)
-        self.Bind(wx.EVT_MENU,self.OnFlushTemporaryFolder,self.menuFileFlush)
-        self.Bind(wx.EVT_MENU,self.OnQuit,self.menuFileQuit)
-        
-        self.Type = wx.Menu()
-        self.TypeRecip = wx.MenuItem(self.Type, -1, "Recip", "", wx.ITEM_RADIO)
-        self.TypeScroll = wx.MenuItem(self.Type, -1, "Scroll", "", wx.ITEM_RADIO)
-        self.TypeCompressor = wx.MenuItem(self.Type, -1, "Compressor mode", "", wx.ITEM_RADIO)
-        self.TypeExpander = wx.MenuItem(self.Type, -1, "Expander mode", "", wx.ITEM_RADIO)
-        self.TypeCompressor.Enable(False)
-        self.TypeExpander.Enable(False)
-        self.Type.AppendItem(self.TypeRecip)
-        self.Type.AppendItem(self.TypeScroll)
-        self.Type.AppendSeparator()
-        self.Type.AppendItem(self.TypeCompressor)
-        self.Type.AppendItem(self.TypeExpander)
-        self.MenuBar.Append(self.Type, "Type")
-        
-        
-        self.Plugins = wx.Menu()
-        self.load_plugins(self.Plugins)
-        
-        self.MenuBar.Append(self.Plugins, "Plugins")
-        
-        
-        if self.config_parser.get('Globals', 'Type') == 'recip':
-            self.TypeRecip.Check(True)
-        else:
-            self.TypeScroll.Check(True)
-            
-        self.Bind(wx.EVT_MENU,self.OnChangeSimType,self.TypeScroll)
-        self.Bind(wx.EVT_MENU,self.OnChangeSimType,self.TypeRecip)
-        
-        self.Solve = wx.Menu()
-        self.SolveSolve = wx.MenuItem(self.Solve, -1, "Solve\tF5", "", wx.ITEM_NORMAL)
-        self.Solve.AppendItem(self.SolveSolve)
-        self.MenuBar.Append(self.Solve, "Solve")
-        self.Bind(wx.EVT_MENU, self.OnStart, self.SolveSolve)
-        
-        self.Help = wx.Menu()
-        #self.HelpHelp = wx.MenuItem(self.Help, -1, "Help...\tCtrl+H", "", wx.ITEM_NORMAL)
-        self.HelpAbout = wx.MenuItem(self.Help, -1, "About", "", wx.ITEM_NORMAL)
-        #self.Help.AppendItem(self.HelpHelp)
-        self.Help.AppendItem(self.HelpAbout)
-        self.MenuBar.Append(self.Help, "Help")
-        #self.Bind(wx.EVT_MENU, lambda event: self.Destroy(), self.HelpHelp)
-        self.Bind(wx.EVT_MENU, self.OnAbout, self.HelpAbout)
-        
-        #Actually set it
-        self.SetMenuBar(self.MenuBar)
+    
 
 class MySplashScreen(wx.SplashScreen):
     """

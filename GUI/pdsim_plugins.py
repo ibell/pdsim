@@ -18,11 +18,26 @@ class PDSimPlugin(object):
         self.GUI = Main
         
     def activate(self, event):
+        """
+        Activate the plugin
+        """
         self._activated = True
         
-    def deactivate(self):
-        self._activated = True
+    def deactivate(self, event):
+        """
+        Deactivate the plugin
+        """
+        self._activated = False
         
     def is_activated(self):
         return self._activated
+    
+    def post_process(self, simulation):
+        """
+        Do any post-processing required of the data after the model has been
+        run to completion
+        """
+        pass
+
+    
     

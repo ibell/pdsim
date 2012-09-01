@@ -754,7 +754,7 @@ class Scroll(PDSimCore, _Scroll):
         
     def mechanical_losses(self):
         print 'temporary mechanical losses'
-        return 1.0 #[kW]
+        return 0.4 #[kW]
     
     def ambient_heat_transfer(self, Tshell):
         """

@@ -386,7 +386,7 @@ class PDPanel(wx.Panel):
             dlg.Destroy()
             _parser = default_parser
         elif default:
-            # We are programatically using the default parameters, 
+            # We are programmatically using the default parameters, 
             # don't warn automatically'
             _parser = default_parser
         else:
@@ -669,7 +669,20 @@ class ParametricOption(wx.Panel):
     def set_values(self,key,value):
         self.Terms.SetStringSelection(key)
         self.Values.SetValue(value)
-       
+        
+    def update_parametric_terms(self, items):
+        """
+        Update the items in each of the comboboxes
+        """
+        labels = [item['text'] for item in items]
+        #Get the old string
+        old_val = self.Terms.GetStringSelection()
+        #Update the contents of the combobox
+        self.Terms.SetItems(labels)
+        #Reset the string
+        self.Terms.SetStringSelection(old_val)
+        
+        
 class ParametricCheckList(wx.ListCtrl, CheckListCtrlMixin):
     def __init__(self, parent, headers, values):
         wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT)
@@ -885,6 +898,14 @@ class ParametricPanel(PDPanel):
                 return item['attr']
         raise KeyError
         
+    def update_parametric_terms(self, items):
+        """
+        Sets the list of possible parametric terms
+        """
+        self.variables = items
+        for child in self.Children:
+            if isinstance(child,ParametricOption):
+                child.update_parametric_terms(items)
 
 def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True, tooltip = None):
     """
@@ -1113,9 +1134,18 @@ class StatePanel(wx.Panel):
         rho = float(self.rho.GetValue())
         return State(Fluid,dict(T=T,D=rho))
     
-    def set_state(self,Fluid,**kwargs):
-        #Create a state instance
-        S  = State(Fluid,kwargs)
+    def set_state(self, Fluid, **kwargs):
+        """
+        Fluid must not be unicode
+        """
+        if self._Fluid_fixed and not str(self.Fluid.GetValue()) == str(Fluid):
+            import warnings
+            warnings.warn('Could not set state since fluid is fixed')
+            return
+
+        #Create a state instance from the parameters passed in
+        S  = State(str(Fluid), kwargs)
+
         #Load up the textboxes
         self.Fluid.SetValue(S.Fluid)
         self.T.SetValue(str(S.T))
@@ -1147,9 +1177,9 @@ class StatePanel(wx.Panel):
 
 class StateInputsPanel(PDPanel):
     
-    def __init__(self, parent, configfile,**kwargs):
+    def __init__(self, parent, configfile, **kwargs):
     
-        PDPanel.__init__(self, parent,**kwargs)
+        PDPanel.__init__(self, parent, **kwargs)
         
         #Loads all the parameters from the config file (case-sensitive)
         self.configdict, self.descdict = self.get_from_configfile('StatePanel')

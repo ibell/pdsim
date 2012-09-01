@@ -45,7 +45,8 @@ def Compressor(f = None):
     ScrollComp.Tamb = 298.0
     ScrollComp.eta_motor = 0.9
     
-    ScrollComp.geo.phi_ie_offset = 0
+    ScrollComp.geo.delta_suction_offset = 5.0e-3
+    ScrollComp.geo.phi_ie_offset = pi
     
 #    print ScrollComp.V_s1(0)[0]
 #    print ScrollComp.V_sa(2*pi)[0]-ScrollComp.V_sa(0)[0]
@@ -72,15 +73,12 @@ def Compressor(f = None):
 #    pylab.show()
 #    return
 #        
-
     
 #    ScrollComp.geo.phi_ie_offset = pi
 #    for th in np.linspace(0,2*pi,11):
 #        plotScrollSet(th,ScrollComp.geo,shaveOn=False,offsetScroll=ScrollComp.geo.phi_ie_offset>0,show=True)
 #        print scroll_geo.S1(th,ScrollComp.geo,poly=True)
 #    return
-
-    
     
 #    import pylab
 #    pylab.plot(fx,fy,'-',fxp,fyp,'s',mfc='none')
