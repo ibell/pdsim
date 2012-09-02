@@ -6,7 +6,16 @@ class PDSimPlugin(object):
         
         Plugins are structured in order to be as flexible as possible.
         """
-        pass
+        self._activated = False
+        self.GUI = None
+        
+    def should_enable(self):
+        """
+        Pre-enabling code that determines whether the plugin should be enabled.
+        
+        Can be overloaded in the derived class
+        """
+        return True
     
     def apply(self, sim, **kwargs):
         """
@@ -21,13 +30,7 @@ class PDSimPlugin(object):
         """
         Activate the plugin
         """
-        self._activated = True
-        
-    def deactivate(self, event):
-        """
-        Deactivate the plugin
-        """
-        self._activated = False
+        self._activated = not self._activated
         
     def is_activated(self):
         return self._activated
@@ -39,5 +42,7 @@ class PDSimPlugin(object):
         """
         pass
 
+    def collect_output_terms(self):
+        return []
     
     

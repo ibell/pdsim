@@ -13,6 +13,8 @@ from PDSim.scroll.plots import plotScrollSet
 
 LabeledItem = pdsim_panels.LabeledItem
 
+class struct(object):
+    pass
 class InjectionViewerDialog(wx.Dialog):
     """
     A simple dialog with plot of the locations of the injection ports overlaid
@@ -399,7 +401,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         sizer.Layout()
         self.SetSizer(sizer)
         self.Nterms = 0
-        self.Terms = []
+        self.Lines = []
         
     def OnAddInjection(self, event = None):
         """
@@ -407,7 +409,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         """
         IE = InjectionElementPanel(self,self.Nterms+1)
         self.GetSizer().Add(IE)
-        self.Terms.append(IE)
+        self.Lines.append(IE)
         self.Nterms += 1
         self.GetSizer().Layout()
         self.Refresh()
@@ -416,7 +418,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         """
         Remove the given injection term
         """
-        self.Terms.remove(injection)
+        self.Lines.remove(injection)
         injection.Destroy()
         self.Nterms -= 1
         #Renumber the injection panels
@@ -458,17 +460,17 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
             I = str(i+1)
             
             #These things are for the line
-            s += ['Lline_'+I+' = '+str(self.Terms[i].Lval.GetValue())]
-            s += ['IDline_'+I+' = '+str(self.Terms[i].IDval.GetValue())]
-            State = self.Terms[i].state.GetState()
+            s += ['Lline_'+I+' = '+str(self.Lines[i].Lval.GetValue())]
+            s += ['IDline_'+I+' = '+str(self.Lines[i].IDval.GetValue())]
+            State = self.Lines[i].state.GetState()
             s += ['State_'+I+' = '+State.Fluid+','+str(State.T)+','+str(State.rho)]
             
             #Then the things related to the ports for this line
-            s += ['Nports_'+I+' = '+str(len(self.Terms[i].ports_list))]
-            for j in range(self.Terms[i].Nports):
+            s += ['Nports_'+I+' = '+str(len(self.Lines[i].ports_list))]
+            for j in range(self.Lines[i].Nports):
                 J = str(j+1)
                 #Get the port itself for code compactness
-                port = self.Terms[i].ports_list[j]
+                port = self.Lines[i].ports_list[j]
                 
                 #The things that are for the port
                 s += ['phi_'+I+'_'+J+' = '+str(port.phi_inj_port.GetValue())]
@@ -503,7 +505,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
                 I = str(i+1)
                 self.OnAddInjection()
                 #Get a pointer to the last IEP (the one just added)
-                IEP = self.Terms[-1]
+                IEP = self.Lines[-1]
                 #Set the line length in the GUI
                 Lline = float(configfile_dict.pop(u'Lline_'+I))
                 IEP.Lval.SetValue(str(Lline))
@@ -547,16 +549,16 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         return [dict(attr = 'injection_phi_1_1',
                      text = 'Injection port angle #1,1 [rad]',
                      parent = self),
-                dict(attr = 'injection_pressure_1',
+                dict(attr = 'injection_state_pressure_1',
                      text = 'Injection pressure #1[kPa]',
                      parent = self),
-                dict(attr = 'injection_sat_temp_1',
+                dict(attr = 'injection_state_sat_temp_1',
                      text = 'Injection saturated temperature (dew) #1 [K]',
                      parent = self),
-                dict(attr = 'injection_temp_1',
+                dict(attr = 'injection_state_temp_1',
                      text = 'Injection temperature #1 [K]',
                      parent = self),
-                dict(attr = 'injection_superheat_1',
+                dict(attr = 'injection_state_superheat_1',
                      text = 'Injection superheat #1 [K]',
                      parent = self),
                 ]
@@ -569,9 +571,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         panel_attrs = [panel_item['attr'] for panel_item in panel_items]
         
         phi_params = [(par,val) for par, val in zip(attrs,vals) if par.startswith('injection_phi')]
-        
-        num_phi_params = len(phi_params)
-        
+        num_phi_params = len(phi_params)        
         if num_phi_params > 0:
             #Unzip the parameters (List of tuples -> tuple of lists)
             phi_attrs, phi_vals = zip(*phi_params)
@@ -591,65 +591,87 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
                 j = int(attr.rsplit('_',1)[1])-1
                 i = int(attr.rsplit('_',2)[1])-1
                 
-                self.Terms[i].ports_list[j].phi_inj_port.SetValue(str(val))
-        
-        return [],[]
+                self.Lines[i].ports_list[j].phi_inj_port.SetValue(str(val))
     
-#        # First check about the suction state; if two suction related terms are 
-#        # provided, use them to fix the inlet state
-#        suct_params = [(par,val) for par,val in zip(attrs,vals) if par.startswith('suction')]
-#        
-#        num_suct_params = len(suct_params)
-#        
-#        #Get a copy of the state from the StatePanel
-#        inletState = self.SuctionState.GetState()
-#        
-#        if num_suct_params > 0:
-#            #Unzip the parameters (List of tuples -> tuple of lists)
-#            suct_attrs, suct_vals = zip(*suct_params)
-#            
-#        if num_suct_params == 2:
-#            # Remove all the entries that correspond to the suction state - 
-#            # we need them and don't want to set them in the conventional way
-#            for a in suct_attrs:
-#                i = attrs.index(a)
-#                vals.pop(i)
-#                attrs.pop(i)
-#            
-#            #Temperature and pressure provided
-#            if 'suction_temp' in suct_attrs and 'suction_pressure' in suct_attrs:
-#                suction_temp = suct_vals[suct_attrs.index('suction_temp')]
-#                suction_pressure = suct_vals[suct_attrs.index('suction_pressure')]
-#                self.SuctionState.set_state(inletState.Fluid,
-#                                            T=suction_temp, 
-#                                            P=suction_pressure)
-#                
-#            #Dew temperature and superheat provided
-#            elif 'suction_sat_temp' in suct_attrs and 'suction_superheat' in suct_attrs:
-#                suction_sat_temp = suct_vals[suct_attrs.index('suction_sat_temp')]
-#                suction_superheat = suct_vals[suct_attrs.index('suction_superheat')]
-#                suction_temp = suction_sat_temp + suction_superheat
-#                suction_pressure = CP.Props('P','T',suction_sat_temp,'Q',1.0,inletState.Fluid)
-#                self.SuctionState.set_state(inletState.Fluid,
-#                                            T=suction_temp, 
-#                                            P=suction_pressure)
-#            else:
-#                raise ValueError('Invalid combination of suction states: '+str(suct_attrs))
-#            
-#        elif num_suct_params == 1:
-#            raise NotImplementedError('only one param provided')
-#        elif num_suct_params >2:
-#            raise ValueError ('Only two inlet state parameters can be provided in parametric table')
+        # First check about the injection state; if two state related terms are 
+        # provided, use them to fix the injection state
+        inj_state_params = [(par,val) for par,val in zip(attrs,vals) if par.startswith('injection_state')]
+        num_inj_state_params = len(inj_state_params)
+        
+        i = 0
+        I = '1'
+        #Get a copy of the state from the StatePanel
+        inletState = self.Lines[i].state.GetState()
+        
+        if num_inj_state_params > 0:
+            #Unzip the parameters (List of tuples -> tuple of lists)
+            state_attrs, state_vals = zip(*inj_state_params)
+            
+        if num_inj_state_params == 2:
+            # Remove all the entries that correspond to the injection state - 
+            # we need them and don't want to set them in the conventional way
+            for a in state_attrs:
+                vals.pop(attrs.index(a))
+                attrs.pop(attrs.index(a))
+            
+            #Temperature and pressure provided
+            if 'injection_state_temp_'+I in state_attrs and 'injection_state_pressure_'+I in state_attrs:
+                injection_temp = state_vals[state_attrs.index('injection_state_temp_'+I)]
+                injection_pressure = state_vals[state_attrs.index('injection_state_pressure_'+I)]
+                self.Lines[i].state.set_state(inletState.Fluid,
+                                              T=injection_temp, 
+                                              P=injection_pressure)
+                
+            #Dew temperature and superheat provided
+            elif 'injection_state_sat_temp_'+I in state_attrs and 'injection_state_superheat_'+I in state_attrs:
+                injection_sat_temp = state_vals[state_attrs.index('injection_state_sat_temp_'+I)]
+                injection_superheat = state_vals[state_attrs.index('injection_state_superheat_'+I)]
+                injection_temp = injection_sat_temp + injection_superheat
+                import CoolProp.CoolProp as CP
+                injection_pressure = CP.Props('P','T',injection_sat_temp,'Q',1.0,inletState.Fluid)
+                self.Lines[i].state.set_state(inletState.Fluid,
+                                              T=injection_temp, 
+                                              P=injection_pressure)
+                
+            else:
+                raise ValueError('Invalid combination of injection states: '+str(state_attrs))
+            
+        elif num_inj_state_params == 1:
+            import textwrap
+            string = textwrap.dedent(
+                     """
+                     Sorry but you need to provide two variables for the injection
+                     state in parametric table to fix the state.  
+                     
+                     If you want to just
+                     modify the saturated temperature, add the superheat as a
+                     variable and give it one element in the parametric table
+                     """
+                     )
+            dlg = wx.MessageDialog(None,string)
+            dlg.ShowModal()
+            dlg.Destroy()
+            
+        elif num_inj_state_params >2:
+            raise ValueError ('Only two inlet state parameters can be provided in parametric table')
+    
+        return attrs,vals
         
 class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
+    """
+    A plugin that adds the injection ports for the scroll compressor
+    """
     
     short_description = 'Refrigerant injection for scroll'
-    
-    def __init__(self):
+        
+    def should_enable(self):
         """
-        A plugin that adds the injection ports for the scroll compressor
+        Only enable if it is a scroll type compressor
         """
-        self._activated = False
+        if not self.GUI.SimType.lower() == 'scroll':
+            return False
+        else:
+            return True
         
     def build_from_configfile_items(self, configfile_items):
         """
@@ -747,27 +769,43 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                                                     )
                                             )
                         
-    def post_process(self, simulation):
+    def post_process(self, sim):
         """
-        Post-process the results
+        Post-process the results from the simulation in order to calculate any parameters that
+        are required
+        
+        This function will be called by OnIdle in GUI Main frame when run finishes
+        """
+        sim.injection = struct()
+        sim.injection.massflow={}
+        #:the ratio of the injection flow rate to the suction flow rate
+        sim.injection.flow_ratio={}
+        for i,Tube in enumerate(sim.Tubes):
+            if Tube.key1.startswith('injection_line'):
+                key = Tube.key1
+                sim.injection.massflow[key]=sim.FlowsProcessed.mean_mdot[key]
+                sim.injection.flow_ratio[key]=(sim.injection.massflow[key]/
+                                               sim.mdot)
+                
+        print sim.injection.massflow, sim.injection.flow_ratio
+    
+    def collect_output_terms(self):
+        """
+        Return terms for the output panel in the GUI
+        
+        Happens after even the post-processing
         """
         
+        return [
+                dict(attr = "injection.massflow['injection_line.1.1']",
+                     text = 'Injection line #1 mass flow [kg/s]',
+                     parent = self
+                     ),
+                dict(attr = "injection.flow_ratio['injection_line.1.1']",
+                     text = 'Injection line #1 flow ratio to suction flow [-]',
+                     parent = self
+                     )
+                ]
         
-        
-#    def output_dictionary(self):
-#        """
-#        Return a dictionary of column options for the plugin that should be
-#        added to the output on the OutputDataPanel
-#        
-#        This function is called before the simulation is run 
-#         
-#        Returns
-#        -------
-#        output_dict : dictionary
-#            A dict with keys that are attributes of the ScrollComp instance, and
-#            values that are the human-readable string representation of this term
-#        """
-#        return {'':
-#                }
         
         

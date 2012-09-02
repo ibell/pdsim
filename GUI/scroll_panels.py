@@ -127,7 +127,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         sizer.Layout()
         
         for item in self.items:
-            item['textbox'].Bind(wx.EVT_KILL_FOCUS,self.OnChangeParam)
+            item['textbox'].Bind(wx.EVT_KILL_FOCUS, self.OnChangeParam)
         
         # Keep a local copy of the scroll in order to be able to use the 
         # set_scroll_geo and set_disc_geo functions

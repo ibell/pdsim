@@ -1182,6 +1182,126 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         self.Bind(wx.EVT_SIZE, self.OnRefresh)
         
         self.get_from_configfile('OutputDataPanel')
+    
+    def _get_nested_attr(self,sim,attr):
+        """
+        Get a nested attribute of the class.  Can be a combination of indexing
+        as well as dotted attribute access.  For instance
+        
+            "injection.massflow['injection_line.1.1']"
+            
+        The only delimiters allowed are [ ] . ' 
+        
+        Returns
+        -------
+        The value if found, ``None`` otherwise
+        """   
+        def _clean_string(_string):
+            """ returns True if doesn't contain any of the delimiters """
+            return (_string.find(".") < 0
+                    and _string.find("[") < 0
+                    and _string.find("]") < 0
+                    and _string.find("'") < 0)
+        
+        def _next_delimiter(_string):
+            """ returns the next delimiter, or None if none found """
+            dels = ["[","'","."]
+            i = 9999
+            for _del in dels:
+                Ifound = _string.find(_del)
+                if Ifound >= 0 and Ifound < i:
+                    i = Ifound
+            
+            if i == 9999:
+                return None
+            else:
+                return _string[i] 
+        
+        def _last_delimiter(_string):
+            """ returns the last delimiter, or None if none found """
+            dels = ["[","'","."]
+            i = -1
+            for _del in dels:
+                Ifound = _string.find(_del)
+                if Ifound >= 0 and Ifound > i:
+                    i = Ifound
+            
+            if i == -1:
+                return None
+            else:
+                return _string[i]
+                
+        var = sim
+        while len(attr)>0:
+            
+            # Just return the attribute if it has it
+            if hasattr(var, attr):
+                return getattr(var, attr)
+            
+            # If the attr you are looking up has no funny delimiters, but isn't
+            # in the class, return None (not found)
+            elif _clean_string(attr):
+                return None
+            
+            # Split at the dot (.) if there is nothing funny in the left part
+            elif len(attr.split('.')) > 1 and _clean_string(attr.split('.',1)[0]):
+                # Actually split the string
+                left, right = attr.split('.',1)
+                # Update variable using the left side, update attribute using right
+                if hasattr(var, left):
+                    var = getattr(var, left)
+                    attr = right
+                else:
+                    return None
+            
+            # If the next delimiter is a [ but does not start the string, 
+            # you are doing some sort of indexing.  This can't be a return
+            # value
+            elif _next_delimiter(attr) == '[' and not attr[0] == '[':
+                # Actually split the string
+                left, right = attr.split('[',1)
+                #Right gets its bracket back
+                right = '[' + right
+                # Update variable using the left side, update attribute using right
+                if hasattr(var, left):
+                    var = getattr(var,left)
+                    attr = right
+                else:
+                    return None
+            
+            #If the next thing is an index
+            elif attr[0] == '[':
+                #Remove the leading bracket
+                attr = attr[1:len(attr)]
+                #Get the part in-between the brackets, rest is attr
+                index_string, attr = attr.split(']', 1)
+                #If it is wrapped in single-quotes it is a string, otherwise it must be an integer
+                try:
+                    if index_string[0] == "'" and index_string[-1] == "'":
+                        # It is a string, discard the single-quotes
+                        index_string = index_string[1:len(index_string)-1]
+                        # A string index
+                        var = var[index_string]
+                    else:
+                        # An integer index
+                        var = var[int(index_string)]
+                        
+                except IndexError:
+                    return None
+                
+                if len(attr)==0:
+                    return var             
+                    
+    def _hasattr(self, sim, attr):
+        #If the attribute exists at the top-level of the simulation class
+        if hasattr(sim, attr):
+            return True
+        else:
+            val = self._get_nested_attr(sim, attr)
+            if val is None:
+                return False
+            else:
+                return True 
         
     def rebuild(self):
         
@@ -1197,7 +1317,7 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             
             for attr in reversed(self.columns_selected):
                 #If the key is in any of the simulations 
-                if not any([hasattr(sim,attr) for sim in self.results]):
+                if not any([self._hasattr(sim,attr) for sim in self.results]):
                     print 'removing column_heading', attr,' since it is not found in any simulation'
                     self.columns_selected.remove(attr)
                         
@@ -1205,8 +1325,8 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             for sim in self.results: #loop over the results
                 row = []
                 for attr in self.columns_selected:
-                    if hasattr(sim, attr):
-                        value = getattr(sim,attr)
+                    if self._hasattr(sim, attr):
+                        value = self._get_nested_attr(sim, attr)
                         row.append(value)
                     else:
                         print 'Trying to add attribute \'' + attr + '\' to output but it is not found found in simulation instance'
@@ -1247,6 +1367,13 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         self.results += results
         if rebuild:
             self.rebuild()
+            
+    def add_output_terms(self, items):
+        
+        for var in items:
+            key = var['attr']
+            value = var['text']
+            self.column_options[key] = value
         
     def OnLoadRuns(self, event = None):
         """
@@ -1367,6 +1494,9 @@ class OutputsToolBook(wx.Toolbook):
         else:
             self.PN.update(recip)
             
+    def add_output_terms(self, items):
+        self.DataPanel.add_output_terms(items)
+            
 class MainToolBook(wx.Toolbook):
     def __init__(self,parent,configfile):
         wx.Toolbook.__init__(self, parent, -1, style=wx.BK_TOP)
@@ -1452,19 +1582,19 @@ class MainFrame(wx.Frame):
         #Use the builder function to rebuild using the configuration objects
         self.build()
         
-        # Set up redirection of input and output to logging wx.TextCtrl
-        # Taken literally from http://www.blog.pythonlibrary.org/2009/01/01/wxpython-redirecting-stdout-stderr/
-        class RedirectText(object):
-            def __init__(self,aWxTextCtrl):
-                self.out=aWxTextCtrl
-            def write(self, string):
-                wx.CallAfter(self.out.WriteText, string)
-            def flush(self):
-                return None
-                
-        redir=RedirectText(self.MTB.RunTB.log_ctrl)
-        sys.stdout=redir
-        sys.stderr=redir
+#        # Set up redirection of input and output to logging wx.TextCtrl
+#        # Taken literally from http://www.blog.pythonlibrary.org/2009/01/01/wxpython-redirecting-stdout-stderr/
+#        class RedirectText(object):
+#            def __init__(self,aWxTextCtrl):
+#                self.out=aWxTextCtrl
+#            def write(self, string):
+#                wx.CallAfter(self.out.AppendText, string)
+#            def flush(self):
+#                return None
+#                
+#        redir=RedirectText(self.MTB.RunTB.log_ctrl)
+#        sys.stdout=redir
+#        sys.stderr=redir
         
         self.SetPosition(position)
         self.SetSize(size)
@@ -1628,18 +1758,27 @@ class MainFrame(wx.Frame):
                 try:
                     #If it is a plugin class
                     if issubclass(thing, pdsim_plugins.PDSimPlugin):
+                        
+                        #Instantiate the plugin
+                        plugin = thing()
+                        
+                        #Give the plugin a link to the main 
+                        plugin.set_GUI(self)
+                        
+                        #Check if it should be enabled, if not, go to the next plugin
+                        if not plugin.should_enable():
+                            del plugin
+                            continue
+                                                
+                        #Append an instance of the plugin to the list of plugins
+                        self.plugins_list.append(plugin)
+                        
                         #Create a menu item for the plugin
                         menuItem = wx.MenuItem(self.Type, -1, thing.short_description, "", wx.ITEM_CHECK)
                         PluginsMenu.AppendItem(menuItem)
-                        #Instantiate the plugin
-                        plugin = thing()
-                        #Give the plugin a link to the main 
-                        plugin.set_GUI(self)
-                        #Append an instance of the plugin to the list of plugins
-                        self.plugins_list.append(plugin)
                         #Bind the event to activate the plugin
                         self.Bind(wx.EVT_MENU, plugin.activate, menuItem)
-                        
+                                                
                         # Check if this type of plugin is included in the config
                         # file
                         for section in self.config_parser.sections():
@@ -1852,7 +1991,17 @@ class MainFrame(wx.Frame):
             print 'readying to get simulation'
             sim = self.results_list.get()
             print 'got a simulation'
-
+            
+            #Allow the plugins to post-process the results
+            for plugin in self.plugins_list:
+                plugin.post_process(sim)
+                more_terms = plugin.collect_output_terms()
+                self.MTB.OutputsTB.add_output_terms(more_terms)
+                
+#            from plugins.HDF5_plugin import HDF5Writer
+#            HDF5 = HDF5Writer()
+#            HDF5.write_to_file(sim,'sim.hd5')
+                
             self.MTB.OutputsTB.plot_outputs(sim)
             self.MTB.OutputsTB.DataPanel.add_runs([sim])
             self.MTB.OutputsTB.DataPanel.rebuild()
@@ -1863,27 +2012,6 @@ class MainFrame(wx.Frame):
         
         if self.results_list.empty() and self.WTM is not None and not self.WTM.threadsList:
             self.WTM = None
-        
-    def OnRunFinish(self, sim = None):
-        #Collect the runs
-        
-        if sim is not None:
-            wx.CallAfter(sys.stdout.write,'called OnRunFinish with sim data\n')
-            self.MTB.OutputsTB.plot_outputs(sim)
-            self.MTB.OutputsTB.DataPanel.add_runs([sim])
-            self.MTB.OutputsTB.DataPanel.rebuild()
-        else:
-            wx.CallAfter(sys.stdout.write,'called OnRunFinish without sim data\n')
-        """
-        Each time a run completes, if the list of running threads is empty,
-        remove the thread manager 
-        """
-        if self.WTM is not None:
-            if not self.WTM.threadsList:
-                wx.CallAfter(sys.stdout.write,'Empty\n')
-                self.WTM = None
-            else:
-                wx.CallAfter(sys.stdout.write,'Not Empty Yet\n')
     
     def OnAbout(self, event = None):
         if "unicode" in wx.PlatformInfo:
@@ -1936,7 +2064,6 @@ class MainFrame(wx.Frame):
             dlg = wx.MessageDialog(None,'Temporary folder does not exist', style = wx.OK)
             dlg.ShowModal()
             dlg.Destroy()
-            
     
 
 class MySplashScreen(wx.SplashScreen):

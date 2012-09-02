@@ -29,7 +29,7 @@ from PDSim.misc._listmath import listm
 from PDSim.misc.solvers import Broyden,MultiDimNewtRaph
 
 #An empty class for storage
-class struct():
+class struct(object):
     pass    
         
 class TubeCollection(list):
