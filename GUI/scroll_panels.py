@@ -30,6 +30,7 @@ class PlotPanel(wx.Panel):
         self.SetSizer(sizer)
         sizer.Layout()
         
+from wx.lib.scrolledpanel import ScrolledPanel
 class GeometryPanel(pdsim_panels.PDPanel):
     """
     The geometry panel of the scroll compressor
@@ -37,6 +38,13 @@ class GeometryPanel(pdsim_panels.PDPanel):
     """
     def __init__(self,parent,configfile,**kwargs):
         pdsim_panels.PDPanel.__init__(self,parent,**kwargs)
+        
+        #Now we are going to put everything into a scrolled window
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        scrolled_panel = ScrolledPanel(self, size=(-1,-1),
+                                 style = wx.TAB_TRAVERSAL, name="panel1")
+        scrolled_panel.SetScrollbars(1,1,1,1)
         
         #Loads all the parameters from the config file
         configdict, descdict = self.get_from_configfile('GeometryPanel')
@@ -58,7 +66,18 @@ class GeometryPanel(pdsim_panels.PDPanel):
         
         sizerInputs = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
         
-        self.ConstructItems(self.items, sizerInputs, configdict, descdict)
+        self.ConstructItems(self.items, sizerInputs, configdict, descdict, parent = scrolled_panel)
+        
+        self.UseOffsetLabel = wx.StaticText(scrolled_panel, label = 'Use Offset scrolls')
+        self.UseOffset = wx.CheckBox(scrolled_panel)
+        self.UseOffset.SetValue(self._use_offset)
+        del self._use_offset
+        self.UseOffset.Bind(wx.EVT_CHECKBOX, self.OnChangeOffset)
+        sizerInputs.AddMany([self.UseOffsetLabel,self.UseOffset])
+        
+        items2 = [dict(attr = 'delta_offset')]
+        self.ConstructItems(items2, sizerInputs, configdict, descdict, parent = scrolled_panel)
+        self.items += items2
         
         for item in self.items:
             setattr(self,item['attr'],item['textbox'])
@@ -66,24 +85,24 @@ class GeometryPanel(pdsim_panels.PDPanel):
         kwargs = dict(label = u"\u03D5_i0 [radian]",
                       tooltip = 'Initial involute angle for inner involute'
                       )
-        self.phi_i0_label, self.phi_i0 = LabeledItem(self, **kwargs)
+        self.phi_i0_label, self.phi_i0 = LabeledItem(scrolled_panel, **kwargs)
         
-        self.phi_is_label, self.phi_is= LabeledItem(self,
+        self.phi_is_label, self.phi_is= LabeledItem(scrolled_panel,
                                                        label=u"\u03D5_is [radian]")
 
         width = max([item['label'].GetEffectiveMinSize()[0] for item in self.items])
         self.phi_is_label.SetMinSize((width,-1))
-        self.phi_ie_label, self.phi_ie= LabeledItem(self,
+        self.phi_ie_label, self.phi_ie= LabeledItem(scrolled_panel,
                                                        label=u"\u03D5_ie [radian]")
-        self.phi_o0_label, self.phi_o0= LabeledItem(self,
+        self.phi_o0_label, self.phi_o0= LabeledItem(scrolled_panel,
                                                        label=u"\u03D5_o0 [radian]")
-        self.phi_os_label, self.phi_os= LabeledItem(self,
+        self.phi_os_label, self.phi_os= LabeledItem(scrolled_panel,
                                                        label=u"\u03D5_os [radian]")
-        self.phi_oe_label, self.phi_oe= LabeledItem(self,
+        self.phi_oe_label, self.phi_oe= LabeledItem(scrolled_panel,
                                                        label=u"\u03D5_oe [radian]")
-        self.rb_label, self.rb = LabeledItem(self,
+        self.rb_label, self.rb = LabeledItem(scrolled_panel,
                                              label="rb [m]")
-        self.hs_label, self.hs= LabeledItem(self,
+        self.hs_label, self.hs= LabeledItem(scrolled_panel,
                                             label="hs [m]")
         
         self.phi_i0.Enable(False)
@@ -95,10 +114,10 @@ class GeometryPanel(pdsim_panels.PDPanel):
         self.rb.Enable(False)
         self.hs.Enable(False)
         
-        self.PP = PlotPanel(self)
+        self.PP = PlotPanel(scrolled_panel)
         hsizer = wx.BoxSizer(wx.HORIZONTAL)
         hsizer.Add(self.PP,0,wx.EXPAND)
-        anibutton = wx.Button(self, label = 'Animate')
+        anibutton = wx.Button(scrolled_panel, label = 'Animate')
         anibutton.Bind(wx.EVT_BUTTON,self.OnAnimate)
         hsizer.Add(anibutton,1,wx.EXPAND)
         
@@ -122,19 +141,35 @@ class GeometryPanel(pdsim_panels.PDPanel):
                      self.hs_label,self.hs
                      ])
         sizer.Add(fgsGeoAnglesInputs)
-        
-        self.SetSizer(sizer)
-        sizer.Layout()
+
         
         for item in self.items:
             item['textbox'].Bind(wx.EVT_KILL_FOCUS, self.OnChangeParam)
+        self.UseOffset.Bind(wx.EVT_CHECKBOX,self.OnChangeParam)
+        delta_offset_item = self._get_item_by_attr('delta_offset')['textbox']
+        delta_offset_item.Bind(wx.EVT_KILL_FOCUS, self.OnChangeParam)
         
+        self.items += items2
         # Keep a local copy of the scroll in order to be able to use the 
         # set_scroll_geo and set_disc_geo functions
         self.Scroll=Scroll()
         
-        self.OnChangeParam()
+        #Do the layout of all the panels
+        scrolled_panel.SetSizer(sizer)
+        main_sizer.Add(scrolled_panel,1,wx.EXPAND)
+        self.SetSizer(main_sizer)   
         
+        self.OnChangeOffset()
+        self.OnChangeParam()
+          
+    def post_prep_for_configfile(self):
+        return 'use_offset = bool, ' + str(self.UseOffset.IsChecked()) + '\n'
+    
+    def post_get_from_configfile(self,k,v):
+        
+        if k == 'use_offset':
+            self._use_offset = (v.split(',')[1].strip().lower() == 'true')
+    
     def skip_list(self):
         """
         Returns a list of atttributes to skip setting in set_params() function
@@ -142,12 +177,20 @@ class GeometryPanel(pdsim_panels.PDPanel):
         """
         return ['Vdisp','Vratio','t','ro']
         
-    def OnAnimate(self, event):
+    def OnChangeOffset(self, event = None):
+        delta_offset_item = self._get_item_by_attr('delta_offset')['textbox']
+        if self.UseOffset.IsChecked():
+            delta_offset_item.Enable(True)
+        else:
+            delta_offset_item.Enable(False)
+        
+    def OnAnimate(self, event = None):
         SAF = ScrollAnimForm(self.Scroll.geo)
         SAF.Show()
         
     def OnChangeParam(self, event = None):
-        
+        if event is not None:
+            event.Skip()
         Vdisp=float(self.Vdisp.GetValue())
         Vratio=float(self.Vratio.GetValue())
         t=float(self.t.GetValue())
@@ -163,6 +206,14 @@ class GeometryPanel(pdsim_panels.PDPanel):
                                    phi_is = phi_is,) 
         self.Scroll.set_disc_geo('2Arc', r2='PMP')
         
+        if self.UseOffset.IsChecked():
+            self.Scroll.geo.phi_ie_offset = pi
+            delta_offset_item = self._get_item_by_attr('delta_offset')['textbox']
+            self.Scroll.geo.delta_suction_offset = float(delta_offset_item.GetValue())
+        else:
+            self.Scroll.geo.phi_ie_offset = 0
+            self.Scroll.geo.delta_suction_offset = 0.0
+        
         self.phi_i0.SetValue(str(self.Scroll.geo.phi_i0))
         self.phi_is.SetValue(str(self.Scroll.geo.phi_is))
         self.phi_ie.SetValue(str(self.Scroll.geo.phi_ie))
@@ -173,7 +224,11 @@ class GeometryPanel(pdsim_panels.PDPanel):
         self.hs.SetValue(str(self.Scroll.geo.h))
         
         self.ax.cla()
-        plotScrollSet(pi/4.0, axis = self.ax, geo = self.Scroll.geo)
+
+        plotScrollSet(pi/4.0, 
+                      axis = self.ax, 
+                      geo = self.Scroll.geo,
+                      offsetScroll = self.Scroll.geo.phi_ie_offset > 0)
         self.PP.canvas.draw()
     
     def post_set_params(self, scroll):
@@ -186,6 +241,11 @@ class GeometryPanel(pdsim_panels.PDPanel):
         scroll.set_disc_geo('2Arc', r2='PMP')
         scroll.geo.delta_flank = float(self.delta_flank.GetValue())
         scroll.geo.delta_radial = float(self.delta_radial.GetValue())
+        
+        if self.UseOffset.IsChecked():
+            scroll.geo.phi_ie_offset = pi
+        else:
+            scroll.geo.phi_ie_offset = 0
         
 class FlankLeakageFlowChoice(pdsim_panels.MassFlowOption):
     

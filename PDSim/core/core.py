@@ -1066,6 +1066,8 @@ class PDSimCore(object):
             Number of conventional steps to be taken when not using newton-raphson prior to entering into a line search
         """
         
+        from time import clock
+        t1=clock()
         
         # Set up a pipe for accepting a value of True which will abort the run
         # Typically used from the GUI
@@ -1312,6 +1314,9 @@ class PDSimCore(object):
         del self.resid_Td, self.x_state
         if Abort is None or not Abort():
             self.__post_solve()
+            
+        #Save the elapsed time for simulation
+        self.elapsed_time = clock()-t1
         
     def __post_solve(self):
         """

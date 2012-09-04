@@ -243,7 +243,7 @@ class RedirectedWorkerThread(Thread):
                     time.sleep(0.5)
 #                   #Collect all display output from process while you wait
                     while pipe_outlet.poll():
-                        wx.CallAfter(self.stdout_target_.WriteText, pipe_outlet.recv())
+                        wx.CallAfter(self.stdout_target_.AppendText, pipe_outlet.recv())
                     print 'Waiting for abort'
                 abort_flag = pipe_abort_inlet.recv()
                 if abort_flag == 'ACK':
@@ -253,7 +253,7 @@ class RedirectedWorkerThread(Thread):
                 
             #Collect all display output from process
             while pipe_outlet.poll():
-                wx.CallAfter(self.stdout_target_.WriteText, pipe_outlet.recv())
+                wx.CallAfter(self.stdout_target_.AppendText, pipe_outlet.recv())
                 
             #Get back the results from the simulation process if they are waiting
             if pipe_results_outlet.poll():
@@ -263,7 +263,7 @@ class RedirectedWorkerThread(Thread):
         if self._want_abort == True:
             print self.name+": Process has aborted successfully"
         else:
-            wx.CallAfter(self.stdout_target_.WriteText, self.name+": Process is done")
+            wx.CallAfter(self.stdout_target_.AppendText, self.name+": Process is done")
             if sim is not None:
                 #Get a unique identifier for the model run for pickling purposes
                 home = os.getenv('USERPROFILE') or os.getenv('HOME')
@@ -1165,7 +1165,8 @@ class OutputDataPanel(pdsim_panels.PDPanel):
                                'Wdot_mechanical': 'Mechanical losses [kW]',
                                'Qamb': 'Ambient heat transfer [kW]',
                                'run_index': 'Run Index',
-                               'eta_oi': 'Overall isentropic efficiency [-]'
+                               'eta_oi': 'Overall isentropic efficiency [-]',
+                               'elapsed_time': 'Elapsed time [s]'
                                }
         
         # Add all the parameters that arrive from the self.items lists from the 
@@ -1362,6 +1363,18 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             
             sizer.Layout()
             self.Refresh()
+        else:
+            #Destroy the items associated with the output data
+            if self.ResultsList is not None:
+                self.WriteButton.Destroy()
+                self.RemoveButton.Destroy()
+                self.PlotButton.Destroy()
+                self.ResultsList.Destroy()
+                self.ResultsList = None
+                
+            sizer = self.GetSizer()
+            sizer.Layout()
+            self.Refresh()
     
     def add_runs(self, results, rebuild = False):
         self.results += results
@@ -1424,6 +1437,8 @@ class OutputDataPanel(pdsim_panels.PDPanel):
                     self.results.pop(index)
             dlg.Destroy()
             self.rebuild()
+        print self.results
+        print 'done removing'
                 
     
     def OnWriteFiles(self, event):
@@ -1582,19 +1597,19 @@ class MainFrame(wx.Frame):
         #Use the builder function to rebuild using the configuration objects
         self.build()
         
-#        # Set up redirection of input and output to logging wx.TextCtrl
-#        # Taken literally from http://www.blog.pythonlibrary.org/2009/01/01/wxpython-redirecting-stdout-stderr/
-#        class RedirectText(object):
-#            def __init__(self,aWxTextCtrl):
-#                self.out=aWxTextCtrl
-#            def write(self, string):
-#                wx.CallAfter(self.out.AppendText, string)
+        # Set up redirection of input and output to logging wx.TextCtrl
+        # Taken literally from http://www.blog.pythonlibrary.org/2009/01/01/wxpython-redirecting-stdout-stderr/
+        class RedirectText(object):
+            def __init__(self,aWxTextCtrl):
+                self.out=aWxTextCtrl
+            def write(self, string):
+                wx.CallAfter(self.out.AppendText, string)
 #            def flush(self):
 #                return None
-#                
-#        redir=RedirectText(self.MTB.RunTB.log_ctrl)
-#        sys.stdout=redir
-#        sys.stderr=redir
+                
+        redir=RedirectText(self.MTB.RunTB.log_ctrl)
+        sys.stdout=redir
+        sys.stderr=redir
         
         self.SetPosition(position)
         self.SetSize(size)

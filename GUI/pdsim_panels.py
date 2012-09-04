@@ -78,6 +78,8 @@ class UnitConvertor(wx.Dialog):
         elif default_units in temperature_units or type == 'temperature':
             self.unit_dict = temperature_units
             self.__is_temperature__ = True
+        else:
+            raise KeyError('Sorry your units '+default_units+' did not match any of the unit terms')
             
         self.txt = wx.TextCtrl(self, value=str(value))
         self.units = wx.ComboBox(self)
@@ -249,12 +251,15 @@ class PDPanel(wx.Panel):
         for item in items:
             setattr(sim, item['attr'],self._get_value(item['textbox']))
     
-    def ConstructItems(self,items,sizer,configdict=None,descdict=None):
+    def ConstructItems(self,items,sizer,configdict=None, descdict=None, parent = None):
         for item in items:
             #item is a dictionary of values including the keys:
             #  - attr
             #  - textbox
             #  - val
+            
+            if parent is None:
+                parent = self
             
             if 'val' not in item and configdict is not None:
                 k = item['attr']
@@ -269,9 +274,9 @@ class PDPanel(wx.Panel):
                 val = item['val']
                 item['text'] = descdict[k]
                 
-            label=wx.StaticText(self, -1, item['text'])
+            label=wx.StaticText(parent, -1, item['text'])
             sizer.Add(label, 1, wx.EXPAND)
-            textbox=wx.TextCtrl(self,-1,str(val))
+            textbox=wx.TextCtrl(parent,-1,str(val))
             sizer.Add(textbox, 1, wx.EXPAND)
             item.update(dict(textbox=textbox,label=label))
             
@@ -840,7 +845,10 @@ class ParametricPanel(PDPanel):
                 # apply_additional_parametric_terms returns a tuple of attrs, vals 
                 # for the terms that were unmatched by the parametric
                 # preprocessors
-                attrs, vals = Main.MTB.InputsTB.apply_additional_parametric_terms(attrs, vals, self.variables)
+                try:
+                    attrs, vals = Main.MTB.InputsTB.apply_additional_parametric_terms(attrs, vals, self.variables)
+                except ValueError:
+                    break
                 
                 #Build the recip or the scroll using the GUI parameters
                 if Main.SimType == 'recip':
@@ -1230,7 +1238,7 @@ class StateInputsPanel(PDPanel):
         
     def OnChangeDischargeValue(self, event = None):
         """ 
-        Set the internal pressure when the value is changed in the TextCtrl
+        Set the internal pressure variable when the value is changed in the TextCtrl
         """
         p_suction = self.SuctionState.GetState().p
         Fluid = self.SuctionState.GetState().Fluid
@@ -1257,8 +1265,14 @@ class StateInputsPanel(PDPanel):
         p_suction = self.SuctionState.GetState().p
         Fluid = self.SuctionState.GetState().Fluid
 
+        #Remove the handler for units selection
+        self.DischargeValue.Unbind(wx.EVT_CONTEXT_MENU)
+        
         if self.cmbDischarge.GetStringSelection() == 'Discharge pressure [kPa]':
             self.DischargeValue.SetValue(str(self._discharge_pressure))
+            #Set the handler for unit selection
+            self.DischargeValue.default_units = 'kPa'
+            self.DischargeValue.Bind(wx.EVT_CONTEXT_MENU, self.OnChangeUnits)
             
         elif self.cmbDischarge.GetStringSelection() == 'Pressure ratio [-]':
             p_disc = self._discharge_pressure
@@ -1269,6 +1283,9 @@ class StateInputsPanel(PDPanel):
             p_disc = self._discharge_pressure
             Tsat = CP.Props('T', 'P', p_disc, 'Q', 1.0, Fluid)
             self.DischargeValue.SetValue(str(Tsat))
+            #Set the handler for unit selection
+            self.DischargeValue.default_units = 'Kelvin'
+            self.DischargeValue.Bind(wx.EVT_CONTEXT_MENU, self.OnChangeUnits)
         
         else:
             raise KeyError

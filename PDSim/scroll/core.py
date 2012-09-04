@@ -74,12 +74,14 @@ class Scroll(PDSimCore, _Scroll):
     
     def V_injection(self, theta, V_tube = None):
         """
-        Volume of injection tube
+        Volume code for injection tube
         
         The tube volume can either be given by the keyword argument V_tube 
         (so you can easily have more than one injection tube), or it can be 
         provided by setting the Scroll class attribute V_inj_tube 
         and NOT providing the V_tube argument
+        
+        The injection tube volume is assumed to be constant, hence the derivative of volume is zero 
         """
         if V_tube is None:
             return self.V_inj_tube, 0.0
@@ -99,41 +101,24 @@ class Scroll(PDSimCore, _Scroll):
         -------
         
         """
-        if full_output==True:
-            HTangles = {'1_i':None,'2_i':None,'1_o':None,'2_o':None}
-            return scroll_geo.SA(theta,self.geo)[0:2],HTangles
-        else:
-            return scroll_geo.SA(theta,self.geo)[0:2]
+        return scroll_geo.SA(theta,self.geo)[0:2]
         
-    def V_s1(self,theta,full_output=False):
+    def V_s1(self,theta):
         """
         Wrapper around the Cython code for Vs1_calcs
         
         theta: angle in range [0,2*pi]
         """
-        if full_output==True:
-            HTangles = {'1_i':self.geo.phi_ie,
-                        '2_i':self.geo.phi_ie-theta,
-                        '1_o':scroll_geo.phi_s_sa(theta,self.geo),
-                        '2_o':self.geo.phi_oe-pi-theta}
-            return scroll_geo.S1(theta,self.geo)[0:2],HTangles
-        else:
-            return scroll_geo.S1(theta,self.geo)[0:2]
+        return scroll_geo.S1(theta,self.geo)[0:2]
         
-    def V_s2(self,theta,full_output=False):
+    def V_s2(self,theta):
         """
         Wrapper around the Cython code for Vs1_calcs
         
         theta: angle in range [0,2*pi]
         """
-        if full_output==True:
-            HTangles = {'1_i':self.geo.phi_ie,
-                        '2_i':self.geo.phi_ie-theta,
-                        '1_o':scroll_geo.phi_s_sa(theta,self.geo),
-                        '2_o':self.geo.phi_oe-pi-theta}
-            return scroll_geo.S2(theta,self.geo)[0:2],HTangles
-        else:
-            return scroll_geo.S2(theta,self.geo)[0:2]
+
+        return scroll_geo.S2(theta,self.geo)[0:2]
     
     def V_c1(self,theta,alpha=1,full_output=False):
         """
@@ -142,11 +127,7 @@ class Scroll(PDSimCore, _Scroll):
         theta: angle in range [0,2*pi]
         alpha: index of compression chamber pair; 1 is for outermost set
         """
-        if full_output==True:
-            HTangles = {'1_i':None,'2_i':None,'1_o':None,'2_o':None}
-            return scroll_geo.C1(theta,alpha,self.geo)[0:2],HTangles
-        else:
-            return scroll_geo.C1(theta,alpha,self.geo)[0:2]
+        return scroll_geo.C1(theta,alpha,self.geo)[0:2]
         
     def V_c2(self,theta,alpha=1,full_output=False):
         """
@@ -155,11 +136,7 @@ class Scroll(PDSimCore, _Scroll):
         theta: angle in range [0,2*pi]
         alpha: index of compression chamber pair; 1 is for outermost set
         """
-        if full_output==True:
-            HTangles = {'1_i':None,'2_i':None,'1_o':None,'2_o':None}
-            return scroll_geo.C2(theta,alpha,self.geo)[0:2],HTangles
-        else:
-            return scroll_geo.C2(theta,alpha,self.geo)[0:2]
+        return scroll_geo.C2(theta,alpha,self.geo)[0:2]
         
     def V_d1(self,theta,full_output=False):
         """
@@ -167,17 +144,14 @@ class Scroll(PDSimCore, _Scroll):
         
         theta: angle in range [0,2*pi]
         """
-        if full_output==True:
-            HTangles = {'1_i':None,'2_i':None,'1_o':None,'2_o':None}
-            return scroll_geo.D1(theta,self.geo)[0:2],HTangles
+        
+        if self.__before_discharge1__==True and theta<self.theta_d:
+                #Get the number of compression chambers in existence
+                alpha=scroll_geo.getNc(theta,self.geo)
+                #Use the innermost compression chamber 
+                return scroll_geo.C1(theta,alpha,self.geo)[0:2]
         else:
-            if self.__before_discharge1__==True and theta<self.theta_d:
-                    #Get the number of compression chambers in existence
-                    alpha=scroll_geo.getNc(theta,self.geo)
-                    #Use the innermost compression chamber 
-                    return scroll_geo.C1(theta,alpha,self.geo)[0:2]
-            else:
-                return scroll_geo.D1(theta,self.geo)[0:2]
+            return scroll_geo.D1(theta,self.geo)[0:2]
     
     def V_d2(self,theta,full_output=False):
         """
@@ -185,17 +159,14 @@ class Scroll(PDSimCore, _Scroll):
         
         theta: angle in range [0,2*pi]
         """
-        if full_output==True:
-            HTangles = {'1_i':None,'2_i':None,'1_o':None,'2_o':None}
-            return scroll_geo.D2(theta,self.geo)[0:2],HTangles
+
+        if self.__before_discharge1__==True and theta<self.theta_d:
+                #Get the number of compression chambers in existence
+                alpha=scroll_geo.getNc(theta,self.geo)
+                #Use the innermost compression chamber 
+                return scroll_geo.C2(theta,alpha,self.geo)[0:2]
         else:
-            if self.__before_discharge1__==True and theta<self.theta_d:
-                    #Get the number of compression chambers in existence
-                    alpha=scroll_geo.getNc(theta,self.geo)
-                    #Use the innermost compression chamber 
-                    return scroll_geo.C2(theta,alpha,self.geo)[0:2]
-            else:
-                return scroll_geo.D2(theta,self.geo)[0:2]
+            return scroll_geo.D2(theta,self.geo)[0:2]
     
     def V_dd(self,theta,full_output=False):
         """
@@ -415,6 +386,15 @@ class Scroll(PDSimCore, _Scroll):
         self.auto_add_radial_leakage(radialFunc)
         
     def auto_add_radial_leakage(self, radialFunc):
+        """
+        A function to add all the radial leakage terms
+        
+        Parameters
+        ----------
+        radialFunc : function
+            The function that will be called for each radial leakage
+        """
+        #Get all the radial leakage pairs
         pairs = scroll_geo.radial_leakage_pairs(self.geo)
         
         #Loop over all the radial leakage pairs possible for the given geometry
@@ -426,14 +406,21 @@ class Scroll(PDSimCore, _Scroll):
                           )
         
     def auto_add_flank_leakage(self, flankFunc):
+        """
+        A function to add all the flank leakage terms
+        
+        Parameters
+        ----------
+        flankFunc : function
+            The function that will be called for each flank leakage
+        """
         
         # Always a s1-c1 leakage and s2-c2 leakage
         self.add_flow(FlowPath(key1='s1',key2='c1.1',MdotFcn=flankFunc))
         self.add_flow(FlowPath(key1='s2',key2='c2.1',MdotFcn=flankFunc))
         
         # Only add the DDD-S1 and DDD-S2 flow path if there is one set of
-        # compression chambers.  You can provide a different flank leakage
-        # function if desired by setting the 
+        # compression chambers.   
         if scroll_geo.nC_Max(self.geo) == 1:
             self.add_flow(FlowPath(key1='s1',key2='ddd',MdotFcn=self.DDD_to_S))
             self.add_flow(FlowPath(key1='s2',key2='ddd',MdotFcn=self.DDD_to_S))
@@ -443,6 +430,8 @@ class Scroll(PDSimCore, _Scroll):
         
         # Must have at least one pair
         assert (nCmax>=1)
+        
+        
         for alpha in range(1,nCmax+1):
             keyc1 = 'c1.'+str(alpha)
             keyc2 = 'c2.'+str(alpha)
@@ -527,18 +516,20 @@ class Scroll(PDSimCore, _Scroll):
         but we need to get the inlet and outlet states to get the linear 
         temperature profile in the scroll wrap. Thus we wrap the callback 
         we would like to call in this function that allows us to determine
-        the inlet and outlet state dynamically.
+        the inlet and outlet state at run-time.
         """
         State_inlet = self.Tubes.Nodes[self.key_inlet]
         State_outlet = self.Tubes.Nodes[self.key_outlet]
         return self._heat_transfer_callback(theta, State_inlet, State_outlet, **kwargs)
     
     def _heat_transfer_callback(self, theta, State_inlet, State_outlet, HTC_tune = 0.0, **kwargs):
-        
+        """
+        A private function to actually do the heat transfer analysis
+        """
         # dT_dphi is generally negative because as you move to the 
         # outside of the scroll (larger phi), the temperature goes down because
-        # you are moving towards the suction temperature
-        # dT_dphi is positive in expander mode
+        # you are moving towards low pressure and low temperature
+
         Tsuction = State_inlet.T
         Tdischarge = State_outlet.T
         dT_dphi = (Tsuction - Tdischarge) / (self.geo.phi_ie - self.geo.phi_os)

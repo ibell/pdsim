@@ -780,7 +780,7 @@ def CoordsOrbScroll(theta,geo,shaveOn=True):
     if shaveOn==True:
         shaveDelta=pi/2
     else:
-        shaveDelta=0.0000001
+        shaveDelta=1e-12
     (xshave,yshave)=Shave(geo,theta,shaveDelta)
     
     
@@ -864,13 +864,19 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
         lw=1.0
         
     if offsetScroll:
+        #Turn off the conventional wall
         kwargs['wallOn'] = False
+        #Turn off shaving of the orbiting scroll
+        kwargs['shaveOn'] = False
+        
+        # This is the part of the fixed scroll forming the extension for
+        # the offset scroll pocket
         phi  = np.linspace(geo.phi_ie,geo.phi_ie+1.02*pi,1000)
         x,y = coords_inv(phi,geo,0.0,'fi')
         axis.plot(x,y,'k')
-        phi  = np.linspace(geo.phi_ie,geo.phi_ie+1.02*pi,1000)
-        x,y = coords_inv(phi,geo,theta,'oo')
-        axis.plot(x,y,'r--')
+#        phi  = np.linspace(geo.phi_ie,geo.phi_ie+1.02*pi,1000)
+#        x,y = coords_inv(phi,geo,theta,'oo')
+#        axis.plot(x,y,'r--')
         
         # pitch (involute-involute distance for a given involute) 
         # for 2*pi radians or one rotation is equal to 2*pi*rb, subtract 
@@ -884,7 +890,7 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
         
         beta = math.atan2(yee-y0,xee-x0)
         t = np.linspace(beta,beta+pi,1000)
-        pylab.plot(x0+r*np.cos(t),y0+r*np.sin(t),'k')
+        axis.plot(x0+r*np.cos(t),y0+r*np.sin(t),'k',lw=lw)
     
     xarc1=geo.xa_arc1+geo.ra_arc1*cos(np.linspace(geo.t2_arc1,geo.t1_arc1,100))
     yarc1=geo.ya_arc1+geo.ra_arc1*sin(np.linspace(geo.t2_arc1,geo.t1_arc1,100))
@@ -1033,9 +1039,11 @@ class ScrollAnimForm(wx.Frame):
         self.theta=0
         self.N=50
         self.geo=geo
-        self.OS=plotScrollSet(0,axis=self.pltTs.axes,geo=self.geo,lw=1,discOn=False)
+        self.OS=plotScrollSet(0,axis=self.pltTs.axes,geo=self.geo,lw=1,discOn=False,
+                              offsetScroll = self.geo.phi_ie_offset>0)
 
         self.PT=PlotThread()
+        self.PT.setDaemon(True)
         self.PT.setGUI(self) #pass it an instance of the frame (by reference)
         self.PT.setInterval(0.05) #delay between plot events
         self.PT.start()
@@ -1065,7 +1073,12 @@ class ScrollAnimForm(wx.Frame):
 
     def plotStep(self):
         self.theta+=2*np.pi/(self.N-1)
-        (x,y)=CoordsOrbScroll(self.theta,self.geo)
+        #If offset scroll, don't shave the orbiting scroll
+        
+        (x,y)=CoordsOrbScroll(self.theta,
+                              self.geo,
+                              shaveOn = self.geo.phi_ie_offset < 1e-12
+                              )
         self.OS.set_xy(np.hstack((x,y)))
         self.pltTs.axes.figure.canvas.draw() #Annoyingly this draw is required to flush the ghost orbiting scroll
         self.SetTitle('theta= '+str(self.theta)+' radians')

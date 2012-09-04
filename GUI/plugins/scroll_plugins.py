@@ -643,14 +643,14 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
                      Sorry but you need to provide two variables for the injection
                      state in parametric table to fix the state.  
                      
-                     If you want to just
-                     modify the saturated temperature, add the superheat as a
+                     If you want to just modify the saturated temperature, add the superheat as a
                      variable and give it one element in the parametric table
                      """
                      )
             dlg = wx.MessageDialog(None,string)
             dlg.ShowModal()
             dlg.Destroy()
+            raise ValueError('Must provide two state variables in the parametric table for injection line')
             
         elif num_inj_state_params >2:
             raise ValueError ('Only two inlet state parameters can be provided in parametric table')
@@ -712,6 +712,13 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
         ScrollComp : Scroll instance
         """
         
+        #Add a struct (empty class with no methods)
+        ScrollComp.injection = struct()
+        #Empty dictionaries for the port terms
+        ScrollComp.injection.phi = {}
+        ScrollComp.injection.inner_outer = {}
+        ScrollComp.injection.check_valve = {}
+            
         #IEPs are children of injection_panel that are instances of InjectionElementPanel class
         IEPs = [child for child in self.injection_panel.Children if isinstance(child,InjectionElementPanel)]
         for i,IEP in enumerate(IEPs):
@@ -749,25 +756,33 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                                          )
                                 )
             
-            for child in IEP.Children:
-                if isinstance(child,InjectionPortPanel):
-                    phi,inner_outer,check_valve = child.get_values()
-                    
-                    #Figure out which CV are in contact with this location for the injection port
-                    partner_key_start = ScrollComp._get_injection_CVkey(phi, 0*pi, inner_outer)
-                    partner_key_end = ScrollComp._get_injection_CVkey(phi, 2*pi, inner_outer)
-                    
-                    #Add the CV that start and end the rotation connected to the port
-                    for partner_key in [partner_key_start, partner_key_end]:
-                        #Injection flow paths
-                        ScrollComp.add_flow(FlowPath(key1= partner_key, 
-                                                     key2 = CVkey, 
-                                                     MdotFcn=ScrollComp.Injection_to_Comp,
-                                                     MdotFcn_kwargs = dict(phi = phi,
-                                                                           inner_outer = inner_outer,
-                                                                           check_valve = check_valve)
-                                                    )
-                                            )
+            
+            
+            Ports = [c for c in IEP.Children if isinstance(c,InjectionPortPanel)]
+            for j,child in enumerate(Ports):
+                phi,inner_outer,check_valve = child.get_values()
+                
+                #Figure out which CV are in contact with this location for the injection port
+                partner_key_start = ScrollComp._get_injection_CVkey(phi, 0*pi, inner_outer)
+                partner_key_end = ScrollComp._get_injection_CVkey(phi, 2*pi, inner_outer)
+                
+                #Store the port parameters for writing in the collect_output_terms function
+                k = str(i+1)+','+str(j+1)
+                ScrollComp.injection.phi[k]=phi
+                ScrollComp.injection.inner_outer[k]=inner_outer
+                ScrollComp.injection.check_valve[k]=check_valve
+                
+                #Add the CV that start and end the rotation connected to the port
+                for partner_key in [partner_key_start, partner_key_end]:
+                    #Injection flow paths
+                    ScrollComp.add_flow(FlowPath(key1= partner_key, 
+                                                 key2 = CVkey, 
+                                                 MdotFcn=ScrollComp.Injection_to_Comp,
+                                                 MdotFcn_kwargs = dict(phi = phi,
+                                                                       inner_outer = inner_outer,
+                                                                       check_valve = check_valve)
+                                                )
+                                        )
                         
     def post_process(self, sim):
         """
@@ -776,18 +791,28 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
         
         This function will be called by OnIdle in GUI Main frame when run finishes
         """
-        sim.injection = struct()
+
         sim.injection.massflow={}
         #:the ratio of the injection flow rate to the suction flow rate
         sim.injection.flow_ratio={}
-        for i,Tube in enumerate(sim.Tubes):
-            if Tube.key1.startswith('injection_line'):
-                key = Tube.key1
-                sim.injection.massflow[key]=sim.FlowsProcessed.mean_mdot[key]
-                sim.injection.flow_ratio[key]=(sim.injection.massflow[key]/
-                                               sim.mdot)
+        #injection pressure
+        sim.injection.pressure={}
+        #injection temperature
+        sim.injection.temperature={}
+        
+        #The tubes that are injection tubes have a key1 that starts with 'injection_line'
+        ITubes = [T for T in sim.Tubes if T.key1.startswith('injection_line')]
+        
+        for i,Tube in enumerate(ITubes):
+            key = Tube.key1
+            sim.injection.massflow[i+1]=sim.FlowsProcessed.mean_mdot[key]
+            sim.injection.flow_ratio[i+1]=(sim.injection.massflow[i+1]/
+                                           sim.mdot)
+            sim.injection.pressure[i+1] = Tube.State1.p
+            sim.injection.temperature[i+1] = Tube.State1.T
                 
-        print sim.injection.massflow, sim.injection.flow_ratio
+        #Save a local copy of a pointer to the simulation
+        self.simulation = sim
     
     def collect_output_terms(self):
         """
@@ -795,17 +820,52 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
         
         Happens after even the post-processing
         """
+        _T = []
         
-        return [
-                dict(attr = "injection.massflow['injection_line.1.1']",
-                     text = 'Injection line #1 mass flow [kg/s]',
-                     parent = self
-                     ),
-                dict(attr = "injection.flow_ratio['injection_line.1.1']",
-                     text = 'Injection line #1 flow ratio to suction flow [-]',
-                     parent = self
-                     )
-                ]
+        #These parameters pertain to each of the injection lines
+        for i in self.simulation.injection.massflow:
+            _T.append(dict(attr = "injection.massflow["+str(i)+"]",
+                           text = "Injection line #"+str(i)+" mass flow [kg/s]",
+                           parent = self
+                           )
+                      )
+            _T.append(dict(attr = "injection.flow_ratio["+str(i)+"]",
+                           text = "Injection line #"+str(i)+" flow ratio to suction flow [-]",
+                           parent = self
+                           )
+                      )
+            _T.append(dict(attr = "injection.pressure["+str(i)+"]",
+                           text = "Injection line #"+str(i)+" pressure [kPa]",
+                           parent = self
+                           )
+                      )
+            _T.append(dict(attr = "injection.temperature["+str(i)+"]",
+                           text = "Injection line #"+str(i)+" temperature [K]",
+                           parent = self
+                           )
+                      )
+        
+        #These are defined for each port
+        for _i_j in self.simulation.injection.phi:
+            
+            #Split the key back into its integer components (still as strings)
+            _i,_j = _i_j.split(',')
+            
+            #Add the output things for the ports
+            _T.append(dict(attr = "injection.phi['"+_i+","+_j+"']",
+                           text = "Injection inv. angle #" + _i + "," + _j + " [rad]",
+                           parent = self
+                           )
+                      )
+            _T.append(dict(attr = "injection.inner_outer['"+_i+","+_j+"']",
+                           text = "Injection involute #" + _i + "," + _j + " [-]",
+                           parent = self
+                           )
+                      )
+                
+            
+        
+        return _T
         
         
         
