@@ -1052,6 +1052,11 @@ class Scroll(PDSimCore, _Scroll):
         #Overall isentropic efficiency
         self.eta_oi = self.Wdot_i/self.Wdot_electrical
         
+        #Shaft power from forces
+        self.calculate_force_terms(self.suction_pressure)
+        self.Wdot_forces = self.omega*self.forces.mean_tau
+        print 'power forces',self.Wdot_forces
+        
     def calculate_force_terms(self,
                               orbiting_back_pressure=None):
         """
@@ -1153,9 +1158,13 @@ class Scroll(PDSimCore, _Scroll):
             self.forces.summed_Fy = np.sum(self.forces.Fy,axis = 0) #kN    
             #Calculate the radial force on the crank pin at each crank angle
             self.forces.Fr = np.sqrt(np.power(self.forces.summed_Fx,2)+np.power(self.forces.summed_Fy,2))
+            self.forces.xpin = self.geo.ro*np.cos(self.geo.phi_ie-pi/2-self.t)
+            self.forces.ypin = self.geo.ro*np.sin(self.geo.phi_ie-pi/2-self.t)
+            self.forces.tau = self.forces.xpin*self.forces.summed_Fy-self.forces.ypin*self.forces.summed_Fx
             # Calculate the mean normal force on the crank pin
             # This assumes a quasi-steady bearing where the film is well-behaved
             self.forces.mean_Fr = np.trapz(self.forces.Fr, self.t)/(2*pi)
+            self.forces.mean_tau = np.trapz(self.forces.tau, self.t)/(2*pi)
 
         pylab.show()
                 

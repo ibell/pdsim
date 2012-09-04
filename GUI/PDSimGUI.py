@@ -2009,9 +2009,10 @@ class MainFrame(wx.Frame):
             
             #Allow the plugins to post-process the results
             for plugin in self.plugins_list:
-                plugin.post_process(sim)
-                more_terms = plugin.collect_output_terms()
-                self.MTB.OutputsTB.add_output_terms(more_terms)
+                if plugin.is_activated():
+                    plugin.post_process(sim)
+                    more_terms = plugin.collect_output_terms()
+                    self.MTB.OutputsTB.add_output_terms(more_terms)
                 
 #            from plugins.HDF5_plugin import HDF5Writer
 #            HDF5 = HDF5Writer()

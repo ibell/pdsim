@@ -15,6 +15,7 @@ LabeledItem = pdsim_panels.LabeledItem
 
 class struct(object):
     pass
+
 class InjectionViewerDialog(wx.Dialog):
     """
     A simple dialog with plot of the locations of the injection ports overlaid
@@ -546,22 +547,37 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
     
     def get_additional_parametric_terms(self):
         
-        return [dict(attr = 'injection_phi_1_1',
-                     text = 'Injection port angle #1,1 [rad]',
-                     parent = self),
-                dict(attr = 'injection_state_pressure_1',
-                     text = 'Injection pressure #1[kPa]',
-                     parent = self),
-                dict(attr = 'injection_state_sat_temp_1',
-                     text = 'Injection saturated temperature (dew) #1 [K]',
-                     parent = self),
-                dict(attr = 'injection_state_temp_1',
-                     text = 'Injection temperature #1 [K]',
-                     parent = self),
-                dict(attr = 'injection_state_superheat_1',
-                     text = 'Injection superheat #1 [K]',
-                     parent = self),
+        #: the list of terms
+        _T = []
+        
+        #IEPs are children of injection_panel that are instances of InjectionElementPanel class
+        IEPs = [child for child in self.Children if isinstance(child,InjectionElementPanel)]
+        for i,IEP in enumerate(IEPs):
+            I = str(i+1)
+            
+            _T += [dict(attr = 'injection_state_pressure_' + I,
+                        text = 'Injection pressure #' + I + ' [kPa]',
+                        parent = self),
+                   dict(attr = 'injection_state_sat_temp_' + I,
+                        text = 'Injection saturated temperature (dew) #' + I + ' [K]',
+                        parent = self),
+                   dict(attr = 'injection_state_temp_' + I,
+                        text = 'Injection temperature #' + I + ' [K]',
+                        parent = self),
+                   dict(attr = 'injection_state_superheat_' + I,
+                        text = 'Injection superheat #' + I + ' [K]',
+                        parent = self),
                 ]
+                
+            Ports = [c for c in IEP.Children if isinstance(c,InjectionPortPanel)]
+            for j,child in enumerate(Ports):
+                J = str(j+1)
+                _T += [dict(attr = 'injection_phi_'+I+'_'+J,
+                            text = 'Injection port angle #'+I+','+J+' [rad]',
+                            parent = self)]
+                
+        return _T
+                
         
     def apply_additional_parametric_terms(self, attrs, vals, panel_items):
         """
