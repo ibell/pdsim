@@ -900,8 +900,6 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                            parent = self
                            )
                       )
-                
-            
         
         return _T
         

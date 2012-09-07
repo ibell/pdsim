@@ -984,7 +984,6 @@ class ParametricPanel(PDPanel):
                     
                 attrs = [self._get_attr(name) for name in names]
                 
-                print attrs, names, vals
                 # Run the special handler for any additional terms that are
                 # not handled in the conventional way using self.items in the 
                 # panel.  This is meant for optional terms primarily

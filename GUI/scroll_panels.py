@@ -246,6 +246,20 @@ class GeometryPanel(pdsim_panels.PDPanel):
             scroll.geo.phi_ie_offset = pi
         else:
             scroll.geo.phi_ie_offset = 0
+    
+    
+    def collect_output_terms(self):
+        """
+        
+        Hacked to change the parameters in the output table
+        """
+        print 'changing params'
+        Main = self.GetTopLevelParent()
+        Main.MTB.OutputTB.change_output_terms(dict(t = 'geo.t',
+                                                   ro = 'geo.ro',
+                                                   )
+                                              )
+        return []
         
 class FlankLeakageFlowChoice(pdsim_panels.MassFlowOption):
     

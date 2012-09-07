@@ -246,7 +246,8 @@ class PDSimCore(object):
             
             #For each tube, update the flow going through it
             #Tube.mdot is always a positive value
-            Tube.mdot = max(mdot1, mdot2)
+            Tube.mdot = max(abs(mdot1), abs(mdot2))
+            
         
     def __postprocess_HT(self):    
         self.HTProcessed=struct()
@@ -919,7 +920,8 @@ class PDSimCore(object):
     
     def _check_cycle_abort(self, index, I = 100):
         """
-        This function will check whether an abort has been requested every I steps
+        This function will check whether an abort has been requested every 
+        I steps of the solver throughout the rotation
         
         Meant for calling by cycle_RK45, cycle_SimpleEuler, cycle_Heun, etc.
         
@@ -948,7 +950,7 @@ class PDSimCore(object):
         Once self._want_abort is ``True``, it will stay latched True until the 
         run is over
         """
-        #If you received an abort request, set a flag
+        #If you received an abort request, set a flag in the simulation
         if self.pipe_abort.poll() and self.pipe_abort.recv():
             print 'received an abort request'
             self._want_abort = True
@@ -1017,7 +1019,8 @@ class PDSimCore(object):
         
         It is highly recommended to call this function using keyword arguments like::
         
-            solve(key_inlet = 'inlet', key_outlet = 'outlet', ....)
+            solve(key_inlet = 'inlet.1', 
+                  key_outlet = 'outlet.1', ....)
         
         Parameters
         ----------
@@ -1296,7 +1299,7 @@ class PDSimCore(object):
                     init_state_counter += 1
             
             #If the abort function returns true, quit this loop
-            if self.Abort or OneCycle:
+            if self.Abort() or OneCycle:
                 print 'Quitting OBJECTIVE function in core.solve'
                 return None
                     
@@ -1314,15 +1317,14 @@ class PDSimCore(object):
         x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,x0, dx=1.0, ytol=0.001, itermax=30)
         print 'Solution is', x_soln,'Td, Tlumps'
         
-        #If aborted, just quit
-        if x_soln[0] is not None:
-        
+        if not self.Abort():
+            self.__post_solve()
+            
+        if hasattr(self,'resid_Td') and hasattr(self,'x_state'):
             del self.resid_Td, self.x_state
-            if Abort is None or not Abort():
-                self.__post_solve()
-                
-            #Save the elapsed time for simulation
-            self.elapsed_time = clock()-t1
+            
+        #Save the elapsed time for simulation
+        self.elapsed_time = clock()-t1
         
     def __post_solve(self):
         """

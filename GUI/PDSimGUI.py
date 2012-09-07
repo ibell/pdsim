@@ -61,15 +61,28 @@ class RedirectText2Pipe(object):
         return None
 
 class Run1(Process):
+    """
+    A multiprocessing Process class that actually runs one simulation
+    
+    Everything within the run() function MUST!! be picklable.  This is a major
+    headache but required in order to fork a process of python for the simulation.
+    
+    """
     def __init__(self, pipe_std, pipe_abort, pipe_results, simulation):
         Process.__init__(self)
+        #Keep local variables that point to the pipes
         self.pipe_std = pipe_std
         self.pipe_abort = pipe_abort
         self.pipe_results = pipe_results
+        #Local pointer to simulation
         self.sim = simulation
+        #Reset the abort flag at instantiation
         self._want_abort = False
 
     def run(self):
+        # Any stdout or stderr output will be redirected to a pipe for passing
+        # back to the GUI.  Pipes must be used because they are picklable and
+        # otherwise the text output will not show up anywhere
         redir = RedirectText2Pipe(self.pipe_std)
         sys.stdout = redir
         sys.stderr = redir
@@ -78,6 +91,8 @@ class Run1(Process):
         OneCycle = self.sim.OneCycle if hasattr(self.sim,'OneCycle') else False
         plot_every_cycle = self.sim.plot_every_cycle if hasattr(self.sim,'plot_every_cycle')  else False
             
+        # These parameters are common to all compressor types, so put them all
+        # in one dictionary an unpack it into each function call
         commons = dict(key_inlet='inlet.1',
                        key_outlet='outlet.2',
                        endcycle_callback=self.sim.endcycle_callback,
@@ -102,29 +117,26 @@ class Run1(Process):
         else:
             raise TypeError
         
-        #Delete the pipe_abort since it cannot pickle
+        #Delete a few items that cannot pickle properly
         if hasattr(self.sim,'pipe_abort'):
             del self.sim.pipe_abort
             del self.sim.FlowStorage
-            
+            del self.sim.Abort #Can't pickle because it is a pointer to a bound method
+        
         if not self.sim._want_abort:
             #Send simulation result back to calling thread
-            print 'About to send recip back to calling thread'
             self.pipe_results.send(self.sim)
             print 'Sent simulation back to calling thread'
-            #Wait for an acknowledgement of receipt
+            #Wait for an acknowledgment of receipt
             while not self.pipe_results.poll():
-                print 'Waiting for ack of recipt'
                 time.sleep(0.1)
-                #Check that you got the right acknowledgement key back
+                #Check that you got the right acknowledgment key back
                 ack_key = self.pipe_results.recv()
                 if not ack_key == 'ACK':
                     raise KeyError
                 else:
-                    print 'Ack accepted'
+                    print 'Acknowledgment of receipt accepted'
                     break
-            print 'Sent results back to calling thread'
-            
         else:
             print 'Acknowledging completion of abort'
             self.pipe_abort.send('ACK')
@@ -196,9 +208,7 @@ class WorkerThreadManager(Thread):
                 #Send the abort signal
                 _thread.abort()
                 #Wait for it to finish up
-                #_thread.join()
-                #Remove thread from list of threads
-                self.threadsList.remove(_thread)
+                _thread.join()
             del busy
             
         dlg.Destroy()
@@ -238,12 +248,11 @@ class RedirectedWorkerThread(Thread):
                 pipe_abort_inlet.send(True)
                 #Wait until it acknowledges the kill by sending back 'ACK'
                 while not pipe_abort_inlet.poll():
-                    time.sleep(0.5)
+                    time.sleep(0.1)
 #                   #Collect all display output from process while you wait
                     while pipe_outlet.poll():
                         wx.CallAfter(self.stdout_target_.AppendText, pipe_outlet.recv())
                         
-                    print 'Waiting for abort'
                 abort_flag = pipe_abort_inlet.recv()
                 if abort_flag == 'ACK':
                     break
@@ -253,17 +262,19 @@ class RedirectedWorkerThread(Thread):
             #Collect all display output from process
             while pipe_outlet.poll():
                 wx.CallAfter(self.stdout_target_.AppendText, pipe_outlet.recv())
-            time.sleep(0.5)
-                
+            time.sleep(0.5)    
+            
             #Get back the results from the simulation process if they are waiting
             if pipe_results_outlet.poll():
                 sim = pipe_results_outlet.recv()
                 pipe_results_outlet.send('ACK')
         
-        #Flush out any remaining stuff
+        #Flush out any remaining stuff left in the pipe after process ends
         while pipe_outlet.poll():
             wx.CallAfter(self.stdout_target_.AppendText, pipe_outlet.recv())
-                
+        
+        
+                    
         if self._want_abort == True:
             print self.name+": Process has aborted successfully"
         else:
@@ -1389,6 +1400,32 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             key = var['attr']
             value = var['text']
             self.column_options[key] = value
+      
+    def change_output_attrs(self, key_dict):
+        """
+        Change column attributes
+        
+        Parameters
+        ----------
+        key_dict : dict
+            A dictionary with keys of old key and value of new key
+        """
+        for old_key,new_key in key_dict.iteritems():
+            #Make a copy using the old_key
+            val = self.column_options.pop(old_key)
+            #Use the old value with the updated key
+            self.column_options[new_key] = val
+            
+        self.rebuild()
+        
+    def remove_output_terms(self, keys):
+        """
+        
+        Parameters
+        ----------
+        keys : list of strings
+            Remove the items with 'attr' equal to key
+        """
         
     def OnLoadRuns(self, event = None):
         """
@@ -1499,7 +1536,7 @@ class OutputsToolBook(wx.Toolbook):
             
         self.PN = None
             
-    def plot_outputs(self, recip=None):
+    def plot_outputs(self, recip = None):
         parent = self.PlotsPanel
         # First call there is no plot notebook in existence
         if self.PN is None:
@@ -1513,6 +1550,9 @@ class OutputsToolBook(wx.Toolbook):
             
     def add_output_terms(self, items):
         self.DataPanel.add_output_terms(items)
+        
+    def change_output_terms(self, key_dict):
+        self.DataPanel.change_output_terms(key_dict)
             
 class MainToolBook(wx.Toolbook):
     def __init__(self,parent,configfile):
