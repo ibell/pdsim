@@ -462,10 +462,13 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         dict(attr='Tamb'),
         dict(attr='D_upper_bearing'),
         dict(attr='L_upper_bearing'),
+        dict(attr='c_upper_bearing'),
         dict(attr='D_crank_bearing'),
         dict(attr='L_crank_bearing'),
+        dict(attr='c_crank_bearing'),
         dict(attr='D_lower_bearing'),
         dict(attr='L_lower_bearing'),
+        dict(attr='c_lower_bearing'),
         
         dict(attr='thrust_friction_coefficient')
         ]

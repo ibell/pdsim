@@ -1,7 +1,7 @@
 # -*- coding: latin-1 -*-
 
 import wx
-from wx.lib.mixins.listctrl import CheckListCtrlMixin
+from wx.lib.mixins.listctrl import CheckListCtrlMixin,TextEditMixin
 import CoolProp
 from CoolProp.State import State
 from CoolProp import CoolProp as CP
@@ -666,9 +666,15 @@ class ParametricOption(wx.Panel):
         dlg.Destroy()
         
     def get_values(self):
+        """
+        Get a list of floats from the items in the textbox
+        """
         name = self.Terms.GetStringSelection()
         #To list of floats
-        values = [float(val) for val in self.Values.GetValue().split(',')]
+        if hasattr(self,'Values'):
+            values = [float(val) for val in self.Values.GetValue().split(',')]
+        else:
+            values = None
         return name, values
     
     def set_values(self,key,value):
@@ -687,11 +693,40 @@ class ParametricOption(wx.Panel):
         #Reset the string
         self.Terms.SetStringSelection(old_val)
         
+    def make_unstructured(self):
+        self.Values.Destroy()
+        del self.Values 
+        self.Select.Destroy()
+        del self.Select
+        self.GetSizer().Layout()
+        self.Refresh()
+    
+    def make_structured(self):
+        if not hasattr(self,'Values'):
+            self.Values = wx.TextCtrl(self, value = '1,2,3,4,5,6,7,8,9')
+            self.Select = wx.Button(self, label = 'Select...')
+            self.Select.Bind(wx.EVT_BUTTON,self.OnSelectValues)
+            self.GetSizer().AddMany([self.Values,self.Select])
+            self.GetSizer().Layout()
+            self.Refresh()
         
-class ParametricCheckList(wx.ListCtrl, CheckListCtrlMixin):
+class ParametricCheckList(wx.ListCtrl, CheckListCtrlMixin, TextEditMixin):
+    """
+    The checklist that stores all the possible runs
+    """
     def __init__(self, parent, headers, values):
+        """
+        Parameters
+        ----------
+        parent : wx.window
+            The parent of this checklist
+        headers : list
+            A list of header strings
+        values : 
+        """
         wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT)
         CheckListCtrlMixin.__init__(self)
+        TextEditMixin.__init__(self)
         
         #Build the headers
         self.InsertColumn(0, '')
@@ -699,7 +734,7 @@ class ParametricCheckList(wx.ListCtrl, CheckListCtrlMixin):
         for i, header in enumerate(headers):
             self.InsertColumn(i+1, header)
         
-        self.data = [row for row in itertools.product(*values)]
+        self.data = [list(row) for row in itertools.product(*values)]
         
         #Add the values one row at a time
         for i,row in enumerate(self.data):
@@ -711,19 +746,61 @@ class ParametricCheckList(wx.ListCtrl, CheckListCtrlMixin):
         for i in range(len(headers)):
             self.SetColumnWidth(i+1,wx.LIST_AUTOSIZE_USEHEADER)
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnItemActivated)
+        self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.OnCellEdited)
 
     def OnItemActivated(self, event):
         self.ToggleItem(event.m_itemIndex)
     
-    def GetStringItem(self,Irow,Icol):
+    def OnCellEdited(self, event):
+        """
+        Once the cell is edited, write its value back into the data matrix
+        """
+        row_index = event.m_itemIndex
+        col_index = event.Column
+        val = float(event.Text)
+        self.data[row_index][col_index-1] = val
+    
+    def GetStringCell(self,Irow,Icol):
+        """ Returns a string representation of the cell """
         return self.data[Irow][Icol]
+    
+    def GetFloatCell(self,Irow,Icol):
+        """ Returns a float representation of the cell """
+        return float(self.data[Irow][Icol])
+    
+    def AddRow(self):
+        
+        row = [0]*self.GetColumnCount()
+        
+        i = len(self.data)-1
+        self.InsertStringItem(i,'')
+        for j,val in enumerate(row):
+            self.SetStringItem(i,j+1,str(val))
+        self.CheckItem(i)
+        
+        self.data.append(row)
+        
+    def RemoveRow(self, i = 0):
+        self.data.pop(i)
+        self.DeleteItem(i)
+        
+    def RemoveLastRow(self):
+        i = len(self.data)-1
+        self.data.pop(i)
+        self.DeleteItem(i)
                                  
 class ParametricPanel(PDPanel):
     def __init__(self, parent, configfile, items, **kwargs):
         PDPanel.__init__(self, parent, **kwargs)
         
         self.variables =  items
+        self.Structured = wx.Choice(self, -1, choices = ['Structured',
+                                                         'Unstructured'])
+        self.Structured.Bind(wx.EVT_CHOICE, self.OnChangeStructured)
+        self.Structured.SetSelection(0)
+        
         sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.Structured)
         self.ButtonSizer = wx.BoxSizer(wx.HORIZONTAL)
         self.AddButton = wx.Button(self, label = "Add Term", style = wx.ID_ADD)
         self.AddButton.Bind(wx.EVT_BUTTON, self.OnAddTerm)
@@ -740,6 +817,21 @@ class ParametricPanel(PDPanel):
         #Has no self.items, so all processing done through post_get_from_configfile
         self.get_from_configfile('ParametricPanel')
         
+    def OnChangeStructured(self, event = None):
+        
+        #Param
+        terms = [term for term in self.Children if isinstance(term,ParametricOption)]
+        
+        for term in terms:
+            if self.Structured.GetStringSelection() == 'Structured':
+                term.make_structured()    
+            else:
+                term.make_unstructured()
+
+        self.GetSizer().Layout()
+        self.Refresh()
+            
+            
     def OnAddTerm(self, event = None):
         if self.NTerms == 0:
             self.ParamSizerBox = wx.StaticBox(self, label = "Parametric Terms")
@@ -783,13 +875,16 @@ class ParametricPanel(PDPanel):
         #make names a list of strings
         #make values a list of lists of values
         for param in self.ParamSizer.GetChildren():
-            name, val = param.Window.get_values()
+            name, vals = param.Window.get_values()
             names.append(name)
-            values.append(val)
+            if self.Structured.GetStringSelection() == 'Structured':
+                values.append(vals)
+            else:
+                values.append([0.0]*3)
         
         #Build the list of parameters for the parametric study
         if self.ParamListSizer is None:
-            #Build and add a sizer for the para values
+            
             self.ParamListBox = wx.StaticBox(self, label = "Parametric Terms Ranges")
             self.ParamListSizer = wx.StaticBoxSizer(self.ParamListBox, wx.VERTICAL)
         else:
@@ -798,7 +893,29 @@ class ParametricPanel(PDPanel):
 #            #Build and add a sizer for the para values
             self.ParamListBox = wx.StaticBox(self, label = "Parametric Runs")
             self.ParamListSizer = wx.StaticBoxSizer(self.ParamListBox, wx.VERTICAL)
+        
+        #Remove the spinner and its friends
+        if hasattr(self,'RowCountSpinner'):
+            self.RowCountSpinner.Destroy(); del self.RowCountSpinner
+            self.RowCountLabel.Destroy(); del self.RowCountLabel
+            self.RowCountSpinnerText.Destroy(); del self.RowCountSpinnerText
             
+        #Build and add a sizer for the para values
+        if self.Structured.GetStringSelection() == 'Unstructured':
+            self.RowCountLabel = wx.StaticText(self,label='Number of rows')
+            self.RowCountSpinnerText = wx.TextCtrl(self, value = "1", size = (40,-1))
+            h = self.RowCountSpinnerText.GetSize().height
+            w = self.RowCountSpinnerText.GetSize().width + self.RowCountSpinnerText.GetPosition().x + 2
+            self.RowCountSpinner = wx.SpinButton(self, wx.ID_ANY, (w,50), (h*2/3,h), style = wx.SP_VERTICAL)
+            self.RowCountSpinner.SetRange(1, 100)
+            self.RowCountSpinner.SetValue(1)
+            self.RowCountSpinner.Bind(wx.EVT_SPIN_UP, self.OnSpinUp)
+            self.RowCountSpinner.Bind(wx.EVT_SPIN_DOWN, self.OnSpinDown)
+            
+            sizer = wx.BoxSizer(wx.HORIZONTAL)
+            sizer.AddMany([self.RowCountLabel, self.RowCountSpinner,self.RowCountSpinnerText])
+            self.GetSizer().Add(sizer)
+                    
         self.GetSizer().Add(self.ParamListSizer,1,wx.EXPAND)
         self.ParaList = ParametricCheckList(self,names,values)
             
@@ -813,7 +930,35 @@ class ParametricPanel(PDPanel):
             self.RunButton.Bind(wx.EVT_BUTTON, self.OnRunTable)
             self.ButtonSizer.Add(self.RunButton)
             self.ButtonSizer.Layout()
-
+            
+        if self.Structured.GetStringSelection() == 'Unstructured':
+            self.RowCountSpinner.SetValue(self.ParaList.GetItemCount())
+            self.RowCountSpinnerText.SetValue(str(self.ParaList.GetItemCount()))
+            
+    def OnSpinDown(self, event):
+        """ 
+        Fires when the spinner is used to decrease the number of rows
+        """
+        
+        if event.GetPosition()>=1:
+            
+            # Set the textbox value
+            self.RowCountSpinnerText.SetValue(str(event.GetPosition()))
+        
+            #Remove the last row
+            self.ParaList.RemoveLastRow()
+        
+        
+    def OnSpinUp(self, event):
+        """ 
+        Fires when the spinner is used to increase the number of rows
+        """
+        #Set the textbox value
+        self.RowCountSpinnerText.SetValue(str(event.GetPosition()))
+        
+        #Add a row
+        self.ParaList.AddRow()
+        
     def OnRunTable(self, event=None):
         """
         Actually runs the parametric table
@@ -823,18 +968,23 @@ class ParametricPanel(PDPanel):
         Main = self.GetTopLevelParent()
         sims=[]
         #Column index 1 is the list of parameters
-        self.ParaList.GetColumn(1)
         for Irow in range(self.ParaList.GetItemCount()):
             #Loop over all the rows that are checked
             if self.ParaList.IsChecked(Irow):
                 
-                vals, Names = [], []
-                for Icol in range(self.ParaList.GetColumnCount()-1):
-                    vals.append(self.ParaList.GetStringItem(Irow, Icol))
-                    Names.append(self.ParaList.GetColumn(Icol+1).Text)
-                    
-                attrs = [self._get_attr(Name) for Name in Names]
+                #Empty lists for this run
+                vals, names = [], []
                 
+                # Each row corresponds to one run of the model
+                # 
+                # Loop over the columns for this row 
+                for Icol in range(self.ParaList.GetColumnCount()-1):
+                    vals.append(self.ParaList.GetFloatCell(Irow, Icol))
+                    names.append(self.ParaList.GetColumn(Icol+1).Text)
+                    
+                attrs = [self._get_attr(name) for name in names]
+                
+                print attrs, names, vals
                 # Run the special handler for any additional terms that are
                 # not handled in the conventional way using self.items in the 
                 # panel.  This is meant for optional terms primarily
