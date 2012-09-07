@@ -1132,26 +1132,22 @@ class PDSimCore(object):
                 
                 t1 = clock()
                 if solver_method == 'Euler':
-                    if hasattr(self,'EulerN'):
-                        N=self.EulerN
-                    else:
-                        N=7000
+                    
+                    #Default to 7000 steps if not provided
+                    N = getattr(self,'EulerN', 7000)
                     aborted = self.cycle_SimpleEuler(N,x_state,step_callback=step_callback,
                                     heat_transfer_callback=heat_transfer_callback,
                                     valves_callback=valves_callback)
                 elif solver_method == 'Heun':
-                    if hasattr(self,'HeunN'):
-                        N=self.HeunN
-                    else:
-                        N=7000
+                    #Default to 7000 steps if not provided
+                    N = getattr(self,'HeunN', 7000)
                     aborted = self.cycle_Heun(N,x_state,step_callback=step_callback,
                                            heat_transfer_callback=heat_transfer_callback,
                                            valves_callback=valves_callback)
                 elif solver_method == 'RK45':
-                    if hasattr(self,'RK45_eps'):
-                        eps_allowed=self.RK45_eps
-                    else:
-                        eps_allowed = 1e-8
+                    #Default to tolerance of 1e-8 if not provided
+                    eps_allowed = getattr(self,'RK45_eps', 1e-8)
+                    
                     aborted = self.cycle_RK45(x_state,
                                     eps_allowed = eps_allowed,
                                     step_callback=step_callback,
@@ -1160,6 +1156,7 @@ class PDSimCore(object):
                                     **kwargs)
                 else:
                     raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
+                
                 t2 = clock()
                 print 'Elapsed time for cycle is {0:g} s'.format(t2-t1)
                 
@@ -1201,8 +1198,10 @@ class PDSimCore(object):
                     errors, x_state_ = endcycle_callback()
                     self.x_state = x_state_[:] #Make a copy
                     return errors
-                
-            #! End of OBJECTIVE_CYCLE
+            
+            ##################################
+            ## End OBJECTIVE_CYCLE function ##
+            ##################################
             
             if UseNR:
                 self.x_state = Broyden(OBJECTIVE_CYCLE, 
