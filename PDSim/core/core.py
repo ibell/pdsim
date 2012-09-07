@@ -228,7 +228,7 @@ class PDSimCore(object):
             
             
         # Special-case the tubes.  Only one of the nodes can have flow.  
-        #   The other one is invariant because it is quasi-steady.
+        # The other one is invariant because it is quasi-steady.
         for Tube in self.Tubes:
             mdot1 = self.FlowsProcessed.mean_mdot[Tube.key1]
             mdot2 = self.FlowsProcessed.mean_mdot[Tube.key2]
@@ -243,6 +243,10 @@ class PDSimCore(object):
             self.FlowsProcessed.integrated_mdot[Tube.key2]-=mdot_i1
             self.FlowsProcessed.integrated_mdoth[Tube.key1]-=mdoth_i2
             self.FlowsProcessed.integrated_mdoth[Tube.key2]-=mdoth_i1
+            
+            #For each tube, update the flow going through it
+            #Tube.mdot is always a positive value
+            Tube.mdot = max(mdot1, mdot2)
         
     def __postprocess_HT(self):    
         self.HTProcessed=struct()
