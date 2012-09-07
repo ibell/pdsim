@@ -1,3 +1,4 @@
+from __future__ import division
 ##--- package imports
 from PDSim.core.containers import ControlVolume
 from PDSim.flow.flow import FlowPath
@@ -743,15 +744,116 @@ class Scroll(PDSimCore, _Scroll):
             
         return disable,h
         
-    def mechanical_losses(self):
-        print 'temporary mechanical losses'
-        return 0.4 #[kW]
+    def crank_bearing(self):
+        from PDSim.core.bearings import journal_bearing
+        #print 'Crank pin load is',self.forces.mean_Fr*1000,'N'
+        JB = journal_bearing(r_b = self.D_crank_bearing/2,
+                             L = self.L_crank_bearing,
+                             omega = self.omega,
+                             W = self.forces.mean_Fr*1000,
+                             c = self.c_crank_bearing,
+                             eta_0 = self.mu_oil
+                             )
+    
+        #print 'Crank pin journal loss is',JB['Wdot_loss'],'W'
+        return JB['Wdot_loss']/1000.0
+        
+    def upper_bearing(self):
+        """
+        Moment balance around the upper bearing gives the force for
+        the lower bearing.  Torques need to balance around the upper bearing
+        """
+        
+        from PDSim.core.bearings import journal_bearing
+        #print 'Upper bearing load is',self.forces.mean_Fr*1000*(1+1/3),'N'
+        JB = journal_bearing(r_b = self.D_upper_bearing/2,
+                             L = self.L_upper_bearing,
+                             omega = self.omega,
+                             W = self.forces.mean_Fr*1000*(1+1/3),
+                             c = self.c_upper_bearing,
+                             eta_0 = self.mu_oil
+                             )
+        #print 'Upper bearing journal loss is',JB['Wdot_loss'],'W'
+        return JB['Wdot_loss']/1000.0
+    
+    def lower_bearing(self):
+        """
+        Moment balance around the upper bearing gives the force for
+        the lower bearing.  Torques need to balance around the upper bearing
+        """
+        from PDSim.core.bearings import journal_bearing
+        #print 'Lower bearing load is',self.forces.mean_Fr*1000*(1/3),'N'
+        JB = journal_bearing(r_b = self.D_lower_bearing/2,
+                             L = self.L_lower_bearing,
+                             omega = self.omega,
+                             W = self.forces.mean_Fr*1000*(1/3),
+                             c = self.c_lower_bearing,
+                             eta_0 = self.mu_oil
+                             )
+        
+        #print 'Lower bearing journal loss is',JB['Wdot_loss'],'W'
+        return JB['Wdot_loss']/1000.0
+    
+    def thrust_bearing(self):
+        """
+        The thrust bearing analysis
+        """
+        from PDSim.core.bearings import thrust_bearing
+        V = self.geo.ro*self.omega
+        N = self.forces.mean_Fz*1000 #[N]
+        TB = thrust_bearing(mu = self.thrust_friction_coefficient,
+                            V = V,
+                            N = N)
+        return TB['Wdot_loss']/1000.0
+    
+    def mechanical_losses(self, shell_pressure = 'low'):
+        """
+        Calculate the mechanical losses in the bearings
+        
+        Parameters
+        ----------
+            shell_pressure : string, 'low' or 'high'
+
+        """
+        
+        #inlet pressure [kPa]
+        inlet_pressure = self.Tubes.Nodes[self.key_inlet].p
+        outlet_pressure = self.Tubes.Nodes[self.key_outlet].p
+        
+        # Get the shell pressure based on either the inlet or outlet pressure
+        # based on whether it is a low-pressure or high-pressure shell
+        if shell_pressure == 'low':
+            back_pressure = min((inlet_pressure, outlet_pressure))
+        elif shell_pressure == 'high':
+            back_pressure = max((inlet_pressure, outlet_pressure))
+        else:
+            raise KeyError("keyword argument shell_pressure must be one of 'low' or 'high'")
+        
+        #Calculate the force terms: force profiles, mean values, etc. 
+        self.calculate_force_terms(orbiting_back_pressure = back_pressure)
+        
+        if not hasattr(self,'losses'):
+            self.losses = struct()
+            
+        #Conduct the calculations for the bearings
+        self.losses.crank_bearing = self.crank_bearing()
+        self.losses.upper_bearing = self.upper_bearing()
+        self.losses.lower_bearing = self.lower_bearing()
+        self.losses.thrust_bearing = self.thrust_bearing()
+        
+        self.losses.bearings  = (self.losses.crank_bearing 
+                                 + self.losses.upper_bearing 
+                                 + self.losses.lower_bearing
+                                 + self.losses.thrust_bearing)
+        
+        print 'mechanical losses: ', self.losses.bearings
+        return self.losses.bearings #[kW]
     
     def ambient_heat_transfer(self, Tshell):
         """
         The amount of heat transfer from the compressor to the ambient
         """
-        return 0.001*(Tshell-self.Tamb)
+        return self.h_shell*self.A_shell*(Tshell-self.Tamb)
     
     def lump_energy_balance_callback(self):
         
@@ -1053,7 +1155,8 @@ class Scroll(PDSimCore, _Scroll):
         self.eta_oi = self.Wdot_i/self.Wdot_electrical
         
         #Shaft power from forces
-        self.calculate_force_terms(self.suction_pressure)
+        suction_pressure = self.Tubes.Nodes[self.key_outlet].p
+        self.calculate_force_terms(suction_pressure)
         self.Wdot_forces = self.omega*self.forces.mean_tau
         print 'power forces',self.Wdot_forces
         
@@ -1072,6 +1175,11 @@ class Scroll(PDSimCore, _Scroll):
         
         self.forces = struct()
         
+        #Get the slice of indices that are in use.  At the end of the simulation
+        #execution this will be the full range of the indices, but when used
+        # at itermediate iterations it will be a subset of the indices
+        _slice = range(self.Itheta)        
+        
         ####################################################
         #############  Normal force components #############
         ####################################################
@@ -1088,12 +1196,12 @@ class Scroll(PDSimCore, _Scroll):
         Isa = self.CVs.index('sa')
         self.forces.Fz[Isa,:] = 0.0
         
-        #Remove all the NAN placeholders
+        #Remove all the NAN placeholders and replace them with zero values
         self.forces.Fz[np.isnan(self.forces.Fz)]=0
         #Sum the terms
         self.forces.summed_Fz = np.sum(self.forces.Fz,axis = 0) #kN    
         #Calculate the mean axial force
-        self.forces.mean_Fz = np.trapz(self.forces.summed_Fz, self.t)/(2*pi)
+        self.forces.mean_Fz = np.trapz(self.forces.summed_Fz[_slice], self.t[_slice])/(2*pi)
         
         ####################################################
         #############  "Radial" force components ###########
@@ -1147,26 +1255,29 @@ class Scroll(PDSimCore, _Scroll):
                 self.forces.fyp[I,:] = [comp['fy_p'] for comp in geo_components]
                 self.forces.Fx[I,:] = [comp['fx_p'] for comp in geo_components]*p
                 self.forces.Fy[I,:] = [comp['fy_p'] for comp in geo_components]*p
-                import pylab
-                pylab.plot(self.forces.Fx[I,:],self.forces.Fy[I,:])
-                
-            #Remove all the NAN placeholders
-            self.forces.Fx[np.isnan(self.forces.Fx)]=0
-            self.forces.Fy[np.isnan(self.forces.Fy)]=0
-            #Sum the terms
-            self.forces.summed_Fx = np.sum(self.forces.Fx,axis = 0) #kN
-            self.forces.summed_Fy = np.sum(self.forces.Fy,axis = 0) #kN    
-            #Calculate the radial force on the crank pin at each crank angle
-            self.forces.Fr = np.sqrt(np.power(self.forces.summed_Fx,2)+np.power(self.forces.summed_Fy,2))
-            self.forces.xpin = self.geo.ro*np.cos(self.geo.phi_ie-pi/2-self.t)
-            self.forces.ypin = self.geo.ro*np.sin(self.geo.phi_ie-pi/2-self.t)
-            self.forces.tau = self.forces.xpin*self.forces.summed_Fy-self.forces.ypin*self.forces.summed_Fx
-            # Calculate the mean normal force on the crank pin
-            # This assumes a quasi-steady bearing where the film is well-behaved
-            self.forces.mean_Fr = np.trapz(self.forces.Fr, self.t)/(2*pi)
-            self.forces.mean_tau = np.trapz(self.forces.tau, self.t)/(2*pi)
+#                import pylab
+#                pylab.plot(self.forces.Fx[I,:],self.forces.Fy[I,:])
+        
+        
+        #Remove all the NAN placeholders
+        self.forces.Fx[np.isnan(self.forces.Fx)]=0
+        self.forces.Fy[np.isnan(self.forces.Fy)]=0
+        #Sum the terms at each crank angle
+        self.forces.summed_Fx = np.sum(self.forces.Fx,axis = 0) #kN
+        self.forces.summed_Fy = np.sum(self.forces.Fy,axis = 0) #kN
+        
+        #Calculate the radial force on the crank pin at each crank angle
+        self.forces.Fr = np.sqrt(np.power(self.forces.summed_Fx,2)
+                                 +np.power(self.forces.summed_Fy,2)
+                                 )
+        self.forces.xpin = self.geo.ro*np.cos(self.geo.phi_ie-pi/2-self.t)
+        self.forces.ypin = self.geo.ro*np.sin(self.geo.phi_ie-pi/2-self.t)
+        self.forces.tau = self.forces.xpin*self.forces.summed_Fy-self.forces.ypin*self.forces.summed_Fx
+        # Calculate the mean normal force on the crank pin
+        # This assumes a quasi-steady bearing where the film is well-behaved
+        self.forces.mean_Fr = np.trapz(self.forces.Fr[_slice], self.t[_slice])/(2*pi)
+        self.forces.mean_tau = np.trapz(self.forces.tau[_slice], self.t[_slice])/(2*pi)
 
-        pylab.show()
                 
                 
     def IsentropicNozzleFM(self,*args,**kwargs):

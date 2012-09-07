@@ -23,7 +23,7 @@ from CoolProp.State import State
 from PDSim.flow._sumterms import setcol, getcol
 from PDSim.flow import _flow,flow_models
 from PDSim.flow.flow import FlowPathCollection, FlowPath
-from containers import ControlVolumeCollection
+from containers import ControlVolumeCollection,Tube,TubeCollection
 from PDSim.plot.plots import debug_plots
 from PDSim.misc._listmath import listm 
 from PDSim.misc.solvers import Broyden,MultiDimNewtRaph
@@ -31,55 +31,7 @@ from PDSim.misc.solvers import Broyden,MultiDimNewtRaph
 #An empty class for storage
 class struct(object):
     pass    
-        
-class TubeCollection(list):
-    
-    def _Nodes(self):
-        """
-        Nodes is a dictionary of flow states for any tubes that exist
-        """
-        list1=[(Tube.key1,Tube.State1) for Tube in self if Tube.exists==True]
-        list2=[(Tube.key2,Tube.State2) for Tube in self if Tube.exists==True]
-        return dict(list1+list2)
-    Nodes=property(_Nodes)
-    
-class Tube():
-    """
-    A tube is a component of the model that allows for heat transfer and pressure drop.
-    
-    With this class, the state of at least one of the points is fixed.  For instance, at the inlet of the compressor, the state well upstream is quasi-steady.
-    """
-    def __init__(self,key1,key2,L,ID,OD=None,State1=None,State2=None,fixed=-1,TubeFcn=None,mdot=-1,exists=True):
-        self.key1=key1
-        self.key2=key2
-        self.fixed=fixed
-        self.exists=exists
-        if fixed<0:
-            raise AttributeError(textwrap.dedent("""You must provide an integer 
-            value for fixed, either 1 for Node 1 fixed, or 2 for Node 2 fixed.  
-            You provided None (or didn\'t include the parameter"""))
-        if fixed==1 and isinstance(State1,State) and State2==None:
-            #Everything good
-            self.State1=State1
-            self.State2=State(self.State1.Fluid,{'T':self.State1.T,'D':self.State1.rho})
-        elif fixed==2 and isinstance(State2,State) and State1==None:
-            #Everything good
-            self.State2=State2
-            self.State1=State(self.State2.Fluid,{'T':self.State2.T,'D':self.State2.rho})
-        else:
-            raise AttributeError('Incompatibility between the value for fixed and the states provided')
-            
-        self.TubeFcn=TubeFcn
-        if mdot<0:
-            self.mdot=0.010
-            print('Warning: mdot not provided to Tube class contructor, guess value of '+str(self.mdot)+' kg/s used')
-        else:
-            self.mdot=mdot
-        self.L=L
-        self.ID=ID
-        self.OD=OD
 
-    
 class PDSimCore(object):
     """
     This is the main driver class for the model

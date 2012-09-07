@@ -1235,6 +1235,8 @@ class StateInputsPanel(PDPanel):
         
         #Set the value self._discharge_pressure variable
         self.OnChangeDischargeValue()
+        #Bind the selection of discharge value event
+        self.OnChangeDischargeVariable()
         
     def OnChangeDischargeValue(self, event = None):
         """ 

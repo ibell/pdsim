@@ -61,7 +61,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         dict(attr='phi_fis'),
         dict(attr='phi_fos'),
         dict(attr='delta_flank'),
-        dict(attr='delta_radial')
+        dict(attr='delta_radial'),
         ]
         
         sizerInputs = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
@@ -460,6 +460,14 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         dict(attr='h_shell'),
         dict(attr='A_shell'),
         dict(attr='Tamb'),
+        dict(attr='D_upper_bearing'),
+        dict(attr='L_upper_bearing'),
+        dict(attr='D_crank_bearing'),
+        dict(attr='L_crank_bearing'),
+        dict(attr='D_lower_bearing'),
+        dict(attr='L_lower_bearing'),
+        
+        dict(attr='thrust_friction_coefficient')
         ]
         
         sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)

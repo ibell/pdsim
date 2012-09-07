@@ -39,13 +39,28 @@ def Compressor(f = None):
     #This runs if the module code is run directly
     ScrollComp.set_scroll_geo(104.8e-6, 1.61, 0.004, 0.005) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2='PMP')
-    ScrollComp.geo.delta_flank = 15e-6
-    ScrollComp.geo.delta_radial = 15e-6
+    ScrollComp.geo.delta_flank = 1.5e-6
+    ScrollComp.geo.delta_radial = 1.5e-6
     ScrollComp.omega = 3600/60*2*pi
     ScrollComp.Tamb = 298.0
     ScrollComp.eta_motor = 0.9
     
-    ScrollComp.geo.delta_suction_offset = 5.0e-3
+    #Temporarily set the bearing dimensions
+    ScrollComp.D_upper_bearing = 0.025
+    ScrollComp.L_upper_bearing = 0.025
+    ScrollComp.c_upper_bearing = 20e-6
+    ScrollComp.D_crank_bearing = 0.025
+    ScrollComp.L_crank_bearing = 0.025
+    ScrollComp.c_crank_bearing = 20e-6
+    ScrollComp.D_lower_bearing = 0.025
+    ScrollComp.L_lower_bearing = 0.025
+    ScrollComp.c_lower_bearing = 20e-6
+    ScrollComp.thrust_friction_coefficient = 0.028 #From Chen thesis
+    
+    ScrollComp.h_shell = 10
+    ScrollComp.A_shell = 0.05
+    
+    ScrollComp.geo.delta_suction_offset = 0.0e-3
     ScrollComp.geo.phi_ie_offset = pi
     
 #    print ScrollComp.V_s1(0)[0]
@@ -121,8 +136,7 @@ def Compressor(f = None):
     inletState = State.State(Ref,{'T':Tin,'P':pe})
     T2s = ScrollComp.isentropic_outlet_temp(inletState,pc)
     outletState = State.State(Ref,{'T':T2s,'P':pc})
-    print 'pc',pc
-    
+
 #    inletState = State.State(Ref,{'T':300.0,'P':300.0})
 #    p_outlet = inletState.p*4.0
 #    T2s = ScrollComp.isentropic_outlet_temp(inletState,p_outlet)
@@ -236,12 +250,12 @@ def Compressor(f = None):
                      lump_energy_balance_callback=ScrollComp.lump_energy_balance_callback,
                      solver_method='RK45',
                      UseNR = False, #Use Newton-Raphson ND solver to determine the initial state
-                     OneCycle = False,
+                     OneCycle = True,
                      plot_every_cycle= False
                      )
     except:
         
-        debug_plots(ScrollComp)
+        #debug_plots(ScrollComp)
         raise
 
     print 'time taken',clock()-t1
@@ -255,13 +269,15 @@ def Compressor(f = None):
         ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
     
-    debug_plots(ScrollComp,plot_names=['Pressure v. crank angle'])
+    #return 
+    debug_plots(ScrollComp, plot_names=['Pressure v. crank angle'])
     
     ScrollComp.calculate_force_terms(orbiting_back_pressure = pe)
     
     import pylab
     V = ScrollComp.geo.ro*ScrollComp.omega
     mu = 0.08
+    print 'meanFz',ScrollComp.forces.mean_Fz
     Wdot_loss_thrust = ScrollComp.forces.mean_Fz*V*mu
     pylab.plot(ScrollComp.t,ScrollComp.forces.Fz.T,
                ScrollComp.t,ScrollComp.forces.summed_Fz,'-',
@@ -269,7 +285,8 @@ def Compressor(f = None):
     pylab.show()
     print 'Thrust bearing loss is',Wdot_loss_thrust*1000,'W'
     
-    pylab.plot(ScrollComp.t,ScrollComp.forces.Fr.T,
+    print 'meanFr',ScrollComp.forces.mean_Fr, type(ScrollComp.forces.mean_Fr)
+    pylab.plot(ScrollComp.t,ScrollComp.forces.Fr.T, #.T for transpose of the matrix
                ScrollComp.t,ScrollComp.forces.mean_Fr*(1+0*ScrollComp.t),'--') #kN
     pylab.show()
     
@@ -284,6 +301,7 @@ def Compressor(f = None):
     
     print 'Crank pin journal loss is',JB['Wdot_loss'],'W'
     print 'Crank pin gap width is',JB['c']*1e6,'um'
+    print 'Bearing number',JB['S']
     
     JB = journal_bearing(r_b = 0.01,
                          L = 0.02,

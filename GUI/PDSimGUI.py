@@ -244,6 +244,7 @@ class RedirectedWorkerThread(Thread):
 #                   #Collect all display output from process while you wait
                     while pipe_outlet.poll():
                         wx.CallAfter(self.stdout_target_.AppendText, pipe_outlet.recv())
+                        
                     print 'Waiting for abort'
                 abort_flag = pipe_abort_inlet.recv()
                 if abort_flag == 'ACK':
@@ -254,11 +255,16 @@ class RedirectedWorkerThread(Thread):
             #Collect all display output from process
             while pipe_outlet.poll():
                 wx.CallAfter(self.stdout_target_.AppendText, pipe_outlet.recv())
+            time.sleep(0.5)
                 
             #Get back the results from the simulation process if they are waiting
             if pipe_results_outlet.poll():
                 sim = pipe_results_outlet.recv()
                 pipe_results_outlet.send('ACK')
+        
+        #Flush out any remaining stuff
+        while pipe_outlet.poll():
+            wx.CallAfter(self.stdout_target_.AppendText, pipe_outlet.recv())
                 
         if self._want_abort == True:
             print self.name+": Process has aborted successfully"
@@ -300,7 +306,7 @@ class RedirectedWorkerThread(Thread):
                 "Send the data back to the GUI"
                 wx.CallAfter(self.done_callback, sim)
             else:
-                print 'Didnt get any simulation data'
+                print "Didn't get any simulation data"
         return 1
         
     def abort(self):

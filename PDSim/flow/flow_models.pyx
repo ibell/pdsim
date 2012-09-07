@@ -14,11 +14,35 @@ import cython
 This is the module that contains all the flow models
 """
 
-cdef list a_radial = [25932.1070099, 0.914825434095, -177.588568125, -0.237052788124, -172347.610527, -12.0687599808, -0.0128861161041, -151.202604262, -0.999674457769, 0.0161435039267, 0.825533456725]
+cdef double ar_0 = 25932.1070099
+cdef double ar_1 = 0.914825434095
+cdef double ar_2 = -177.588568125
+cdef double ar_3 = -0.237052788124
+cdef double ar_4 = -172347.610527
+cdef double ar_5 = -12.0687599808
+cdef double ar_6 = -0.0128861161041
+cdef double ar_7 = -151.202604262
+cdef double ar_8 = -0.999674457769
+cdef double ar_9 = 0.0161435039267
+cdef double ar_10 = 0.825533456725
 cdef double Re_star_radial = 5243.58194594
-cdef list a_flank = [-2.63970395918, -0.567164431229 , 0.83655499929 , 0.810567167521 , 6174.02825667 , -7.60907962464 , -0.510200923053 , -1205.17482697 , -1.02938914174 , 0.689497785772, 1.09607735134]
+
+cdef double af_0 = -2.63970395918
+cdef double af_1 = -0.567164431229
+cdef double af_2 = 0.83655499929
+cdef double af_3 = 0.810567167521
+cdef double af_4 = 6174.02825667
+cdef double af_5 = -7.60907962464
+cdef double af_6 = -0.510200923053
+cdef double af_7 = -1205.17482697
+cdef double af_8 = -1.02938914174
+cdef double af_9 = 0.689497785772
+cdef double af_10 = 1.09607735134
 cdef double Re_star_flank = 826.167177885
-        
+    
+cpdef double pow(double x, double y):
+    return x**y
+
 cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',Tmean=None,T_wall=None):
     """
     In this tube model, one of the nodes is known (fixed), but the other is calculated based on heat transfer and pressure drop for a given mass flow rate
@@ -335,7 +359,7 @@ cdef class ValveModel(object):
         return rebuildValveModel,(self.__cdict__(),)
 
 @cython.cdivision(True)        
-cpdef IsentropicNozzle(double A, State State_up, State State_down, bint full_output = False):   
+cpdef double IsentropicNozzle(double A, State State_up, State State_down, bytes other_output = None):
     """
     The mass flow rate is calculated by using isentropic flow model
     
@@ -348,13 +372,16 @@ cpdef IsentropicNozzle(double A, State State_up, State State_down, bint full_out
         Upstream ``State`` instance
     State_down : :class:`State <CoolProp.State.State>` instance
         Downstream ``State`` instance
-    full_output : bool
-        Outputs just mdot (full_output=False), or mdot,others if full_output=True
+    other_output : string
+        If 'v', returns the velocity
         
     Returns
     -------
     
     """
+    
+    #some cython type declarations
+    cython.declare(T_up = cython.double, T_down = cython.double, mdot = cython.double)
     # Since ideal, R=cp-cv, and k=cp/cv
     cp=State_up.get_cp0()
     R = 8.314472/State_up.get_MM()*1000 #[J/kg/K]
@@ -371,11 +398,11 @@ cpdef IsentropicNozzle(double A, State State_up, State State_down, bint full_out
     rho_up=p_up*1000.0/(R*T_up)
     pr=p_down/p_up
     pr_crit=(1+(k-1)/2)**(k/(1-k))
-    if pr > pr_crit:
+    if pr > pr_crit: 
         # Mass flow rate if not choked [kg/s]
         mdot=A*p_up*1000.0/(R*T_up)**0.5*(2*k/(k-1.0)*pr**(2.0/k)*(1-pr**((k-1.0)/k)))**0.5
         # Throat temperature [K]
-        T_down=T_up*pow(p_down/p_up,(k-1.)/k)
+        T_down=T_up*(p_down/p_up)**((k-1.0)/k)
         # Throat density [kg/m3]
         rho_down=p_down*1000.0/(R*T_down)
         # Velocity at throat
@@ -384,20 +411,21 @@ cpdef IsentropicNozzle(double A, State State_up, State State_down, bint full_out
         Ma=v/c
     else:
         # Mass flow rate if choked
-        mdot=A*rho_up*(k*R*T_up)**0.5*pow(1.+(k-1.)/2.,(1+k)/(2*(1-k)))
+        mdot=A*rho_up*(k*R*T_up)**0.5*(1.+(k-1.)/2.)**((1+k)/(2*(1-k)))
         # Velocity at throat
         v=c
         # Mach Number
         Ma=1.0
     
-    if full_output==True:
-        otherparameters={'Ma':Ma,'v':v}
-        return mdot,otherparameters
-    else:
+    if other_output is None:
         return mdot
-    
+    elif other_output == 'v':
+        return v
+    elif other_output == 'Ma':
+        return Ma
+     
 @cython.cdivision(True)
-cpdef FrictionCorrectedIsentropicNozzle(double A, State State_up, State State_down, double delta, bytes Type, double t = -1.0, double ro = -1.0, bint full_output = False):
+cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State State_down, double delta, bytes Type, double t = -1.0, double ro = -1.0, bint full_output = False):
     """
     Frictionally-corrected nozzle model - the so-called hybrid leakage model
     
@@ -437,42 +465,39 @@ cpdef FrictionCorrectedIsentropicNozzle(double A, State State_up, State State_do
     """
     
     cdef double mdot,Re,v,mdot_ratio
-    #Get the flow velocity using the Isentropic nozzle model
-    mdot, others = IsentropicNozzle(A, State_up, State_down, full_output = True)
+    #Get the flow velocity and mass flow rate using the Isentropic nozzle model
+    mdot = IsentropicNozzle(A, State_up, State_down)
+    
     if abs(mdot) < 1e-12:
         return mdot
-    v = others['v']
     # Hydraulic diameter
     Dh=2 * delta
     # Viscosity for Re
     mu = State_up.get_visc()
     rho_up = State_up.get_rho()
     # Reynolds number
+    v = mdot/rho_up/A
     Re=rho_up*v*Dh/mu
 
     if (Type == 'radial' and t<=0):
         raise ValueError("Type 'radial' provided, but thickness of scroll [{0:g}] is not positive".format(t))
     elif (Type == 'radial' and Re > 1e-12):
-        a=a_radial
         Re_star=Re_star_radial
         xi=1.0/(1.0+exp(-0.01*(Re-Re_star)))
         Lstar=t/0.005
         delta_star=delta/10e-6
-        mdot_ratio=a[0]*pow(Lstar,a[1])/(a[2]*delta_star+a[3])*(xi*(a[4]*pow(Re,a[5])+a[6])+(1-xi)*(a[7]*pow(Re,a[8])+a[9]))+a[10]
+        mdot_ratio=ar_0*pow(Lstar,ar_1)/(ar_2*delta_star+ar_3)*(xi*(ar_4*pow(Re,ar_5)+ar_6)+(1-xi)*(ar_7*pow(Re,ar_8)+ar_9))+ar_10
     elif (Type == 'flank' and ro <= 0):
         raise ValueError("Type 'flank' provided, but orbiting radius of scroll [{0:g}] is not positive".format(ro))
     elif (Type == 'flank' and Re > 1e-12):
-        a=a_flank
         Re_star=Re_star_flank
         xi=1.0/(1.0+exp(-0.01*(Re-Re_star)))
         Lstar=ro/0.005
         delta_star=delta/10e-6
-        mdot_ratio=a[0]*pow(Lstar,a[1])/(a[2]*delta_star+a[3])*(xi*(a[4]*pow(Re,a[5])+a[6])+(1-xi)*(a[7]*pow(Re,a[8])+a[9]))+a[10]
+        mdot_ratio=af_0*pow(Lstar,af_1)/(af_2*delta_star+af_3)*(xi*(af_4*pow(Re,af_5)+af_6)+(1-xi)*(af_7*pow(Re,af_8)+af_9))+af_10
     else:
         mdot_ratio=1.0
     mdot=mdot/mdot_ratio
-    if full_output:
-        other = dict()
-        return mdot,others
-    else:
-        return mdot
+    
+    
+    return mdot
