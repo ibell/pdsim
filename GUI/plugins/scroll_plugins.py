@@ -348,6 +348,11 @@ class InjectionElementPanel(wx.Panel):
                 else:
                     port.SymmTarget.SetStringSelection('None')
         
+        #Update the elements in the parametric table
+        Main = self.GetTopLevelParent()
+        items = Main.collect_parametric_terms()
+        Main.MTB.SolverTB.update_parametric_terms(items)
+        
     def OnAddPort(self, event = None):
         IPP = InjectionPortPanel(self, index = len(self.ports_list)+1)
         self.SBSSizer.Add(IPP)
@@ -379,6 +384,11 @@ class InjectionElementPanel(wx.Panel):
                 port.SymmTarget.SetStringSelection(index_partner)
             else:
                 port.SymmTarget.SetStringSelection('None')
+        
+        #Update the elements in the parametric table
+        Main = self.GetTopLevelParent()
+        items = Main.collect_parametric_terms()
+        Main.MTB.SolverTB.update_parametric_terms(items)
         
 class InjectionInputsPanel(pdsim_panels.PDPanel):
     """
@@ -415,6 +425,12 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         self.GetSizer().Layout()
         self.Refresh()
         
+        #Update the elements in the parametric table
+        Main = self.GetTopLevelParent()
+        items = Main.collect_parametric_terms()
+        Main.MTB.SolverTB.update_parametric_terms(items)
+        
+        
     def RemoveInjection(self, injection):
         """
         Remove the given injection term
@@ -430,6 +446,11 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
                 I+=1
         self.GetSizer().Layout()
         self.Refresh()
+        
+        #Update the elements in the parametric table
+        Main = self.GetTopLevelParent()
+        items = Main.collect_parametric_terms()
+        Main.MTB.SolverTB.update_parametric_terms(items)
         
     def OnView(self, event):
         geo = self.GetTopLevelParent().MTB.InputsTB.panels[0].Scroll.geo
@@ -678,6 +699,7 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
     A plugin that adds the injection ports for the scroll compressor
     """
     
+    #: A short description of the plugin 
     short_description = 'Refrigerant injection for scroll'
         
     def should_enable(self):
