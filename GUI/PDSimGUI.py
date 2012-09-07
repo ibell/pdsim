@@ -78,32 +78,26 @@ class Run1(Process):
         OneCycle = self.sim.OneCycle if hasattr(self.sim,'OneCycle') else False
         plot_every_cycle = self.sim.plot_every_cycle if hasattr(self.sim,'plot_every_cycle')  else False
             
+        commons = dict(key_inlet='inlet.1',
+                       key_outlet='outlet.2',
+                       endcycle_callback=self.sim.endcycle_callback,
+                       heat_transfer_callback=self.sim.heat_transfer_callback,
+                       lump_energy_balance_callback = self.sim.lump_energy_balance_callback, 
+                       OneCycle=OneCycle,
+                       solver_method = self.sim.cycle_integrator_type,
+                       pipe_abort = self.pipe_abort,
+                       plot_every_cycle = plot_every_cycle
+                       )
+        
         if isinstance(self.sim, Recip):
-            self.sim.precond_solve(key_inlet='inlet.1',
-                                   key_outlet='outlet.2',
-                                   endcycle_callback=self.sim.endcycle_callback,
-                                   heat_transfer_callback=self.sim.heat_transfer_callback,
-                                   lump_energy_balance_callback = self.sim.lump_energy_balance_callback,
-                                   valves_callback =self.sim.valves_callback, 
-                                   OneCycle=OneCycle,
-                                   UseNR = True,
-                                   solver_method = self.sim.cycle_integrator_type,
-                                   pipe_abort = self.pipe_abort,
-                                   plot_every_cycle = plot_every_cycle
+            self.sim.precond_solve(UseNR = True,
+                                   valves_callback =self.sim.valves_callback,
+                                   **commons
                                    )
         elif isinstance(self.sim, Scroll):
-            self.sim.precond_solve(
-                                   key_inlet='inlet.1',
-                                   key_outlet='outlet.2',
-                                   step_callback = self.sim.step_callback,
-                                   endcycle_callback=self.sim.endcycle_callback,
-                                   heat_transfer_callback=self.sim.heat_transfer_callback,
-                                   lump_energy_balance_callback = self.sim.lump_energy_balance_callback, 
-                                   solver_method = self.sim.cycle_integrator_type,
-                                   OneCycle=OneCycle,
-                                   UseNR = False, #Use Newton-Raphson ND solver to determine the initial state if True
-                                   pipe_abort = self.pipe_abort,
-                                   plot_every_cycle = plot_every_cycle
+            self.sim.precond_solve(UseNR = False, #Use Newton-Raphson ND solver to determine the initial state if True
+                                   step_callback = self.sim.step_callback,                                   
+                                   **commons
                                    )
         else:
             raise TypeError
@@ -130,6 +124,7 @@ class Run1(Process):
                     print 'Ack accepted'
                     break
             print 'Sent results back to calling thread'
+            
         else:
             print 'Acknowledging completion of abort'
             self.pipe_abort.send('ACK')
@@ -176,14 +171,14 @@ class WorkerThreadManager(Thread):
                 t.daemon = True
                 t.start()
                 self.threadsList.append(t)
-                wx.CallAfter(self.main_stdout.WriteText, 'Adding thread;' + str(len(self.threadsList)) + ' threads active\n') 
+                wx.CallAfter(self.main_stdout.AppendText, 'Adding thread;' + str(len(self.threadsList)) + ' threads active\n') 
             
             for _thread in reversed(self.threadsList):
                 if not _thread.is_alive():
-                    wx.CallAfter(self.main_stdout.WriteText, 'Joining zombie thread\n')
+                    wx.CallAfter(self.main_stdout.AppendText, 'Joining zombie thread\n')
                     _thread.join()
                     self.threadsList.remove(_thread)
-                    wx.CallAfter(self.main_stdout.WriteText, 'Thread finished; now '+str(len(self.threadsList))+ ' threads active\n')
+                    wx.CallAfter(self.main_stdout.AppendText, 'Thread finished; now '+str(len(self.threadsList))+ ' threads active\n')
     
     def abort(self):
         """
@@ -196,13 +191,16 @@ class WorkerThreadManager(Thread):
             #Empty the list of simulations to run
             self.simulations = []
             
-            while self.threadsList:
-                for _thread in self.threadsList:
-                    #Send the abort signal
-                    _thread.abort()
-                    #Wait for it to finish up
-                    _thread.join()
+            #while self.threadsList:
+            for _thread in self.threadsList:
+                #Send the abort signal
+                _thread.abort()
+                #Wait for it to finish up
+                #_thread.join()
+                #Remove thread from list of threads
+                self.threadsList.remove(_thread)
             del busy
+            
         dlg.Destroy()
         
 class RedirectedWorkerThread(Thread):
@@ -701,11 +699,9 @@ class RunToolBook(wx.Panel):
         
         sizer = wx.BoxSizer(wx.VERTICAL)
         
-        self.Outputtext = wx.StaticText(self,-1,'Temporary text')
         self.cmdAbort = wx.Button(self,-1,'Stop\nAll\nRuns')
         self.cmdAbort.Bind(wx.EVT_BUTTON, self.GetGrandParent().OnStop)
         hsizer = wx.BoxSizer(wx.HORIZONTAL)
-        hsizer.Add(self.Outputtext,1)
         hsizer.Add(self.cmdAbort,0)
         sizer.Add(hsizer)
         sizer.Add(wx.StaticText(self,-1,"Output Log:"))
@@ -1783,7 +1779,7 @@ class MainFrame(wx.Frame):
                         #Instantiate the plugin
                         plugin = thing()
                         
-                        #Give the plugin a link to the main 
+                        #Give the plugin a link to the main wx.Frame
                         plugin.set_GUI(self)
                         
                         #Check if it should be enabled, if not, go to the next plugin
@@ -1980,7 +1976,6 @@ class MainFrame(wx.Frame):
         """
         Runs the primary inputs without applying the parametric table inputs
         """
-        print "Running.."
         self.MTB.SetSelection(2)
         if self.SimType == 'recip':
             self.recip = self.build_recip()

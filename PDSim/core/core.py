@@ -449,7 +449,10 @@ class PDSimCore(object):
         self.__put_to_matrices(xold, 0)
         
         for Itheta in range(N):
-            
+            #Once every 100 steps check if you are supposed to abort
+            if self._check_cycle_abort(Itheta):
+                return 'abort'
+                  
             #Call the step callback if provided
             if step_callback is not None:
                 disable, h = step_callback(t0, h, Itheta)
@@ -541,6 +544,11 @@ class PDSimCore(object):
         self.__put_to_matrices(xold, 0)
     
         for Itheta in range(N):
+            
+            #Once every 100 steps check if you are supposed to abort
+            if self._check_cycle_abort(Itheta):
+                return 'abort'
+            
             if step_callback!=None:
                 step_callback(t0,h,Itheta)
                 
@@ -674,6 +682,10 @@ class PDSimCore(object):
         
         #t is the independent variable here, where t takes on values in the bounded range [tmin,tmax]
         while (t0<tmax):
+            
+            #Once every 100 steps check if you are supposed to abort
+            if self._check_cycle_abort(Itheta):
+                return 'abort'
             
             stepAccepted=False
             while not stepAccepted:
@@ -901,13 +913,36 @@ class PDSimCore(object):
         self.__postprocess_flows()
         self.__postprocess_HT()
     
+    def _check_cycle_abort(self, index, I = 100):
+        """
+        This function will check whether an abort has been requested every I steps
+        
+        Meant for calling by cycle_RK45, cycle_SimpleEuler, cycle_Heun, etc.
+        
+        Parameters
+        ----------
+        index : int
+            The index of the step
+        
+        I : int, optional
+            Check abort at this interval
+        
+        """
+        # % is the symbol for modulus
+        if index % I == 0 and self.Abort():
+            self._want_abort = True
+            return True
+        
     def check_abort(self):
         """
         A callback for use with the graphical user interface to force solver to quit
         
         It will check the Scroll.pipe_abort pipe for a ``True`` value, and if it
         finds one, it will set the Scroll._want_abort value to ``True`` which 
-        will be read by the main execution thread 
+        will be read by the main execution thread
+        
+        Once self._want_abort is ``True``, it will stay latched True until the 
+        run is over
         """
         #If you received an abort request, set a flag
         if self.pipe_abort.poll() and self.pipe_abort.recv():
@@ -924,6 +959,7 @@ class PDSimCore(object):
         function
         """
         
+        #We are going to over-write OldCycle in the preconditioner
         OneCycle_oldval = kwargs.get('OneCycle', False)
         
         #Run it with OneCycle turned on
@@ -1022,7 +1058,7 @@ class PDSimCore(object):
         t1=clock()
         
         # Set up a pipe for accepting a value of True which will abort the run
-        # Typically used from the GUI
+        # Used from the GUI to kill process from the top-level thread
         self.pipe_abort = pipe_abort
         
         #If a function called pre_solve is provided, call it with no input arguments
@@ -1043,7 +1079,16 @@ class PDSimCore(object):
         self.key_outlet = key_outlet
         
         if Abort is None and pipe_abort is not None:
-            Abort = self.check_abort
+            # Use the pipe_abort pipe to look at the abort pipe to see whether 
+            # to quit 
+            self.Abort = self.check_abort
+        elif Abort is None and pipe_abort is None:
+            #Disable the ability to abort, always don't abort
+            self.Abort = lambda x: False
+        elif Abort is not None and pipe_abort is None:
+            self.Abort = Abort
+        else:
+            raise ValueError('Only one of Abort and pipe_abort may be provided')
         
         if reset_initial_state is not None and reset_initial_state:
             self.reset_initial_state()
@@ -1084,7 +1129,6 @@ class PDSimCore(object):
                     
                 #Convert numpy array to listm
                 x_state = listm(x_state)
-                print 'x_state is', x_state
                 
                 t1 = clock()
                 if solver_method == 'Euler':
@@ -1092,15 +1136,15 @@ class PDSimCore(object):
                         N=self.EulerN
                     else:
                         N=7000
-                    self.cycle_SimpleEuler(N,x_state,step_callback=step_callback,
-                                           heat_transfer_callback=heat_transfer_callback,
-                                           valves_callback=valves_callback)
+                    aborted = self.cycle_SimpleEuler(N,x_state,step_callback=step_callback,
+                                    heat_transfer_callback=heat_transfer_callback,
+                                    valves_callback=valves_callback)
                 elif solver_method == 'Heun':
                     if hasattr(self,'HeunN'):
                         N=self.HeunN
                     else:
                         N=7000
-                    self.cycle_SimpleEuler(N,x_state,step_callback=step_callback,
+                    aborted = self.cycle_Heun(N,x_state,step_callback=step_callback,
                                            heat_transfer_callback=heat_transfer_callback,
                                            valves_callback=valves_callback)
                 elif solver_method == 'RK45':
@@ -1108,7 +1152,7 @@ class PDSimCore(object):
                         eps_allowed=self.RK45_eps
                     else:
                         eps_allowed = 1e-8
-                    self.cycle_RK45(x_state,
+                    aborted = self.cycle_RK45(x_state,
                                     eps_allowed = eps_allowed,
                                     step_callback=step_callback,
                                     heat_transfer_callback=heat_transfer_callback,
@@ -1118,6 +1162,10 @@ class PDSimCore(object):
                     raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
                 t2 = clock()
                 print 'Elapsed time for cycle is {0:g} s'.format(t2-t1)
+                
+                #Quit if you have aborted in one of the cycle solvers
+                if aborted == 'abort':
+                    return None
                 
                 if (key_inlet in self.FlowsProcessed.mean_mdot and 
                     key_outlet in self.FlowsProcessed.mean_mdot):
@@ -1142,7 +1190,7 @@ class PDSimCore(object):
                     debug_plots(self)
                 
                 #If the abort function returns true, quit this loop
-                if (Abort is not None and Abort()) or OneCycle:
+                if self.Abort() or OneCycle:
                     print 'Quitting OBJECTIVE_CYCLE loop in core.solve'
                     return None #Stop
                         
@@ -1243,17 +1291,17 @@ class PDSimCore(object):
                     
                     #Increment the counter for the inner loop
                     init_state_counter += 1
+            
+            #If the abort function returns true, quit this loop
+            if self.Abort or OneCycle:
+                print 'Quitting OBJECTIVE function in core.solve'
+                return None
                     
             # (3) After convergence of the inner loop, check the energy balance on the lumps
             if lump_energy_balance_callback is not None:
                 resid_HT = lump_energy_balance_callback()
                 if not isinstance(resid_HT,list) and not isinstance(resid_HT,listm):
                     resid_HT = [resid_HT]
-                
-            #If the abort function returns true, quit this loop
-            if (Abort is not None and Abort()) or OneCycle:
-                print 'Quitting OBJECTIVE function in core.solve'
-                return None
                 
             print [self.resid_Td]+resid_HT,'resids'
             return [self.resid_Td]+resid_HT
@@ -1263,12 +1311,15 @@ class PDSimCore(object):
         x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,x0, dx=1.0, ytol=0.001, itermax=30)
         print 'Solution is', x_soln,'Td, Tlumps'
         
-        del self.resid_Td, self.x_state
-        if Abort is None or not Abort():
-            self.__post_solve()
-            
-        #Save the elapsed time for simulation
-        self.elapsed_time = clock()-t1
+        #If aborted, just quit
+        if x_soln[0] is not None:
+        
+            del self.resid_Td, self.x_state
+            if Abort is None or not Abort():
+                self.__post_solve()
+                
+            #Save the elapsed time for simulation
+            self.elapsed_time = clock()-t1
         
     def __post_solve(self):
         """

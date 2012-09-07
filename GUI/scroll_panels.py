@@ -460,6 +460,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         dict(attr='h_shell'),
         dict(attr='A_shell'),
         dict(attr='Tamb'),
+        dict(attr='mu_oil'),
         dict(attr='D_upper_bearing'),
         dict(attr='L_upper_bearing'),
         dict(attr='c_upper_bearing'),
