@@ -145,7 +145,7 @@ class WorkerThreadManager(Thread):
     """
     This manager thread creates all the threads that run.  It checks how many processors are available and runs Ncore-1 processes
     
-    Runs are consumed from the 
+    Runs are consumed from the simulations one at a time
     """
     def __init__(self, target, simulations, stdout_targets, args = None, done_callback = None, 
                  add_results = None, Ncores = None, main_stdout = None):
@@ -170,6 +170,7 @@ class WorkerThreadManager(Thread):
     def run(self):
         #While simulations left to be run or computation is not finished
         while self.simulations or self.threadsList:
+            
             #Add a new thread if possible (leave one core for main GUI)
             if len(self.threadsList) < self.Ncores and self.simulations:
                 #Get the next simulation to be run as a tuple
@@ -191,6 +192,8 @@ class WorkerThreadManager(Thread):
                     _thread.join()
                     self.threadsList.remove(_thread)
                     wx.CallAfter(self.main_stdout.AppendText, 'Thread finished; now '+str(len(self.threadsList))+ ' threads active\n')
+            
+            time.sleep(2.0)
     
     def abort(self):
         """
@@ -203,7 +206,6 @@ class WorkerThreadManager(Thread):
             #Empty the list of simulations to run
             self.simulations = []
             
-            #while self.threadsList:
             for _thread in self.threadsList:
                 #Send the abort signal
                 _thread.abort()
@@ -1579,16 +1581,17 @@ class MainFrame(wx.Frame):
         
         if configfile is None: #No file name or object passed in
             
-            #First see if there is a file at configs/default.cfg
             configfile = os.path.join('configs','default.cfg')
-            if os.path.exists(configfile):
-                configbuffer = open(configfile,'rb')
-                
-            #Command line option provided
-            elif '--config' in sys.argv:
+            
+            #First see if a command line option provided
+            if '--config' in sys.argv:
                 i = sys.argv.index('--config')
                 configfile = sys.argv[i+1]
                 configbuffer = open(configfile, 'rb') 
+                
+            #Then see if there is a file at configs/default.cfg
+            elif os.path.exists(configfile):
+                configbuffer = open(configfile,'rb')
                 
             #Then use the internal default recip
             else:
@@ -1869,7 +1872,7 @@ class MainFrame(wx.Frame):
         self.File = wx.Menu()
         self.menuFileOpen = wx.MenuItem(self.File, -1, "Open Config from file...\tCtrl+O", "", wx.ITEM_NORMAL)
         self.menuFileSave = wx.MenuItem(self.File, -1, "Save config to file...\tCtrl+S", "", wx.ITEM_NORMAL)
-        self.menuFileFlush = wx.MenuItem(self.File, -1, "Flush out temporary files...\tCtrl+S", "", wx.ITEM_NORMAL)
+        self.menuFileFlush = wx.MenuItem(self.File, -1, "Flush out temporary files...", "", wx.ITEM_NORMAL)
         self.menuFileQuit = wx.MenuItem(self.File, -1, "Quit\tCtrl+Q", "", wx.ITEM_NORMAL)
         self.File.AppendItem(self.menuFileOpen)
         self.File.AppendItem(self.menuFileSave)

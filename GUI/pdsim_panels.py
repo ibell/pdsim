@@ -817,6 +817,8 @@ class ParametricPanel(PDPanel):
         #Has no self.items, so all processing done through post_get_from_configfile
         self.get_from_configfile('ParametricPanel')
         
+    
+            
     def OnChangeStructured(self, event = None):
         
         #Param
@@ -934,7 +936,41 @@ class ParametricPanel(PDPanel):
         if self.Structured.GetStringSelection() == 'Unstructured':
             self.RowCountSpinner.SetValue(self.ParaList.GetItemCount())
             self.RowCountSpinnerText.SetValue(str(self.ParaList.GetItemCount()))
+            #Bind a right click to opening a popup
+            # for wxMSW
+            self.ParaList.Bind(wx.EVT_COMMAND_RIGHT_CLICK, self.OnParaListRightClick)
+            # for wxGTK
+            self.ParaList.Bind(wx.EVT_RIGHT_UP, self.OnParaListRightClick)
             
+    def OnParaListRightClick(self, event): 
+        #based on wxpython demo program
+        
+        # make a menu
+        menu = wx.Menu()
+        # add some items
+        menuitem1 = wx.MenuItem(menu, -1, 'Fill from clipboard')
+        menuitem2 = wx.MenuItem(menu, -1, 'Fill from csv file')
+        
+        self.Bind(wx.EVT_MENU, self.OnPaste, menuitem1)
+        menu.AppendItem(menuitem1)
+        menu.AppendItem(menuitem2)
+        
+        # Popup the menu.  If an item is selected then its handler
+        # will be called before PopupMenu returns.
+        self.PopupMenu(menu)
+        menu.Destroy()
+        
+    def OnPaste(self, event):
+        do = wx.TextDataObject()
+        if wx.TheClipboard.Open():
+            success = wx.TheClipboard.GetData(do)
+            wx.TheClipboard.Close()
+
+        data = do.GetText()
+        rows = data.split('\n')
+        rows = [row.replace('\r','').split('\t') for row in rows]
+        print rows
+        
     def OnSpinDown(self, event):
         """ 
         Fires when the spinner is used to decrease the number of rows
@@ -1474,7 +1510,8 @@ class StateInputsPanel(PDPanel):
             p = simulation.discharge_pressure
             simulation.discharge_sat_temp = CP.Props('T', 'P', p, 'Q', 1.0, Fluid)
         else:
-            del simulation.discharge_sat_temp
+            if hasattr(self,"discharge_sat_temp"):
+                del simulation.discharge_sat_temp
         
     def post_prep_for_configfile(self):
         """

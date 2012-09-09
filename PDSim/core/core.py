@@ -1091,7 +1091,7 @@ class PDSimCore(object):
             self.Abort = self.check_abort
         elif Abort is None and pipe_abort is None:
             #Disable the ability to abort, always don't abort
-            self.Abort = lambda x: False
+            self.Abort = lambda : False
         elif Abort is not None and pipe_abort is None:
             self.Abort = Abort
         else:
@@ -1272,9 +1272,7 @@ class PDSimCore(object):
                                 diff_abs = [abs(dx) for dx in diff]
                                 RSSE = np.sqrt(np.sum(np.power(errors, 2)))
                                 print 'Cycle #',init_state_counter,'RSSE',RSSE
-#                            if init_state_counter > LS_start:
-#                                print 'init_state_counter > '10'
-#                                debug_plots(self)
+
                     except IndexError:
                         # You will get an IndexError if the length of the x_state
                         # list changes due to different CV being in existence at
@@ -1282,14 +1280,7 @@ class PDSimCore(object):
                         # by a volume ratio that puts the discharge angle right
                         # before the end of the rotation
                         continue
-                    
-                    def all_negative(yvec):
-                        for y in yvec:
-                            if y>0:
-                                return False
-                        return True
-                    
-                    #print 'diff', diff
+
                     if RSSE < 1e-3:
                         break
                     else:
@@ -1424,6 +1415,7 @@ class PDSimCore(object):
                 rho = d['M']/V
             else:
                 raise KeyError
+            print T,rho
             self.CVs.updateStates('T',T,'D',rho)
         
         ## Calculate properties and property derivatives
