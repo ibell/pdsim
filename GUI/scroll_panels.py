@@ -494,3 +494,29 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
 
         self.SetSizer(sizer)
         sizer.Layout()
+        
+    def collect_output_terms(self):
+        _T = []
+        _T.append(dict(attr = "losses.crank_bearing",
+                       text = "Crank bearing loss [kW]",
+                       parent = self
+                       )
+                  )
+        _T.append(dict(attr = "losses.upper_bearing",
+                       text = "Upper bearing loss [kW]",
+                       parent = self
+                       )
+                  )
+        _T.append(dict(attr = "losses.lower_bearing",
+                       text = "Lower bearing loss [kW]",
+                       parent = self
+                       )
+                  )
+        _T.append(dict(attr = "losses.thrust_bearing",
+                       text = "Thrust bearing loss [kW]",
+                       parent = self
+                       )
+                  )
+        return _T
+        
+        

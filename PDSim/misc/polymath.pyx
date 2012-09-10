@@ -4,6 +4,11 @@ import matplotlib.pyplot as plt
 import cython
 from matplotlib.nxutils import pnpoly
 
+"""
+A module for doing polygon math - finding regions of overlap and differences of
+two polygons
+
+"""
 cdef class Polygon(object):
     def __init__(self, np.ndarray x, np.ndarray y):
         self.x = x

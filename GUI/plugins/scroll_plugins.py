@@ -518,7 +518,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         configfile_section : list of 2-element tuples, first element is key, second is value as a string
         
         """
-        #List of tuples to dict
+        #Convert List of tuples to dict
         configfile_dict = {param:val for param,val in configfile_items}
         
         if u'Nlines' in configfile_dict:
@@ -594,7 +594,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
             for j,child in enumerate(Ports):
                 J = str(j+1)
                 _T += [dict(attr = 'injection_phi_'+I+'_'+J,
-                            text = 'Injection port angle #'+I+','+J+' [rad]',
+                            text = 'Injection port angle #'+I+':'+J+' [rad]',
                             parent = self)]
                 
         return _T

@@ -611,7 +611,18 @@ class SolverToolBook(wx.Toolbook):
             if hasattr(panel,'collect_output_terms'):
                 terms += panel.collect_output_terms()
         return terms
-        
+    
+    def flush_parametric_terms(self):
+        """ Remove all the entries in the parametric table """
+        for panel in self.panels:
+            if isinstance(panel, pdsim_panels.ParametricPanel):
+                panel.flush_parametric_terms()
+    
+    def set_parametric_terms(self):
+        """ Set the terms in the parameteric table """
+        for panel in self.panels:
+            if isinstance(panel, pdsim_panels.ParametricPanel):
+                panel.set_parametric_terms()
 
 class WriteOutputsPanel(wx.Panel):
     def __init__(self,parent):
@@ -1761,9 +1772,11 @@ class MainFrame(wx.Frame):
         sizer.Layout()
         
         self.worker=None
-        self.Layout() 
         
         self.load_plugins(self.PluginsMenu)
+        #After loading plugins, try to set the parameters in the parametric table
+        self.MTB.SolverTB.flush_parametric_terms()
+        self.MTB.SolverTB.set_parametric_terms()
             
     def build_recip(self, post_set = True):
         #Instantiate the recip class

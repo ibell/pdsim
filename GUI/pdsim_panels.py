@@ -1121,6 +1121,21 @@ class ParametricPanel(PDPanel):
         for child in self.Children:
             if isinstance(child,ParametricOption):
                 child.update_parametric_terms(items)
+                
+    def flush_parametric_terms(self):
+        """
+        Remove all the terms in the parametric table
+        """
+        terms = [term for term in self.Children if isinstance(term,ParametricOption)]
+        for term in terms:
+            self.RemoveTerm(term)
+            
+    def set_parametric_terms(self):
+        """
+        Set all the parametric terms using the config files
+        """
+        self.get_from_configfile('ParametricPanel')
+            
 
 def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True, tooltip = None):
     """
