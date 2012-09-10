@@ -14,7 +14,7 @@ def RecipBuilder(recip):
     recip.pre_solve()
     
     p_outlet = recip.discharge_pressure
-    T2s = recip.isentropic_outlet_temp(recip.inletState,p_outlet)
+    T2s = recip.guess_outlet_temp(recip.inletState,p_outlet)
     outletState=CPState.State(recip.inletState.Fluid,{'T':T2s,'P':recip.discharge_pressure})
     mdot_guess = recip.inletState.rho*recip.Vdisp()*recip.omega/(2*pi)
     
@@ -76,7 +76,7 @@ def ScrollBuilder(scroll):
     if hasattr(scroll,'pre_solve'):
         scroll.pre_solve()
     
-    T2s = scroll.isentropic_outlet_temp(scroll.inletState, scroll.discharge_pressure)
+    T2s = scroll.guess_outlet_temp(scroll.inletState, scroll.discharge_pressure)
     outletState=CPState.State(scroll.inletState.Fluid,{'T':T2s,'P':scroll.discharge_pressure})
     
     scroll.auto_add_CVs(scroll.inletState, outletState)

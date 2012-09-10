@@ -392,11 +392,9 @@ class InputsToolBook(wx.Toolbook):
         """
         for panel in self.panels:
             panel.set_params(simulation)
-        self.post_set_params(simulation)
     
     def post_set_params(self, simulation):
         for panel in self.panels:
-#            print panel,simulation.omega
             if hasattr(panel,'post_set_params'):
                 panel.post_set_params(simulation)
                 
@@ -436,6 +434,13 @@ class InputsToolBook(wx.Toolbook):
             attrs, vals = panel.apply_additional_parametric_terms(attrs, vals, panel_items)
         
         return attrs, vals
+    
+    def collect_output_terms(self):
+        terms = []
+        for panel in self.panels:
+            if hasattr(panel,'collect_output_terms'):
+                terms += panel.collect_output_terms()
+        return terms
     
 class IntegratorChoices(wx.Choicebook):
     def __init__(self, parent, **kwargs):
@@ -580,6 +585,9 @@ class SolverToolBook(wx.Toolbook):
     def set_params(self,simulat):
         for panel in self.panels:
             panel.set_params(simulat)
+            
+    def post_set_params(self, simulat):
+        for panel in self.panels:
             if hasattr(panel,'post_set_params'):
                 panel.post_set_params(simulat)
     
@@ -596,6 +604,13 @@ class SolverToolBook(wx.Toolbook):
         for child in self.Children:
             if isinstance(child,pdsim_panels.ParametricPanel):
                 child.update_parametric_terms(items)
+                
+    def collect_output_terms(self):
+        terms = []
+        for panel in self.panels:
+            if hasattr(panel,'collect_output_terms'):
+                terms += panel.collect_output_terms()
+        return terms
         
 
 class WriteOutputsPanel(wx.Panel):
@@ -1407,14 +1422,22 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         """
         Change column attributes
         
+        For instance::
+        
+            change_output_attrs( dict(t = 'geo.t') )
+        
         Parameters
         ----------
         key_dict : dict
             A dictionary with keys of old key and value of new key
         """
         for old_key,new_key in key_dict.iteritems():
+            #Replace the value in columns selected if it is selected
+            if old_key in self.columns_selected:
+                i = self.columns_selected.index(old_key)
+                self.columns_selected[i] = new_key
             #Make a copy using the old_key
-            val = self.column_options.pop(old_key)
+            val = self.column_options.pop(str(old_key))
             #Use the old value with the updated key
             self.column_options[new_key] = val
             
@@ -1742,24 +1765,30 @@ class MainFrame(wx.Frame):
         
         self.load_plugins(self.PluginsMenu)
             
-    def build_recip(self):
+    def build_recip(self, post_set = True):
         #Instantiate the recip class
         recip=Recip()
         #Pull things from the GUI as much as possible
         self.MTB.InputsTB.set_params(recip)
         self.MTB.SolverTB.set_params(recip)
-        #Build the model the rest of the way
-        RecipBuilder(recip)
+        if post_set:
+            self.MTB.InputsTB.post_set_params(recip)
+            self.MTB.SolverTB.post_set_params(recip)
+            #Build the model the rest of the way
+            RecipBuilder(recip)
         return recip
     
-    def build_scroll(self):
+    def build_scroll(self, post_set = True):
         #Instantiate the scroll class
         scroll=Scroll()
         #Pull things from the GUI as much as possible
         self.MTB.InputsTB.set_params(scroll)
         self.MTB.SolverTB.set_params(scroll)
-        #Build the model the rest of the way
-        ScrollBuilder(scroll)
+        if post_set:
+            self.MTB.InputsTB.post_set_params(scroll)
+            self.MTB.SolverTB.post_set_params(scroll)
+            #Build the model the rest of the way
+            ScrollBuilder(scroll)
         #Apply any plugins in use
         if hasattr(self,'plugins_list') and self.plugins_list:
             for plugin in self.plugins_list:
@@ -2051,12 +2080,20 @@ class MainFrame(wx.Frame):
             sim = self.results_list.get()
             print 'got a simulation'
             
+            more_terms = []
+            
+            #Collect terms from the panels if any have them
+            for TB in [self.MTB.InputsTB, self.MTB.SolverTB]:
+                more_terms += TB.collect_output_terms()
+                
             #Allow the plugins to post-process the results
             for plugin in self.plugins_list:
                 if plugin.is_activated():
                     plugin.post_process(sim)
-                    more_terms = plugin.collect_output_terms()
-                    self.MTB.OutputsTB.add_output_terms(more_terms)
+                    more_terms += plugin.collect_output_terms()
+            
+            #Add all the terms to the output table        
+            self.MTB.OutputsTB.add_output_terms(more_terms)
                 
 #            from plugins.HDF5_plugin import HDF5Writer
 #            HDF5 = HDF5Writer()

@@ -81,7 +81,7 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, w=1.0, wJ=1.0, itermax=
     
     def not_improving():
         # If the error increased in the last step, re-evaluate the Jacobian
-        if len(error_vec)>2 and error_vec[-1]>error_vec[-2]:
+        if len(error_vec)>2 and error_vec[-1][0]>error_vec[-2][0]:
             return True
         else:
             return False
@@ -90,13 +90,15 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, w=1.0, wJ=1.0, itermax=
     while abs(error)>ytol:
         if iter <= Nfd or not_improving():
             # If past the first numerical derivative step, use the value of x
-            # calculated below 
-            if iter > 1:
-                x0 = x1.copy()
+            # calculated below
+            if not_improving():
+                x0 = error_vec[-2][1]
             f0=f(x0,*args)
-            F0=array(f0)
+            
             if f0 is None:
-                return [None,None]
+                return [None]*len(x0)
+            else:
+                F0=array(f0)
             
             #Build the Jacobian matrix by columns
             for i in range(len(x0)):
@@ -104,7 +106,7 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, w=1.0, wJ=1.0, itermax=
                 epsilon[i]=dx[i]
                 fplus = f(x0+epsilon,*args)
                 if fplus is None:
-                    return [None,None]
+                    return [None]*len(x0)
                 A0[:,i]=(array(fplus)-F0)/epsilon[i]
             #Get the difference vector
             x1=x0-w*np.dot(inv(A0),F0)
@@ -123,17 +125,20 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, w=1.0, wJ=1.0, itermax=
             f1=f(x1,*args)
             F1=array(f1)
             if f1 is None:
-                return [None,None]
+                return [None]*len(x0)
             Y=F1-F0
             A1=A0+w/d*dot((Y-dot(A0,S)),S.T)
             x2=x1-w*np.dot(inv(A1),F1)
+            
+            error=np.sqrt(np.sum(np.power(F1,2)))
+            error_vec.append((error,x0))
+            
             #Update values
             x0=x1
             x1=x2
             F0=F1
             A0=A1
-            error=np.sqrt(np.sum(np.power(F1,2)))
-            error_vec.append(error)
+            
             print 'error_vec',error_vec
             iter+=1
         else:

@@ -255,10 +255,10 @@ class GeometryPanel(pdsim_panels.PDPanel):
         """
         print 'changing params'
         Main = self.GetTopLevelParent()
-        Main.MTB.OutputTB.change_output_terms(dict(t = 'geo.t',
-                                                   ro = 'geo.ro',
-                                                   )
-                                              )
+        Main.MTB.OutputsTB.DataPanel.change_output_attrs(dict(t = 'geo.t',
+                                                              ro = 'geo.ro',
+                                                              )
+                                                         )
         return []
         
 class FlankLeakageFlowChoice(pdsim_panels.MassFlowOption):
@@ -292,7 +292,7 @@ class SuctionFlowChoice(pdsim_panels.MassFlowOption):
                 dict(desc = 'Isentropic nozzle',
                      function_name = 'SA_S',
                      params = [dict(attr = 'X_d',
-                                    value = 0.3,
+                                    value = 1.0,
                                     desc = 'Tuning factor')]
                      )
                 ]
@@ -307,7 +307,7 @@ class InletFlowChoice(pdsim_panels.MassFlowOption):
         return [dict(desc = 'Isentropic nozzle',
                      function_name = 'IsentropicNozzleFM',
                      params = [dict(attr = 'X_d',
-                                    value = 0.3,
+                                    value = 1.0,
                                     desc = 'Tuning factor')
                                ]
                      )
@@ -434,7 +434,7 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                         
         Vdot = Vdisp*simulation.omega/(2*pi)
         
-        T2s = simulation.isentropic_outlet_temp(simulation.inletState, simulation.discharge_pressure)
+        T2s = simulation.guess_outlet_temp(simulation.inletState, simulation.discharge_pressure)
         outletState=CPState.State(simulation.inletState.Fluid,{'T':T2s,'P':simulation.discharge_pressure})
         
         simulation.auto_add_leakage(flankFunc = simulation.FlankLeakage, 

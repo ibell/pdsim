@@ -15,7 +15,7 @@ from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as WXCanvas
 from matplotlib.backends.backend_wxagg import NavigationToolbar2Wx as WXToolbar
 from multiprocessing import Process
 from PDSim.scroll import scroll_geo
-
+from PDSimLoader import RecipBuilder, ScrollBuilder
 import quantities as pq
 
 length_units = {
@@ -882,7 +882,7 @@ class ParametricPanel(PDPanel):
             if self.Structured.GetStringSelection() == 'Structured':
                 values.append(vals)
             else:
-                values.append([0.0]*3)
+                values.append([0.0])
         
         #Build the list of parameters for the parametric study
         if self.ParamListSizer is None:
@@ -961,15 +961,30 @@ class ParametricPanel(PDPanel):
         menu.Destroy()
         
     def OnPaste(self, event):
+        """
+        Paste the contents of the clipboard into the table
+        """
         do = wx.TextDataObject()
         if wx.TheClipboard.Open():
             success = wx.TheClipboard.GetData(do)
             wx.TheClipboard.Close()
 
         data = do.GetText()
-        rows = data.split('\n')
-        rows = [row.replace('\r','').split('\t') for row in rows]
-        print rows
+        rows = data.strip().replace('\r','').split('\n')
+        rows = [row.split('\t') for row in rows]
+        #Check that the dimensions of pasted section and table are the same
+        if not self.ParaList.GetItemCount() == len(rows):
+            msg = 'There are '+str(len(rows))+' rows in your pasted table, but '+str(self.ParaList.GetItemCount())+' rows in the table'
+            dlg = wx.MessageDialog(None, msg)
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
+        else:
+            #Right number of rows, set the values
+            for i,row in enumerate(rows): 
+                for j,item in enumerate(row): 
+                    self.ParaList.SetStringItem(i,j+1,item)
+                    self.ParaList.data[i][j] = item
         
     def OnSpinDown(self, event):
         """ 
@@ -1037,17 +1052,24 @@ class ParametricPanel(PDPanel):
                 
                 #Build the recip or the scroll using the GUI parameters
                 if Main.SimType == 'recip':
-                    sim = Main.build_recip()
+                    sim = Main.build_recip(post_set = False)
                 elif Main.SimType == 'scroll':
-                    sim = Main.build_scroll()
+                    sim = Main.build_scroll(post_set = False)
                 else:
-                    raise AttributeError
+                    raise AttributeError('Invalid Main.SimType : '+str(Main.SimType))
                     
                 for val, attr in zip(vals, attrs):
                     # Actually set it
                     setattr(sim, attr, float(val))
-                    #Run the post_set_params for all the panels
-                    Main.MTB.InputsTB.post_set_params(sim)
+                    
+                #Run the post_set_params for all the panels
+                Main.MTB.InputsTB.post_set_params(sim)
+                Main.MTB.SolverTB.post_set_params(sim)
+                
+                if Main.SimType == 'recip':
+                    RecipBuilder(sim)
+                elif Main.SimType == 'scroll':
+                    ScrollBuilder(sim)
                 
                 #Add an index for the run so that it can be sorted properly
                 sim.run_index = Irow + 1

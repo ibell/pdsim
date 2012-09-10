@@ -261,8 +261,37 @@ class PDSimCore(object):
             self.HTProcessed.summed_Q[i] = np.sum(_Q[:, i])
         self.HTProcessed.mean_Q = trapz(self.HTProcessed.summed_Q[r], self.t[r])/(self.t[self.Ntheta-1]-self.t[0])
     
-    def isentropic_outlet_temp(self, inletState, p_outlet):
-        return Props('T','S',inletState.s,'P',p_outlet,inletState.Fluid)
+    def guess_outlet_temp(self, inletState, p_outlet, eta_a = 0.7):
+        """ 
+        Function to guess outlet temperature
+        
+        Using a guess value for the adiabatic efficiency, calculate the guessed
+        outlet temperature.  In compressor mode, the adiabatic efficiency is defined by
+        
+        .. math::
+        
+            \eta_a = \frac{h_{2s}-h_1}{h_2-h_1}
+            
+        and in expander mode it is defined by
+        
+        .. math::
+        
+            \eta_a = \frac{h_2-h_1}{h_{2s}-h_1}
+            
+        This function can also be overloaded by the subclass in order to 
+        implement a different guess method
+        """
+        
+        h1 = inletState.h
+        h2s = Props('H','S',inletState.s,'P',p_outlet, inletState.Fluid)
+        if p_outlet > inletState.p:
+            #Compressor Mode
+            h2 = h1 + (h2s-h1)/eta_a
+            return Props('T','H',h2,'P',p_outlet, inletState.Fluid)
+        else:
+            #Expander Mode
+            h2 = h1 + (h2s-h1)*eta_a
+            return Props('T','H',h2,'P',p_outlet, inletState.Fluid)
     
     def reset_initial_state(self):
         
@@ -336,10 +365,10 @@ class PDSimCore(object):
         self.Valves.append(Valve)
         self.__hasValves__=True
         
-    def __pre_run(self):
+    def __pre_run(self, N = 1000):
         #Build the full numpy arrays for temperature, volume, etc.
-        self.t=np.zeros((50000,))
-        self.T=np.zeros((self.CVs.N,50000))
+        self.t=np.zeros((10000,))
+        self.T=np.zeros((self.CVs.N,10000))
         self.T.fill(np.nan)
         self.p=self.T.copy()
         self.h = self.T.copy()
@@ -349,7 +378,7 @@ class PDSimCore(object):
         self.rho=self.T.copy()
         self.Q=self.T.copy()
         self.xL=self.T.copy()
-        self.xValves=np.zeros((2*len(self.Valves),50000))
+        self.xValves=np.zeros((2*len(self.Valves),10000))
         
         self.CVs.rebuild_exists()
         
@@ -1308,7 +1337,7 @@ class PDSimCore(object):
         x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,x0, dx=1.0, ytol=0.001, itermax=30)
         print 'Solution is', x_soln,'Td, Tlumps'
         
-        if not self.Abort():
+        if not self.Abort(): 
             self.__post_solve()
             
         if hasattr(self,'resid_Td') and hasattr(self,'x_state'):
@@ -1415,7 +1444,6 @@ class PDSimCore(object):
                 rho = d['M']/V
             else:
                 raise KeyError
-            print T,rho
             self.CVs.updateStates('T',T,'D',rho)
         
         ## Calculate properties and property derivatives
@@ -1470,6 +1498,8 @@ class PDSimCore(object):
         dTdtheta=1.0/(m*cv)*(-1.0*T*dpdT*(dV-v*dmdtheta)-m*dudxL*dxLdtheta-h*dmdtheta+Q/self.omega+summerdT)
         drhodtheta = 1.0/V*(dmdtheta-rho*dV)
         
+        
+        
         if self.__hasLiquid__==True:
             f=np.zeros((3*self.NCV,))
             f[0:self.NCV]=dTdtheta
@@ -1489,6 +1519,7 @@ class PDSimCore(object):
                     raise KeyError
             if self.__hasValves__==True:
                 f+=f_valves
+
             return listm(f)
     
     def valves_callback(self):

@@ -383,10 +383,11 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, bytes 
     #some cython type declarations
     cython.declare(T_up = cython.double, T_down = cython.double, mdot = cython.double)
     # Since ideal, R=cp-cv, and k=cp/cv
-    cp=State_up.get_cp0()
+    cp = State_up.get_cp0()
     R = 8.314472/State_up.get_MM()*1000 #[J/kg/K]
     cv = cp-R/1000.0 #[kJ/kg/K]
     k = cp / cv
+    
     
     p_up=State_up.get_p()
     T_up=State_up.get_T()
@@ -398,6 +399,7 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, bytes 
     rho_up=p_up*1000.0/(R*T_up)
     pr=p_down/p_up
     pr_crit=(1+(k-1)/2)**(k/(1-k))
+    
     if pr > pr_crit: 
         # Mass flow rate if not choked [kg/s]
         mdot=A*p_up*1000.0/(R*T_up)**0.5*(2*k/(k-1.0)*pr**(2.0/k)*(1-pr**((k-1.0)/k)))**0.5
@@ -417,6 +419,7 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, bytes 
         # Mach Number
         Ma=1.0
     
+
     if other_output is None:
         return mdot
     elif other_output == 'v':

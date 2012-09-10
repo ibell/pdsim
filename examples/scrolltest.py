@@ -134,7 +134,7 @@ def Compressor(f = None):
     pe = CP.Props('P','T',Te,'Q',1.0,Ref)
     pc = CP.Props('P','T',Tc,'Q',1.0,Ref)
     inletState = State.State(Ref,{'T':Tin,'P':pe})
-    T2s = ScrollComp.isentropic_outlet_temp(inletState,pc)
+    T2s = ScrollComp.guess_outlet_temp(inletState,pc)
     outletState = State.State(Ref,{'T':T2s,'P':pc})
 
 #    inletState = State.State(Ref,{'T':300.0,'P':300.0})
