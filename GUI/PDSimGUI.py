@@ -1447,10 +1447,11 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             if old_key in self.columns_selected:
                 i = self.columns_selected.index(old_key)
                 self.columns_selected[i] = new_key
-            #Make a copy using the old_key
-            val = self.column_options.pop(str(old_key))
-            #Use the old value with the updated key
-            self.column_options[new_key] = val
+            if old_key in self.column_options:
+                #Make a copy using the old_key
+                val = self.column_options.pop(str(old_key))
+                #Use the old value with the updated key
+                self.column_options[new_key] = val
             
         self.rebuild()
         
