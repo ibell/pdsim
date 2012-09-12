@@ -469,8 +469,14 @@ def plot_injection_ports(theta, geo, phi, ax, inner_outer):
         ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
     else:
         raise KeyError
+
+def min2(a,b):
+    return a if a<b else b
+
+def max2(a,b):
+    return a if a>b else b
         
-def radial_leakage_area(theta, geo, key1, key2, location = 'up'):
+def radial_leakage_area(theta, geo, key1, key2, location = str('up')):
     """
     Get the flow area of the flow path for a given radial flow pair
     
@@ -489,6 +495,8 @@ def radial_leakage_area(theta, geo, key1, key2, location = 'up'):
     Area in [\ :math:`m^2`\ ]
     
     """
+    cython.declare(phi_min = cython.double, 
+                   phi_max = cython.double)
     #Get the bounding angles
     phi_min,phi_max = radial_leakage_angles(theta,geo,key1,key2)
     if location =='up':
@@ -527,56 +535,54 @@ def radial_leakage_angles(theta, geo, key1, key2):
     """
     cython.declare(phi_min = cython.double, 
                    phi_max = cython.double, 
-                   sort = cython.list,
+                   sort = cython.tuple,
                    alpha = cython.long,
                    Nc = cython.long)
     phi_min = 9e99
     phi_max = 9e99
     Nc = getNc(theta,geo)
-    sort = sorted((key1,key2))
+    
+    sort = tuple(sorted((key1,key2)))
+    
     #These are always in existence
-    if (sort == sorted(('s2','sa')) or
-        sort == sorted(('s1','sa'))):
+    if sort == ('s2','sa') or sort == ('s1','sa'):
             phi_max = geo.phi_ie
-            phi_min = max(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0)
+            phi_min = max2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0)
     #suction chambers only in contact with each other beyond theta = pi
-    elif sort == sorted(('s2','s1')):
+    elif sort == ('s1','s2'):
         if theta > pi:
             phi_max = phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0
             phi_min = geo.phi_ie - theta
             #Ensure that at the very least phi_max is greater than  phi_min
-            phi_max = max(phi_min, phi_max)
+            phi_max = max2(phi_min, phi_max)
         else:
             #They are the same so there is no flow area
             phi_max = geo.phi_ie - theta + 0.0000001
             phi_min = geo.phi_ie - theta
     
     elif Nc == 0 and phi_max>1e90:
-        if (sort == sorted(('d2','s1')) or
-            sort == sorted(('d1','s2'))):
+        if sort == ('d2','s1') or sort == ('d1','s2'):
                 phi_max = geo.phi_ie - theta
                 phi_min = geo.phi_ie - theta - pi
-        elif sort == sorted(('d2','d1')):
+        elif sort == ('d1','d2'):
                 phi_max = geo.phi_ie - theta - pi
                 phi_min = geo.phi_is
         elif theta > theta_d(geo):
+            print 'theta = ', theta,theta_d(geo)
             print 'Nc: {Nc:d}'.format(Nc=Nc)
-            raise KeyError('Nc: {Nc:d}'.format(Nc=Nc))
+            raise KeyError('Nc: {Nc:d} sort {sort:s}'.format(Nc=Nc, sort = str(sort)))
     
     if Nc >= 1 and phi_max > 1e90:
-        if (sort == sorted(('c2.1','sa')) or
-            sort == sorted(('c1.1','sa'))):
-                phi_max = max(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
-                phi_min = min(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
-        elif (sort == sorted(('c2.1','s1')) or
-              sort == sorted(('c1.1','s2'))):
-                phi_max = min(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
+        if sort == ('c2.1','sa') or sort == ('c1.1','sa'):
+                phi_max = max2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
+                phi_min = min2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
+        elif sort == ('c2.1','s1') or sort == ('c1.1','s2'):
+                phi_max = min2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
                 phi_min = geo.phi_ie - theta - pi
-        elif sort == sorted(('c2.1','c1.1')):
+        elif sort == ('c1.1','c2.1'):
                 phi_max = geo.phi_ie - theta - pi
                 phi_min = geo.phi_ie - theta - 2*pi
-        elif Nc == 1 and (sort == sorted(('c2.1','d1')) or
-                          sort == sorted(('c1.1','d2'))):
+        elif Nc == 1 and (sort == ('c2.1','d1') or sort == ('c1.1','d2')):
                 phi_max = geo.phi_ie - theta - 2*pi
                 phi_min = geo.phi_is
         elif Nc == 1 and theta > theta_d(geo):
@@ -596,8 +602,7 @@ def radial_leakage_angles(theta, geo, key1, key2):
                 phi_min = geo.phi_ie - theta - 2*pi*(alpha)
                 break
         if phi_max > 1e90:
-            if (sort == sorted(('c2.'+str(Nc),'d1')) or
-                sort == sorted(('c1.'+str(Nc),'d2'))):
+            if sort == ('c2.'+str(Nc),'d1') or sort == ('c1.'+str(Nc),'d2'):
                 phi_max = geo.phi_ie - theta - 2*pi*Nc
                 phi_min = geo.phi_is
     

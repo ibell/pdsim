@@ -349,18 +349,25 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                                               key1 = 'sa',
                                               key2 = 's1',
                                               label = 'Flow to suction chamber #1')
+        Xd_sa_s1 = self.get_from_configfile('MassFlowPanel','Xd_sa_s1')
+        self.suctionflow1.set_attr('X_d', float(Xd_sa_s1))
+        
         self.suctionflow2 = SuctionFlowChoice(parent = self,
                                               key1 = 'sa',
                                               key2 = 's2',
                                               label = 'Flow to suction chamber #2')    
+        Xd_sa_s2 = self.get_from_configfile('MassFlowPanel','Xd_sa_s2')
+        self.suctionflow2.set_attr('X_d', float(Xd_sa_s2))
+        
         self.inletflow = InletFlowChoice(parent = self,
                                          key1 = 'inlet.2',
                                          key2 = 'sa',
                                          label = 'Flow into shell',
                                          )
+        Xd_shell_sa = self.get_from_configfile('MassFlowPanel','Xd_shell_sa')
+        self.inletflow.set_attr('X_d', float(Xd_shell_sa))
         
         self.flows = [self.suctionflow1, self.suctionflow2, self.inletflow]
-#        self.flows = [self.flankflow,self.radialflow,self.suctionflow,self.inletflow]
         
         box_sizer.AddMany(self.flows)
         
@@ -372,10 +379,13 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         self.items=self.items1
         
     def resize_flows(self, flows):
+        """
+        Resize the labels for the flows to all be the same size
+        """
         min_width = max([flow.label.GetSize()[0] for flow in flows])
         for flow in flows:
             flow.label.SetMinSize((min_width,-1))
-            
+        
     def post_set_params(self, simulation):
         #Create and add each of the flow paths based on the flow model selection
         for flow in self.flows:
@@ -388,7 +398,7 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                 #Get the diameter from the inlet_tube_ID item
                 D = float(self._get_item_by_attr('inlet_tube_ID')['textbox'].GetValue())
                 #Apply the correction factor
-                A = pi*D**2/4 * param_dict.pop('X_d')
+                A = pi * D**2/4 * param_dict.pop('X_d')
                 param_dict['A']=A
                 
             simulation.add_flow(FlowPath(key1 = flow.key1,
@@ -460,6 +470,11 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                                   TubeFcn=simulation.TubeCode) )
         
         
+class MotorPanel(wx.Panel):
+    """ A panel to contain values for the motor model """
+    def __init__(self):
+        pass
+    
 class MechanicalLossesPanel(pdsim_panels.PDPanel):
     
     def __init__(self, parent, configfile,**kwargs):
@@ -469,30 +484,68 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         #Loads all the parameters from the config file (case-sensitive)
         self.configdict, self.descdict = self.get_from_configfile('MechanicalLossesPanel')
         
-        self.items = [
-        dict(attr='eta_motor'),
-        dict(attr='h_shell'),
-        dict(attr='A_shell'),
-        dict(attr='Tamb'),
-        dict(attr='mu_oil'),
-        dict(attr='D_upper_bearing'),
-        dict(attr='L_upper_bearing'),
-        dict(attr='c_upper_bearing'),
-        dict(attr='D_crank_bearing'),
-        dict(attr='L_crank_bearing'),
-        dict(attr='c_crank_bearing'),
-        dict(attr='D_lower_bearing'),
-        dict(attr='L_lower_bearing'),
-        dict(attr='c_lower_bearing'),
         
-        dict(attr='thrust_friction_coefficient')
+        #: The box sizer that contains all the sizers
+        box_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        """
+        There are 2 possibilities for the types of motor models supported.
+        
+        The motor can be map based in which case efficiency and slip speed are
+        given as a function of mechanical torque output.  Or the efficiency and
+        rotational speed are given
+         
+        Either the motor rejects its heat to the ambient (as in open-drive), or
+        it rejects its heat to the suction volume
+        """
+        
+        if ('eta_motor' in self.configdict 
+            and 'eta_motor_coeffs' not in self.configdict
+            and 'tau_motor_coeffs' not in self.configdict
+            and 'omega_motor_coeffs' not in self.configdict):
+            #Only eta_motor is provided, use it in the motor panel
+            pass
+        elif ('eta_motor' not in self.configdict 
+            and 'eta_motor_coeffs' in self.configdict
+            and 'tau_motor_coeffs' in self.configdict
+            and 'omega_motor_coeffs' in self.configdict):
+            #Only eta_motor is provided, use it in the motor panel
+            pass
+        else:
+            raise ValueError('Your combination of motor terms is not valid')
+        
+        box_sizer.Add(wx.StaticText(self,-1,"Motor Model"))
+        box_sizer.Add(wx.StaticLine(self, -1, (25, 50), (300,1)))
+        
+        self.items = [
+                      dict(attr='eta_motor'),
+      
+                    dict(attr='h_shell'),
+                    dict(attr='A_shell'),
+                    dict(attr='Tamb'),
+                    dict(attr='mu_oil'),
+                    dict(attr='D_upper_bearing'),
+                    dict(attr='L_upper_bearing'),
+                    dict(attr='c_upper_bearing'),
+                    dict(attr='D_crank_bearing'),
+                    dict(attr='L_crank_bearing'),
+                    dict(attr='c_crank_bearing'),
+                    dict(attr='D_lower_bearing'),
+                    dict(attr='L_lower_bearing'),
+                    dict(attr='c_lower_bearing'),
+                    
+                    dict(attr='thrust_friction_coefficient')
         ]
         
-        sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
         
+        sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
+#        self.ConstructItems([self.items[0]],sizer,self.configdict,self.descdict)
+#        
+#        box_sizer.AddSpacer(20)
         self.ConstructItems(self.items,sizer,self.configdict,self.descdict)
-
-        self.SetSizer(sizer)
+        
+        box_sizer.Add(sizer)
+        self.SetSizer(box_sizer)
         sizer.Layout()
         
     def collect_output_terms(self):

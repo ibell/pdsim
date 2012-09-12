@@ -523,7 +523,7 @@ class Scroll(PDSimCore, _Scroll):
         State_outlet = self.Tubes.Nodes[self.key_outlet]
         return self._heat_transfer_callback(theta, State_inlet, State_outlet, **kwargs)
     
-    def _heat_transfer_callback(self, theta, State_inlet, State_outlet, HTC_tune = 0.0, **kwargs):
+    def _heat_transfer_callback(self, theta, State_inlet, State_outlet, HTC_tune = 1.0, **kwargs):
         """
         A private function to actually do the heat transfer analysis
         """
@@ -961,6 +961,8 @@ class Scroll(PDSimCore, _Scroll):
         """
         Calculate the radial leakge flow rate
         """
+        return _Scroll.RadialLeakage(self, FlowPath,kwargs)
+    
         #Calculate the area
         #Arc length of the upstream part of the flow path
         try:

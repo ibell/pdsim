@@ -17,6 +17,7 @@ from multiprocessing import Process
 from PDSim.scroll import scroll_geo
 from PDSimLoader import RecipBuilder, ScrollBuilder
 import quantities as pq
+import warnings
 
 length_units = {
                 'Meter': pq.length.m,
@@ -264,9 +265,7 @@ class PDPanel(wx.Panel):
             if 'val' not in item and configdict is not None:
                 k = item['attr']
                 if k not in configdict:
-                    self.warn_unmatched_attr(k)
                     val,item['text']=self.get_from_configfile(self.name, k, default = True)
-                    print val, item['text']
                 else:
                     val = configdict[k]
                     item['text'] = descdict[k]
@@ -292,9 +291,6 @@ class PDPanel(wx.Panel):
                 elif units == 'rad/s':
                     textbox.default_units = 'Radians per second'
                 self.Bind(wx.EVT_CONTEXT_MENU,self.OnChangeUnits,textbox)      
-        
-    def warn_unmatched_attr(self, attr):
-        print "didn't match attribute", attr
         
     def prep_for_configfile(self):
         """
@@ -366,6 +362,12 @@ class PDPanel(wx.Panel):
                
     def get_from_configfile(self, section, key = None, default = False):
         """
+        This function will get parameters from the config file
+        
+        If section and key are provided, it will return just the value, either from
+        the main config file if found or the default config file if not found.  If the parameter default is True,
+        it will ALWAYS use the default config file 
+        
         configfile: file path or readable object (StringIO instance or file)
         Returns a dictionary with each of the elements from the given section 
         name from the given configuration file.  Each of the values in the configuration 
@@ -397,10 +399,16 @@ class PDPanel(wx.Panel):
         else:
             _parser = parser
         
-        if key is not None and default:
-            value = _parser.get(section, key)
-            _d,_desc =  self._get_from_configfile(key, value)
-            return _d,_desc
+        if key is not None:
+            #Return the value from the file directly if the key is found
+            if _parser.has_option(section,key):
+                value = _parser.get(section, key)
+                return value
+            else:
+                #Fall back to the default file
+                warnings.warn('Did not find the key ['+key+'] in section '+section+', falling back to default config' )
+                value = default_parser.get(section, key)
+                return value
         
         for name, value in _parser.items(section):
             _d,_desc = self._get_from_configfile(name,value)
@@ -533,26 +541,28 @@ class MassFlowOption(wx.Panel):
         self.key1 = key1
         self.key2 = key2
         
+        #Get the options from the derived class
         options = self.model_options()
         
         self.label = wx.StaticText(self, label=label)
         self.choices = wx.ComboBox(self)
         
+        #Load up the combobox with the options possible
         for option in options:
             self.choices.Append(option['desc'])
         self.choices.SetSelection(0)
         self.choices.SetEditable(False)
+        
+        #Store all the options in a list
         self.options_list = options
         
+        #A button to fire the chooser
         self.params = wx.Button(self, label='Params...')
         if not 'params' in option or not option['params']:
             self.params.Enable(False)
-            
         else:
-            TTS = self.dict_to_tooltip_string(option['params'])
-            self.params.SetToolTipString(TTS)
             self.params_dict = option['params']
-            
+            self.update_tooltip()            
             self.params.Bind(wx.EVT_BUTTON, self.OnChangeParams)
         
         sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -562,6 +572,12 @@ class MassFlowOption(wx.Panel):
         self.SetSizer(sizer)
         sizer.Layout()
     
+    def update_tooltip(self):
+        for option in self.options_list:
+            if option['desc'] == self.choices.GetStringSelection():
+                TTS = self.dict_to_tooltip_string(option['params'])
+                self.params.SetToolTipString(TTS)
+        
     def OnChangeParams(self, event):
         """
         Open a dialog to change the values
@@ -569,11 +585,16 @@ class MassFlowOption(wx.Panel):
         dlg = ChangeParamsDialog(self.params_dict)
         if dlg.ShowModal() == wx.ID_OK:
             self.params_dict = dlg.get_values()
-            TTS = self.dict_to_tooltip_string(self.params_dict)
-            self.params.SetToolTipString(TTS)
+            self.update_tooltip()
         dlg.Destroy()
         
     def dict_to_tooltip_string(self, params):
+        """
+        Take the dictionary of terms and turn it into a nice string for use in the
+        tooltip of the textbox
+        
+        """
+        
         s = ''
         for param in params:
             s += param['desc'] + ': ' + str(param['value']) + '\n'
@@ -584,6 +605,29 @@ class MassFlowOption(wx.Panel):
             if option['desc'] == self.choices.GetStringSelection():
                 return option['function_name']
         raise AttributeError
+    
+    def set_attr(self, attr, value):
+        """
+        Set an attribute in the params list of dictionaries
+        
+        Parameters
+        ----------
+        attr : string
+            Attribute to be set
+        value : 
+            The value to be given to this attribute
+        """
+        
+        #self.options_list is a list of dictionaries with the keys 'desc','function_name','params'
+        for option in self.options_list:
+            #Each param is a dictionary with keys of 'attr', 'value', 'desc'
+            for param in option['params']:
+                if param['attr'] == attr:
+                    param['value'] = value
+                    self.update_tooltip()
+                    return
+                
+        raise KeyError('Did not find the attribute '+attr)
         
     def model_options(self):
         """
@@ -594,7 +638,7 @@ class MassFlowOption(wx.Panel):
             Very terse description of the term 
         * function_name : function
             the function in the main machine class to be called
-        * params : list of dictionaries
+        * params : list of dictionaries with the keys 'attr', 'value', 'desc'
         
         MUST be implemented in the sub-class
         """
@@ -1059,7 +1103,7 @@ class ParametricPanel(PDPanel):
                     raise AttributeError('Invalid Main.SimType : '+str(Main.SimType))
                     
                 for val, attr in zip(vals, attrs):
-                    # Actually set it
+                    # Actually set the attr in the model
                     setattr(sim, attr, float(val))
                     
                 #Run the post_set_params for all the panels
