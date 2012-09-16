@@ -78,6 +78,9 @@ inlet_tube_length = float,0.3,Inlet tube length [m]
 inlet_tube_ID = float,0.02,Inlet tube inner diameter [m]
 outlet_tube_length = float,0.3,Outlet tube length [m]
 outlet_tube_ID = float, 0.02, Outlet tube inner diameter [m]
+Xd_sa_s1 = 0.8
+Xd_sa_s2 = 0.8
+Xd_shell_sa = 0.8
 
 [MechanicalLossesPanel]
 eta_motor = float,0.95,Motor efficiency [-]
@@ -95,6 +98,11 @@ D_lower_bearing = float, 0.025, Lower bearing diameter [m]
 L_lower_bearing = float, 0.025, Lower bearing length [m]
 c_lower_bearing = float, 20e-6, Lower bearing gap [m]
 thrust_friction_coefficient = float, 0.03, Thrust bearing friction coefficient [-]
+thrust_ID = float, 0.15, Thrust bearing inner diameter [m]
+thrust_OD = float, 0.3, Thrust bearing outer diameter [m]
+orbiting_scroll_mass = float,2.0,Orbiting scroll mass [kg]
+L_ratio_bearings = float,3.0, Ratio of lengths for bearings [-]
+HTC = float, 0.0, Heat transfer coefficient in scrolls [-]
 
 [StatePanel]
 omega = float,377.0,Rotational speed [rad/s]

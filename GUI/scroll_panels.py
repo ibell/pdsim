@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
 import pdsim_panels
 import wx
+from wx.lib.mixins.listctrl import TextEditMixin
 import numpy as np
 from math import pi
 from PDSim.scroll.core import Scroll
 import matplotlib as mpl
+
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as WXCanvas
 from matplotlib.backends.backend_wxagg import NavigationToolbar2Wx as WXToolbar
 from PDSim.scroll.plots import plotScrollSet, ScrollAnimForm
 from PDSim.flow.flow import FlowPath
 from PDSim.core.core import Tube
+from PDSim.core.motor import Motor
 from CoolProp import State as CPState
 
 LabeledItem = pdsim_panels.LabeledItem
@@ -204,7 +207,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
                                    phi_i0 = phi_i0, 
                                    phi_os = phi_os,
                                    phi_is = phi_is,) 
-        self.Scroll.set_disc_geo('2Arc', r2='PMP')
+        self.Scroll.set_disc_geo('2Arc', r2=0)
         
         if self.UseOffset.IsChecked():
             self.Scroll.geo.phi_ie_offset = pi
@@ -232,21 +235,33 @@ class GeometryPanel(pdsim_panels.PDPanel):
         self.PP.canvas.draw()
     
     def post_set_params(self, scroll):
+        
         Vdisp=float(self.Vdisp.GetValue())
         Vratio=float(self.Vratio.GetValue())
         t=float(self.t.GetValue())
         ro=float(self.ro.GetValue())
+        phi_i0 = float(self.phi_fi0.GetValue())
+        phi_is = float(self.phi_fis.GetValue())
+        phi_os = float(self.phi_fos.GetValue())
         
-        scroll.set_scroll_geo(Vdisp,Vratio,t,ro) #Set the scroll wrap geometry
-        scroll.set_disc_geo('2Arc', r2='PMP')
-        scroll.geo.delta_flank = float(self.delta_flank.GetValue())
-        scroll.geo.delta_radial = float(self.delta_radial.GetValue())
+        #Set the scroll wrap geometry
+        scroll.set_scroll_geo(Vdisp,Vratio,t,ro,
+                                   phi_i0 = phi_i0, 
+                                   phi_os = phi_os,
+                                   phi_is = phi_is)
+        scroll.set_disc_geo('2Arc', r2 = 0)
+        
+        # self.delta_flank and self.delta_radial are set in the conventional way
+        # using the parametric table
+        scroll.geo.delta_flank = scroll.delta_flank
+        scroll.geo.delta_radial = scroll.delta_radial
+        del scroll.delta_flank
+        del scroll.delta_radial
         
         if self.UseOffset.IsChecked():
             scroll.geo.phi_ie_offset = pi
         else:
             scroll.geo.phi_ie_offset = 0
-    
     
     def collect_output_terms(self):
         """
@@ -349,18 +364,25 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                                               key1 = 'sa',
                                               key2 = 's1',
                                               label = 'Flow to suction chamber #1')
+#        Xd_sa_s1 = self.get_from_configfile('MassFlowPanel','Xd_sa_s1')
+#        self.suctionflow1.set_attr('X_d', float(Xd_sa_s1))
+        
         self.suctionflow2 = SuctionFlowChoice(parent = self,
                                               key1 = 'sa',
                                               key2 = 's2',
                                               label = 'Flow to suction chamber #2')    
+#        Xd_sa_s2 = self.get_from_configfile('MassFlowPanel','Xd_sa_s2')
+#        self.suctionflow2.set_attr('X_d', float(Xd_sa_s2))
+        
         self.inletflow = InletFlowChoice(parent = self,
                                          key1 = 'inlet.2',
                                          key2 = 'sa',
                                          label = 'Flow into shell',
                                          )
+#        Xd_shell_sa = self.get_from_configfile('MassFlowPanel','Xd_shell_sa')
+#        self.inletflow.set_attr('X_d', float(Xd_shell_sa))
         
         self.flows = [self.suctionflow1, self.suctionflow2, self.inletflow]
-#        self.flows = [self.flankflow,self.radialflow,self.suctionflow,self.inletflow]
         
         box_sizer.AddMany(self.flows)
         
@@ -372,10 +394,13 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         self.items=self.items1
         
     def resize_flows(self, flows):
+        """
+        Resize the labels for the flows to all be the same size
+        """
         min_width = max([flow.label.GetSize()[0] for flow in flows])
         for flow in flows:
             flow.label.SetMinSize((min_width,-1))
-            
+        
     def post_set_params(self, simulation):
         #Create and add each of the flow paths based on the flow model selection
         for flow in self.flows:
@@ -388,7 +413,7 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                 #Get the diameter from the inlet_tube_ID item
                 D = float(self._get_item_by_attr('inlet_tube_ID')['textbox'].GetValue())
                 #Apply the correction factor
-                A = pi*D**2/4 * param_dict.pop('X_d')
+                A = pi * D**2/4 * param_dict.pop('X_d')
                 param_dict['A']=A
                 
             simulation.add_flow(FlowPath(key1 = flow.key1,
@@ -398,8 +423,7 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                                          )
                                 )
             
-        D = float(self._get_item_by_attr('d_discharge')['textbox'].GetValue())
-        A_discharge_port = pi*D**2/4
+        A_discharge_port = pi*simulation.d_discharge**2/4
         
         for _key in ['dd','ddd']:
             simulation.add_flow(FlowPath(key1='outlet.1', 
@@ -459,7 +483,187 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                                   fixed=2,
                                   TubeFcn=simulation.TubeCode) )
         
+       
+#    def collect_output_terms(self):
+#        _T = []
+#        
+#        for i,Tube in zip(:
+#            _T.extend([dict(attr = "Tubes["+str(i)+"].State1.T",
+#                            text = "Tube T ["+ str(Tube.key1) +"] [K]",
+#                            parent = self
+#                            ),
+#                       dict(attr = "Tubes["+str(i)+"].State2.T",
+#                            text = "Tube T ["+ str(Tube.key2) +"] [K]",
+#                            parent = self
+#                            ),
+#                       dict(attr = "Tubes["+str(i)+"].State1.p",
+#                            text = "Tube p ["+ str(Tube.key1) +"] [kPa]",
+#                            parent = self
+#                            ),
+#                       dict(attr = "Tubes["+str(i)+"].State2.p",
+#                            text = "Tube p ["+ str(Tube.key2) +"] [kPa]",
+#                            parent = self
+#                            )
+#                       ])
+#        return _T
+     
+class MotorCoeffsTable(wx.ListCtrl, TextEditMixin):
+    
+    def __init__(self, parent, values = None):
+        """
+        Parameters
+        ----------
+        parent : wx.window
+            The parent of this checklist
+        values : A 3-element list of lists for all the coeff
+        """
+        wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT)
+        TextEditMixin.__init__(self)
         
+        #Build the headers
+        self.InsertColumn(0,'Motor Torque [N-m]')
+        self.InsertColumn(1,'Efficiency [-]')
+        self.InsertColumn(2,'Slip speed [rad/s]')
+        
+        #: The values stored as a list of lists in floating form
+        self.values = values
+        
+        #Reset the values
+        self.refresh_table()
+        
+        #Set the column widths    
+        for i in range(3):
+            self.SetColumnWidth(i,wx.LIST_AUTOSIZE_USEHEADER)
+        
+        # Turn on callback to write values back into internal data structure when
+        # a cell is edited
+        self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.OnCellEdited)
+        
+        #Required width for the table
+        min_width = sum([self.GetColumnWidth(i) for i in range(self.GetColumnCount())])
+        
+        #No required height (+30 for buffer to account for vertical scroll bar)
+        self.SetMinSize((min_width + 30,-1))
+
+    def OnCellEdited(self, event):
+        """
+        Once the cell is edited, write its value back into the data matrix
+        """
+        row_index = event.m_itemIndex
+        col_index = event.Column
+        val = float(event.Text)
+        self.data[row_index][col_index-1] = val
+    
+    def GetStringCell(self,Irow,Icol):
+        """ Returns a string representation of the cell """
+        return self.data[Irow][Icol]
+    
+    def GetFloatCell(self,Irow,Icol):
+        """ Returns a float representation of the cell """
+        return float(self.data[Irow][Icol])
+    
+    def AddRow(self):
+        
+        row = [0]*self.GetColumnCount()
+        
+        i = len(self.data)-1
+        self.InsertStringItem(i,'')
+        for j,val in enumerate(row):
+            self.SetStringItem(i,j+1,str(val))
+        self.CheckItem(i)
+        
+        self.data.append(row)
+        
+    def RemoveRow(self, i = 0):
+        self.data.pop(i)
+        self.DeleteItem(i)
+        
+    def RemoveLastRow(self):
+        i = len(self.data)-1
+        self.data.pop(i)
+        self.DeleteItem(i)
+    
+    def update_from_configfile(self, values):
+        """
+        
+        Parameters
+        ----------
+        values : list of lists, with entries as floating point values
+            The first entry is a list (or other iterable) of torque values
+            
+            The second entry is a list (or other iterable) of efficiency values
+            
+            The third entry is a list (or other iterable) of slip speed values
+        """
+        self.values = values
+        self.refresh_table()
+        
+    def string_for_configfile(self):
+        """
+        Build and return a string for writing to the config file
+        """
+            
+        tau_list = self.values[0]
+        tau_string = 'tau_motor_coeffs = coeffs, '+'; '.join([str(tau) for tau in tau_list])
+        
+        eta_list = self.values[1]
+        eta_string = 'eta_motor_coeffs = coeffs, '+'; '.join([str(eta) for eta in eta_list])
+        
+        omega_list = self.values[2]
+        omega_string = 'omega_motor_coeffs = coeffs, '+'; '.join([str(omega) for omega in omega_list])
+            
+        return tau_string + '\n' + eta_string + '\n' + omega_string + '\n'
+        
+        
+    def refresh_table(self):
+        """
+        Take the values from self.values and write them to the table
+        """
+        #Remove all the values in the table
+        for i in reversed(range(self.GetItemCount())):
+            self.DeleteItem(i)
+            
+        if self.values is None:
+            #Add a few rows
+            for i in range(10):
+                self.InsertStringItem(i,str(i))
+        else:
+            #They all need to be the same length
+            assert len(self.values[0]) == len(self.values[1]) == len(self.values[2])
+            for i in range(len(self.values[0])):
+                self.InsertStringItem(i,str(self.values[0][i]))
+                self.SetStringItem(i,1,str(self.values[1][i]))
+                self.SetStringItem(i,2,str(self.values[2][i]))
+                
+    def get_coeffs(self):
+        """
+        Get the list of lists of values that are used in the table
+        """
+        return self.values
+    
+
+        
+class MotorChoices(wx.Choicebook):
+    def __init__(self, parent):
+        wx.Choicebook.__init__(self, parent, -1)
+        
+        self.pageconsteta=wx.Panel(self)
+        self.AddPage(self.pageconsteta,'Constant efficiency')
+        self.eta_motor_label, self.eta_motor = LabeledItem(self.pageconsteta, 
+                                                           label="Motor Efficiency [-]",
+                                                           value='0.9')
+        sizer=wx.FlexGridSizer(cols = 2, hgap = 3, vgap = 3)
+        sizer.AddMany([self.eta_motor_label, self.eta_motor])
+        self.pageconsteta.SetSizer(sizer)
+        
+        self.pagemotormap=wx.Panel(self)
+        self.AddPage(self.pagemotormap,'Motor map')
+        self.MCT = MotorCoeffsTable(self.pagemotormap,values = [[1,2,3],[0.9,0.9,0.9],[307,307,307]])
+        sizer=wx.FlexGridSizer(cols = 2, hgap = 3, vgap = 3)
+        sizer.Add(self.MCT, 1, wx.EXPAND)
+        self.pagemotormap.SetSizer(sizer)
+        sizer.Layout()
+    
 class MechanicalLossesPanel(pdsim_panels.PDPanel):
     
     def __init__(self, parent, configfile,**kwargs):
@@ -469,54 +673,171 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         #Loads all the parameters from the config file (case-sensitive)
         self.configdict, self.descdict = self.get_from_configfile('MechanicalLossesPanel')
         
-        self.items = [
-        dict(attr='eta_motor'),
-        dict(attr='h_shell'),
-        dict(attr='A_shell'),
-        dict(attr='Tamb'),
-        dict(attr='mu_oil'),
-        dict(attr='D_upper_bearing'),
-        dict(attr='L_upper_bearing'),
-        dict(attr='c_upper_bearing'),
-        dict(attr='D_crank_bearing'),
-        dict(attr='L_crank_bearing'),
-        dict(attr='c_crank_bearing'),
-        dict(attr='D_lower_bearing'),
-        dict(attr='L_lower_bearing'),
-        dict(attr='c_lower_bearing'),
+        #: The box sizer that contains all the sizers
+        box_sizer = wx.BoxSizer(wx.VERTICAL)
         
-        dict(attr='thrust_friction_coefficient')
+        """
+        There are 2 possibilities for the types of motor models supported.
+        
+        The motor can be map based in which case efficiency and slip speed are
+        given as a function of mechanical torque output.  Or the efficiency and
+        rotational speed are given
+         
+        Either the motor rejects its heat to the ambient (as in open-drive), or
+        it rejects its heat to the suction volume
+        """
+        
+        box_sizer.Add(wx.StaticText(self, -1, "Motor Model"))
+        box_sizer.Add(wx.StaticLine(self, -1, (25, 50), (300,1)))
+        
+        self.motor_choices = MotorChoices(self)
+        box_sizer.Add(self.motor_choices)
+        
+        if ('eta_motor' in self.configdict 
+            and 'eta_motor_coeffs' not in self.configdict
+            and 'tau_motor_coeffs' not in self.configdict
+            and 'omega_motor_coeffs' not in self.configdict):
+            #Only eta_motor is provided, use it in the motor panel
+            self.motor_choices.SetSelection(0)
+            #Set the value in the panel
+            self.motor_choices.eta_motor.SetValue(str(self.configdict['eta_motor']))
+            
+        elif ('eta_motor' not in self.configdict 
+            and 'eta_motor_coeffs' in self.configdict
+            and 'tau_motor_coeffs' in self.configdict
+            and 'omega_motor_coeffs' in self.configdict):
+            #Coefficients are provided, use them in the motor panel
+            self.motor_choices.SetSelection(1)
+            values = [self.configdict['tau_motor_coeffs'],
+                      self.configdict['eta_motor_coeffs'],
+                      self.configdict['omega_motor_coeffs']
+                      ]
+            self.motor_choices.MCT.update_from_configfile(values)
+        elif False:
+            #If neither of the above are matched, fall back to the default configuration
+            pass
+        else:
+            raise ValueError('Your combination of motor terms is not valid')
+        
+        
+        
+        self.items = [
+      
+                    dict(attr='h_shell'),
+                    dict(attr='A_shell'),
+                    dict(attr='Tamb'),
+                    dict(attr='mu_oil'),
+                    dict(attr='D_upper_bearing'),
+                    dict(attr='L_upper_bearing'),
+                    dict(attr='c_upper_bearing'),
+                    dict(attr='D_crank_bearing'),
+                    dict(attr='L_crank_bearing'),
+                    dict(attr='c_crank_bearing'),
+                    dict(attr='D_lower_bearing'),
+                    dict(attr='L_lower_bearing'),
+                    dict(attr='c_lower_bearing'),
+                    
+                    dict(attr = 'thrust_friction_coefficient'),
+                    dict(attr = 'thrust_ID'),
+                    dict(attr = 'thrust_OD'),
+                    dict(attr = 'orbiting_scroll_mass'),
+                    dict(attr = 'L_ratio_bearings'),
+                    dict(attr = 'HTC')
         ]
         
-        sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
         
+        sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
+#        self.ConstructItems([self.items[0]],sizer,self.configdict,self.descdict)
+#        
+#        box_sizer.AddSpacer(20)
         self.ConstructItems(self.items,sizer,self.configdict,self.descdict)
-
-        self.SetSizer(sizer)
+        
+        box_sizer.Add(sizer)
+        self.SetSizer(box_sizer)
         sizer.Layout()
         
+    def post_set_params(self, sim):
+        """
+        Set other parameters after loading all the conventional terms
+        
+        Parameters
+        ----------
+        sim : PDSimCore instance (or derived class)
+            The simulation instance
+        """
+        #Create the motor if if doesn't have one
+        if not hasattr(sim,'motor'):
+            sim.motor = Motor()
+        
+        if self.motor_choices.GetSelection() == 0:
+            #Use the value for the motor efficiency
+            sim.eta_motor = float(self.motor_choices.eta_motor.GetValue())
+            sim.motor.eta_motor = sim.eta_motor 
+        elif self.motor_choices.GetSelection() == 1:
+            # Get the tuple of list of coeffs from the MCT, then unpack the tuple
+            # back into the call to set the coefficients
+            c = self.motor_choices.MCT.get_coeffs()
+            #Set the coefficients for the motor model
+            sim.motor.set_coeffs(tau_coeffs = c[0], eta_coeffs = c[1], omega_coeffs = c[2])
+            #Will set the type flag itself
+        else:
+            raise NotImplementedError
+        
+        sim.motor.suction_fraction = 1.0
+        
+            
+    def post_get_from_configfile(self,key,value):
+        """
+        Parse the coefficients or other things that are not handled in the normal way
+        """
+        #value starts as a string like 'coeffs,1;2;3' --> list of string
+        values = value.split(',')[1].split(';')
+        #Return a list of coefficients - whitespace is ignored in the float() call
+        return [float(v) for v in values] 
+        
     def collect_output_terms(self):
-        _T = []
-        _T.append(dict(attr = "losses.crank_bearing",
+        return [dict(attr = "losses.crank_bearing",
                        text = "Crank bearing loss [kW]",
                        parent = self
-                       )
-                  )
-        _T.append(dict(attr = "losses.upper_bearing",
+                       ),
+                dict(attr = "losses.upper_bearing",
                        text = "Upper bearing loss [kW]",
                        parent = self
-                       )
-                  )
-        _T.append(dict(attr = "losses.lower_bearing",
+                       ),
+                dict(attr = "losses.lower_bearing",
                        text = "Lower bearing loss [kW]",
                        parent = self
-                       )
-                  )
-        _T.append(dict(attr = "losses.thrust_bearing",
+                       ),
+                dict(attr = "losses.thrust_bearing",
                        text = "Thrust bearing loss [kW]",
                        parent = self
-                       )
-                  )
-        return _T
+                       ),
+                dict(attr = 'forces.mean_Fm',
+                     text = 'Mean pin force magnitude [kN]',
+                     parent = self),
+                dict(attr = 'forces.mean_Fz',
+                     text = 'Mean axial force [kN]',
+                     parent = self),
+                dict(attr = 'forces.mean_Fr',
+                     text = 'Mean radial force [kN]',
+                     parent = self),
+                dict(attr = 'forces.mean_Ft',
+                     text = 'Mean tangential force [kN]',
+                     parent = self),
+                dict(attr = 'forces.inertial',
+                     text = 'Inertial forces on orb. scroll [kN]',
+                     parent = self),
+                  ]
+    
+    def post_prep_for_configfile(self):
+        """
+        Custom code for output to config file to handle motor
+        """
+        if self.motor_choices.GetSelection() == 0:
+            eta = self.motor_choices.eta_motor.GetValue()
+            return 'eta_motor = float, '+eta+', Motor Efficiency [-]'
+        else:
+            return self.motor_choices.MCT.string_for_configfile()
+            
         
         

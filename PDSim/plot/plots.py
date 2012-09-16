@@ -73,7 +73,17 @@ class PlotNotebook(wx.Panel):
                       ('Mass v. crank angle',self.m_theta),
                       ('Mass flow v. crank angle',self.mdot_theta),
                       ('Valve lift v. crank angle',self.valve_theta),
-                      ('Temperature-pressure',self.temperature_pressure)
+                      ('Temperature-pressure',self.temperature_pressure),
+                      ('Heat transfer v. crank angle', self.heat_transfer),
+                      ('Axial force v. crank angle',self.axial_force),
+                      ('X-direction force v. crank angle',self.x_direction_force),
+                      ('Y-direction force v. crank angle',self.y_direction_force),
+                      ('Crank pin force magnitude v. crank angle',self.magnitude_force),
+                      ('Gas Torque v. crank angle',self.torque),
+                      ('Force trace', self.force_trace),
+                      ('Force component trace',self.force_component_trace),
+                      ('Radial force', self.radial_force),
+                      ('Tangential force', self.tangential_force)
                       
                       ]
         for value,callbackfcn in self.plot_buttons:
@@ -176,8 +186,8 @@ class PlotNotebook(wx.Panel):
     def temperature_pressure(self, event = None):
         if not hasattr(self.Sim,'__hasLiquid__') or not self.Sim.__hasLiquid__:
             #Fluid T-p plot
-            axes = notebook.add('T-P phase').gca()
-            Fluid=Comp.CVs[0].State.Fluid
+            axes = self.add('T-P phase').gca()
+            Fluid=self.Sim.CVs[0].State.Fluid
             #Saturation curve
             Tsat=np.linspace(Props(Fluid,'Ttriple'),Props(Fluid,'Tcrit'))
             psat=np.array([Props('P','T',T_,'Q',1.0,Fluid) for T_ in Tsat])
@@ -185,6 +195,128 @@ class PlotNotebook(wx.Panel):
             axes.plot(T,p,'.')
             axes.set_xlabel('Temperature [K]')
             axes.set_ylabel(r'Pressure [kPa]')
+            
+    def heat_transfer(self, event = None):
+        #Axial force
+            
+        axes = self.add('Heat transfer').gca()
+        theta = self.Sim.t
+        Q=self.Sim.Q[:,0:self.Sim.Ntheta].T
+        Q[np.abs(Q)<1e-12]=np.nan
+        axes.plot(theta,Q)
+        axes.plot(theta,self.Sim.HTProcessed.summed_Q[0:self.Sim.Ntheta],lw=2)
+        axes.set_ylabel(r'$\dot Q$ [kW]')
+        axes.set_xlabel(r'$\theta$ [rad]')
+    
+    def axial_force(self, event = None):
+        #Axial force
+            
+        axes = self.add('Axial Force').gca()
+        theta=self.Sim.t
+        Fz=self.Sim.forces.Fz[:,0:self.Sim.Ntheta].T
+        Fz[np.abs(Fz)<1e-12]=np.nan
+        axes.plot(theta,Fz)
+        axes.set_ylabel(r'$F_z$ [kN]')
+        axes.set_xlabel(r'$\theta$ [rad]')
+    
+    def x_direction_force(self, event = None):
+        #x-direction force
+            
+        axes = self.add('X Force').gca()
+        theta=self.Sim.t
+        Fx=self.Sim.forces.Fx[:,0:self.Sim.Ntheta].T
+        Fx[np.abs(Fx)<1e-12]=np.nan
+        axes.plot(theta,Fx)
+        axes.set_ylabel(r'$F_x$ [kN]')
+        axes.set_xlabel(r'$\theta$ [rad]')
+        
+    def y_direction_force(self, event = None):
+        #y-direction force
+
+        axes = self.add('Y Force').gca()
+        theta=self.Sim.t
+        Fy=self.Sim.forces.Fy[:,0:self.Sim.Ntheta].T
+        Fy[np.abs(Fy)<1e-12]=np.nan
+        axes.plot(theta,Fy)
+        axes.set_ylabel(r'$F_y$ [kN]')
+        axes.set_xlabel(r'$\theta$ [rad]')
+    
+    def force_component_trace(self, event = None):
+        #trace of force components
+            
+        axes = self.add('Force trace').gca()
+        theta=self.Sim.t
+        Fx=self.Sim.forces.Fx[:,0:self.Sim.Ntheta].T
+        Fx[np.abs(Fx)<1e-12]=np.nan
+        Fy=self.Sim.forces.Fy[:,0:self.Sim.Ntheta].T
+        Fy[np.abs(Fy)<1e-12]=np.nan
+        axes.plot(Fx,Fy)
+        
+        axes.set_ylabel(r'$F_x$ [kN]')
+        axes.set_xlabel(r'$F_y$ [kN]')    
+        
+    def force_trace(self, event = None):
+        #trace of force components
+            
+        axes = self.add('Force trace').gca()
+        theta=self.Sim.t
+        Fx=self.Sim.forces.summed_Fx[0:self.Sim.Ntheta].T
+        Fx[np.abs(Fx)<1e-12]=np.nan
+        Fy=self.Sim.forces.summed_Fy[0:self.Sim.Ntheta].T
+        Fy[np.abs(Fy)<1e-12]=np.nan
+        axes.plot(Fx,Fy)
+        
+        axes.set_ylabel(r'$F_x$ [kN]')
+        axes.set_xlabel(r'$F_y$ [kN]')
+        
+    def magnitude_force(self, event = None):
+        #Crank pin force magnitude
+            
+        axes = self.add('Shaft force magnitude').gca()
+        theta=self.Sim.t
+        Fm=self.Sim.forces.Fm[0:self.Sim.Ntheta].T
+        Fm[np.abs(Fm)<1e-12]=np.nan
+        axes.plot(theta,Fm)
+        axes.set_ylabel(r'$F_m$ [kN]')
+        axes.set_xlabel(r'$\theta$ [rad]')
+        
+    def radial_force(self, event = None):
+        #Radial force magnitude
+            
+        axes = self.add('Radial force magnitude').gca()
+        theta=self.Sim.t
+        Fr=self.Sim.forces.Fr[0:self.Sim.Ntheta].T
+        Fr[np.abs(Fr)<1e-12]=np.nan
+        axes.plot(theta,Fr)
+        axes.plot(theta,self.Sim.forces.mean_Fr*(1.0+0.0*theta),'k--')
+        axes.set_ylabel(r'$F_r$ [kN]')
+        axes.set_xlabel(r'$\theta$ [rad]')
+        
+    def tangential_force(self, event = None):
+        #Tangential force magnitude
+            
+        axes = self.add('Tangential force magnitude').gca()
+        theta=self.Sim.t
+        Ft=self.Sim.forces.Ft[0:self.Sim.Ntheta].T
+        Ft[np.abs(Ft)<1e-12]=np.nan
+        axes.plot(theta,Ft)
+        axes.plot(theta,self.Sim.forces.mean_Ft*(1.0+0.0*theta),'k--')
+        axes.set_ylabel(r'$F_t$ [kN]')
+        axes.set_xlabel(r'$\theta$ [rad]') 
+    
+        
+    def torque(self, event = None):
+        #Torque
+
+        axes = self.add('Torque').gca()
+        theta=self.Sim.t
+        tau=self.Sim.forces.tau[0:self.Sim.Ntheta].T
+        tau[np.abs(tau)<1e-12]=np.nan
+        axes.plot(theta,tau)
+        axes.plot(theta,self.Sim.forces.mean_tau*(1.0+0.0*theta),'k--')
+        axes.set_ylabel(r'$\tau$ [kN-m]')
+        axes.set_xlabel(r'$\theta$ [rad]')
+         
     
 def debug_plots(Comp, plotparent=None, plot_names = None):
     #Build a new frame, not embedded

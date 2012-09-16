@@ -6,11 +6,12 @@ from PDSim.core.core import PDSimCore
 from PDSim.misc._listmath import listm
 from PDSim.flow import flow_models
 from PDSim.plot.plots import debug_plots
+from PDSim.core.bearings import journal_bearing
 import scroll_geo
 from _scroll import _Scroll
 
 ##--- non-package imports
-
+import warnings
 from scipy.optimize import fsolve, newton
 from CoolProp.CoolProp import UseSinglePhaseLUT, Props
 from CoolProp import State
@@ -331,14 +332,18 @@ class Scroll(PDSimCore, _Scroll):
             else:
                 #It is not the first CV, more involved analysis
                 #Assume isentropic compression from the inlet state at the end of the suction process
-                p1 = inletState.p
                 T1 = inletState.T
+                s1 = inletState.s
+                rho1 = inletState.rho
                 k = inletState.cp/inletState.cv
                 V1 = self.V_s1(2*pi)[0]
                 V2 = self.V_c1(0,alpha)[0]
-                p2 = p1 * (V1/V2)**k
-                T2 = T1 * (V1/V2)**(k-1)
-                initState=State.State(inletState.Fluid,dict(T=T2,P=p2)).copy()
+                #Mass is constant, so rho1*V1 = rho2*V2
+                rho2 = rho1 * V1 / V2
+                # Now don't know temperature or pressure, but you can assume
+                # it is isentropic to find the temperature
+                T2 = newton(lambda T: Props('S','T',T,'D',rho2,inletState.Fluid)-s1, T1)
+                initState=State.State(inletState.Fluid,dict(T=T2,D=rho2)).copy()
             if alpha<nCmax:
                 # Does not change definition at discharge angle
                 disc_becomes_c1 = 'c1.'+str(alpha)
@@ -523,7 +528,7 @@ class Scroll(PDSimCore, _Scroll):
         State_outlet = self.Tubes.Nodes[self.key_outlet]
         return self._heat_transfer_callback(theta, State_inlet, State_outlet, **kwargs)
     
-    def _heat_transfer_callback(self, theta, State_inlet, State_outlet, HTC_tune = 0.0, **kwargs):
+    def _heat_transfer_callback(self, theta, State_inlet, State_outlet, HTC_tune = 1.0, **kwargs):
         """
         A private function to actually do the heat transfer analysis
         """
@@ -552,7 +557,7 @@ class Scroll(PDSimCore, _Scroll):
     
                 #print 'calculate HTC'
                 #TODO: calculate HTC
-                hc = 1.0 #[kW/m2/K]
+                hc = self.HTC #[kW/m2/K]
                 
                 # The heat transfer rate of the inner involute on 
                 # the outer wrap of the chamber
@@ -591,8 +596,8 @@ class Scroll(PDSimCore, _Scroll):
                     # dd chambers
                     return calcHT('d1') + calcHT('d2') + calcHT('dd')
                 elif key == 'dd':
-                    # dd chamber
-                    return self.heat_transfer_coefficient(key)
+                    # dd chamber is treated as having no heat transfer
+                    return 0.0
                 elif key.startswith('inj'):
                     # injection chambers are treated as having no heat transfer
                     return 0.0
@@ -745,12 +750,11 @@ class Scroll(PDSimCore, _Scroll):
         return disable,h
         
     def crank_bearing(self):
-        from PDSim.core.bearings import journal_bearing
-        #print 'Crank pin load is',self.forces.mean_Fr*1000,'N'
+        
         JB = journal_bearing(r_b = self.D_crank_bearing/2,
                              L = self.L_crank_bearing,
                              omega = self.omega,
-                             W = self.forces.mean_Fr*1000,
+                             W = self.forces.corr_Fm*1000,
                              c = self.c_crank_bearing,
                              eta_0 = self.mu_oil
                              )
@@ -764,12 +768,10 @@ class Scroll(PDSimCore, _Scroll):
         the lower bearing.  Torques need to balance around the upper bearing
         """
         
-        from PDSim.core.bearings import journal_bearing
-        #print 'Upper bearing load is',self.forces.mean_Fr*1000*(1+1/3),'N'
         JB = journal_bearing(r_b = self.D_upper_bearing/2,
                              L = self.L_upper_bearing,
                              omega = self.omega,
-                             W = self.forces.mean_Fr*1000*(1+1/3),
+                             W = self.forces.corr_Fm*1000*(1+1/self.L_ratio_bearings),
                              c = self.c_upper_bearing,
                              eta_0 = self.mu_oil
                              )
@@ -781,12 +783,11 @@ class Scroll(PDSimCore, _Scroll):
         Moment balance around the upper bearing gives the force for
         the lower bearing.  Torques need to balance around the upper bearing
         """
-        from PDSim.core.bearings import journal_bearing
-        #print 'Lower bearing load is',self.forces.mean_Fr*1000*(1/3),'N'
+        
         JB = journal_bearing(r_b = self.D_lower_bearing/2,
                              L = self.L_lower_bearing,
                              omega = self.omega,
-                             W = self.forces.mean_Fr*1000*(1/3),
+                             W = self.forces.corr_Fm*1000*(1/self.L_ratio_bearings),
                              c = self.c_lower_bearing,
                              eta_0 = self.mu_oil
                              )
@@ -800,7 +801,8 @@ class Scroll(PDSimCore, _Scroll):
         """
         from PDSim.core.bearings import thrust_bearing
         V = self.geo.ro*self.omega
-        N = self.forces.mean_Fz*1000 #[N]
+        #Use the corrected force to account for the decrease in back area due to the bearing
+        N = self.forces.corr_Fz*1000 #[N]
         TB = thrust_bearing(mu = self.thrust_friction_coefficient,
                             V = V,
                             N = N)
@@ -826,8 +828,10 @@ class Scroll(PDSimCore, _Scroll):
             back_pressure = min((inlet_pressure, outlet_pressure))
         elif shell_pressure == 'high':
             back_pressure = max((inlet_pressure, outlet_pressure))
+        elif shell_pressure == 'mid':
+            back_pressure = (inlet_pressure + outlet_pressure)/2
         else:
-            raise KeyError("keyword argument shell_pressure must be one of 'low' or 'high'")
+            raise KeyError("keyword argument shell_pressure must be one of 'low', 'mid' or 'high'")
         
         #Calculate the force terms: force profiles, mean values, etc. 
         self.calculate_force_terms(orbiting_back_pressure = back_pressure)
@@ -849,24 +853,163 @@ class Scroll(PDSimCore, _Scroll):
         print 'mechanical losses: ', self.losses.bearings
         return self.losses.bearings #[kW]
     
+    def post_solve(self):
+        """
+        """
+        self.mechanical_losses('low')
+        print 'mean_Q', self.HTProcessed.mean_Q
+        PDSimCore.post_solve(self)
+        
     def ambient_heat_transfer(self, Tshell):
         """
         The amount of heat transfer from the compressor to the ambient
         """
         return self.h_shell*self.A_shell*(Tshell-self.Tamb)
     
+    def initial_motor_losses(self, eta_a = 0.7):
+        """
+        Assume a 70% adiabatic efficiency to estimate the motor power and 
+        motor losses
+        """
+        
+        for Tube in self.Tubes:
+            if self.key_inlet in [Tube.key1, Tube.key2]:
+                mdot = Tube.mdot
+                
+        inletState = self.Tubes.Nodes[self.key_inlet]
+        outletState = self.Tubes.Nodes[self.key_outlet]
+        s1 = inletState.s
+        h1 = inletState.h
+        h2s = Props('H', 'S', s1, 'P', outletState.p, inletState.Fluid)
+        
+        if outletState.p > inletState.p:
+            #Compressor Mode
+            h2 = h1 + (h2s-h1)/eta_a
+        else:
+            #Expander Mode
+            h2 = h1 + (h2s-h1)*eta_a
+        
+        # A guess for the compressor mechanical power based on 70% efficiency [kW]
+        Wdot = abs(mdot*(h2-h1))
+        
+        if self.motor.type == 'const_eta_motor':
+            eta = self.motor.eta_motor
+        else:
+            #The efficiency and speed [-,rad/s] from the mechanical power output
+            eta, self.omega = self.motor.invert_map(Wdot)
+        
+        #Motor losses [kW]
+        self.motor.losses = Wdot*(1.0/eta-1)
+        
+    def suction_heating(self):
+        if hasattr(self,'motor'):
+            # If some fraction of heat from motor losses is going to get added
+            # to suction flow
+            if 0.0 <= self.motor.suction_fraction <= 1.0:
+                for Tube in self.Tubes:
+                    # Find the tube that has one of the keys starting with 'inlet'
+                    if Tube.key1.startswith('inlet') or Tube.key2.startswith('inlet'):
+                        #Add some fraction of the motor losses to the inlet gas 
+                        Tube.Q_add = self.motor.losses * self.motor.suction_fraction
+                    else:
+                        Tube.Q_add = 0.0
+                        
+    def pre_run(self):
+        """
+        Intercepts the call to pre_run and does some scroll processing, then 
+        calls the base class function
+        """
+        
+        #Get an initial guess before running at all for the motor losses.
+        self.initial_motor_losses()
+        
+        #Run the suction heating code
+        self.suction_heating()
+        
+        #Call the base class function        
+        PDSimCore.pre_run(self)
+        
+        
     def lump_energy_balance_callback(self):
+        """
+        .. math ::
+            
+            \\eta _{motor}} = \\frac{{{{\dot W}_{shaft}}}}{{{{\dot W}_{shaft}} + {{\dot W}_{motor}}}}
+            
+        .. math ::
+            
+            {\eta _{motor}}\left( {{{\dot W}_{shaft}} + {{\dot W}_{motor}}} \\right) = {{\dot W}_{shaft}}
+            
+        .. math::
+        
+            {{\dot W}_{motor}} = \frac{{{{\dot W}_{shaft}}}}{{{\eta _{motor}}}} - {{\dot W}_{shaft}}
+        """
         
         #For the single lump
         # HT terms are positive if heat transfer is TO the lump
         Qnet=0.0
         for Tube in self.Tubes:
             Qnet-=Tube.Q
-        Qnet+=self.mechanical_losses()-self.ambient_heat_transfer(self.Tlumps[0])
+        
+        self.Qamb = self.ambient_heat_transfer(self.Tlumps[0])
+        
+        # Heat transfer with the ambient; Qamb is positive if heat is being removed, thus flip the sign
+        Qnet -= self.Qamb
+        
+        Qnet += self.mechanical_losses('low') 
         # Heat transfer with the gas in the working chambers.  mean_Q is positive
         # if heat is transfered to the gas in the working chamber, so flip the 
         # sign for the lump
         Qnet -= self.HTProcessed.mean_Q
+        
+        print 'mean_Q', self.HTProcessed.mean_Q
+        
+        #Shaft power from forces on the orbiting scroll from the gas in the pockets [kW]
+        self.Wdot_forces = self.omega*self.forces.mean_tau
+        
+        self.Wdot_mechanical = self.Wdot_pv + self.losses.bearings
+        
+        #The actual torque required to do the compression [N-m]
+        self.tau_mechanical = self.Wdot_mechanical / self.omega * 1000
+        
+        # 2 Options for the motor losses:
+        # a) Constant efficiency
+        # b) Based on the torque-speed-efficiency motor
+        
+        if self.motor.type == 'const_eta_motor':
+            self.eta_motor = self.motor.eta_motor
+        elif self.motor.type == 'motor_map':
+            # Use the motor map to calculate the slip rotational speed [rad/s]
+            # and the motor efficiency as a function of the torque [N-m]
+            eta, omega = self.motor.apply_map(self.tau_mechanical)
+            self.eta_motor = eta
+            self.omega = omega
+        else:
+            raise AttributeError
+        
+        print 'self.forces.mean_Fm', self.forces.mean_Fm
+        print 'self.forces.inertial', self.forces.inertial
+        print 'self.Qamb', self.Qamb
+        print 'self.Wdot_forces', self.Wdot_forces
+        print 'self.Wdot_pv', self.Wdot_pv 
+        print 'self.losses.bearings', self.losses.bearings
+        print 'self.Wdot_mechanical', self.Wdot_mechanical
+        
+        #Motor losses [kW]
+        self.motor.losses = self.Wdot_mechanical*(1/self.eta_motor-1)
+        
+        #Electrical Power
+        self.Wdot_electrical = self.Wdot_mechanical + self.motor.losses
+        
+        #Overall isentropic efficiency
+        self.eta_oi = self.Wdot_i/self.Wdot_electrical
+        
+        #Set the heat input to the suction line
+        self.suction_heating()
+        
+        print 'At this iteration'
+        print '    Electrical power:', self.Wdot_electrical
+        print '    Mass flow rate:', self.mdot
         
         #Want to return a list
         return [Qnet]
@@ -878,7 +1021,9 @@ class Scroll(PDSimCore, _Scroll):
                                                 Tube.fixed,
                                                 Tube.L,
                                                 Tube.ID,
-                                                T_wall=self.Tlumps[0])
+                                                T_wall=self.Tlumps[0],
+                                                Q_add = Tube.Q_add
+                                                )
         
     
     def DDD_to_S(self,FlowPath,flankFunc = None,**kwargs):
@@ -961,6 +1106,8 @@ class Scroll(PDSimCore, _Scroll):
         """
         Calculate the radial leakge flow rate
         """
+        return _Scroll.RadialLeakage(self, FlowPath, kwargs)
+    
         #Calculate the area
         #Arc length of the upstream part of the flow path
         try:
@@ -1135,30 +1282,6 @@ class Scroll(PDSimCore, _Scroll):
         except ZeroDivisionError:
             return 0.0
         
-    #Name gets mangled in the core base class, so un-mangle it
-    def _PDSimCore__post_solve(self):
-        """
-        {\eta _{motor}} = \frac{{{{\dot W}_{shaft}}}}{{{{\dot W}_{shaft}} + {{\dot W}_{motor}}}}
-        {\eta _{motor}}\left( {{{\dot W}_{shaft}} + {{\dot W}_{motor}}} \right) = {{\dot W}_{shaft}}
-        {{\dot W}_{motor}} = \frac{{{{\dot W}_{shaft}}}}{{{\eta _{motor}}}} - {{\dot W}_{shaft}}
-        """
-        #Call the base class function
-        PDSimCore._PDSimCore__post_solve(self)
-        
-        #Motor losses
-        self.Wdot_motor = self.Wdot*(1/self.eta_motor-1)
-        
-        #Electrical Power
-        self.Wdot_electrical = self.Wdot + self.Wdot_motor
-        
-        #Overall isentropic efficiency
-        self.eta_oi = self.Wdot_i/self.Wdot_electrical
-        
-        #Shaft power from forces
-        suction_pressure = self.Tubes.Nodes[self.key_outlet].p
-        self.calculate_force_terms(suction_pressure)
-        self.Wdot_forces = self.omega*self.forces.mean_tau
-        print 'power forces',self.Wdot_forces
         
     def calculate_force_terms(self,
                               orbiting_back_pressure=None):
@@ -1170,24 +1293,25 @@ class Scroll(PDSimCore, _Scroll):
         orbiting_back_pressure : float, or class instance
             If a class instance, must provide a function __call__ that takes as its first input the Scroll class
         
-        
         """
         
         self.forces = struct()
         
         #Get the slice of indices that are in use.  At the end of the simulation
         #execution this will be the full range of the indices, but when used
-        # at itermediate iterations it will be a subset of the indices
-        _slice = range(self.Itheta)        
+        # at intermediate iterations it will be a subset of the indices
+        _slice = range(self.Itheta)
         
         ####################################################
         #############  Normal force components #############
         ####################################################
         #The force of the in each chamber pushes the orbiting scroll away
         self.forces.Fz = self.p*self.V/self.geo.h
+        
         if isinstance(orbiting_back_pressure, float):
             #The back gas pressure on the orbiting scroll pushes the scroll back down
-            self.forces.Fz -= orbiting_back_pressure*self.V/self.geo.h
+            self.forces.Fz -= 0.4*orbiting_back_pressure*self.V/self.geo.h
+            pass
         else:
             raise NotImplementedError('calculate_force_terms must get a float back pressure for now')
         
@@ -1199,9 +1323,17 @@ class Scroll(PDSimCore, _Scroll):
         #Remove all the NAN placeholders and replace them with zero values
         self.forces.Fz[np.isnan(self.forces.Fz)]=0
         #Sum the terms
-        self.forces.summed_Fz = np.sum(self.forces.Fz,axis = 0) #kN    
+        self.forces.summed_Fz = np.sum(self.forces.Fz, axis = 0) #kN    
         #Calculate the mean axial force
         self.forces.mean_Fz = np.trapz(self.forces.summed_Fz[_slice], self.t[_slice])/(2*pi)
+        
+        # The corrected axial load accounts for the fact that the area of the 
+        # thrust bearing does not contribute to compensating for the load
+        
+        #: Corrected axial load [kN-m]
+        self.forces.corr_Fz = self.forces.mean_Fz# + pi*(self.thrust_OD**2-self.thrust_ID**2)/4 * orbiting_back_pressure
+        
+        
         
         ####################################################
         #############  "Radial" force components ###########
@@ -1214,7 +1346,8 @@ class Scroll(PDSimCore, _Scroll):
         # A map of CVkey to function to be called to get force components
         # All functions in this map use the same call signature and are "boring"
         # Each function returns a dictionary of terms
-        func_map = dict(s1 = scroll_geo.S1_forces,
+        func_map = dict(sa = scroll_geo.SA_forces,
+                        s1 = scroll_geo.S1_forces,
                         s2 = scroll_geo.S2_forces,
                         d1 = scroll_geo.D1_forces,
                         d2 = scroll_geo.D2_forces,
@@ -1228,7 +1361,7 @@ class Scroll(PDSimCore, _Scroll):
                 func = func_map[CVkey]
                 # Calculate the geometric parts for each chamber
                 # They are divided by the pressure in the chamber
-                geo_components = [func(theta,self.geo) for theta in self.t]
+                geo_components = [func(theta, self.geo) for theta in self.t[_slice]]
             elif CVkey.startswith('c1'):
                 #Early bind the function
                 func = scroll_geo.C1_forces
@@ -1236,7 +1369,7 @@ class Scroll(PDSimCore, _Scroll):
                 alpha = int(CVkey.split('.')[1])
                 # Calculate the geometric parts for each chamber
                 # They are divided by the pressure in the chamber
-                geo_components = [func(theta,alpha,self.geo) for theta in self.t]
+                geo_components = [func(theta,alpha,self.geo) for theta in self.t[_slice]]
             elif CVkey.startswith('c2'):
                 #Early bind the function
                 func = scroll_geo.C2_forces
@@ -1244,17 +1377,17 @@ class Scroll(PDSimCore, _Scroll):
                 alpha = int(CVkey.split('.')[1])
                 # Calculate the geometric parts for each chamber
                 # They are divided by the pressure in the chamber
-                geo_components = [func(theta,alpha,self.geo) for theta in self.t]
+                geo_components = [func(theta,alpha,self.geo) for theta in self.t[_slice]]
             else:
                 geo_components = []
                 
             if geo_components:
                 I = self.CVs.index(CVkey)
-                p = self.p[I,:]
-                self.forces.fxp[I,:] = [comp['fx_p'] for comp in geo_components]
-                self.forces.fyp[I,:] = [comp['fy_p'] for comp in geo_components]
-                self.forces.Fx[I,:] = [comp['fx_p'] for comp in geo_components]*p
-                self.forces.Fy[I,:] = [comp['fy_p'] for comp in geo_components]*p
+                p = self.p[I,_slice]
+                self.forces.fxp[I,_slice] = [comp['fx_p'] for comp in geo_components]
+                self.forces.fyp[I,_slice] = [comp['fy_p'] for comp in geo_components]
+                self.forces.Fx[I,_slice] = [comp['fx_p'] for comp in geo_components]
+                self.forces.Fy[I,_slice] = [comp['fy_p'] for comp in geo_components]
 #                import pylab
 #                pylab.plot(self.forces.Fx[I,:],self.forces.Fy[I,:])
         
@@ -1266,20 +1399,46 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.summed_Fx = np.sum(self.forces.Fx,axis = 0) #kN
         self.forces.summed_Fy = np.sum(self.forces.Fy,axis = 0) #kN
         
-        #Calculate the radial force on the crank pin at each crank angle
-        self.forces.Fr = np.sqrt(np.power(self.forces.summed_Fx,2)
-                                 +np.power(self.forces.summed_Fy,2)
-                                 )
+        #Position of the pin as a function of crank angle
         self.forces.xpin = self.geo.ro*np.cos(self.geo.phi_ie-pi/2-self.t)
         self.forces.ypin = self.geo.ro*np.sin(self.geo.phi_ie-pi/2-self.t)
+        
+        #Calculate the radial force on the crank pin at each crank angle
+        
+        #The radial component magnitude is just the projection of the force onto a vector going from origin to center of orbiting coordinate system 
+        self.forces.Fr = (self.forces.xpin*self.forces.summed_Fx+self.forces.ypin*self.forces.summed_Fy)/self.geo.ro
+        
+        #The tangent component magnitude is just the projection of the force onto a vector going from origin to center of orbiting coordinate system
+        
+        #Components of the unit vector in the direction of rotation
+        x_dot =  np.sin(self.geo.phi_ie-pi/2-self.t)
+        y_dot =  -np.cos(self.geo.phi_ie-pi/2-self.t)
+        self.forces.Ft = (x_dot*self.forces.summed_Fx+y_dot*self.forces.summed_Fy)
+
+        self.forces.Fm = np.sqrt(np.power(self.forces.summed_Fx,2)
+                                 +np.power(self.forces.summed_Fy,2)
+                                 )
+        
         self.forces.tau = self.forces.xpin*self.forces.summed_Fy-self.forces.ypin*self.forces.summed_Fx
         # Calculate the mean normal force on the crank pin
         # This assumes a quasi-steady bearing where the film is well-behaved
+        self.forces.mean_Fm = np.trapz(self.forces.Fm[_slice], self.t[_slice])/(2*pi)
         self.forces.mean_Fr = np.trapz(self.forces.Fr[_slice], self.t[_slice])/(2*pi)
+        self.forces.mean_Ft = np.trapz(self.forces.Ft[_slice], self.t[_slice])/(2*pi)
         self.forces.mean_tau = np.trapz(self.forces.tau[_slice], self.t[_slice])/(2*pi)
-
                 
-                
+        #: The interial forces on the orbiting scroll
+        self.forces.inertial = self.orbiting_scroll_mass * self.omega**2 * self.geo.ro / 1000
+        
+        self.forces.corr_Fm = self.forces.mean_Fm + self.forces.inertial
+        
+        print 'self.forces.mean_Ft', self.forces.mean_Ft
+        print 'self.forces.mean_Fr', self.forces.mean_Fr
+        print 'self.forces.mean_Fz', self.forces.mean_Fz
+        print 'self.forces.corr_Fz', self.forces.corr_Fz
+        
+        
+        
     def IsentropicNozzleFM(self,*args,**kwargs):
         """
         A thin wrapper around the base class function for pickling purposes

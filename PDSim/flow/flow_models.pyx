@@ -43,7 +43,7 @@ cdef double Re_star_flank = 826.167177885
 cpdef double pow(double x, double y):
     return x**y
 
-cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',Tmean=None,T_wall=None):
+cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',Tmean=None,T_wall=None,Q_add = 0.0):
     """
     In this tube model, one of the nodes is known (fixed), but the other is calculated based on heat transfer and pressure drop for a given mass flow rate
     
@@ -71,6 +71,10 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
         Mean fluid temperature for evaluation of fluid properties [K]
     T_wall : float, optional
         Temperature of wall [K]
+    Q_add : float, optional
+        Additional amount of heat that will be added to the fluid in the tube [kW]
+        
+        This term is not added to the 
     """
         
     #Use the provided value for Tmean if it is a float or integer
@@ -100,7 +104,8 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
             p=State2.p
             T2=State2.T
             
-        print Tmean,p,Fluid
+        #Q_add needs to be in W
+        Q_add *= 1000
         
         S=State(Fluid,{'T':Tmean,'P':p})
             
@@ -130,21 +135,37 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
         DELTAP=dp_dz*L
 
         if fixed==1:
-            T2=T_wall-(T_wall-T1)*exp(-pi*ID*L*alpha/(mdot*cp))
+            #The outlet temperature considering just the wall heat transfer 
+            T2_star=T_wall-(T_wall-T1)*exp(-pi*ID*L*alpha/(mdot*cp))
             
-            # Q is defined to be positive if heat transferred from wall to fluid 
-            Q=mdot*cp*(T2-T1)
+            #Get the actual outlet temperature based on the additional heat input
+            T2 = T1 + Q_add/(mdot*cp)
+            
+            # Q is defined to be positive if heat transferred from wall to fluid
+            #
+            # It only includes the term from the wall heat transfer 
+            Q=mdot*cp*(T2_star-T1)
             
             State2.update({'T':T2,'P':p+DELTAP/1000})
         else:
+            #Get the wall heat transfer outlet temperature based on the additional heat input
+            T2_star = T2-(Q_add/mdot*cp)
             
-            T1=T_wall-(T_wall-T2)/exp(-pi*ID*L*alpha/(mdot*cp))
+            T1=T_wall-(T_wall-T2_star)/exp(-pi*ID*L*alpha/(mdot*cp))
             
             # Q is defined to be positive if heat transferred from wall to fluid 
-            Q=mdot*cp*(T2-T1)
+            Q=mdot*cp*(T2_star-T1)
             
             State1.update({'T':T1,'P':p-DELTAP/1000})
-
+        
+        print 'T1',T1
+        print 'T2',T2
+        print 'p',p
+        print 'DELTAP',DELTAP
+        print 'Fluid',Fluid
+        print 'Q_add', Q_add
+        print 'Q', Q
+        
         return Q/1000.0
 
 def rebuildValveModel(d):

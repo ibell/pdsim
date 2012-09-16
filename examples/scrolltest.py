@@ -38,7 +38,8 @@ def Compressor(f = None):
     global Injection
     ScrollComp=Scroll()
     #This runs if the module code is run directly
-    ScrollComp.set_scroll_geo(104.8e-6, 1.61, 0.004, 0.005) #Set the scroll wrap geometry
+    
+    ScrollComp.set_scroll_geo(227.8e-6, 2.4, 0.004, 0.007) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2='PMP')
     ScrollComp.geo.delta_flank = 1.5e-6
     ScrollComp.geo.delta_radial = 1.5e-6
@@ -57,8 +58,8 @@ def Compressor(f = None):
     ScrollComp.L_lower_bearing = 0.025
     ScrollComp.c_lower_bearing = 20e-6
     ScrollComp.thrust_friction_coefficient = 0.028 #From Chen thesis
-    ScrollComp.mu_oil = 0.0086
-    ScrollComp.L_ratio_bearings = 3.0
+    ScrollComp.orbiting_scroll_mass = 2.5
+    ScrollComp.L_ratio_bearings = 3
     
     ScrollComp.h_shell = 10
     ScrollComp.A_shell = 0.05
@@ -67,10 +68,9 @@ def Compressor(f = None):
     ScrollComp.geo.delta_suction_offset = 0.0e-3
     ScrollComp.geo.phi_ie_offset = pi
     
+    ScrollComp.mu_oil = 0.008
     ScrollComp.motor = Motor()
     ScrollComp.motor.set_eta(0.9)
-    
-    ScrollComp.orbiting_scroll_mass = 3.5
     
 #    print ScrollComp.V_s1(0)[0]
 #    print ScrollComp.V_sa(2*pi)[0]-ScrollComp.V_sa(0)[0]
@@ -278,8 +278,8 @@ def Compressor(f = None):
         ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
     
-    #return 
-    debug_plots(ScrollComp, plot_names=['Pressure v. crank angle'])
+    return 
+    #debug_plots(ScrollComp, plot_names=['Pressure v. crank angle'])
     
     ScrollComp.calculate_force_terms(orbiting_back_pressure = pe)
     

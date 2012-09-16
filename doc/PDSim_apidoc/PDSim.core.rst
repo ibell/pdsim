@@ -17,3 +17,20 @@ core Package
     :undoc-members:
     :show-inheritance:
 
+
+:mod:`motor` Module
+------------------
+
+.. automodule:: PDSim.core.motor
+    :members:
+    :undoc-members:
+    :show-inheritance:
+    
+
+:mod:`bearings` Module
+------------------
+
+.. automodule:: PDSim.core.bearings
+    :members:
+    :undoc-members:
+    :show-inheritance:

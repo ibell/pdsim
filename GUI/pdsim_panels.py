@@ -17,6 +17,7 @@ from multiprocessing import Process
 from PDSim.scroll import scroll_geo
 from PDSimLoader import RecipBuilder, ScrollBuilder
 import quantities as pq
+import warnings
 
 length_units = {
                 'Meter': pq.length.m,
@@ -82,9 +83,8 @@ class UnitConvertor(wx.Dialog):
             raise KeyError('Sorry your units '+default_units+' did not match any of the unit terms')
             
         self.txt = wx.TextCtrl(self, value=str(value))
-        self.units = wx.ComboBox(self)
+        self.units = wx.Choice(self)
         self.units.AppendItems(sorted(self.unit_dict.keys()))
-        self.units.SetEditable(False)
         if default_units in self.units.GetStrings():
             self.units.SetStringSelection(default_units)
         else:
@@ -96,8 +96,21 @@ class UnitConvertor(wx.Dialog):
         self.Fit()
         self._old_units = default_units
         
-        self.Bind(wx.EVT_COMBOBOX, self.OnSwitchUnits, self.units)
+        self.Bind(wx.EVT_CHOICE, self.OnSwitchUnits, self.units)
+
+    #Bind a key-press event to all objects to get Esc 
+        children = self.GetChildren()
+        for child in children:
+            child.Bind(wx.EVT_KEY_UP,  self.OnKeyPress)
         
+    def OnKeyPress(self,event=None):
+        """ cancel if Escape key is pressed """
+        event.Skip()
+        if event.GetKeyCode() == wx.WXK_ESCAPE:
+            self.EndModal(wx.ID_CANCEL)
+        elif event.GetKeyCode() == wx.WXK_RETURN:
+            self.EndModal(wx.ID_OK)
+                    
     def OnSwitchUnits(self, event):
         if not self.__is_temperature__:
             old = float(self.txt.GetValue()) * self.unit_dict[self._old_units]
@@ -264,9 +277,7 @@ class PDPanel(wx.Panel):
             if 'val' not in item and configdict is not None:
                 k = item['attr']
                 if k not in configdict:
-                    self.warn_unmatched_attr(k)
                     val,item['text']=self.get_from_configfile(self.name, k, default = True)
-                    print val, item['text']
                 else:
                     val = configdict[k]
                     item['text'] = descdict[k]
@@ -283,18 +294,16 @@ class PDPanel(wx.Panel):
             caption = item['text']
             if caption.find(']')>=0 and caption.find(']')>=0: 
                 units = caption.split('[',1)[1].split(']',1)[0]
-                if units == 'm':
+                unicode_units = unicode(units)
+                if unicode_units == u'm':
                     textbox.default_units = 'Meter'
-                elif units == 'm²':
+                elif unicode_units == u'm\xb2':
                     textbox.default_units = 'Square Meter'
-                elif units == 'm³':
+                elif unicode_units == u'm\xb3':
                     textbox.default_units = 'Cubic Meter'
                 elif units == 'rad/s':
                     textbox.default_units = 'Radians per second'
                 self.Bind(wx.EVT_CONTEXT_MENU,self.OnChangeUnits,textbox)      
-        
-    def warn_unmatched_attr(self, attr):
-        print "didn't match attribute", attr
         
     def prep_for_configfile(self):
         """
@@ -336,6 +345,16 @@ class PDPanel(wx.Panel):
         return s
            
     def _get_from_configfile(self, name, value):
+        """
+        Takes in a string from the config file and figures out how to parse it
+        
+        Returns
+        -------
+        d : value
+            Variable type
+        desc : string
+            The description from the config file
+        """
         
         #Split at the first comma to get type, and value+description
         type,val_desc = value.split(',',1)
@@ -366,6 +385,12 @@ class PDPanel(wx.Panel):
                
     def get_from_configfile(self, section, key = None, default = False):
         """
+        This function will get parameters from the config file
+        
+        If section and key are provided, it will return just the value, either from
+        the main config file if found or the default config file if not found.  If the parameter default is True,
+        it will ALWAYS use the default config file 
+        
         configfile: file path or readable object (StringIO instance or file)
         Returns a dictionary with each of the elements from the given section 
         name from the given configuration file.  Each of the values in the configuration 
@@ -397,10 +422,24 @@ class PDPanel(wx.Panel):
         else:
             _parser = parser
         
-        if key is not None and default:
-            value = _parser.get(section, key)
-            _d,_desc =  self._get_from_configfile(key, value)
-            return _d,_desc
+        if key is not None:
+            if default:
+                #Use the default value
+                value = default_parser.get(section, key)
+                _d,_desc =  self._get_from_configfile(key, value)
+                return _d,_desc
+            
+            #Return the value from the file directly if the key is found
+            elif _parser.has_option(section,key):
+                value = _parser.get(section, key)
+                _d,_desc =  self._get_from_configfile(key, value)
+                return _d,_desc
+            
+            else:
+                #Fall back to the default file
+                warnings.warn('Did not find the key ['+key+'] in section '+section+', falling back to default config' )
+                value = default_parser.get(section, key)
+                return value
         
         for name, value in _parser.items(section):
             _d,_desc = self._get_from_configfile(name,value)
@@ -533,26 +572,28 @@ class MassFlowOption(wx.Panel):
         self.key1 = key1
         self.key2 = key2
         
+        #Get the options from the derived class
         options = self.model_options()
         
         self.label = wx.StaticText(self, label=label)
         self.choices = wx.ComboBox(self)
         
+        #Load up the combobox with the options possible
         for option in options:
             self.choices.Append(option['desc'])
         self.choices.SetSelection(0)
         self.choices.SetEditable(False)
+        
+        #Store all the options in a list
         self.options_list = options
         
+        #A button to fire the chooser
         self.params = wx.Button(self, label='Params...')
         if not 'params' in option or not option['params']:
             self.params.Enable(False)
-            
         else:
-            TTS = self.dict_to_tooltip_string(option['params'])
-            self.params.SetToolTipString(TTS)
             self.params_dict = option['params']
-            
+            self.update_tooltip()            
             self.params.Bind(wx.EVT_BUTTON, self.OnChangeParams)
         
         sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -562,6 +603,12 @@ class MassFlowOption(wx.Panel):
         self.SetSizer(sizer)
         sizer.Layout()
     
+    def update_tooltip(self):
+        for option in self.options_list:
+            if option['desc'] == self.choices.GetStringSelection():
+                TTS = self.dict_to_tooltip_string(option['params'])
+                self.params.SetToolTipString(TTS)
+        
     def OnChangeParams(self, event):
         """
         Open a dialog to change the values
@@ -569,11 +616,16 @@ class MassFlowOption(wx.Panel):
         dlg = ChangeParamsDialog(self.params_dict)
         if dlg.ShowModal() == wx.ID_OK:
             self.params_dict = dlg.get_values()
-            TTS = self.dict_to_tooltip_string(self.params_dict)
-            self.params.SetToolTipString(TTS)
+            self.update_tooltip()
         dlg.Destroy()
         
     def dict_to_tooltip_string(self, params):
+        """
+        Take the dictionary of terms and turn it into a nice string for use in the
+        tooltip of the textbox
+        
+        """
+        
         s = ''
         for param in params:
             s += param['desc'] + ': ' + str(param['value']) + '\n'
@@ -584,6 +636,29 @@ class MassFlowOption(wx.Panel):
             if option['desc'] == self.choices.GetStringSelection():
                 return option['function_name']
         raise AttributeError
+    
+    def set_attr(self, attr, value):
+        """
+        Set an attribute in the params list of dictionaries
+        
+        Parameters
+        ----------
+        attr : string
+            Attribute to be set
+        value : 
+            The value to be given to this attribute
+        """
+        
+        #self.options_list is a list of dictionaries with the keys 'desc','function_name','params'
+        for option in self.options_list:
+            #Each param is a dictionary with keys of 'attr', 'value', 'desc'
+            for param in option['params']:
+                if param['attr'] == attr:
+                    param['value'] = value
+                    self.update_tooltip()
+                    return
+                
+        raise KeyError('Did not find the attribute '+attr)
         
     def model_options(self):
         """
@@ -594,7 +669,7 @@ class MassFlowOption(wx.Panel):
             Very terse description of the term 
         * function_name : function
             the function in the main machine class to be called
-        * params : list of dictionaries
+        * params : list of dictionaries with the keys 'attr', 'value', 'desc'
         
         MUST be implemented in the sub-class
         """
@@ -1059,7 +1134,7 @@ class ParametricPanel(PDPanel):
                     raise AttributeError('Invalid Main.SimType : '+str(Main.SimType))
                     
                 for val, attr in zip(vals, attrs):
-                    # Actually set it
+                    # Actually set the attr in the model
                     setattr(sim, attr, float(val))
                     
                 #Run the post_set_params for all the panels
@@ -1070,7 +1145,7 @@ class ParametricPanel(PDPanel):
                     RecipBuilder(sim)
                 elif Main.SimType == 'scroll':
                     ScrollBuilder(sim)
-                
+                    
                 #Add an index for the run so that it can be sorted properly
                 sim.run_index = Irow + 1
                 #Add sim to the list
@@ -1466,22 +1541,28 @@ class StateInputsPanel(PDPanel):
         """
         p_suction = self.SuctionState.GetState().p
         Fluid = self.SuctionState.GetState().Fluid
-        
-        if self.cmbDischarge.GetStringSelection() == 'Discharge pressure [kPa]':
-            p_disc = float(self.DischargeValue.GetValue())
-            self._discharge_pressure = p_disc
+        try:
             
-        elif self.cmbDischarge.GetStringSelection() == 'Pressure ratio [-]':
-            p_ratio = float(self.DischargeValue.GetValue())
-            self._discharge_pressure = p_ratio*p_suction
-        
-        elif self.cmbDischarge.GetStringSelection() == 'Saturated Temperature [K]':
-            Tsat = float(self.DischargeValue.GetValue())
-            self._discharge_pressure = CP.Props('P','T',Tsat,'Q',1.0,Fluid)
-
-        else:
-            raise KeyError
-        
+            if self.cmbDischarge.GetStringSelection() == 'Discharge pressure [kPa]':
+                p_disc = float(self.DischargeValue.GetValue())
+                self._discharge_pressure = p_disc
+                
+            elif self.cmbDischarge.GetStringSelection() == 'Pressure ratio [-]':
+                p_ratio = float(self.DischargeValue.GetValue())
+                self._discharge_pressure = p_ratio*p_suction
+            
+            elif self.cmbDischarge.GetStringSelection() == 'Saturated Temperature [K]':
+                Tsat = float(self.DischargeValue.GetValue())
+                self._discharge_pressure = CP.Props('P','T',Tsat,'Q',1.0,Fluid)
+    
+            else:
+                raise KeyError
+            
+        except ValueError:
+            # Silently allow CoolProp to raise ValueError if intermediate value is not within 
+            # saturation range
+            pass
+            
     def OnChangeDischargeVariable(self, event = None):
         """
         Fires when the combobox is selected

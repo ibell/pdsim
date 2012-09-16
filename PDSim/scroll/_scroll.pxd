@@ -19,6 +19,7 @@ cdef class _Scroll(object):
     cpdef double Discharge(self,_FlowPath FP)
     cpdef double Inlet_sa(self, _FlowPath FP)
     cpdef double FlankLeakage(self, _FlowPath FP)
+    cpdef double RadialLeakage(self, _FlowPath FP, dict kwargs)
     
     cpdef double involute_heat_transfer(self, double hc, double hs, double  rb, 
                                   double phi1, double phi2, double phi0, 

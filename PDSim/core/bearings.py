@@ -30,23 +30,23 @@ def thrust_bearing(**kwargs):
     
     .. math::
     
-        x = {r_o}\cos \left( {{\phi _{ie}} - \frac{\pi }{2} - \theta } \right)
+        x = {r_o}\cos \left( {{\phi _{ie}} - \\frac{\pi }{2} - \\theta } \\right)
 
     .. math::
     
-        y = {r_o}\sin \left( {{\phi _{ie}} - \frac{\pi }{2} - \theta } \right)
+        y = {r_o}\sin \left( {{\phi _{ie}} - \\frac{\pi }{2} - \\theta } \\right)
     
     .. math::
     
-        \frac{{dx}}{{d\theta }} = {r_o}\sin \left( {{\phi _{ie}} - \frac{\pi }{2} - \theta } \right)\omega 
+        \\frac{{dx}}{{d\\theta }} = {r_o}\sin \left( {{\phi _{ie}} - \\frac{\pi }{2} - \\theta } \\right)\omega 
     
     .. math::
     
-        \frac{{dy}}{{d\theta }} =  - {r_o}\cos \left( {{\phi _{ie}} - \frac{\pi }{2} - \theta } \right)\omega
+        \\frac{{dy}}{{d\\theta }} =  - {r_o}\cos \left( {{\phi _{ie}} - \\frac{\pi }{2} - \\theta } \\right)\omega
 
     .. math::
     
-        \left| v \right| = \sqrt {{{\left( {\frac{{dx}}{{d\theta }}} \right)}^2} + {{\left( {\frac{{dy}}{{d\theta }}} \right)}^2}}  = {r_o}\omega 
+        \left| v \\right| = \sqrt {{{\left( {\\frac{{dx}}{{d\\theta }}} \\right)}^2} + {{\left( {\\frac{{dy}}{{d\\theta }}} \\right)}^2}}  = {r_o}\omega 
     """
     #Friction coefficient
     mu = kwargs.pop('mu', None)
@@ -194,6 +194,10 @@ def journal_bearing(**kwargs):
             log10_f_rb_c_list.append(interp1d(x, y)(np.log10(S)))
             
             D_over_L_list.append(k)
+            
+        
+        
+        
         
         #get log10(f*rb/c) by 1-D interpolation for D/L
         log10_f_rb_c = interp1d(D_over_L_list, log10_f_rb_c_list)(2*r_b/L)
@@ -204,10 +208,21 @@ def journal_bearing(**kwargs):
         #r_b/c from function inputs
         rb_c = r_b/c
     
-    #Friction factor after all that
+    #Friction factor after all that [-]
     f = rb_c_f/rb_c
     
+    #Frictional losses [W]
     Wdot_loss = omega*r_b*f*W
+    
+    print 'W',W
+    print 'r_b',r_b
+    print 'omega',omega
+    print 'eta_0',eta_0
+    print 'S',S
+    print 'D_over_L_list',D_over_L_list
+    print 'log10_f_rb_c_list',log10_f_rb_c_list
+    print 'rb*f/c',rb_c_f
+    print 'f',f
     
     return dict(
                 S = S,

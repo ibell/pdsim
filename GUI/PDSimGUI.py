@@ -21,15 +21,20 @@ import textwrap
 import cPickle
 from ConfigParser import SafeConfigParser
 import StringIO
+import warnings
 
+#Other packages that are required
 import numpy as np
 import CoolProp.State as CPState
+
+#PDSim imports
 from PDSim.recip.core import Recip
 from PDSim.scroll.core import Scroll
 from PDSimLoader import RecipBuilder, ScrollBuilder
 from PDSim.plot.plots import PlotNotebook
 import PDSim
 
+#PDSim GUI imports
 import pdsim_panels
 import pdsim_plugins
 import recip_panels
@@ -41,6 +46,12 @@ class InfiniteList(object):
     Creates a special list where removing an element just puts it back at the end of the list
     """
     def __init__(self, values):
+        """
+        
+        Parameters
+        ----------
+        values : list
+        """
         self.values = values
         
     def pop(self):
@@ -53,6 +64,9 @@ class InfiniteList(object):
         return val1
        
 class RedirectText2Pipe(object):
+    """
+    An text output redirector
+    """
     def __init__(self, pipe_inlet):
         self.pipe_inlet = pipe_inlet
     def write(self, string):
@@ -210,7 +224,7 @@ class WorkerThreadManager(Thread):
                 #Send the abort signal
                 _thread.abort()
                 #Wait for it to finish up
-                _thread.join()
+                _thread.join(1)
             del busy
             
         dlg.Destroy()
@@ -782,46 +796,53 @@ class AutoWidthListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
         ListCtrlAutoWidthMixin.__init__(self)
         
 class ResultsList(wx.Panel, ColumnSorterMixin):
-    def __init__(self, parent, headers, values):
+    def __init__(self, parent, headers, values, results):
         """
-        values: a list of list of values.  Each entry should be as long as the number of headers
+        
+        parent : wx.Window
+            parent of the Panel
+            
+        headers: a list of strings
+            Each element is the string that will be the header of the column
+            
+        values: a list of list of values.  
+            Each entry in the list should be as long as the number of headers
+            
+        results : PDSimCore instances
+            The simulation runs
         """
         wx.Panel.__init__(self, parent)
         
-        self.headers = headers
-        self.values = values
+        #: The list of strings of the header
+        self.headers = list(headers)
+        #: The values in the table
+        self.values = list(values)
+        #: The PDSimCore instances that have all the data
+        self.results = list(results)
         
         self.list = AutoWidthListCtrl(self, 
-                                      style=wx.LC_REPORT
-                                      | wx.BORDER_NONE
-                                      | wx.LC_SORT_ASCENDING
+                                      style=wx.LC_REPORT | wx.BORDER_NONE
                                       )
         #Build the headers
         for i, header in enumerate(headers):
             self.list.InsertColumn(i, header)
         
-        self.data = values
-        
         #Add the values one row at a time
-        for i, row in enumerate(self.data):
-            index = self.list.InsertStringItem(sys.maxint,str(row[0]))
-            self.list.SetItemData(index,i)
-            for j in range(1,len(row)):
-                val = row[j]
-                self.list.SetStringItem(index,j,str(val))
-            
-        #Build the itemDataMap needed for the Sorter mixin
         self.itemDataMap = {}
-        for i, row in enumerate(self.data):
-            Data = []
-            for val in row:
-                Data.append(val)
-            self.itemDataMap[i] = tuple(Data)
+        for i, row in enumerate(self.values):
+            #Add an entry to the data map
+            self.itemDataMap[i] = tuple(row)
+            
+            self.list.InsertStringItem(i,str(row[0]))
+            self.list.SetItemData(i,i)
+            
+            for j in range(1,len(row)):
+                self.list.SetStringItem(i,j,str(row[j]))
         
         total_width = 0    
         for i in range(len(headers)):
             self.list.SetColumnWidth(i, wx.LIST_AUTOSIZE_USEHEADER)
-            total_width+=self.list.GetColumnWidth(i)
+            total_width += self.list.GetColumnWidth(i)
             
         width_available = self.Parent.GetSize()[0]
         self.list.SetMinSize((width_available,200))
@@ -847,20 +868,87 @@ class ResultsList(wx.Panel, ColumnSorterMixin):
         self.SetSizer(sizer)
         self.SetAutoLayout(True)
         
-    # Used by the ColumnSorterMixin, see wx/lib/mixins/listctrl.py
+    def OnSortOrderChanged(self, *args, **kwargs):
+        """
+        Overload the base class method to resort the internal structures 
+        when the table is sorted
+        """
+        self._sort_objects()
+        return ColumnSorterMixin.OnSortOrderChanged(self, *args, **kwargs)
+        
+    def __getitem__(self, index):
+        """
+        Provided to be able to index the class
+        returns the index of the run returned
+        """
+        
+        return self.results[index]
+    
+    def _sort_objects(self):
+        """
+        Sort the internal data structures based on the table sort state
+        """
+        
+        # Sort the output csv table in the same way as the listctrl
+        iCol, direction = self.GetSortState()
+        
+        #If sorted, sort the variables
+        if iCol >= 0:
+        
+            # Get a sorted version of self.values sorted by the column used in list
+            values_results = zip(self.values, self.results)
+            
+            # Sort the results and the rows together
+            sorted_things = sorted(values_results, key=itemgetter(iCol))
+            
+            # Unpack
+            self.values, self.results = zip(*sorted_things)
+            
+            # tuples --> list
+            self.values = list(self.values)
+            self.results = list(self.results)
+        
+    def remove_item(self, index):
+        """
+        Remove the item from the ResultsList instance
+        """
+        #Remove the item from the data map
+        self.itemDataMap.pop(index)
+        #Remove the item from the values
+        del self.values[index]
+        #Remove the item from the results
+        del self.results[index]
+        
+    def get_results(self):
+        """
+        Return the list of PDSimCore instances
+        """
+        return self.results
+ 
     def GetListCtrl(self):
+        """
+        Required method for ColumnSorterMixin
+        
+        Used by the ColumnSorterMixin, see wx/lib/mixins/listctrl.py
+        """
         return self.list
     
-    # Used by the ColumnSorterMixin, see wx/lib/mixins/listctrl.py
     def GetSortImages(self):
+        """
+        Required method for ColumnSorterMixin
+        
+        Used by the ColumnSorterMixin, see wx/lib/mixins/listctrl.py
+        """
         return (self.sm_dn, self.sm_up)
     
     def AsString(self):
-        #Sort the output csv table in the same way as the listctrl
-        iCol, direction = self.GetSortState()
+        """
+        Return a csv formatted table of the ResultsList
         
-        #Get a sorted version of self.values sorted by the column used in list
-        self.values = sorted(self.values, key=itemgetter(iCol))
+        """
+        
+        #Sort the internal data structures based on table sort
+        self._sort_objects()
         
         header_string = [','.join(self.headers)]
         def tostr(row):
@@ -1200,10 +1288,9 @@ class OutputDataPanel(pdsim_panels.PDPanel):
                                'eta_v': 'Volumetric efficiency [-]',
                                'eta_a': 'Adiabatic efficiency [-]',
                                'Td': 'Discharge temperature [K]',
-                               'Wdot': 'Shaft power [kW]',
-                               'Wdot_motor': 'Motor losses [kW]',
+                               'motor.losses': 'Motor losses [kW]',
                                'Wdot_electrical': 'Electrical power [kW]',
-                               'Wdot_mechanical': 'Mechanical losses [kW]',
+                               'Wdot_mechanical': 'Mechanical power [kW]',
                                'Qamb': 'Ambient heat transfer [kW]',
                                'run_index': 'Run Index',
                                'eta_oi': 'Overall isentropic efficiency [-]',
@@ -1357,6 +1444,13 @@ class OutputDataPanel(pdsim_panels.PDPanel):
                 self.ResultsList.Destroy()
                 self.GetSizer().Layout()
             
+            #Remove any keys that are in cols_selected but not in col_options
+            #Iterate over a copy so that removing the keys works properly
+            for key in self.columns_selected[:]:
+                if key not in self.column_options:
+                    self.columns_selected.remove(key)
+                    warnings.warn('The key '+key+' was found in columns_selected but not in column_options.')
+                
             for attr in reversed(self.columns_selected):
                 #If the key is in any of the simulations 
                 if not any([self._hasattr(sim,attr) for sim in self.results]):
@@ -1372,12 +1466,11 @@ class OutputDataPanel(pdsim_panels.PDPanel):
                         row.append(value)
                     else:
                         print 'Trying to add attribute \'' + attr + '\' to output but it is not found found in simulation instance'
-                        
                 rows.append(row)
             headers = [self.column_options[attr] for attr in self.columns_selected]
             
             #The items being created
-            self.ResultsList = ResultsList(self, headers, rows)
+            self.ResultsList = ResultsList(self, headers, rows, self.results)
 
             
             self.WriteButton = wx.Button(self, label = 'Write to file...')
@@ -1404,6 +1497,7 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             
             sizer.Layout()
             self.Refresh()
+            
         else:
             #Destroy the items associated with the output data
             if self.ResultsList is not None:
@@ -1455,15 +1549,6 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             
         self.rebuild()
         
-    def remove_output_terms(self, keys):
-        """
-        
-        Parameters
-        ----------
-        keys : list of strings
-            Remove the items with 'attr' equal to key
-        """
-        
     def OnLoadRuns(self, event = None):
         """
         Load a pickled run from a file
@@ -1510,11 +1595,16 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             dlg = wx.MessageDialog(None,'You are about to remove '+str(len(indices))+' runs.  Ok to confirm', style = wx.OK|wx.CANCEL)
             if dlg.ShowModal() == wx.ID_OK:
                 for index in reversed(indices):
-                    self.results.pop(index)
+                    #Remove the item from the ResultsList
+                    self.ResultsList.remove_item(index)
+                    
+                #Update our copy of the results
+                self.results = self.ResultsList.get_results()
+                
             dlg.Destroy()
+            
+            #Rebuild the ResultsList
             self.rebuild()
-        print self.results
-        print 'done removing'
                 
     
     def OnWriteFiles(self, event):
@@ -1916,12 +2006,17 @@ class MainFrame(wx.Frame):
         self.menuFileOpen = wx.MenuItem(self.File, -1, "Open Config from file...\tCtrl+O", "", wx.ITEM_NORMAL)
         self.menuFileSave = wx.MenuItem(self.File, -1, "Save config to file...\tCtrl+S", "", wx.ITEM_NORMAL)
         self.menuFileFlush = wx.MenuItem(self.File, -1, "Flush out temporary files...", "", wx.ITEM_NORMAL)
+        self.menuFileConsole = wx.MenuItem(self.File, -1, "Open a python console", "", wx.ITEM_NORMAL)
         self.menuFileQuit = wx.MenuItem(self.File, -1, "Quit\tCtrl+Q", "", wx.ITEM_NORMAL)
+        
         self.File.AppendItem(self.menuFileOpen)
         self.File.AppendItem(self.menuFileSave)
         self.File.AppendItem(self.menuFileFlush)
+        self.File.AppendItem(self.menuFileConsole)
         self.File.AppendItem(self.menuFileQuit)
+        
         self.MenuBar.Append(self.File, "File")
+        self.Bind(wx.EVT_MENU,self.OnOpenConsole,self.menuFileConsole)
         self.Bind(wx.EVT_MENU,self.OnConfigOpen,self.menuFileOpen)
         self.Bind(wx.EVT_MENU,self.OnConfigSave,self.menuFileSave)
         self.Bind(wx.EVT_MENU,self.OnFlushTemporaryFolder,self.menuFileFlush)
@@ -1976,7 +2071,16 @@ class MainFrame(wx.Frame):
     ################################
     #         Event handlers       #
     ################################
-       
+    
+    def OnOpenConsole(self, event):
+        frm = wx.Frame(None)
+        from wx.py.crust import Crust
+        console = Crust(frm, intro = 'Welcome to the debug console within PDSim', locals = locals())
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(console,1,wx.EXPAND)
+        frm.SetSizer(sizer)
+        frm.Show()
+        
     def OnConfigOpen(self,event):
         FD = wx.FileDialog(None,"Load Configuration file",defaultDir='configs',
                            style=wx.FD_OPEN)
@@ -2116,6 +2220,7 @@ class MainFrame(wx.Frame):
             self.MTB.OutputsTB.plot_outputs(sim)
             self.MTB.OutputsTB.DataPanel.add_runs([sim])
             self.MTB.OutputsTB.DataPanel.rebuild()
+            
             #Check whether there are no more results to be processed and threads list is empty
             #This means the manager has completed its work - reset it
             if self.results_list.empty() and not self.WTM.threadsList:

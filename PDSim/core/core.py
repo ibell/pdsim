@@ -153,7 +153,7 @@ class PDSimCore(object):
             setcol(self.p, i, exists_indices, self.p_)
         if hasattr(self,'h_') and len(self.h_) == len(exists_indices):
             setcol(self.h, i, exists_indices, self.h_)
-        if hasattr(self,'Q_') and len(self.Q_) == len(exists_indices):            
+        if hasattr(self,'Q_') and len(self.Q_) == len(exists_indices):       
             setcol(self.Q, i, exists_indices, self.Q_)
     
     def __postprocess_flows(self):
@@ -248,17 +248,20 @@ class PDSimCore(object):
             #Tube.mdot is always a positive value
             Tube.mdot = max(abs(mdot1), abs(mdot2))
             
+        self.mdot = self.FlowsProcessed.mean_mdot[self.key_inlet]
+            
         
     def __postprocess_HT(self):    
         self.HTProcessed=struct()
         r = range(self.Ntheta)
-        self.HTProcessed.summed_Q = np.zeros((self.Ntheta,))
-        #Make a copy of Q and replace NAN with zeros
-        _Q = self.Q[:] 
-        _Q[np.isnan(_Q)] = 0.0
         
-        for i in range(self.Ntheta):
-            self.HTProcessed.summed_Q[i] = np.sum(_Q[:, i])
+        #Remove all the NAN placeholders and replace them with zero values
+        self.Q[np.isnan(self.Q)] = 0.0
+        
+        #Sum at each step of the revolution
+        self.HTProcessed.summed_Q = np.sum(self.Q, axis = 0) #kW
+        
+        #Get the mean heat transfer rate
         self.HTProcessed.mean_Q = trapz(self.HTProcessed.summed_Q[r], self.t[r])/(self.t[self.Ntheta-1]-self.t[0])
     
     def guess_outlet_temp(self, inletState, p_outlet, eta_a = 0.7):
@@ -270,13 +273,13 @@ class PDSimCore(object):
         
         .. math::
         
-            \eta_a = \frac{h_{2s}-h_1}{h_2-h_1}
+            \eta_a = \\frac{h_{2s}-h_1}{h_2-h_1}
             
         and in expander mode it is defined by
         
         .. math::
         
-            \eta_a = \frac{h_2-h_1}{h_{2s}-h_1}
+            \eta_a = \\frac{h_2-h_1}{h_{2s}-h_1}
             
         This function can also be overloaded by the subclass in order to 
         implement a different guess method
@@ -365,7 +368,7 @@ class PDSimCore(object):
         self.Valves.append(Valve)
         self.__hasValves__=True
         
-    def __pre_run(self, N = 1000):
+    def pre_run(self, N = 1000):
         #Build the full numpy arrays for temperature, volume, etc.
         self.t=np.zeros((10000,))
         self.T=np.zeros((self.CVs.N,10000))
@@ -385,7 +388,17 @@ class PDSimCore(object):
         #Initialize the control volumes
         self.__hasLiquid__=False
         
-    def __pre_cycle(self, x0 = None):
+        # If it has a motor model, try to use that to get a guess for the motor
+        # losses and then also figure out whether these motor losses should be
+        # added to the suction gas 
+        if hasattr(self,'motor'):
+            pass
+            
+        
+    def pre_cycle(self, x0 = None):
+        """
+        This runs before the cycle is run but after pre_run has been called
+        """
         self.temp_vectors_list=[]
         def add_thing(name,item):
             #Actually create the array
@@ -471,7 +484,7 @@ class PDSimCore(object):
         
         """
         #Do some initialization - create arrays, etc.
-        self.__pre_cycle(x_state)
+        self.pre_cycle(x_state)
         
         #Step variables
         t0=tmin
@@ -533,7 +546,7 @@ class PDSimCore(object):
         print 'Number of steps taken', N
         self.Itheta = N
         self.Ntheta = N+1
-        self.__post_cycle()
+        self.post_cycle()
         
     def cycle_Heun(self,N,x_state, tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
         """
@@ -565,7 +578,7 @@ class PDSimCore(object):
         
         """
         #Do some initialization - create arrays, etc.
-        self.__pre_cycle()
+        self.pre_cycle()
         
         #Start at an index of 0
         Itheta=0
@@ -624,7 +637,7 @@ class PDSimCore(object):
         print 'Number of steps taken', N,'len(FlowStorage)',len(self.FlowStorage)
         self.Itheta = N
         self.Ntheta = N+1
-        self.__post_cycle()
+        self.post_cycle()
         return
         
     def cycle_RK45(self,x_state,hmin=1e-4,tmin=0,tmax=2.0*pi,eps_allowed=1e-10,step_relax=0.9,
@@ -695,7 +708,7 @@ class PDSimCore(object):
         """
         
         #Do some initialization - create arrays, etc.
-        self.__pre_cycle()
+        self.pre_cycle()
         
         #Start at an index of 0
         Itheta=0
@@ -863,7 +876,7 @@ class PDSimCore(object):
         print 'Itheta steps taken', Itheta+1
         self.Itheta=Itheta
         self.Ntheta = Itheta+1
-        self.__post_cycle()
+        self.post_cycle()
         
     def __calc_boundary_work(self):
         
@@ -935,7 +948,7 @@ class PDSimCore(object):
         for CVindex in range(self.p.shape[0]):
             self.Wdot_pv+=Wdot_one_CV(CVindex)
         
-    def __post_cycle(self):
+    def post_cycle(self):
         """
         This stuff all happens at the end of the cycle.  It is a private method not meant to be called externally
         """
@@ -1090,6 +1103,16 @@ class PDSimCore(object):
             Number of conventional steps to be taken when not using newton-raphson prior to entering into a line search
         """
         
+        #Both inlet and outlet keys must be connected to invariant nodes - 
+        # that is they must be part of the tubes which are all quasi-steady
+        if not key_inlet == None and not key_inlet in self.Tubes.Nodes:
+            raise KeyError('key_inlet must be a Tube node')
+        if not key_outlet == None and not key_outlet in self.Tubes.Nodes:
+            raise KeyError('key_outlet must be a Tube node')
+        
+        self.key_inlet = key_inlet
+        self.key_outlet = key_outlet
+        
         from time import clock
         t1=clock()
         
@@ -1102,17 +1125,7 @@ class PDSimCore(object):
             self.pre_solve()
             
         #This runs before the model starts at all
-        self.__pre_run()
-        
-        #Both inlet and outlet keys must be connected to invariant nodes - 
-        # that is they must be part of the tubes which are all quasi-steady
-        if not key_inlet == None and not key_inlet in self.Tubes.Nodes:
-            raise KeyError('key_inlet must be a Tube node')
-        if not key_outlet == None and not key_outlet in self.Tubes.Nodes:
-            raise KeyError('key_outlet must be a Tube node')
-        
-        self.key_inlet = key_inlet
-        self.key_outlet = key_outlet
+        self.pre_run()
         
         if Abort is None and pipe_abort is not None:
             # Use the pipe_abort pipe to look at the abort pipe to see whether 
@@ -1128,10 +1141,10 @@ class PDSimCore(object):
         
         if reset_initial_state is not None and reset_initial_state:
             self.reset_initial_state()
-            self.__pre_cycle(self.xstate_init)
+            self.pre_cycle(self.xstate_init)
         else:
             # (2) Run a cycle with the given values for the temperatures
-            self.__pre_cycle()
+            self.pre_cycle()
             #x_state only includes the values for the chambers, the valves start closed
             #Since indexed, yields a copy
             self.x_state = self.__get_from_matrices(0)[0:len(self.stateVariables)*self.CVs.N]
@@ -1321,6 +1334,8 @@ class PDSimCore(object):
             #If the abort function returns true, quit this loop
             if self.Abort() or OneCycle:
                 print 'Quitting OBJECTIVE function in core.solve'
+                if hasattr(self,'mechanical_losses'):
+                    self.mechanical_losses('low')
                 return None
                     
             # (3) After convergence of the inner loop, check the energy balance on the lumps
@@ -1338,7 +1353,7 @@ class PDSimCore(object):
         print 'Solution is', x_soln,'Td, Tlumps'
         
         if not self.Abort(): 
-            self.__post_solve()
+            self.post_solve()
             
         if hasattr(self,'resid_Td') and hasattr(self,'x_state'):
             del self.resid_Td, self.x_state
@@ -1346,7 +1361,7 @@ class PDSimCore(object):
         #Save the elapsed time for simulation
         self.elapsed_time = clock()-t1
         
-    def __post_solve(self):
+    def post_solve(self):
         """
         Do some post-processing to calculate flow rates, efficiencies, etc.  
         """
@@ -1431,7 +1446,7 @@ class PDSimCore(object):
         
         #1. Calculate the volume and derivative of volume of each control volumes
         #    Return two lists, one for the volumes, second for the derivatives of volumes 
-        V,dV=self.CVs.volumes(theta)
+        V, dV=self.CVs.volumes(theta)
 
         if self.__hasLiquid__==True:
             raise NotImplementedError
@@ -1488,7 +1503,7 @@ class PDSimCore(object):
         else:
             Q=0.0
         
-        self.Q_=Q        
+        self.Q_=Q    
         dudxL=0.0
         summerdxL=0.0
         xL=0.0
@@ -1497,8 +1512,6 @@ class PDSimCore(object):
         dxLdtheta=1.0/m*(summerdxL-xL*dmdtheta)
         dTdtheta=1.0/(m*cv)*(-1.0*T*dpdT*(dV-v*dmdtheta)-m*dudxL*dxLdtheta-h*dmdtheta+Q/self.omega+summerdT)
         drhodtheta = 1.0/V*(dmdtheta-rho*dV)
-        
-        
         
         if self.__hasLiquid__==True:
             f=np.zeros((3*self.NCV,))

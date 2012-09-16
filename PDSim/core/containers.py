@@ -22,10 +22,13 @@ class Tube():
     With this class, the state of at least one of the points is fixed.  For instance, at the inlet of the compressor, the state well upstream is quasi-steady.
     """
     def __init__(self,key1,key2,L,ID,OD=None,State1=None,State2=None,fixed=-1,TubeFcn=None,mdot=-1,exists=True):
-        self.key1=key1
-        self.key2=key2
-        self.fixed=fixed
-        self.exists=exists
+        self.key1 = key1
+        self.key2 = key2
+        self.fixed = fixed
+        
+        #: Additional heat to be added to the tube
+        self.Q_add = 0.0
+        self.exists = exists
         if fixed<0:
             raise AttributeError(textwrap.dedent("""You must provide an integer 
             value for fixed, either 1 for Node 1 fixed, or 2 for Node 2 fixed.  

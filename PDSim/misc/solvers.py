@@ -4,6 +4,7 @@ from __future__ import division
 import numpy as np
 from numpy.linalg import inv
 from numpy import array,dot
+from error_bar import error_ascii_bar
 
 def MultiDimNewtRaph(f,x0,dx=1e-6,args=(),ytol=1e-5,w=1.0,JustOneStep=False):
     """
@@ -139,7 +140,8 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, w=1.0, wJ=1.0, itermax=
             F0=F1
             A0=A1
             
-            print 'error_vec',error_vec
+            for err in error_vec:
+                print error_ascii_bar(err[0],ytol)
             iter+=1
         else:
             raise ValueError('Reached maximum number of iterations without getting below ytol RMS error')
