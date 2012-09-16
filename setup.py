@@ -28,7 +28,7 @@ fp.close()
 
 if len(sys.argv) == 1:
     #sys.argv+=['build_ext','--inplace']
-    sys.argv+=['build','--force','install']
+    sys.argv+=['install']
     
 import Cython
 
@@ -46,7 +46,6 @@ pyx_list = [
             "PDSim/flow/_flow.pyx",
             "PDSim/scroll/scroll_geo.py",
             "PDSim/misc/_listmath.pyx",
-            "PDSim/misc/polymath.pyx",
             "PDSim/recip/_recip.pyx",
             "PDSim/scroll/_scroll.pyx"
             ]

@@ -12,7 +12,7 @@ from math import pi
 # If the following line is uncommented, python will try to use a local version
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
-#sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo
@@ -269,8 +269,8 @@ def Compressor(f = None):
         ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
     
-    return 
-    #debug_plots(ScrollComp, plot_names=['Pressure v. crank angle'])
+    #return 
+    debug_plots(ScrollComp, plot_names=['Pressure v. crank angle'])
     
     ScrollComp.calculate_force_terms(orbiting_back_pressure = pe)
     

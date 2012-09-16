@@ -1,13 +1,5 @@
 import copy
 
-cdef class FMFunction(object):
-    cpdef double calc(self, _FlowPath FP):
-        return 0.0
-        
-cdef class IsentropicNozzle(FMFunction):
-    cpdef double calc(self, _FlowPath FP):
-        return 1.0
-    
 cpdef tuple sum_flows(bytes key, object Flows):
     cdef _FlowPath Flow
     cdef double summer_mdot,summer_mdoth

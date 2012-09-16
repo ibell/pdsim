@@ -20,12 +20,10 @@ cdef class geoVals:
 cpdef double fxA(double rb, double phi, double phi0)
 cpdef double fyA(double rb, double phi, double phi0)
 
-cpdef double theta_d(geoVals geo)
 cpdef tuple coords_inv(phi_vec,geoVals geo, double theta, flag = *)
 cpdef tuple _coords_inv_np(np.ndarray phi, geoVals geo, double theta, flag = *)
 cpdef tuple _coords_inv_d(double phi, geoVals geo, double theta, flag = *)
 
-cpdef double radial_leakage_area(double theta, geoVals geo, bytes key1, bytes key2, location = *) except *
 cpdef tuple radial_leakage_angles(double theta, geoVals geo, bytes key1, bytes key2)
 
 cpdef int getNc(double theta, geoVals geo)
@@ -58,9 +56,7 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=*)
 cpdef DDD(double theta, geoVals geo, bint poly=*) 
 cpdef DDD_forces(double theta, geoVals geo, bint poly=*) 
 
-cpdef double min2(double, double)
-cpdef double max2(double, double)
-cpdef double phi_s_sa(double theta,geoVals geo)
+cpdef phi_s_sa(double theta,geoVals geo)
 
 @cython.locals(iter=cython.int,phi_os=cython.double,phi_o0=cython.double,phi_ie=cython.double,phi_i0=cython.double,change=cython.double,eps=cython.double,f=cython.double,x1=cython.double,x2=cython.double,x3=cython.double,y1=cython.double,y2=cython.double,phi=cython.double,alpha=cython.double)
 cdef double phi_d_dd(double theta, geoVals geo)

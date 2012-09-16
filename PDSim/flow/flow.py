@@ -72,7 +72,6 @@ class FlowPathCollection(_FlowPathCollection):
         """
         exists_keys=Core.CVs.exists_keys
         Tubes_Nodes=Core.Tubes.Nodes
-        
         for FlowPath in self:
             ## Update the pointers to the states for the ends of the flow path
             if FlowPath.key1 in exists_keys:

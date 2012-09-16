@@ -41,28 +41,6 @@ cdef class _Scroll(object):
         except ZeroDivisionError:
             return 0.0
         
-    cpdef double RadialLeakage(self, _FlowPath FP, dict kwargs):
-        """
-        Calculate the radial leakge flow rate
-        """
-        #Calculate the area
-        #Arc length of the upstream part of the flow path
-        
-        FP.A = scroll_geo.radial_leakage_area(self.theta,
-                                               self.geo,
-                                               FP.key1,
-                                               FP.key2)
-        
-        if FP.A == 0.0:
-            return 0.0
-        
-        return flow_models.FrictionCorrectedIsentropicNozzle(FP.A, 
-                                                             FP.State_up, 
-                                                             FP.State_down, 
-                                                             self.geo.delta_radial, 
-                                                             str('radial'), 
-                                                             self.geo.t)
-        
     cpdef double involute_heat_transfer(self, double hc, double hs, double  rb, 
                                   double phi1, double phi2, double phi0, 
                                   double T_scroll, double T_CV, double dT_dphi, 
