@@ -12,7 +12,7 @@ from math import pi
 # If the following line is uncommented, python will try to use a local version
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
-sys.path.insert(0, os.path.abspath('..'))
+#sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo
@@ -21,6 +21,7 @@ from PDSim.core.containers import ControlVolume
 from PDSim.core.core import Tube
 from PDSim.plot.plots import debug_plots
 from PDSim.scroll.plots import plotScrollSet
+from PDSim.core.motor import Motor
 
 from CoolProp import State
 from CoolProp import CoolProp as CP
@@ -56,12 +57,20 @@ def Compressor(f = None):
     ScrollComp.L_lower_bearing = 0.025
     ScrollComp.c_lower_bearing = 20e-6
     ScrollComp.thrust_friction_coefficient = 0.028 #From Chen thesis
+    ScrollComp.mu_oil = 0.0086
+    ScrollComp.L_ratio_bearings = 3.0
     
     ScrollComp.h_shell = 10
     ScrollComp.A_shell = 0.05
+    ScrollComp.HTC = 0.0
     
     ScrollComp.geo.delta_suction_offset = 0.0e-3
     ScrollComp.geo.phi_ie_offset = pi
+    
+    ScrollComp.motor = Motor()
+    ScrollComp.motor.set_eta(0.9)
+    
+    ScrollComp.orbiting_scroll_mass = 3.5
     
 #    print ScrollComp.V_s1(0)[0]
 #    print ScrollComp.V_sa(2*pi)[0]-ScrollComp.V_sa(0)[0]
