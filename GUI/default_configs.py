@@ -103,6 +103,7 @@ thrust_OD = float, 0.3, Thrust bearing outer diameter [m]
 orbiting_scroll_mass = float,2.0,Orbiting scroll mass [kg]
 L_ratio_bearings = float,3.0, Ratio of lengths for bearings [-]
 HTC = float, 0.0, Heat transfer coefficient in scrolls [-]
+journal_tune_factor = float, 1.0, Journal loss tune factor [-]
 
 [StatePanel]
 omega = float,377.0,Rotational speed [rad/s]

@@ -839,10 +839,13 @@ class Scroll(PDSimCore, _Scroll):
         if not hasattr(self,'losses'):
             self.losses = struct()
             
+        if not hasattr(self,'journal_tune_factor'):
+            self.journal_tune_factor = 1.0
+            
         #Conduct the calculations for the bearings
-        self.losses.crank_bearing = self.crank_bearing()
-        self.losses.upper_bearing = self.upper_bearing()
-        self.losses.lower_bearing = self.lower_bearing()
+        self.losses.crank_bearing = self.crank_bearing()*self.journal_tune_factor
+        self.losses.upper_bearing = self.upper_bearing()*self.journal_tune_factor
+        self.losses.lower_bearing = self.lower_bearing()*self.journal_tune_factor
         self.losses.thrust_bearing = self.thrust_bearing()
         
         self.losses.bearings  = (self.losses.crank_bearing 
@@ -866,7 +869,7 @@ class Scroll(PDSimCore, _Scroll):
         """
         return self.h_shell*self.A_shell*(Tshell-self.Tamb)
     
-    def initial_motor_losses(self, eta_a = 0.7):
+    def initial_motor_losses(self, eta_a = 0.8):
         """
         Assume a 70% adiabatic efficiency to estimate the motor power and 
         motor losses
@@ -1004,8 +1007,8 @@ class Scroll(PDSimCore, _Scroll):
         #Overall isentropic efficiency
         self.eta_oi = self.Wdot_i/self.Wdot_electrical
         
-        #Set the heat input to the suction line
-        self.suction_heating()
+#        #Set the heat input to the suction line
+#        self.suction_heating()
         
         print 'At this iteration'
         print '    Electrical power:', self.Wdot_electrical
@@ -1386,11 +1389,8 @@ class Scroll(PDSimCore, _Scroll):
                 p = self.p[I,_slice]
                 self.forces.fxp[I,_slice] = [comp['fx_p'] for comp in geo_components]
                 self.forces.fyp[I,_slice] = [comp['fy_p'] for comp in geo_components]
-                self.forces.Fx[I,_slice] = [comp['fx_p'] for comp in geo_components]
-                self.forces.Fy[I,_slice] = [comp['fy_p'] for comp in geo_components]
-#                import pylab
-#                pylab.plot(self.forces.Fx[I,:],self.forces.Fy[I,:])
-        
+                self.forces.Fx[I,_slice] = [comp['fx_p'] for comp in geo_components]*p
+                self.forces.Fy[I,_slice] = [comp['fy_p'] for comp in geo_components]*p
         
         #Remove all the NAN placeholders
         self.forces.Fx[np.isnan(self.forces.Fx)]=0

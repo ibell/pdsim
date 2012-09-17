@@ -255,8 +255,8 @@ class GeometryPanel(pdsim_panels.PDPanel):
         # using the parametric table
         scroll.geo.delta_flank = scroll.delta_flank
         scroll.geo.delta_radial = scroll.delta_radial
-        del scroll.delta_flank
-        del scroll.delta_radial
+#        del scroll.delta_flank
+#        del scroll.delta_radial
         
         if self.UseOffset.IsChecked():
             scroll.geo.phi_ie_offset = pi
@@ -736,6 +736,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                     dict(attr='D_lower_bearing'),
                     dict(attr='L_lower_bearing'),
                     dict(attr='c_lower_bearing'),
+                    dict(attr='journal_tune_factor'),
                     
                     dict(attr = 'thrust_friction_coefficient'),
                     dict(attr = 'thrust_ID'),

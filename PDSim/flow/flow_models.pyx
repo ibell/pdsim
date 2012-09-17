@@ -139,7 +139,7 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
             T2_star=T_wall-(T_wall-T1)*exp(-pi*ID*L*alpha/(mdot*cp))
             
             #Get the actual outlet temperature based on the additional heat input
-            T2 = T1 + Q_add/(mdot*cp)
+            T2 = T2_star + Q_add/(mdot*cp)
             
             # Q is defined to be positive if heat transferred from wall to fluid
             #

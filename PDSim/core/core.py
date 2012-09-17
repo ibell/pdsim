@@ -1349,7 +1349,7 @@ class PDSimCore(object):
         
         #end of OJECTIVE
         
-        x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,x0, dx=1.0, ytol=0.001, itermax=30)
+        x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,x0, dx=1.0, ytol=0.01, itermax=30)
         print 'Solution is', x_soln,'Td, Tlumps'
         
         if not self.Abort(): 
