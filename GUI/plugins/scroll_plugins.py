@@ -9,75 +9,22 @@ from PDSim.core.containers import ControlVolume
 from PDSim.scroll import scroll_geo
 from math import pi
 import wx
-from PDSim.scroll.plots import plotScrollSet
+from wx.lib.scrolledpanel import ScrolledPanel
+from PDSim.scroll.plots import plotScrollSet, ScrollAnimForm
+import types
 
 LabeledItem = pdsim_panels.LabeledItem
 
 class struct(object):
     pass
-
-class InjectionViewerDialog(wx.Dialog):
-    """
-    A simple dialog with plot of the locations of the injection ports overlaid
-    on the scroll wraps to allow easy visualization of the port locations
-    """
-    def __init__(self, theta, geo):
-        """
-        Parameters
-        ----------
-        theta : float
-            crank angle in the range [0, :math:`2\pi`] 
-        geo : geoVals instance
-        """
-        wx.Dialog.__init__(self, parent = None)
-        
-        #: Make class variable since needed by add_port
-        self.theta = theta
-        #: Make class variable since needed by add_port
-        self.geo = geo
-        
-        #: A matplotlib panel with a figure inside
-        self.PP = pdsim_panels.PlotPanel(self)
-        #: The axis that the plot will go in
-        self.ax = self.PP.figure.add_axes((0,0,1,1))
-        
-        #A blank scroll wrap
-        plotScrollSet(theta, 
-                      geo, 
-                      axis = self.ax, 
-                      use_offset = geo.phi_ie_offset>0)
-        
-        #: The sizer for the panel 
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        #Add the plot to it
-        sizer.Add(self.PP)
-        #Layout the sizer
-        sizer.Layout()
-        #Fit the dialog to its contents
-        self.Fit()
-        
-    def add_port(self, phi, inner_outer):
-        """
-        Add an injection port to the axis given by the scroll set plot
-        
-        Parameters
-        ----------
-        phi : float
-            involute angle of injection port
-        inner_outer : string
-            If ``'i'``, phi is along the inner involute of the fixed scroll
-            
-            If ``'o'``, phi is along the outer involute of the fixed scroll
-        
-        """
-        scroll_geo.plot_injection_ports(self.theta, self.geo, phi, self.ax, inner_outer)
-        
+                
 class InjectionPortPanel(wx.Panel):
     """
     A panel with the values for one injection port
     """
     def __init__(self, parent, index):
         wx.Panel.__init__(self,parent)
+        
         
         #: The index of the panel
         self.index = index
@@ -103,10 +50,9 @@ class InjectionPortPanel(wx.Panel):
         self.phi_inj_port.SetToolTipString('If you want symmetric injection ports, the involute angle on the inner involute should be pi radians greater than that on the outer involute.  View the ports to be sure')
         element_sizer.Add(self.phi_inj_port)
         element_sizer.Add(wx.StaticText(self,label="Neighbor Involute"))
-        self.involute = wx.ComboBox(self)
+        self.involute = wx.Choice(self)
         self.involute.AppendItems(['Outer involute','Inner involute'])
         self.involute.SetSelection(0)
-        self.involute.SetEditable(False)
         element_sizer.Add(self.involute)
         element_sizer.Add(wx.StaticText(self,label="Uses check valve"))
         self.check_valve = wx.CheckBox(self,label="")
@@ -162,9 +108,9 @@ class InjectionPortPanel(wx.Panel):
         self.phi_inj_port.SetValue(str(phi))
         self.check_valve.SetValue(check_valve.lower()=='true')
         if inner_outer == 'i':
-            self.involute.SetValue('Inner involute')
+            self.involute.SetStringSelection('Inner involute')
         elif inner_outer == 'o':
-            self.involute.SetValue('Outer involute')
+            self.involute.SetStringSelection('Outer involute')
         else:
             raise ValueError
         self.SymmTarget.SetStringSelection(symmetric)
@@ -253,7 +199,8 @@ class InjectionElementPanel(wx.Panel):
         line_sizer.AddMany([self.IDlabel,self.IDval])
         
         self.RemoveButton = wx.Button(self,label='Remove Line')
-        self.RemoveButton.Bind(wx.EVT_BUTTON, lambda event: self.Parent.RemoveInjection(self))
+        #Parent of IEP is scrolled_panel, need to go up to IIP
+        self.RemoveButton.Bind(wx.EVT_BUTTON, lambda event: self.GrandParent.RemoveInjection(self))
         
         self.SizerBox = wx.StaticBox(self, label = "Injection line #"+str(index))
         self.SBSSizer = wx.StaticBoxSizer(self.SizerBox, wx.VERTICAL)
@@ -397,20 +344,40 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
     def __init__(self, parent, **kwargs):
         pdsim_panels.PDPanel.__init__(self,parent,**kwargs)
         
+        #Now we are going to put everything into a scrolled window
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        self.scrolled_panel = ScrolledPanel(self, size=(-1,-1),
+                                 style = wx.TAB_TRAVERSAL, name="panel1")
+        self.scrolled_panel.SetScrollbars(1,1,1,1)
+        self.scrolled_panel.SetupScrolling()
+        
         #Add the header row of buttons
-        self.View = wx.Button(self, label='View')
+        self.View = wx.Button(self.scrolled_panel, label='View')
         self.View.Bind(wx.EVT_BUTTON, self.OnView)
-        self.AddInjection = wx.Button(self, label='Add Injection Line')
+        self.AddInjection = wx.Button(self.scrolled_panel, label='Add Injection Line')
         self.AddInjection.Bind(wx.EVT_BUTTON, self.OnAddInjection)
+        self.PlotExistence = wx.Button(self.scrolled_panel, label='Plot Existence')
+        self.PlotExistence.Bind(wx.EVT_BUTTON, self.OnPlotExistence)
         buttons_sizer = wx.BoxSizer(wx.HORIZONTAL)
         buttons_sizer.Add(self.AddInjection)
         buttons_sizer.Add(self.View)
+        buttons_sizer.Add(self.PlotExistence)
         
         sizer = wx.FlexGridSizer(cols = 1)
         sizer.Add(buttons_sizer)
         sizer.AddSpacer(10)
         sizer.Layout()
-        self.SetSizer(sizer)
+        
+        self.scrolled_panel.SetAutoLayout(1)
+
+        #Do the layout of all the panels
+        self.scrolled_panel.SetSizer(sizer)
+        main_sizer.Add(self.scrolled_panel,1,wx.EXPAND)
+        self.SetSizer(main_sizer)
+        main_sizer.Layout()
+        
+        #Set some local variables
         self.Nterms = 0
         self.Lines = []
         
@@ -418,18 +385,22 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         """
         Add an injection line to the injection panel
         """
-        IE = InjectionElementPanel(self,self.Nterms+1)
-        self.GetSizer().Add(IE)
+        IE = InjectionElementPanel(self.scrolled_panel,self.Nterms+1)
+        #Put the panel within the scrolled panel and refresh
+        self.scrolled_panel.GetSizer().Add(IE,0)
+        self.scrolled_panel.FitInside()
+        self.GetSizer().Layout()
+        
+        #Update the local variables
         self.Lines.append(IE)
         self.Nterms += 1
-        self.GetSizer().Layout()
-        self.Refresh()
         
         #Update the elements in the parametric table
         Main = self.GetTopLevelParent()
         items = Main.collect_parametric_terms()
         Main.MTB.SolverTB.update_parametric_terms(items)
         
+        self.Refresh()
         
     def RemoveInjection(self, injection):
         """
@@ -438,13 +409,14 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         self.Lines.remove(injection)
         injection.Destroy()
         self.Nterms -= 1
-        #Renumber the injection panels
+        #Renumber the injection panels that are contained in scrolled_panel
         I=1
-        for child in self.Children:
+        for child in self.scrolled_panel.Children:
             if isinstance(child,InjectionElementPanel):
                 child.SizerBox.SetLabel("Injection line #"+str(I))
                 I+=1
         self.GetSizer().Layout()
+        self.scrolled_panel.FitInside()
         self.Refresh()
         
         #Update the elements in the parametric table
@@ -453,20 +425,69 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         Main.MTB.SolverTB.update_parametric_terms(items)
         
     def OnView(self, event):
+        
         geo = self.GetTopLevelParent().MTB.InputsTB.panels[0].Scroll.geo
-        dlg = InjectionViewerDialog(pi/2,geo)
+        SAF = ScrollAnimForm(geo, start = False)
         
         #IEPs are children that are instances of InjectionElementPanel class
-        IEPs = [child for child in self.Children if isinstance(child,InjectionElementPanel)]
+        IEPs = [child for child in self.scrolled_panel.Children if isinstance(child,InjectionElementPanel)]
         for IEP in IEPs:
             for child in IEP.Children:
                 if isinstance(child,InjectionPortPanel):
+                    #Get the values from the panel
                     phi,inner_outer,check_valve = child.get_values()
-                    dlg.add_port(phi, inner_outer)
-                    
-        dlg.ShowModal()
-        dlg.Destroy()
+                    #Overlay the port on the scroll wrap plot
+                    scroll_geo.overlay_injection_port(0, geo, phi, SAF.ax, inner_outer)
         
+        SAF.start()
+        SAF.Show()
+        
+    def OnPlotExistence(self, event = None):
+        import pylab
+        import numpy as np
+        
+        _Scroll = self.GetTopLevelParent().MTB.InputsTB.panels[0].Scroll
+        
+        Iport = 1
+        #IEPs are children that are instances of InjectionElementPanel class
+        IEPs = [child for child in self.scrolled_panel.Children if isinstance(child,InjectionElementPanel)]
+        for IEP in IEPs:
+            for child in IEP.Children:
+                if isinstance(child,InjectionPortPanel):
+                    #Get the values from the port panel
+                    phi,inner_outer,check_valve = child.get_values()
+                    
+                    partner_list = []
+                    
+                    theta = np.linspace(0, 2*pi, 1000)
+                    for th in theta:
+                        partner_list.append(_Scroll._get_injection_CVkey(phi, th, inner_outer))
+        
+                    #Find the break points in each segment
+                    dividers = [i for i in range(len(theta)-1) if not partner_list[i] == partner_list[i+1]]
+                    #Add end and beginning indices
+                    dividers = [0]+dividers+[len(theta)-1]
+                        
+                    for i in range(len(dividers)-1):
+                        L = dividers[i]
+                        R = dividers[i+1]
+                        M = int((L + R)/2)
+                        pylab.plot(np.r_[theta[L],theta[R]],np.r_[Iport,Iport])
+                        pylab.plot(np.r_[theta[L],theta[L]],np.r_[Iport-0.02,Iport+0.02],'k')
+                        pylab.plot(np.r_[theta[R],theta[R]],np.r_[Iport-0.02,Iport+0.02],'k')
+                        pylab.text(theta[M],Iport+.02,partner_list[M],ha = 'center', va='bottom')    
+                    
+                    #Increase the counter
+                    Iport += 1
+                    
+        
+        pylab.xticks([0,pi/2,pi,3*pi/2,2*pi],
+                     [0,r'$\pi/2$',r'$\pi$',r'$3\pi/2$',r'$2\pi$'])
+        pylab.xlim(0,2*pi)
+        pylab.ylim(0.5,Iport-1+0.5)
+        pylab.yticks(range(1,Iport+1))
+        pylab.show()
+    
     def post_prep_for_configfile(self):
         """
         
@@ -496,7 +517,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
                 
                 #The things that are for the port
                 s += ['phi_'+I+'_'+J+' = '+str(port.phi_inj_port.GetValue())]
-                inv = port.involute.GetValue()
+                inv = port.involute.GetStringSelection()
                 if inv == 'Inner involute':
                     s += ['involute_'+I+'_'+J+' = i']
                 elif inv == 'Outer involute':
@@ -515,7 +536,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         
         Parameters
         ----------
-        configfile_section : list of 2-element tuples, first element is key, second is value as a string
+        configfile_items : list of 2-element tuples, first element is key, second is value as a string
         
         """
         #Convert List of tuples to dict
@@ -572,7 +593,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         _T = []
         
         #IEPs are children of injection_panel that are instances of InjectionElementPanel class
-        IEPs = [child for child in self.Children if isinstance(child,InjectionElementPanel)]
+        IEPs = [child for child in self.scrolled_panel.Children if isinstance(child,InjectionElementPanel)]
         for i,IEP in enumerate(IEPs):
             I = str(i+1)
             
@@ -602,13 +623,123 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         
     def apply_additional_parametric_terms(self, attrs, vals, panel_items):
         """
-        Set the terms in the panel based on the additional parametric terms
+        Set the terms in the injection panel based on the additional parametric
+        terms provided by the get_additional_parametric_terms() function
         """
         
-        panel_attrs = [panel_item['attr'] for panel_item in panel_items]
+        def apply_line_terms(attrs, vals):
+            
+            def is_int(i):
+                """ Returns True if it is an integer """
+                try:
+                    i = int(i)
+                    return True
+                except ValueError:
+                    return False
+                
+            def is_line_term(attr):
+                """
+                Check if it is a line type term of the form injection_xxxxx_1'
+                and is not a port term of the form injection_xxxxx_1_1
+                """
+                if not attr.startswith('injection'):
+                    return False
+                
+                #If there are no underscores, return false
+                if len(attr.rsplit('_',1)) == 1:
+                    return False
+                
+                #Try to split twice
+                attr,i,j = attr.rsplit('_',2)
+                
+                # If the far right one is an integer and the left part isn't you are
+                # ok, its an injection line
+                if not is_int(i) and is_int(j):
+                    return True
+                else:
+                    return False
+        
+            # First check about the injection state; if two state related terms are 
+            # provided, use them to fix the injection state
+            inj_state_params = [(par,val) for par,val in zip(attrs,vals) if is_line_term(par)]
+            num_inj_state_params = len(inj_state_params)
+            
+            for i in range(len(self.Lines)):
+                
+                #Find the injection state terms that apply for this line
+                state_params = [(par,val) for par,val in zip(attrs,vals) 
+                                if par.find('state') > -1 and par.endswith(str(i+1))]
+                num_state_params = len(state_params)
+                
+                #Get a copy of the state from the StatePanel
+                inletState = self.Lines[i].state.GetState()
+                
+                if num_state_params > 0:
+                    #Unzip the parameters (List of tuples -> tuple of lists)
+                    state_attrs, state_vals = zip(*state_params)
+                    
+                if num_state_params == 2:
+                    # Remove all the entries that correspond to the injection state - 
+                    # we need them and don't want to set them in the conventional way
+                    for a in state_attrs:
+                        vals.pop(attrs.index(a))
+                        attrs.pop(attrs.index(a))
+                    
+                    #: The string representation of the index (1-based)
+                    I = str(i+1)
+                    
+                    #Temperature and pressure provided
+                    if 'injection_state_temp_'+I in state_attrs and 'injection_state_pressure_'+I in state_attrs:
+                        injection_temp = state_vals[state_attrs.index('injection_state_temp_'+I)]
+                        injection_pressure = state_vals[state_attrs.index('injection_state_pressure_'+I)]
+                        self.Lines[i].state.set_state(inletState.Fluid,
+                                                      T=injection_temp, 
+                                                      P=injection_pressure)
+                        
+                    #Dew temperature and superheat provided
+                    elif 'injection_state_sat_temp_'+I in state_attrs and 'injection_state_superheat_'+I in state_attrs:
+                        injection_sat_temp = state_vals[state_attrs.index('injection_state_sat_temp_'+I)]
+                        injection_superheat = state_vals[state_attrs.index('injection_state_superheat_'+I)]
+                        injection_temp = injection_sat_temp + injection_superheat
+                        import CoolProp.CoolProp as CP
+                        injection_pressure = CP.Props('P','T',injection_sat_temp,'Q',1.0,inletState.Fluid)
+                        self.Lines[i].state.set_state(inletState.Fluid,
+                                                      T=injection_temp, 
+                                                      P=injection_pressure)
+                        
+                    else:
+                        raise ValueError('Invalid combination of injection states: '+str(state_attrs))
+                    
+                elif num_inj_state_params == 1:
+                    import textwrap
+                    string = textwrap.dedent(
+                             """
+                             Sorry but you need to provide two variables for the injection
+                             state in parametric table to fix the state.  
+                             
+                             If you want to just modify the saturated temperature, add the superheat as a
+                             variable and give it one element in the parametric table
+                             """
+                             )
+                    dlg = wx.MessageDialog(None,string)
+                    dlg.ShowModal()
+                    dlg.Destroy()
+                    raise ValueError('Must provide two state variables in the parametric table for injection line')
+                    
+                elif num_inj_state_params >2:
+                    raise ValueError ('Only two inlet state parameters can be provided in parametric table')
+            
+            return attrs,vals
+        
+        def apply_port_term():
+            pass
+        
+        #Apply all the line terms and get back the lists
+        attrs, vals = apply_line_terms(attrs,vals)
         
         phi_params = [(par,val) for par, val in zip(attrs,vals) if par.startswith('injection_phi')]
         num_phi_params = len(phi_params)        
+        
         if num_phi_params > 0:
             #Unzip the parameters (List of tuples -> tuple of lists)
             phi_attrs, phi_vals = zip(*phi_params)
@@ -629,70 +760,10 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
                 i = int(attr.rsplit('_',2)[1])-1
                 
                 self.Lines[i].ports_list[j].phi_inj_port.SetValue(str(val))
-    
-        # First check about the injection state; if two state related terms are 
-        # provided, use them to fix the injection state
-        inj_state_params = [(par,val) for par,val in zip(attrs,vals) if par.startswith('injection_state')]
-        num_inj_state_params = len(inj_state_params)
         
-        i = 0
-        I = '1'
-        #Get a copy of the state from the StatePanel
-        inletState = self.Lines[i].state.GetState()
-        
-        if num_inj_state_params > 0:
-            #Unzip the parameters (List of tuples -> tuple of lists)
-            state_attrs, state_vals = zip(*inj_state_params)
-            
-        if num_inj_state_params == 2:
-            # Remove all the entries that correspond to the injection state - 
-            # we need them and don't want to set them in the conventional way
-            for a in state_attrs:
-                vals.pop(attrs.index(a))
-                attrs.pop(attrs.index(a))
-            
-            #Temperature and pressure provided
-            if 'injection_state_temp_'+I in state_attrs and 'injection_state_pressure_'+I in state_attrs:
-                injection_temp = state_vals[state_attrs.index('injection_state_temp_'+I)]
-                injection_pressure = state_vals[state_attrs.index('injection_state_pressure_'+I)]
-                self.Lines[i].state.set_state(inletState.Fluid,
-                                              T=injection_temp, 
-                                              P=injection_pressure)
-                
-            #Dew temperature and superheat provided
-            elif 'injection_state_sat_temp_'+I in state_attrs and 'injection_state_superheat_'+I in state_attrs:
-                injection_sat_temp = state_vals[state_attrs.index('injection_state_sat_temp_'+I)]
-                injection_superheat = state_vals[state_attrs.index('injection_state_superheat_'+I)]
-                injection_temp = injection_sat_temp + injection_superheat
-                import CoolProp.CoolProp as CP
-                injection_pressure = CP.Props('P','T',injection_sat_temp,'Q',1.0,inletState.Fluid)
-                self.Lines[i].state.set_state(inletState.Fluid,
-                                              T=injection_temp, 
-                                              P=injection_pressure)
-                
-            else:
-                raise ValueError('Invalid combination of injection states: '+str(state_attrs))
-            
-        elif num_inj_state_params == 1:
-            import textwrap
-            string = textwrap.dedent(
-                     """
-                     Sorry but you need to provide two variables for the injection
-                     state in parametric table to fix the state.  
-                     
-                     If you want to just modify the saturated temperature, add the superheat as a
-                     variable and give it one element in the parametric table
-                     """
-                     )
-            dlg = wx.MessageDialog(None,string)
-            dlg.ShowModal()
-            dlg.Destroy()
-            raise ValueError('Must provide two state variables in the parametric table for injection line')
-            
-        elif num_inj_state_params >2:
-            raise ValueError ('Only two inlet state parameters can be provided in parametric table')
-    
         return attrs,vals
+    
+        
         
 class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
     """
@@ -758,7 +829,7 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
         ScrollComp.injection.check_valve = {}
             
         #IEPs are children of injection_panel that are instances of InjectionElementPanel class
-        IEPs = [child for child in self.injection_panel.Children if isinstance(child,InjectionElementPanel)]
+        IEPs = [child for child in self.injection_panel.scrolled_panel.Children if isinstance(child,InjectionElementPanel)]
         for i,IEP in enumerate(IEPs):
             L = float(IEP.Lval.GetValue())
             ID = float(IEP.IDval.GetValue())
@@ -779,7 +850,7 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                                      key2='injection_line.'+str(i+1)+'.2',
                                      L=L,
                                      ID=ID,
-                                     mdot=0.001, 
+                                     mdot=0.001,
                                      State1=ScrollComp.CVs[CVkey].State.copy(),
                                      fixed=1,
                                      TubeFcn=ScrollComp.TubeCode
@@ -793,7 +864,6 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                                          MdotFcn_kwargs = dict(A = pi*ID**2/4)
                                          )
                                 )
-            
             
             
             Ports = [c for c in IEP.Children if isinstance(c,InjectionPortPanel)]

@@ -1711,8 +1711,12 @@ class MainFrame(wx.Frame):
             #First see if a command line option provided
             if '--config' in sys.argv:
                 i = sys.argv.index('--config')
-                configfile = sys.argv[i+1]
-                configbuffer = open(configfile, 'rb') 
+                _configfile = sys.argv[i+1]
+                if os.path.exists(_configfile):
+                    configbuffer = open(_configfile, 'rb')
+                else:
+                    warnings.warn('Sorry but your --config file "'+_configfile+'" is not found')
+                    configbuffer = open(configfile, 'rb')
                 
             #Then see if there is a file at configs/default.cfg
             elif os.path.exists(configfile):
@@ -1722,6 +1726,7 @@ class MainFrame(wx.Frame):
             else:
                 configbuffer = default_configs.get_recip_defaults()
         
+        #A string has been passed in for the 
         elif isinstance(configfile, basestring):
             if os.path.exists(configfile):
                 configbuffer = open(configfile, 'rb')

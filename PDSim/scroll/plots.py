@@ -957,7 +957,6 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
     OrbScroll=pyplot.Polygon(xy,color=OSColor,lw=lw,fill=True,closed=True,ec='k')
     axis.add_patch(OrbScroll)
     
-    
     axis.set_aspect(1.0)
     axis.axis('off')
     
@@ -967,6 +966,7 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
     
     if show:
         pylab.show()
+        
     return OrbScroll
 
 
@@ -974,8 +974,9 @@ class PlotPanel(wx.Panel):
     def __init__(self, *args, **kwds):
         kwds["style"] = wx.TAB_TRAVERSAL
         wx.Panel.__init__(self, *args,**kwds)
-
-        self.figure=Figure(figsize=(6,4),dpi=100)
+        
+        size = kwds.pop('size',(400,400))
+        self.figure=Figure(figsize=(size[0]/100,size[1]/100),dpi=100)
         self.axes=self.figure.add_subplot(111)
         self.canvas=FigureCanvas(self,wx.ID_ANY,self.figure)
 
@@ -1013,24 +1014,24 @@ class PlotThread(TaskThread):
         self._GUI=GUI
 
     def task(self):
-        if self._GUI.btn.Value==True:
+        if self._GUI.btn.Value == True:
             wx.CallAfter(self._GUI.plotStep)
 
 class ScrollAnimForm(wx.Frame):
  
     #----------------------------------------------------------------------
-    def __init__(self,geo=None):
+    def __init__(self, geo = None, start = True, size = (400, 400)):
         wx.Frame.__init__(self, None, wx.ID_ANY, "Scroll Model GUI")
  
         # Add a panel so it looks the correct on all platforms
         panel = wx.Panel(self, wx.ID_ANY)
         # Create the items
         self.btn = btn = wx.ToggleButton(panel, -1, "Start")
-        self.pltTs = PlotPanel(panel, -1)
+        self.pltpanel = PlotPanel(panel, -1, size=size)
         # Do the layout
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.btn, 0, wx.ALL|wx.CENTER, 5)
-        sizer.Add(self.pltTs, 0, wx.ALL|wx.CENTER, 5)
+        sizer.Add(self.pltpanel, 0, wx.ALL|wx.CENTER, 5)
         panel.SetSizer(sizer)
         # Bind the events
         btn.Bind(wx.EVT_TOGGLEBUTTON,self.onButton)
@@ -1039,9 +1040,22 @@ class ScrollAnimForm(wx.Frame):
         self.theta=0
         self.N=50
         self.geo=geo
-        self.OS=plotScrollSet(0,axis=self.pltTs.axes,geo=self.geo,lw=1,discOn=False,
+        self.OS=plotScrollSet(0,
+                              axis=self.pltpanel.axes,
+                              geo=self.geo,
+                              lw=1,
+                              discOn=False,
                               offsetScroll = self.geo.phi_ie_offset>0)
-
+        
+        self.ax = self.pltpanel.axes
+        
+        if start:
+            self.start()
+        
+    def start(self):
+        """
+        Start the plotting machinery
+        """
         self.PT=PlotThread()
         self.PT.setDaemon(True)
         self.PT.setGUI(self) #pass it an instance of the frame (by reference)
@@ -1072,16 +1086,18 @@ class ScrollAnimForm(wx.Frame):
             self.plotThread.start()
 
     def plotStep(self):
-        self.theta+=2*np.pi/(self.N-1)
-        #If offset scroll, don't shave the orbiting scroll
+        self.theta += 2*np.pi/(self.N-1)
         
+        #If offset scroll, don't shave the orbiting scroll        
         (x,y)=CoordsOrbScroll(self.theta,
                               self.geo,
                               shaveOn = self.geo.phi_ie_offset < 1e-12
                               )
+        
+        #Create the data for the orbiting scroll
         self.OS.set_xy(np.hstack((x,y)))
-        self.pltTs.axes.figure.canvas.draw() #Annoyingly this draw is required to flush the ghost orbiting scroll
-        self.SetTitle('theta= '+str(self.theta)+' radians')
+        self.ax.figure.canvas.draw() #Annoyingly this draw is required to flush the ghost orbiting scroll
+        self.SetTitle('theta = '+str(self.theta)+' radians')
 
     def preClose(self,event):
         """

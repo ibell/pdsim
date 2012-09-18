@@ -425,6 +425,50 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
     else:
         raise AttributeError('Type not understood, should be one of 2Arc or ArcLineArc')
 
+def overlay_injection_port(theta, geo, phi, ax, inner_outer):
+    """
+    Plot the injection ports on an axis - no scroll wrap plot is generated.  Also see
+    plot_injection_ports()
+    
+    Parameters
+    ---------- 
+    theta : float
+        crank angle in the range [0, :math:`2\pi`] 
+    geo : geoVals instance
+    phi : float
+        Involute angle in radians
+    ax : matplotlib axis instance
+    inner_outer : string
+        If ``'i'``, phi is along the inner involute of the fixed scroll
+        
+        If ``'o'``, phi is along the outer involute of the fixed scroll
+        
+    Notes
+    -----
+    If you want symmetric injection ports, the ones on the inner involute 
+    should have a value of phi that is pi radians greater than those on the 
+    outer involute
+    
+    """
+    
+    #Common terms
+    rport = geo.t/2.0
+    t = np.linspace(0,2*pi,100)
+    
+    if inner_outer == 'o':
+        #Involute angle along the outer involute of the scroll wrap
+        x, y = coords_inv(phi, geo, theta, 'fo')
+        nx, ny = coords_norm(phi, geo, theta, 'fo')
+        xc,yc = x-nx*rport,y-ny*rport
+        ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
+    elif inner_outer == 'i':
+        x, y = coords_inv(phi, geo, theta, 'fi')
+        nx, ny = coords_norm(phi, geo, theta, 'fi')
+        xc,yc = x-nx*rport,y-ny*rport
+        ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
+    else:
+        raise KeyError
+    
 def plot_injection_ports(theta, geo, phi, ax, inner_outer):
     """
     Plot the injection ports
@@ -449,26 +493,11 @@ def plot_injection_ports(theta, geo, phi, ax, inner_outer):
     outer involute
     
     """
-    #Plot the injection ports (symmetric)
+    #Plot the scrolls (symmetric)
     plotScrollSet(theta, geo, axis = ax)
     
-    #Common terms
-    rport = geo.t/2.0
-    t = np.linspace(0,2*pi,100)
-    
-    if inner_outer == 'o':
-        #Involute angle along the outer involute of the scroll wrap
-        x, y = coords_inv(phi, geo, theta, 'fo')
-        nx, ny = coords_norm(phi, geo, theta, 'fo')
-        xc,yc = x-nx*rport,y-ny*rport
-        ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
-    elif inner_outer == 'i':
-        x, y = coords_inv(phi, geo, theta, 'fi')
-        nx, ny = coords_norm(phi, geo, theta, 'fi')
-        xc,yc = x-nx*rport,y-ny*rport
-        ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
-    else:
-        raise KeyError
+    #Plot the port
+    overlay_injection_port(theta, geo, phi, ax, inner_outer)
 
 def min2(a,b):
     return a if a<b else b
@@ -577,7 +606,8 @@ def radial_leakage_angles(theta, geo, key1, key2):
                 phi_max = max2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
                 phi_min = min2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
         elif sort == ('c2.1','s1') or sort == ('c1.1','s2'):
-                phi_max = min2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
+                #TODO: this could be improved to take into account the non-perfect separation between s-sa and phi_ie
+                phi_max = geo.phi_ie - theta #this is where the change needs to be made
                 phi_min = geo.phi_ie - theta - pi
         elif sort == ('c1.1','c2.1'):
                 phi_max = geo.phi_ie - theta - pi
@@ -609,7 +639,7 @@ def radial_leakage_angles(theta, geo, key1, key2):
     if phi_max is None or phi_min is None:
         raise KeyError ('For the pair ('+key1+','+key2+') there were no angles found')
     if phi_min > phi_max:
-        raise ValueError ('For the keys ('+key1+','+key2+') there were no angles found (error because '+str(phi_max)+' < '+str(phi_min)+')')
+        raise ValueError ('For the keys ('+key1+','+key2+') @theta = '+str(theta)+' max < min (error because '+str(phi_max)+' < '+str(phi_min)+')')
     return (phi_min, phi_max)
 
 def radial_leakage_pairs(geo):

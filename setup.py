@@ -24,7 +24,7 @@ for line in lines:
     if line.startswith('__version__'):
         line = "__version__ = '" + version + "'"
     fp.write(line+'\n')
-fp.close() 
+fp.close()
 
 if len(sys.argv) == 1:
     #sys.argv+=['build_ext','--inplace']

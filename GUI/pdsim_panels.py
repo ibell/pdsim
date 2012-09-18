@@ -1,7 +1,7 @@
 # -*- coding: latin-1 -*-
 
 import wx
-from wx.lib.mixins.listctrl import CheckListCtrlMixin,TextEditMixin
+from wx.lib.mixins.listctrl import CheckListCtrlMixin,TextEditMixin,ListCtrlAutoWidthMixin
 import CoolProp
 from CoolProp.State import State
 from CoolProp import CoolProp as CP
@@ -18,6 +18,7 @@ from PDSim.scroll import scroll_geo
 from PDSimLoader import RecipBuilder, ScrollBuilder
 import quantities as pq
 import warnings
+from PDSim.scroll.plots import plotScrollSet, ScrollAnimForm
 
 length_units = {
                 'Meter': pq.length.m,
@@ -769,10 +770,13 @@ class ParametricOption(wx.Panel):
         self.Terms.SetStringSelection(old_val)
         
     def make_unstructured(self):
-        self.Values.Destroy()
-        del self.Values 
-        self.Select.Destroy()
-        del self.Select
+        if hasattr(self,'Values'):
+            self.Values.Destroy()
+            del self.Values
+        if hasattr(self,'Select'):
+            self.Select.Destroy()
+            del self.Select
+            
         self.GetSizer().Layout()
         self.Refresh()
     
@@ -785,7 +789,7 @@ class ParametricOption(wx.Panel):
             self.GetSizer().Layout()
             self.Refresh()
         
-class ParametricCheckList(wx.ListCtrl, CheckListCtrlMixin, TextEditMixin):
+class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixin, TextEditMixin):
     """
     The checklist that stores all the possible runs
     """
@@ -800,6 +804,7 @@ class ParametricCheckList(wx.ListCtrl, CheckListCtrlMixin, TextEditMixin):
         values : 
         """
         wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT)
+        ListCtrlAutoWidthMixin.__init__(self)
         CheckListCtrlMixin.__init__(self)
         TextEditMixin.__init__(self)
         
@@ -821,10 +826,24 @@ class ParametricCheckList(wx.ListCtrl, CheckListCtrlMixin, TextEditMixin):
         for i in range(len(headers)):
             self.SetColumnWidth(i+1,wx.LIST_AUTOSIZE_USEHEADER)
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnItemActivated)
+        self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.PreCellEdit)
         self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.OnCellEdited)
 
     def OnItemActivated(self, event):
         self.ToggleItem(event.m_itemIndex)
+    
+    def PreCellEdit(self, event):
+        """
+        Before the cell is edited, only allow edits on columns after the first one
+        """
+        row_index = event.m_itemIndex
+        col_index = event.Column
+        if col_index == 0:
+            event.Veto()
+        else:
+            val = float(event.Text)
+            self.data[row_index][col_index-1] = val
+            event.Skip()
     
     def OnCellEdited(self, event):
         """
@@ -918,6 +937,10 @@ class ParametricPanel(PDPanel):
             self.BuildButton.Bind(wx.EVT_BUTTON, self.OnBuildTable)
             self.ButtonSizer.Add(self.BuildButton)
         option = ParametricOption(self, self.variables)
+        if self.Structured.GetStringSelection() == 'Structured':
+            option.make_structured()    
+        else:
+            option.make_unstructured()
         self.ParamSizer.Add(option)
         self.ParamSizer.Layout()
         self.NTerms += 1
@@ -1120,10 +1143,11 @@ class ParametricPanel(PDPanel):
                 # apply_additional_parametric_terms returns a tuple of attrs, vals 
                 # for the terms that were unmatched by the parametric
                 # preprocessors
+                
                 try:
                     attrs, vals = Main.MTB.InputsTB.apply_additional_parametric_terms(attrs, vals, self.variables)
                 except ValueError:
-                    break
+                    raise
                 
                 #Build the recip or the scroll using the GUI parameters
                 if Main.SimType == 'recip':
@@ -1161,7 +1185,10 @@ class ParametricPanel(PDPanel):
         s = ''
         for i, param in enumerate(self.ParamSizer.GetChildren()):
             name, vals = param.Window.get_values()
-            values = ';'.join([str(val) for val in vals])
+            if vals is not None:
+                values = ';'.join([str(val) for val in vals])
+            else:
+                values = ''
             s += 'Term' + str(i+1) + ' = Term,' + name +',' + values + '\n'
         return s
     

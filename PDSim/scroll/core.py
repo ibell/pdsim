@@ -1186,7 +1186,7 @@ class Scroll(PDSimCore, _Scroll):
         # x1 where x is s,d,c has the inner involute of the fixed scroll as 
         # its outer surface
         if phi_e > phi > phi_e-theta:     
-            #It is a suction chamber       
+            #It is a suction chamber    
             return 's1' if inner_outer == 'i' else 's2'
             
         elif phi_e-theta > phi > phi_e-theta-2*pi*Nc:
@@ -1276,7 +1276,7 @@ class Scroll(PDSimCore, _Scroll):
             return 0.0
         #3. Find the distance of the scroll from the point on the involute
         #   where the port is tangent
-        FlowPath.A = pi*(self.geo.t)**2/4.0
+        FlowPath.A = 3*pi*(0.001)**2/4.0
         try:
             mdot = flow_models.IsentropicNozzle(FlowPath.A,
                                                 FlowPath.State_up,

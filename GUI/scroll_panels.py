@@ -2,6 +2,7 @@
 import pdsim_panels
 import wx
 from wx.lib.mixins.listctrl import TextEditMixin
+from wx.lib.scrolledpanel import ScrolledPanel
 import numpy as np
 from math import pi
 from PDSim.scroll.core import Scroll
@@ -19,11 +20,10 @@ LabeledItem = pdsim_panels.LabeledItem
 
 class PlotPanel(wx.Panel):
     def __init__(self, parent, **kwargs):
-        wx.Panel.__init__(self, parent, size = (300,200), **kwargs)
+        size = kwargs.get('size',(200,200))
+        wx.Panel.__init__(self, parent, size = size, **kwargs)
         sizer = wx.BoxSizer(wx.VERTICAL)
-        self.figure = mpl.figure.Figure(dpi=100, figsize=(2, 2))
-#        self.figure.set_figwidth(2.0)
-#        self.figure.set_figheight(2.0)
+        self.figure = mpl.figure.Figure(dpi=100, figsize=(size[0]/100, size[1]/100))
         self.canvas = WXCanvas(self, -1, self.figure)
 #        self.canvas.resize(200,200)
         #self.toolbar = WXToolbar(self.canvas)
@@ -33,7 +33,7 @@ class PlotPanel(wx.Panel):
         self.SetSizer(sizer)
         sizer.Layout()
         
-from wx.lib.scrolledpanel import ScrolledPanel
+
 class GeometryPanel(pdsim_panels.PDPanel):
     """
     The geometry panel of the scroll compressor
@@ -188,7 +188,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
             delta_offset_item.Enable(False)
         
     def OnAnimate(self, event = None):
-        SAF = ScrollAnimForm(self.Scroll.geo)
+        SAF = ScrollAnimForm(self.Scroll.geo, size=(400,400))
         SAF.Show()
         
     def OnChangeParam(self, event = None):
@@ -773,7 +773,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         if self.motor_choices.GetSelection() == 0:
             #Use the value for the motor efficiency
             sim.eta_motor = float(self.motor_choices.eta_motor.GetValue())
-            sim.motor.eta_motor = sim.eta_motor 
+            sim.motor.set_eta(sim.eta_motor)
         elif self.motor_choices.GetSelection() == 1:
             # Get the tuple of list of coeffs from the MCT, then unpack the tuple
             # back into the call to set the coefficients

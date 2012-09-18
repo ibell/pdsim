@@ -31,7 +31,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import time
 
-Injection = False
+Injection = True
 check_valve = False
 
 def Compressor(f = None):
@@ -39,7 +39,7 @@ def Compressor(f = None):
     ScrollComp=Scroll()
     #This runs if the module code is run directly
     
-    ScrollComp.set_scroll_geo(227.8e-6, 2.4, 0.004, 0.007) #Set the scroll wrap geometry
+    ScrollComp.set_scroll_geo(104.8e-6, 2.4, 0.004, 0.007) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2='PMP')
     ScrollComp.geo.delta_flank = 1.5e-6
     ScrollComp.geo.delta_radial = 1.5e-6
@@ -66,7 +66,7 @@ def Compressor(f = None):
     ScrollComp.HTC = 0.0
     
     ScrollComp.geo.delta_suction_offset = 0.0e-3
-    ScrollComp.geo.phi_ie_offset = pi
+    ScrollComp.geo.phi_ie_offset = 0.0
     
     ScrollComp.mu_oil = 0.008
     ScrollComp.motor = Motor()
@@ -277,50 +277,6 @@ def Compressor(f = None):
         
         ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
-    
-    return 
-    #debug_plots(ScrollComp, plot_names=['Pressure v. crank angle'])
-    
-    ScrollComp.calculate_force_terms(orbiting_back_pressure = pe)
-    
-    import pylab
-    V = ScrollComp.geo.ro*ScrollComp.omega
-    mu = 0.08
-    print 'meanFz',ScrollComp.forces.mean_Fz
-    Wdot_loss_thrust = ScrollComp.forces.mean_Fz*V*mu
-    pylab.plot(ScrollComp.t,ScrollComp.forces.Fz.T,
-               ScrollComp.t,ScrollComp.forces.summed_Fz,'-',
-               ScrollComp.t,ScrollComp.forces.mean_Fz*(1+0*ScrollComp.t),'--') #kN
-    pylab.show()
-    print 'Thrust bearing loss is',Wdot_loss_thrust*1000,'W'
-    
-    print 'meanFr',ScrollComp.forces.mean_Fr, type(ScrollComp.forces.mean_Fr)
-    pylab.plot(ScrollComp.t,ScrollComp.forces.Fr.T, #.T for transpose of the matrix
-               ScrollComp.t,ScrollComp.forces.mean_Fr*(1+0*ScrollComp.t),'--') #kN
-    pylab.show()
-    
-    from PDSim.core.bearings import journal_bearing
-    JB = journal_bearing(r_b = 0.02245/2,
-                    L = 0.027,
-                    omega = ScrollComp.omega,
-                    W = ScrollComp.forces.mean_Fr*1000,
-                    design = 'friction',
-                    eta_0 = 0.008
-                    )
-    
-    print 'Crank pin journal loss is',JB['Wdot_loss'],'W'
-    print 'Crank pin gap width is',JB['c']*1e6,'um'
-    print 'Bearing number',JB['S']
-    
-    JB = journal_bearing(r_b = 0.01,
-                         L = 0.02,
-                         omega = ScrollComp.omega,
-                         W = ScrollComp.forces.mean_Fr*1000,
-                         design = 'friction',
-                         eta_0 = 0.008
-                         )
-    print 'Upper journal loss is',JB['Wdot_loss'],'W'
-    print 'Upper journal gap width is',JB['c']*1e6,'um'
         
     return ScrollComp
     

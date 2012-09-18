@@ -56,14 +56,19 @@ class Motor(object):
         """
         Invert the map to calculate the speed and the torque based on the power
         the power is given by tau*omega
+        
+        If a constant efficiency, just return (efficiency,None) tuple
         """
         
-        Wdot_coeffs = [tau*omega/1000 for tau,omega in zip(self.tau_coeffs,self.omega_coeffs)]
-        #Do the 1D interpolation
-        eta = float(interp1d(Wdot_coeffs, self.eta_coeffs, kind = kind)(Wdot))
-        omega = float(interp1d(Wdot_coeffs, self.omega_coeffs, kind = kind)(Wdot))
-        
-        return eta,omega
+        if self.type == 'const_eta_motor':
+            return self.eta_motor,None
+        else:
+            Wdot_coeffs = [tau*omega/1000 for tau,omega in zip(self.tau_coeffs, self.omega_coeffs)]
+            #Do the 1D interpolation
+            eta = float(interp1d(Wdot_coeffs, self.eta_coeffs, kind = kind)(Wdot))
+            omega = float(interp1d(Wdot_coeffs, self.omega_coeffs, kind = kind)(Wdot))
+            
+            return eta,omega
     
     def apply_map(self, tau, kind = 'linear'):
         """        
