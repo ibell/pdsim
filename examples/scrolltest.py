@@ -31,7 +31,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import time
 
-Injection = True
+Injection = False
 check_valve = False
 
 def Compressor(f = None):
@@ -40,7 +40,7 @@ def Compressor(f = None):
     #This runs if the module code is run directly
     
     ScrollComp.set_scroll_geo(104.8e-6, 2.4, 0.004, 0.007) #Set the scroll wrap geometry
-    ScrollComp.set_disc_geo('2Arc',r2='PMP')
+    ScrollComp.set_disc_geo('2Arc',r2=0)
     ScrollComp.geo.delta_flank = 1.5e-6
     ScrollComp.geo.delta_radial = 1.5e-6
     ScrollComp.omega = 3600/60*2*pi
@@ -71,6 +71,7 @@ def Compressor(f = None):
     ScrollComp.mu_oil = 0.008
     ScrollComp.motor = Motor()
     ScrollComp.motor.set_eta(0.9)
+    ScrollComp.motor.suction_fraction = 1.0
     
 #    print ScrollComp.V_s1(0)[0]
 #    print ScrollComp.V_sa(2*pi)[0]-ScrollComp.V_sa(0)[0]
@@ -129,7 +130,7 @@ def Compressor(f = None):
 #        except KeyError:
 #            print 'no match for',key1,key2
 #            pass
-#    plt.show() 
+#    plt.show()
     
     if f is None:
         Injection = False
@@ -138,11 +139,12 @@ def Compressor(f = None):
     
     Te = -10 + 273.15
     Tc =  43 + 273.15
-    Tin = Tc + 20
+    Tin = Te + 11.1
     DT_sc = 7
     pe = CP.Props('P','T',Te,'Q',1.0,Ref)
     pc = CP.Props('P','T',Tc,'Q',1.0,Ref)
     inletState = State.State(Ref,{'T':Tin,'P':pe})
+
     T2s = ScrollComp.guess_outlet_temp(inletState,pc)
     outletState = State.State(Ref,{'T':T2s,'P':pc})
 
@@ -153,12 +155,22 @@ def Compressor(f = None):
     
     mdot_guess = inletState.rho*ScrollComp.Vdisp*ScrollComp.omega/(2*pi)
     
-    ScrollComp.add_tube(Tube(key1='inlet.1',key2='inlet.2',L=0.3,ID=0.02,
-                             mdot=mdot_guess, State1=inletState.copy(),
-                             fixed=1,TubeFcn=ScrollComp.TubeCode))
-    ScrollComp.add_tube(Tube(key1='outlet.1',key2='outlet.2',L=0.3,ID=0.02,
-                             mdot=mdot_guess, State2=outletState.copy(),
-                             fixed=2,TubeFcn=ScrollComp.TubeCode))
+    ScrollComp.add_tube(Tube(key1='inlet.1',
+                             key2='inlet.2',
+                             L=0.3,
+                             ID=0.02,
+                             mdot=mdot_guess, 
+                             State1=inletState.copy(),
+                             fixed=1,
+                             TubeFcn=ScrollComp.TubeCode))
+    ScrollComp.add_tube(Tube(key1='outlet.1',
+                             key2='outlet.2',
+                             L=0.3,
+                             ID=0.02,
+                             mdot=mdot_guess, 
+                             State2=outletState.copy(),
+                             fixed=2,
+                             TubeFcn=ScrollComp.TubeCode))
              
     if Injection:
         phi = ScrollComp.geo.phi_oe-pi-2*pi+0.01
@@ -189,13 +201,13 @@ def Compressor(f = None):
     ScrollComp.add_flow(FlowPath(key1='sa', 
                                  key2='s1',
                                  MdotFcn=ScrollComp.SA_S1,
-                                 MdotFcn_kwargs = dict(X_d = 0.3)
+                                 MdotFcn_kwargs = dict(X_d = 1.0)
                                  )
                         )
-    ScrollComp.add_flow(FlowPath(key1='sa',
-                                 key2='s2',
-                                 MdotFcn=ScrollComp.SA_S2,
-                                 MdotFcn_kwargs = dict(X_d = 0.3)
+    ScrollComp.add_flow(FlowPath(key1 = 'sa',
+                                 key2 = 's2',
+                                 MdotFcn = ScrollComp.SA_S2,
+                                 MdotFcn_kwargs = dict(X_d = 1.0)
                                  )
                         )
     

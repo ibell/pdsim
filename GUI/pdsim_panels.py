@@ -748,7 +748,7 @@ class ParametricOption(wx.Panel):
         name = self.Terms.GetStringSelection()
         #To list of floats
         if hasattr(self,'Values'):
-            values = [float(val) for val in self.Values.GetValue().split(',')]
+            values = [float(val) for val in self.Values.GetValue().split(',') if not val == '']
         else:
             values = None
         return name, values
@@ -1143,17 +1143,18 @@ class ParametricPanel(PDPanel):
                 # apply_additional_parametric_terms returns a tuple of attrs, vals 
                 # for the terms that were unmatched by the parametric
                 # preprocessors
-                
+
                 try:
                     attrs, vals = Main.MTB.InputsTB.apply_additional_parametric_terms(attrs, vals, self.variables)
                 except ValueError:
                     raise
                 
                 #Build the recip or the scroll using the GUI parameters
+                #Don't apply the plugins or call the post_set functions
                 if Main.SimType == 'recip':
-                    sim = Main.build_recip(post_set = False)
+                    sim = Main.build_recip(post_set = False, apply_plugins = False)
                 elif Main.SimType == 'scroll':
-                    sim = Main.build_scroll(post_set = False)
+                    sim = Main.build_scroll(post_set = False, apply_plugins = False)
                 else:
                     raise AttributeError('Invalid Main.SimType : '+str(Main.SimType))
                     
@@ -1169,6 +1170,12 @@ class ParametricPanel(PDPanel):
                     RecipBuilder(sim)
                 elif Main.SimType == 'scroll':
                     ScrollBuilder(sim)
+                    
+                #Apply any plugins in use - this is the last step
+                if hasattr(Main,'plugins_list') and Main.plugins_list:
+                    for plugin in Main.plugins_list:
+                        if plugin.is_activated():
+                            plugin.apply(sim)
                     
                 #Add an index for the run so that it can be sorted properly
                 sim.run_index = Irow + 1

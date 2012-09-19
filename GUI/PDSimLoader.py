@@ -77,10 +77,11 @@ def ScrollBuilder(scroll):
         scroll.pre_solve()
     
     T2s = scroll.guess_outlet_temp(scroll.inletState, scroll.discharge_pressure)
+    
     outletState=CPState.State(scroll.inletState.Fluid,{'T':T2s,'P':scroll.discharge_pressure})
     
     scroll.auto_add_CVs(scroll.inletState, outletState)
-    
     scroll.add_flow(FlowPath(key1='d1', key2='dd', MdotFcn=scroll.D_to_DD))
     scroll.add_flow(FlowPath(key1='d2', key2='dd', MdotFcn=scroll.D_to_DD))
+    
     

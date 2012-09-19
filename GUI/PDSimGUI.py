@@ -1887,7 +1887,19 @@ class MainFrame(wx.Frame):
             RecipBuilder(recip)
         return recip
     
-    def build_scroll(self, post_set = True):
+    def build_scroll(self, post_set = True, apply_plugins = True):
+        """
+        Build the scroll simulation
+        
+        Parameters
+        ----------
+        post_set : boolean, optional
+            If ``True``, post_set_params will be called on PDPanel instances 
+            and ScrollBuilder will be called
+            
+        apply_plugins: boolean, optional
+            If ``True``, all the plugins will be applied when this function is called
+        """
         #Instantiate the scroll class
         scroll=Scroll()
         #Pull things from the GUI as much as possible
@@ -1898,11 +1910,12 @@ class MainFrame(wx.Frame):
             self.MTB.SolverTB.post_set_params(scroll)
             #Build the model the rest of the way
             ScrollBuilder(scroll)
-        #Apply any plugins in use
-        if hasattr(self,'plugins_list') and self.plugins_list:
-            for plugin in self.plugins_list:
-                if plugin.is_activated():
-                    plugin.apply(scroll)
+        if apply_plugins:
+            #Apply any plugins in use - this is the last step
+            if hasattr(self,'plugins_list') and self.plugins_list:
+                for plugin in self.plugins_list:
+                    if plugin.is_activated():
+                        plugin.apply(scroll)
         return scroll
     
     def run_simulation(self, sim):

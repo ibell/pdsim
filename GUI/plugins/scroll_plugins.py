@@ -737,29 +737,29 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         #Apply all the line terms and get back the lists
         attrs, vals = apply_line_terms(attrs,vals)
         
-        phi_params = [(par,val) for par, val in zip(attrs,vals) if par.startswith('injection_phi')]
-        num_phi_params = len(phi_params)        
-        
-        if num_phi_params > 0:
-            #Unzip the parameters (List of tuples -> tuple of lists)
-            phi_attrs, phi_vals = zip(*phi_params)
-            
-            # Remove all the entries that correspond to the angles 
-            # we need them and don't want to set them in the conventional way
-            for a in phi_attrs:
-                i = attrs.index(a)
-                vals.pop(i)
-                attrs.pop(i)
-                
-            for attr,val in zip(phi_attrs, phi_vals):
-
-                # Term might look like something like 'injection_phi_1_2'
-                # i would be 0, j would be 1
-                #indices are zero-based
-                j = int(attr.rsplit('_',1)[1])-1
-                i = int(attr.rsplit('_',2)[1])-1
-                
-                self.Lines[i].ports_list[j].phi_inj_port.SetValue(str(val))
+#        phi_params = [(par,val) for par, val in zip(attrs,vals) if par.startswith('injection_phi')]
+#        num_phi_params = len(phi_params)        
+#        
+#        if num_phi_params > 0:
+#            #Unzip the parameters (List of tuples -> tuple of lists)
+#            phi_attrs, phi_vals = zip(*phi_params)
+#            
+#            # Remove all the entries that correspond to the angles 
+#            # we need them and don't want to set them in the conventional way
+#            for a in phi_attrs:
+#                i = attrs.index(a)
+#                vals.pop(i)
+#                attrs.pop(i)
+#                
+#            for attr,val in zip(phi_attrs, phi_vals):
+#
+#                # Term might look like something like 'injection_phi_1_2'
+#                # i would be 0, j would be 1
+#                #indices are zero-based
+#                j = int(attr.rsplit('_',1)[1])-1
+#                i = int(attr.rsplit('_',2)[1])-1
+#                
+#                self.Lines[i].ports_list[j].phi_inj_port.SetValue(str(val))
         
         return attrs,vals
     
@@ -810,6 +810,7 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
             I = page_names.index("Injection")
             ITB.RemovePage(I)
             self.injection_panel.Destroy()
+            del self.injection_panel
             self._activated = False
             
     def apply(self, ScrollComp, **kwargs):
@@ -845,8 +846,7 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                                             )
                               )
             
-            #Add the tube for the injection line
-            ScrollComp.add_tube(Tube(key1='injection_line.'+str(i+1)+'.1',
+            InjLine = Tube(key1='injection_line.'+str(i+1)+'.1',
                                      key2='injection_line.'+str(i+1)+'.2',
                                      L=L,
                                      ID=ID,
@@ -855,7 +855,11 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                                      fixed=1,
                                      TubeFcn=ScrollComp.TubeCode
                                      )
-                                )
+            #Turn off heat transfer in the injection line
+            InjLine.alpha = 0.0
+            #Add the tube for the injection line
+            ScrollComp.add_tube(InjLine)
+            
             
             #Add the flow model between the injection line tube and the injection CV 
             ScrollComp.add_flow(FlowPath(key1='injection_line.'+str(i+1)+'.2',

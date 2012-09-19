@@ -28,6 +28,10 @@ class Tube():
         
         #: Additional heat to be added to the tube
         self.Q_add = 0.0
+        
+        #: Fixed heat transfer coefficient if desired (if None will use correlation - default)
+        self.alpha = None
+        
         self.exists = exists
         if fixed<0:
             raise AttributeError(textwrap.dedent("""You must provide an integer 
@@ -47,7 +51,7 @@ class Tube():
         self.TubeFcn=TubeFcn
         if mdot<0:
             self.mdot=0.010
-            print('Warning: mdot not provided to Tube class contructor, guess value of '+str(self.mdot)+' kg/s used')
+            print('Warning: mdot not provided to Tube class constructor, guess value of '+str(self.mdot)+' kg/s used')
         else:
             self.mdot=mdot
         self.L=L

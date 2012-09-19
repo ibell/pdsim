@@ -1025,7 +1025,8 @@ class Scroll(PDSimCore, _Scroll):
                                                 Tube.L,
                                                 Tube.ID,
                                                 T_wall=self.Tlumps[0],
-                                                Q_add = Tube.Q_add
+                                                Q_add = Tube.Q_add,
+                                                alpha = Tube.alpha
                                                 )
         
     

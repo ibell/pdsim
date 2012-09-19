@@ -842,6 +842,10 @@ class PDSimCore(object):
             # Store the flows for the beginning of the step
             self.FlowStorage.append(self.Flows.get_deepcopy())
             
+            if Itheta >= 0.98*self.T.shape[1]:
+                debug_plots(self)
+                raise ValueError('98% of the maximum length of self.T reached, stopping calculation')
+            
             t0+=h
             Itheta+=1
             xold = xnew

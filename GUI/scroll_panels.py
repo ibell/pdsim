@@ -478,7 +478,7 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                                   key2='outlet.2',
                                   L=simulation.outlet_tube_length,
                                   ID=simulation.outlet_tube_ID,
-                                  mdot=outletState.copy().rho*Vdot, 
+                                  mdot=simulation.inletState.copy().rho*Vdot, 
                                   State2=outletState.copy(),
                                   fixed=2,
                                   TubeFcn=simulation.TubeCode) )

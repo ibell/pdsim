@@ -43,7 +43,7 @@ cdef double Re_star_flank = 826.167177885
 cpdef double pow(double x, double y):
     return x**y
 
-cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',Tmean=None,T_wall=None,Q_add = 0.0):
+cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',Tmean=None,T_wall=None,Q_add = 0.0,alpha=None):
     """
     In this tube model, one of the nodes is known (fixed), but the other is calculated based on heat transfer and pressure drop for a given mass flow rate
     
@@ -73,8 +73,11 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
         Temperature of wall [K]
     Q_add : float, optional
         Additional amount of heat that will be added to the fluid in the tube [kW]
+        This term is not added to the amount of heat transfer returned from this function
+    alpha : float, optional
+        The heat transfer coefficient [kW/m2/K].  If not provided, calculated from correlations
         
-        This term is not added to the 
+        
     """
         
     #Use the provided value for Tmean if it is a float or integer
@@ -107,6 +110,8 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
         #Q_add needs to be in W
         Q_add *= 1000
         
+        
+        
         S=State(Fluid,{'T':Tmean,'P':p})
             
         mu = S.visc  #kg/m-s
@@ -127,7 +132,10 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
 
         # Heat Transfer coefficient of Gnielinski
         Nu = (f/8)*(Re-1000)*Pr/(1+12.7*sqrt(f/8)*(Pr**(0.66666)-1)) #[-]
-        alpha = k*Nu/ID #W/m^2-K
+        
+        # alpha is not provided directly, use the correlation
+        if alpha is None:
+            alpha = k*Nu/ID #W/m^2-K
 
         #Pressure gradient using Darcy friction factor
         G=mdot/InnerFlowArea
@@ -149,7 +157,7 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
             State2.update({'T':T2,'P':p+DELTAP/1000})
         else:
             #Get the wall heat transfer outlet temperature based on the additional heat input
-            T2_star = T2-(Q_add/mdot*cp)
+            T2_star = T2 - Q_add/(mdot*cp)
             
             T1=T_wall-(T_wall-T2_star)/exp(-pi*ID*L*alpha/(mdot*cp))
             
@@ -159,8 +167,11 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
             State1.update({'T':T1,'P':p-DELTAP/1000})
         
         print 'T1',T1
+        print 'T2_star',T2_star
         print 'T2',T2
         print 'p',p
+        print 'mdot',mdot
+        print 'others: ID,L,alpha,cp',ID,L,alpha,cp
         print 'DELTAP',DELTAP
         print 'Fluid',Fluid
         print 'Q_add', Q_add
