@@ -548,71 +548,10 @@ class Scroll(PDSimCore, _Scroll):
         dT_dphi = (Tsuction - Tdischarge) / (self.geo.phi_ie - self.geo.phi_os)
         phim = 0.5*self.geo.phi_ie + 0.5*self.geo.phi_os
         
-        def calcHT(key):
-            try:
-                ## If HT is turned off, quit
-                if HTC_tune <= 0.0:
-                    return 0.0
-                    
-                #Get the bounding angles for the control volume
-                HTangles = scroll_geo.HT_angles(theta, self.geo, key)
-                
-                phi_1_i=HTangles['1_i']
-                phi_2_i=HTangles['2_i']
-                phi_1_o=HTangles['1_o']
-                phi_2_o=HTangles['2_o']
-    
-                #print 'calculate HTC'
-                #TODO: calculate HTC
-                hc = self.HTC #[kW/m2/K]
-                
-                # The heat transfer rate of the inner involute on 
-                # the outer wrap of the chamber
-                Q_outer_wrap = self.wrap_heat_transfer(hc = hc, 
-                                                   hs = self.geo.h, 
-                                                   rb = self.geo.rb, 
-                                                   phi1 = phi_1_i, 
-                                                   phi2 = phi_2_i, 
-                                                   phi0 = self.geo.phi_i0, 
-                                                   T_scroll = self.Tlumps[0],
-                                                   T_CV = self.CVs[key].State.T, 
-                                                   dT_dphi = dT_dphi, 
-                                                   phim = phim)
-                
-                # The heat transfer rate of the outer involute on 
-                # the inner wrap of the chamber
-                Q_inner_wrap = self.wrap_heat_transfer(hc = hc, 
-                                                   hs = self.geo.h, 
-                                                   rb = self.geo.rb, 
-                                                   phi1 = phi_1_o, 
-                                                   phi2 = phi_2_o, 
-                                                   phi0 = self.geo.phi_o0,
-                                                   T_scroll = self.Tlumps[0],
-                                                   T_CV = self.CVs[key].State.T, 
-                                                   dT_dphi = dT_dphi, 
-                                                   phim = phim)
-                
-                return HTC_tune *(Q_outer_wrap + Q_inner_wrap)
-            
-            except KeyError:
-                if key == 'sa':
-                    # sa is treated as having no heat transfer
-                    return 0.0
-                elif key == 'ddd':
-                    # ddd is a combination of the heat transfer in the d1, d2, and
-                    # dd chambers
-                    return calcHT('d1') + calcHT('d2') + calcHT('dd')
-                elif key == 'dd':
-                    # dd chamber is treated as having no heat transfer
-                    return 0.0
-                elif key.startswith('inj'):
-                    # injection chambers are treated as having no heat transfer
-                    return 0.0
-                else:
-                    raise KeyError('CV '+key+' not matched')
-            
-        Q=map(calcHT, self.CVs.exists_keys)
-        return listm(Q)
+        Q = listm([])
+        for key in self.CVs.exists_keys:
+            Q.append(self.calcHT(theta,key,HTC_tune,dT_dphi,phim))
+        return Q
         
     def step_callback(self,t,h,Itheta,**kwargs):
         """
@@ -972,7 +911,7 @@ class Scroll(PDSimCore, _Scroll):
         # sign for the lump
         Qnet -= self.HTProcessed.mean_Q
         
-        print 'mean_Q', self.HTProcessed.mean_Q
+        
         
         #Shaft power from forces on the orbiting scroll from the gas in the pockets [kW]
         self.Wdot_forces = self.omega*self.forces.mean_tau
@@ -996,14 +935,15 @@ class Scroll(PDSimCore, _Scroll):
             self.omega = omega
         else:
             raise AttributeError
-        
-        print 'self.forces.mean_Fm', self.forces.mean_Fm
-        print 'self.forces.inertial', self.forces.inertial
-        print 'self.Qamb', self.Qamb
-        print 'self.Wdot_forces', self.Wdot_forces
-        print 'self.Wdot_pv', self.Wdot_pv 
-        print 'self.losses.bearings', self.losses.bearings
-        print 'self.Wdot_mechanical', self.Wdot_mechanical
+
+#        print 'mean_Q', self.HTProcessed.mean_Q
+#        print 'self.forces.mean_Fm', self.forces.mean_Fm
+#        print 'self.forces.inertial', self.forces.inertial
+#        print 'self.Qamb', self.Qamb
+#        print 'self.Wdot_forces', self.Wdot_forces
+#        print 'self.Wdot_pv', self.Wdot_pv 
+#        print 'self.losses.bearings', self.losses.bearings
+#        print 'self.Wdot_mechanical', self.Wdot_mechanical
         
         #Motor losses [kW]
         self.motor.losses = self.Wdot_mechanical*(1/self.eta_motor-1)
@@ -1059,19 +999,6 @@ class Scroll(PDSimCore, _Scroll):
                                                 FlowPath.State_down)
         except ZeroDivisionError:
             return 0.0
-        
-#    def Inlet_sa(self,*args,**kwargs):
-#        mdot = _Scroll.Inlet_sa(self,*args,**kwargs)
-#        return mdot
-#        
-#    def Discharge(self,*args,**kwargs):
-#        return _Scroll.Discharge(self,*args,**kwargs)
-#        
-#    def SA_S(self,*args,**kwargs):
-#        return _Scroll.SA_S(self,*args,**kwargs)
-#        
-#    def FlankLeakage(self,*args,**kwargs):
-#        return _Scroll.FlankLeakage(self,*args,**kwargs)
      
     def SA_S1(self, FlowPath, X_d=1.0,**kwargs):
         """
@@ -1113,36 +1040,36 @@ class Scroll(PDSimCore, _Scroll):
         except ZeroDivisionError:
             return 0.0
     
-    def RadialLeakage(self,FlowPath,**kwargs):
-        """
-        Calculate the radial leakge flow rate
-        """
-        return _Scroll.RadialLeakage(self, FlowPath)
-    
-        #Calculate the area
-        #Arc length of the upstream part of the flow path
-        try:
-            FlowPath.A= scroll_geo.radial_leakage_area(self.theta,
-                                                       self.geo,
-                                                       FlowPath.key1,
-                                                       FlowPath.key2)
-        except KeyError:
-            print FlowPath.key1,FlowPath.key2,'caused a KeyError'
-            return 0.0
-            
-        try:
-            return flow_models.FrictionCorrectedIsentropicNozzle(
-                                 FlowPath.A,
-                                 FlowPath.State_up,
-                                 FlowPath.State_down,
-                                 self.geo.delta_radial,
-                                 Type = 'radial',
-                                 t = self.geo.t
-                                 )
-        except ZeroDivisionError:
-            return 0.0
-            
-    def FlankLeakage(self,FlowPath,**kwargs):
+#    def RadialLeakage(self,FlowPath,**kwargs):
+#        """
+#        Calculate the radial leakge flow rate
+#        """
+#        return _Scroll.RadialLeakage(self, FlowPath)
+#    
+#        #Calculate the area
+#        #Arc length of the upstream part of the flow path
+#        try:
+#            FlowPath.A= scroll_geo.radial_leakage_area(self.theta,
+#                                                       self.geo,
+#                                                       FlowPath.key1,
+#                                                       FlowPath.key2)
+#        except KeyError:
+#            print FlowPath.key1,FlowPath.key2,'caused a KeyError'
+#            return 0.0
+#            
+#        try:
+#            return flow_models.FrictionCorrectedIsentropicNozzle(
+#                                 FlowPath.A,
+#                                 FlowPath.State_up,
+#                                 FlowPath.State_down,
+#                                 self.geo.delta_radial,
+#                                 Type = 'radial',
+#                                 t = self.geo.t
+#                                 )
+#        except ZeroDivisionError:
+#            return 0.0
+#            
+    def FlankLeakage(self,FlowPath):
         """
         Calculate the flank leakge flow rate
         """
@@ -1223,42 +1150,6 @@ class Scroll(PDSimCore, _Scroll):
             If ``True``, there is an idealized check valve and flow can only go 
             from chambers with key names that start with `injCV` to other chambers.
             If ``False``, flow can go either direction
-            
-        .. plot::
-            import matplotlib.pyplot as plt
-            from PDSim.scroll.plots import plotScrollSet
-            import numpy as np
-            from math import pi
-            from PDSim.scroll import scroll_geo
-            
-            theta = pi/3
-            #Plot the scroll wraps
-            plotScrollSet(theta, ScrollComp.geo)
-            ax = plt.gca()
-            
-            #Plot the injection ports (symmetric)
-            phi = ScrollComp.geo.phi_oe-pi-2*pi
-            #Involute angle along the outer involute of the scroll wrap
-            x,y = scroll_geo.coords_inv(phi,ScrollComp.geo,theta,'fo')
-            nx,ny = scroll_geo.coords_norm(phi,ScrollComp.geo,theta,'fo')
-            rport = 0.002
-            xc,yc = x-nx*rport,y-ny*rport
-            ax.plot(xc, yc, '.')
-            t = np.linspace(0,2*pi,100)
-            ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
-            
-            #Plot the injection ports (symmetric)
-            phi = ScrollComp.geo.phi_oe-pi-2*pi+pi
-            #Involute angle along the outer involute of the scroll wrap
-            x,y = scroll_geo.coords_inv(phi,ScrollComp.geo,theta,'fi')
-            nx,ny = scroll_geo.coords_norm(phi,ScrollComp.geo,theta,'fi')
-            rport = 0.002
-            xc,yc = x-nx*rport,y-ny*rport
-            ax.plot(xc, yc, '.')
-            t = np.linspace(0,2*pi,100)
-            ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
-            
-            plt.show()
         
         """
         #1. Figure out what CV is connected to the port
@@ -1343,8 +1234,6 @@ class Scroll(PDSimCore, _Scroll):
         
         #: Corrected axial load [kN-m]
         self.forces.corr_Fz = self.forces.mean_Fz# + pi*(self.thrust_OD**2-self.thrust_ID**2)/4 * orbiting_back_pressure
-        
-        
         
         ####################################################
         #############  "Radial" force components ###########
@@ -1440,10 +1329,10 @@ class Scroll(PDSimCore, _Scroll):
         
         self.forces.corr_Fm = self.forces.mean_Fm + self.forces.inertial
         
-        print 'self.forces.mean_Ft', self.forces.mean_Ft
-        print 'self.forces.mean_Fr', self.forces.mean_Fr
-        print 'self.forces.mean_Fz', self.forces.mean_Fz
-        print 'self.forces.corr_Fz', self.forces.corr_Fz
+#        print 'self.forces.mean_Ft', self.forces.mean_Ft
+#        print 'self.forces.mean_Fr', self.forces.mean_Fr
+#        print 'self.forces.mean_Fz', self.forces.mean_Fz
+#        print 'self.forces.corr_Fz', self.forces.corr_Fz
         
         
         

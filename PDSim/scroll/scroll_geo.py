@@ -6,6 +6,10 @@ import numpy as np
 import cython
 from PDSim.scroll.plots import plotScrollSet
  
+# A container for the values for the heat transfer angles
+class HTAnglesClass(object):
+    pass
+
 #This is a list of all the members in geoVals
 geoValsvarlist=['h','phi_i0','phi_is','phi_ie','phi_e',
                 'phi_o0','ro','rb','phi_os','phi_oe','t',
@@ -738,17 +742,18 @@ def HT_angles(theta, geo, key):
     
     Returns
     -------
-    dict with the keys:
-        '1_i': maximum involute angle on the inner involute of the wrap 
+    angles : HTAngles Class 
+        with the attributes:
+        phi_1_i: maximum involute angle on the inner involute of the wrap 
         that forms the outer wall of the CV
         
-        '2_i': minimum involute angle on the inner involute of the wrap 
+        phi_2_i: minimum involute angle on the inner involute of the wrap 
         that forms the outer wall of the CV
         
-        '1_o': maximum involute angle on the outer involute of the wrap 
+        phi_1_o: maximum involute angle on the outer involute of the wrap 
         that forms the inner wall of the CV
         
-        '2_o': minimum involute angle on the outer involute of the wrap 
+        phi_2_o: minimum involute angle on the outer involute of the wrap 
         that forms the inner wall of the CV
         
     Notes
@@ -764,32 +769,33 @@ def HT_angles(theta, geo, key):
     If key is not valid, raises a KeyError
     """
     cython.declare(alpha = cython.int)
+    angles = HTAnglesClass()
     ## TODO: Offset considerations to the angles
     if key == 's1' or key == 's2':
-        return {'1_i':geo.phi_ie,
-                '2_i':geo.phi_ie-theta,
-                '1_o':phi_s_sa(theta, geo),
-                '2_o':geo.phi_oe - geo.phi_o0 - pi - theta}
+        angles.phi_1_i = geo.phi_ie
+        angles.phi_2_i = geo.phi_ie-theta
+        angles.phi_1_o = phi_s_sa(theta, geo)
+        angles.phi_2_o = geo.phi_oe - geo.phi_o0 - pi - theta
+        return angles
     elif key.startswith('c1') or key.startswith('c2'):
         alpha = int(key.split('.')[1])
         if alpha > getNc(theta,geo):
             raise KeyError('CV '+key+' does not exist')
         else:
-            return {'1_i':geo.phi_ie - theta - (alpha-1)*2*pi, 
-                    '2_i':geo.phi_ie - theta - alpha*2*pi,
-                    '1_o':geo.phi_oe - pi - theta - (alpha-1)*2*pi,
-                    '2_o':geo.phi_oe - geo.phi_o0 - pi - theta - alpha*2*pi
-                    }
+            angles.phi_1_i = geo.phi_ie - theta - (alpha-1)*2*pi 
+            angles.phi_2_i = geo.phi_ie - theta - alpha*2*pi
+            angles.phi_1_o = geo.phi_oe - pi - theta - (alpha-1)*2*pi
+            angles.phi_2_o = geo.phi_oe - geo.phi_o0 - pi - theta - alpha*2*pi
+            return angles
     elif key == 'd1' or key == 'd2':
         alpha = getNc(theta,geo)+1
-        return {'1_i':geo.phi_ie - theta - geo.phi_i0 - (alpha-1)*2*pi, 
-                '2_i':geo.phi_is,
-                '1_o':geo.phi_oe - pi - theta - (alpha-1)*2*pi,
-                '2_o':geo.phi_os
-                }
+        angles.phi_1_i = geo.phi_ie - theta - geo.phi_i0 - (alpha-1)*2*pi
+        angles.phi_2_i = geo.phi_is
+        angles.phi_1_o = geo.phi_oe - pi - theta - (alpha-1)*2*pi
+        angles.phi_2_o = geo.phi_os
+        return angles
     else:
-        raise KeyError
-    
+        return None
 
 def plot_HT_angles(theta, geo, keys, involute):
     """
@@ -819,9 +825,9 @@ def plot_HT_angles(theta, geo, keys, involute):
         try:
             angles = HT_angles(theta, geo, key)
             if involute == 'i':
-                x = np.r_[angles['2_i'], angles['1_i']]
+                x = np.r_[angles.phi_2_i, angles.phi_1_i]
             elif involute == 'o':
-                x = np.r_[angles['2_o'], angles['1_o']]
+                x = np.r_[angles.phi_2_o, angles.phi_1_o]
             ax.plot(x,y)
             ax.text(np.mean(x),y[0]+0.01,key,ha='center',va='bottom')
         except KeyError:

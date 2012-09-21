@@ -7,7 +7,7 @@ from PDSim.flow.flow_models cimport FlowFunctionWrapper
 cpdef tuple sum_flows(bytes key, list Flows)
 
 cdef class _FlowPathCollection(list):
-    pass
+    cpdef calculate(self, Core, dict hdict)
         
 #Make a stripped down class with the necessary terms included
 cdef class FlowPath(object):

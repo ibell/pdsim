@@ -28,7 +28,47 @@ cpdef tuple sum_flows(bytes key, list Flows):
     return summer_mdot, summer_mdoth
 
 cdef class _FlowPathCollection(list):
-    pass
+
+    cpdef calculate(self, Core, dict hdict):
+        """
+        Run the code for each flow path to calculate the flow rates & Update the states for the CVs and the Tubes.
+        
+        This is required whenever the existence of any of the CV or tubes 
+        changes.  Calling this function will update the pointers to the states
+        
+        Parameters
+        ----------
+        Core : PDSimCore instance or derived class thereof
+        hdict : dictionary
+            Maps CV key to enthalpy
+        """
+        cdef FlowPath FP
+        cdef dict Tubes_Nodes
+        cdef list exists_keys
+        exists_keys = Core.CVs.exists_keys
+        Tubes_Nodes = Core.Tubes.Nodes
+                
+        for FP in self:
+            ## Update the pointers to the states for the ends of the flow path
+            if FP.key1 in exists_keys:
+                FP.State1=Core.CVs[FP.key1].State
+            elif FP.key1 in Tubes_Nodes:
+                FP.State1=Tubes_Nodes[FP.key1]
+            else:
+                FP.mdot=0.0
+                #Doesn't exist, go to next flow
+                continue                   
+            
+            if FP.key2 in exists_keys:
+                FP.State2=Core.CVs[FP.key2].State
+            elif FP.key2 in Tubes_Nodes:
+                FP.State2=Tubes_Nodes[FP.key2]
+            else:
+                FP.mdot=0.0
+                #Doesn't exist, go to next flow
+                continue
+            
+            FP.calculate(hdict)
 
 cdef class FlowPath(object):
     
@@ -120,7 +160,6 @@ cdef class FlowPath(object):
     def __getstate__(self):
         d={}
         d['MdotFcn']=cPickle.dumps(self.MdotFcn)
-        d.update(self.__dict__.copy())
         d.update(self.__cdict__().copy())
         return d
         

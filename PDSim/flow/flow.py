@@ -3,7 +3,6 @@ from PDSim.misc._listmath import listm
 from _flow import _FlowPathCollection, FlowPath
 from _sumterms import sumterms_helper
 from PDSim.flow.flow_models import FlowFunctionWrapper, PyFlowFunctionWrapper 
-
 import cPickle
 
 def _pickle_method(method):
@@ -68,36 +67,8 @@ class FlowPathCollection(_FlowPathCollection):
     def N(self):
         return self.__len__()
     
-    def calculate(self, Core, hdict):
-        """
-        Core is the main model core, it contains information that 
-        is needed for the flow models
-        """
-        exists_keys=Core.CVs.exists_keys
-        Tubes_Nodes=Core.Tubes.Nodes
         
-        for FlowPath in self:
-            ## Update the pointers to the states for the ends of the flow path
-            if FlowPath.key1 in exists_keys:
-                FlowPath.State1=Core.CVs[FlowPath.key1].State
-            elif FlowPath.key1 in Tubes_Nodes:
-                FlowPath.State1=Tubes_Nodes[FlowPath.key1]
-            else:
-                FlowPath.mdot=0.0
-                #Doesn't exist, go to next flow
-                continue                    
-            
-            if FlowPath.key2 in exists_keys:
-                FlowPath.State2=Core.CVs[FlowPath.key2].State
-            elif FlowPath.key2 in Tubes_Nodes:
-                FlowPath.State2=Tubes_Nodes[FlowPath.key2]
-            else:
-                FlowPath.mdot=0.0
-                #Doesn't exist, go to next flow
-                continue
-          
-            #Calculate using the unpacked keyword arguments
-            FlowPath.calculate(hdict = hdict)
+    
             
     def sumterms(self,Core):
 
@@ -105,11 +76,5 @@ class FlowPathCollection(_FlowPathCollection):
         summerdm,summerdT = sumterms_helper(self,Core.CVs.exists_keys,Core.omega)
         
         return listm(summerdT),listm(summerdm)
-
-
-
-
-
-
 
     

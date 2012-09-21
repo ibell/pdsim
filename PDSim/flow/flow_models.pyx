@@ -57,7 +57,11 @@ cdef class PyFlowFunctionWrapper(FlowFunctionWrapper):
         return self.call(FP)
     
     def __reduce__(self):
-        return makePyFlowFunctionWrapper, ({'kwargs': self.kwargs,'Function':self.Function.__name__},)
+        if not isinstance(self.Function,str):
+            Function_str = self.Function.__name__
+        else:
+            Function_str = self.Function
+        return makePyFlowFunctionWrapper, ({'kwargs': self.kwargs,'Function':Function_str},)
 
 def makePyFlowFunctionWrapper(kwds):
     return PyFlowFunctionWrapper(**kwds)
@@ -147,6 +151,10 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
     alpha : float, optional
         The heat transfer coefficient [kW/m2/K].  If not provided, calculated from correlations
         
+    Returns
+    -------
+    Q : float
+        The amount of heat transfer [W], not including ``Q_add``
         
     """
         
@@ -236,16 +244,16 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
             
             State1.update({'T':T1,'P':p-DELTAP/1000})
         
-        print 'T1',T1
-        print 'T2_star',T2_star
-        print 'T2',T2
-        print 'p',p
-        print 'mdot',mdot
-        print 'others: ID,L,alpha,cp',ID,L,alpha,cp
-        print 'DELTAP',DELTAP
-        print 'Fluid',Fluid
-        print 'Q_add', Q_add
-        print 'Q', Q
+#        print 'T1',T1
+#        print 'T2_star',T2_star
+#        print 'T2',T2
+#        print 'p',p
+#        print 'mdot',mdot
+#        print 'others: ID,L,alpha,cp',ID,L,alpha,cp
+#        print 'DELTAP',DELTAP
+#        print 'Fluid',Fluid
+#        print 'Q_add', Q_add
+#        print 'Q', Q
         
         return Q/1000.0
 

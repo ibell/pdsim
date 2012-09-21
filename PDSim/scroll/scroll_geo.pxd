@@ -7,6 +7,9 @@ cimport numpy as np
 
 from libc.math cimport sqrt,sin,cos,tan,atan2,acos,floor,M_PI as pi,pow
 
+cdef class HTAnglesClass(object):
+    cdef public double phi_1_i, phi_2_i, phi_1_o, phi_2_o
+    
 #Take over the geo class with strict typing
 cdef class geoVals:
     cdef public double h,phi_i0,phi_is,phi_ie,phi_e,phi_o0,ro,rb,phi_os,phi_oe,t
@@ -30,7 +33,7 @@ cpdef tuple radial_leakage_angles(double theta, geoVals geo, bytes key1, bytes k
 
 cpdef int getNc(double theta, geoVals geo)
 
-cpdef HT_angles(double theta, geoVals geo, bytes key)
+cpdef HTAnglesClass HT_angles(double theta, geoVals geo, bytes key)
 
 cpdef tuple SA(double theta, geoVals geo, bint poly=*, bint use_offset = *)
 cpdef dict SA_forces(double theta, geoVals geo, bint poly = *, bint use_offset = *)

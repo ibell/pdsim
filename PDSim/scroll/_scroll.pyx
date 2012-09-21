@@ -13,7 +13,8 @@ cdef class _Scroll(object):
     
     cpdef dict __cdict__(self):
         return dict(theta = self.theta, 
-                    geo = self.geo)
+                    geo = self.geo,
+                    HTC = self.HTC)
     
     cpdef double SA_S(self, FlowPath FP):
         FP.A=scroll_geo.Area_s_sa(self.theta,self.geo)
@@ -32,14 +33,6 @@ cdef class _Scroll(object):
     cpdef double Inlet_sa(self, FlowPath FP):
         FP.A=pi*0.03**2/4.0
         return flow_models.IsentropicNozzle(FP.A,FP.State_up,FP.State_down)
-    
-    cpdef double FlankLeakage(self, FlowPath FP):
-        #Calculate the area
-        FP.A=self.geo.h*self.geo.delta_flank
-        try:
-            return flow_models.IsentropicNozzle(FP.A,FP.State_up,FP.State_down)
-        except ZeroDivisionError:
-            return 0.0
         
     cpdef double RadialLeakage(self, FlowPath FP):
         """
@@ -63,6 +56,59 @@ cdef class _Scroll(object):
                                                              str('radial'), 
                                                              self.geo.t)
         
+    cpdef double calcHT(self, double theta, bytes key, double HTC_tune, double dT_dphi, double phim):
+        cdef scroll_geo.HTAnglesClass angles
+        cdef double hc,Q_outer_wrap,Q_inner_wrap,Q_d1,Q_d2,Q_dd,T_CV,T_scroll
+        
+        ## If HT is turned off, no heat transfer
+        if HTC_tune <= 0.0 or key.startswith('inj') or key == 'sa' or key == 'dd':
+            return 0.0
+        elif key == 'ddd':
+            # ddd is a combination of the heat transfer in the d1, d2, and
+            # dd chambers
+            Q_d1 = self.calcHT(theta,str('d1'),HTC_tune,dT_dphi,phim)
+            Q_d2 = self.calcHT(theta,str('d2'),HTC_tune,dT_dphi,phim)
+            Q_d3 = self.calcHT(theta,str('dd'),HTC_tune,dT_dphi,phim)
+                
+        #print 'calculate HTC'
+        #TODO: calculate HTC
+        hc = self.HTC #[kW/m2/K]
+            
+        #Get the bounding angles for the control volume
+        angles = scroll_geo.HT_angles(theta, self.geo, key)
+        
+        T_scroll = self.Tlumps[0]
+        T_CV = self.CVs[key].State.T
+        # The heat transfer rate of the inner involute on 
+        # the outer wrap of the chamber
+        Q_outer_wrap = self.involute_heat_transfer(hc, 
+                                                   self.geo.h, 
+                                                   self.geo.rb, 
+                                                   angles.phi_1_i, 
+                                                   angles.phi_2_i, 
+                                                   self.geo.phi_i0, 
+                                                   T_scroll,
+                                                   T_CV, 
+                                                   dT_dphi, 
+                                                   phim)
+        
+        # The heat transfer rate of the outer involute on 
+        # the inner wrap of the chamber
+        Q_inner_wrap = self.involute_heat_transfer(hc, 
+                                                   self.geo.h, 
+                                                   self.geo.rb, 
+                                                   angles.phi_1_o, 
+                                                   angles.phi_2_o, 
+                                                   self.geo.phi_o0,
+                                                   T_scroll,
+                                                   T_CV, 
+                                                   dT_dphi, 
+                                                   phim)
+        
+        return HTC_tune *(Q_outer_wrap + Q_inner_wrap)
+        
+            
+                
     cpdef double involute_heat_transfer(self, double hc, double hs, double  rb, 
                                   double phi1, double phi2, double phi0, 
                                   double T_scroll, double T_CV, double dT_dphi, 

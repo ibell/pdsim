@@ -563,10 +563,6 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
                                 self.plot_every_cycle])
         sizer.Add(sizer_advanced)
         sizer.Layout()
-    
-#        # Loads all the parameters from the config file - 
-#        # it will call post_get_from_configfile 
-#        self.get_from_configfile('SolverInputsPanel') 
         
     def post_get_from_configfile(self, key, config_string):
         """
