@@ -1,7 +1,10 @@
 import numpy as np,copy
 from PDSim.misc._listmath import listm
-from _flow import _FlowPath,_FlowPathCollection
+from _flow import _FlowPathCollection, FlowPath
 from _sumterms import sumterms_helper
+from PDSim.flow.flow_models import FlowFunctionWrapper, PyFlowFunctionWrapper 
+
+import cPickle
 
 def _pickle_method(method):
     func_name = method.im_func.__name__
@@ -103,72 +106,10 @@ class FlowPathCollection(_FlowPathCollection):
         
         return listm(summerdT),listm(summerdm)
 
-def rebuildFlowPath(d):
-    FP = FlowPath()
-    for item in d:
-        setattr(FP,item,d[item])
-    return FP
-    
-class FlowPath(_FlowPath):
-    """
-    This is the class that contains the data and handlers for
-    the flow models.  
-    """
-        
-    def __init__(self,key1='',key2='',MdotFcn='',MdotFcn_kwargs={}):
-        self.key1=key1
-        self.key2=key2
-        #Add the bound method in a wrapper that will pickle properly
-        self.MdotFcn=MdotFcn
-        self.MdotFcn_kwargs=MdotFcn_kwargs
-        
-    def update(self,d):
-        if isinstance(d,dict):
-            for k,v in d.iteritems():
-                setattr(self,k,v)
-                
-    def calculate(self, hdict):
-        """
-        calculate
-        """
-        # Call the Cython routine in _Flow.pyx to evaluate the states
-        # in preparation for the mass flow function
-        self._calculate(hdict)
-        
-        # Pass off to the calculation function
-        #
-        # This function is probably in another class, so pass an 
-        # instance of the current FlowPath class to the function
-        #
-        #Some other keyword arguments can be passed along to the function
-        self.mdot=self.MdotFcn(self, **self.MdotFcn_kwargs)
-    
-    def __reduce__(self):
-        return rebuildFlowPath,(self.__getstate__(),)
-        
-    def __getstate__(self):
-        d={}
-        d.update(self.__dict__.copy())
-        d.update(self.__cdict__().copy())
-        return d
-        
-    def __deepcopy__(self,memo):
-        newFM=FlowPath()
-        newdict = copy.copy(self.__dict__)
-        newFM.__dict__.update(newdict)
-        newFM.mdot=copy.copy(self.mdot)
-        newFM.key_up=copy.copy(self.key_up)
-        newFM.key_down=copy.copy(self.key_down)
-        newFM.key1=copy.copy(self.key1)
-        newFM.key2=copy.copy(self.key2)
-        newFM.h_up=copy.copy(self.h_up)
-        return newFM
 
-if __name__=='__main__':
-    FP=FlowPath()
-    FL=FlowPathCollection()
-    FL.append(FP)
-    from copy import deepcopy
-    f2=deepcopy(FL)
-    print f2
+
+
+
+
+
     

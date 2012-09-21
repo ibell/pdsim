@@ -8,6 +8,9 @@ from libcpp.vector cimport vector
 
 from CoolProp.State cimport State
 
+from PDSim.flow._flow import FlowPath
+from PDSim.flow._flow cimport FlowPath
+
 from libc.math cimport exp, log, M_PI as pi, M_E as e, sqrt
 
 @cython.locals(
@@ -32,6 +35,19 @@ rho_down=cython.double,
 otherparameters=cython.dict,)
 cpdef double IsentropicNozzle(double A, State State_up, State State_down, bytes other_output=*)
 
+cdef class FlowFunctionWrapper(object):
+    
+    cpdef double call(self, FlowPath FP)
+    
+cdef class PyFlowFunctionWrapper(FlowFunctionWrapper):
+    cdef dict kwargs
+    cdef public object Function
+    
+    cpdef double call(self, FlowPath FP)
+    
+cdef class IsentropicNozzleWrapper(FlowFunctionWrapper):
+    cpdef double call(self, FlowPath FP)
+    
 @cython.locals(Re = cython.double, v = cython.double)
 cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State State_down, double delta, bytes Type, double t = *, double ro = *, bint full_output = *)
 

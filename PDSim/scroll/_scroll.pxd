@@ -1,5 +1,5 @@
-from PDSim.flow._flow import _FlowPath
-from PDSim.flow._flow cimport _FlowPath
+from PDSim.flow._flow import FlowPath
+from PDSim.flow._flow cimport FlowPath
 
 from PDSim.misc._listmath import listm
 from PDSim.misc._listmath cimport listm
@@ -15,11 +15,11 @@ cdef class _Scroll(object):
     cdef public double theta
     
     cpdef dict __cdict__(self)
-    cpdef double SA_S(self, _FlowPath FP)
-    cpdef double Discharge(self,_FlowPath FP)
-    cpdef double Inlet_sa(self, _FlowPath FP)
-    cpdef double FlankLeakage(self, _FlowPath FP)
-    cpdef double RadialLeakage(self, _FlowPath FP, dict kwargs)
+    cpdef double SA_S(self, FlowPath FP)
+    cpdef double Discharge(self,FlowPath FP)
+    cpdef double Inlet_sa(self, FlowPath FP)
+    cpdef double FlankLeakage(self, FlowPath FP)
+    cpdef double RadialLeakage(self, FlowPath FP)
     
     cpdef double involute_heat_transfer(self, double hc, double hs, double  rb, 
                                   double phi1, double phi2, double phi0, 

@@ -14,6 +14,7 @@ from math import pi
 # commented out
 #sys.path.insert(0, os.path.abspath('..'))
 
+from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo
 from PDSim.scroll.core import Scroll
@@ -187,17 +188,21 @@ def Compressor(f = None):
                                         initialState = injState1
                                         )
                           )
+     
+    
     
     ScrollComp.auto_add_CVs(inletState, outletState)
+    
     ScrollComp.auto_add_leakage(flankFunc = ScrollComp.FlankLeakage, 
                                 radialFunc = ScrollComp.RadialLeakage)
     
-    ScrollComp.add_flow(FlowPath(key1='inlet.2', 
-                                 key2='sa', 
-                                 MdotFcn=ScrollComp.IsentropicNozzleFM,
-                                 MdotFcn_kwargs = dict(A = pi*0.02**2/4)
-                                 )
-                        )
+    FP = FlowPath(key1='inlet.2', 
+                  key2='sa', 
+                  MdotFcn=IsentropicNozzleWrapper(),
+                  )
+    FP.A = pi*0.02**2/4
+    ScrollComp.add_flow(FP)
+    
     ScrollComp.add_flow(FlowPath(key1='sa', 
                                  key2='s1',
                                  MdotFcn=ScrollComp.SA_S1,
@@ -245,18 +250,26 @@ def Compressor(f = None):
                                      )
                             )
     
-    ScrollComp.add_flow(FlowPath(key1='outlet.1',key2='ddd',
-                                 MdotFcn = ScrollComp.IsentropicNozzleFM,
-                                 MdotFcn_kwargs = dict(A=pi*0.01**2/4)
-                                 )
-                        )
-    ScrollComp.add_flow(FlowPath(key1='outlet.1',key2='dd',
-                                 MdotFcn = ScrollComp.IsentropicNozzleFM,
-                                 MdotFcn_kwargs = dict(A=pi*0.01**2/4)
-                                 )
-                        )
-    ScrollComp.add_flow(FlowPath(key1='d1',key2='dd',MdotFcn=ScrollComp.D_to_DD))
-    ScrollComp.add_flow(FlowPath(key1='d2',key2='dd',MdotFcn=ScrollComp.D_to_DD))
+    FP = FlowPath(key1='outlet.1', 
+                  key2='dd', 
+                  MdotFcn=IsentropicNozzleWrapper(),
+                  )
+    FP.A = pi*0.01**2/4
+    ScrollComp.add_flow(FP)
+    
+    FP = FlowPath(key1='outlet.1', 
+                  key2='ddd', 
+                  MdotFcn=IsentropicNozzleWrapper(),
+                  )
+    FP.A = pi*0.01**2/4
+    ScrollComp.add_flow(FP)
+    
+    ScrollComp.add_flow(FlowPath(key1='d1',
+                                 key2='dd',
+                                 MdotFcn=ScrollComp.D_to_DD))
+    ScrollComp.add_flow(FlowPath(key1='d2',
+                                 key2='dd',
+                                 MdotFcn=ScrollComp.D_to_DD))
 
     from time import clock
     t1=clock()

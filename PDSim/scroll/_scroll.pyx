@@ -15,25 +15,25 @@ cdef class _Scroll(object):
         return dict(theta = self.theta, 
                     geo = self.geo)
     
-    cpdef double SA_S(self, _FlowPath FP):
+    cpdef double SA_S(self, FlowPath FP):
         FP.A=scroll_geo.Area_s_sa(self.theta,self.geo)
         try:
             return flow_models.IsentropicNozzle(FP.A,FP.State_up,FP.State_down)
         except ZeroDivisionError:
             return 0.0  
         
-    cpdef double Discharge(self,_FlowPath FP):
+    cpdef double Discharge(self,FlowPath FP):
         FP.A=pi*0.01**2/4.0
         try:
             return flow_models.IsentropicNozzle(FP.A,FP.State_up,FP.State_down)
         except ZeroDivisionError:
             return 0.0
         
-    cpdef double Inlet_sa(self, _FlowPath FP):
+    cpdef double Inlet_sa(self, FlowPath FP):
         FP.A=pi*0.03**2/4.0
         return flow_models.IsentropicNozzle(FP.A,FP.State_up,FP.State_down)
     
-    cpdef double FlankLeakage(self, _FlowPath FP):
+    cpdef double FlankLeakage(self, FlowPath FP):
         #Calculate the area
         FP.A=self.geo.h*self.geo.delta_flank
         try:
@@ -41,9 +41,9 @@ cdef class _Scroll(object):
         except ZeroDivisionError:
             return 0.0
         
-    cpdef double RadialLeakage(self, _FlowPath FP, dict kwargs):
+    cpdef double RadialLeakage(self, FlowPath FP):
         """
-        Calculate the radial leakge flow rate
+        Calculate the radial leakage flow rate
         """
         #Calculate the area
         #Arc length of the upstream part of the flow path

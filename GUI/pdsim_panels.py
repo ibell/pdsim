@@ -265,12 +265,24 @@ class PDPanel(wx.Panel):
         for item in items:
             setattr(sim, item['attr'],self._get_value(item['textbox']))
     
-    def ConstructItems(self,items,sizer,configdict=None, descdict=None, parent = None):
+    def ConstructItems(self, items, sizer, configdict = None, descdict=None, parent = None):
+        
+        """
+        Parameters
+        ----------
+        items : a list of dictionaries
+            Each item is a dictionary of values with the keys:
+                attr : PDSim attribute
+        sizer : wx.Sizer
+            The sizer to add the items to
+        configdict : dictionary
+            The configuration value dictionary that was pulled from the file
+        descdict : dictionary
+            The configuration description dictionary that was pulled from the file
+        parent : wx.Window
+            The parent of the items, default is this panel
+        """
         for item in items:
-            #item is a dictionary of values including the keys:
-            #  - attr
-            #  - textbox
-            #  - val
             
             if parent is None:
                 parent = self
@@ -278,19 +290,23 @@ class PDPanel(wx.Panel):
             if 'val' not in item and configdict is not None:
                 k = item['attr']
                 if k not in configdict:
-                    val,item['text']=self.get_from_configfile(self.name, k, default = True)
+                    #Returns a dictionary of values and a dictionary of descriptions
+                    d,desc = self.get_from_configfile(self.name, k, default = True)
+                    #Get the entries for the given key
+                    val,item['text'] = d[k],desc[k]
                 else:
                     val = configdict[k]
                     item['text'] = descdict[k]
             else:
-                val = item['val']
-                item['text'] = descdict[k]
+                d,desc = self.get_from_configfile(self.name, item['attr'])
+                #Get the entries for the given key
+                val,item['text'] = d[k],desc[k]
                 
             label=wx.StaticText(parent, -1, item['text'])
             sizer.Add(label, 1, wx.EXPAND)
-            textbox=wx.TextCtrl(parent,-1,str(val))
+            textbox=wx.TextCtrl(parent, -1, str(val))
             sizer.Add(textbox, 1, wx.EXPAND)
-            item.update(dict(textbox=textbox,label=label))
+            item.update(dict(textbox=textbox, label=label))
             
             caption = item['text']
             if caption.find(']')>=0 and caption.find(']')>=0: 
@@ -356,7 +372,6 @@ class PDPanel(wx.Panel):
         desc : string
             The description from the config file
         """
-        
         #Split at the first comma to get type, and value+description
         type,val_desc = value.split(',',1)
         #If it has a description, use it, otherwise, just use the config file key
@@ -388,13 +403,22 @@ class PDPanel(wx.Panel):
         """
         This function will get parameters from the config file
         
-        If section and key are provided, it will return just the value, either from
-        the main config file if found or the default config file if not found.  If the parameter default is True,
-        it will ALWAYS use the default config file 
+        Parameters
+        ----------
+        section : string
+            The section of the config file to retrieve values from
+        key : string, optional
+            The key of the value to return
+        default : boolean, optional
+            If ``True``, ALWAYS use the default config file
         
-        configfile: file path or readable object (StringIO instance or file)
-        Returns a dictionary with each of the elements from the given section 
-        name from the given configuration file.  Each of the values in the configuration 
+        Notes
+        -----
+        If section and key are provided, it will return just the value, either from
+        the main config file if found or the default config file if not found.  
+        If the parameter default is ``True``, it will ALWAYS use the default config file 
+        
+        Each of the values in the configuration 
         file may have a string in the format 
         
         int,3,
@@ -418,7 +442,7 @@ class PDPanel(wx.Panel):
             _parser = default_parser
         elif default:
             # We are programmatically using the default parameters, 
-            # don't warn automatically'
+            # don't warn'
             _parser = default_parser
         else:
             _parser = parser
@@ -427,8 +451,8 @@ class PDPanel(wx.Panel):
             if default:
                 #Use the default value
                 value = default_parser.get(section, key)
-                _d,_desc =  self._get_from_configfile(key, value)
-                return _d,_desc
+                d[key],desc[key] =  self._get_from_configfile(key, value)
+                return d,desc
             
             #Return the value from the file directly if the key is found
             elif _parser.has_option(section,key):
@@ -440,12 +464,11 @@ class PDPanel(wx.Panel):
                 #Fall back to the default file
                 warnings.warn('Did not find the key ['+key+'] in section '+section+', falling back to default config' )
                 value = default_parser.get(section, key)
-                return value
+                _d,_desc =  self._get_from_configfile(key, value)
+                return _d,_desc
         
         for name, value in _parser.items(section):
-            _d,_desc = self._get_from_configfile(name,value)
-            d[name] = _d
-            desc[name] = _desc
+            d[name], desc[name] = self._get_from_configfile(name,value)
             
         return d,desc
     

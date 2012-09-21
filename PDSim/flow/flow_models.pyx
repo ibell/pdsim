@@ -40,6 +40,76 @@ cdef double af_9 = 0.689497785772
 cdef double af_10 = 1.09607735134
 cdef double Re_star_flank = 826.167177885
     
+cdef class PyFlowFunctionWrapper(FlowFunctionWrapper):
+    """
+    This function is defined at the in order to do high-level 
+    mass flow functions that are slower but can still be accessed by the 
+    Cython code. 
+    """
+    def __init__(self,Function,kwargs):
+        self.Function = Function
+        self.kwargs = kwargs
+        
+    cpdef double call(self,FlowPath FP):
+        return self.Function(FP,**self.kwargs)
+        
+    def __call__(self, FlowPath FP):
+        return self.call(FP)
+    
+    def __reduce__(self):
+        return makePyFlowFunctionWrapper, ({'kwargs': self.kwargs,'Function':self.Function.__name__},)
+
+def makePyFlowFunctionWrapper(kwds):
+    return PyFlowFunctionWrapper(**kwds)
+        
+cdef class IsentropicNozzleWrapper(FlowFunctionWrapper):
+    """
+    A wrapper that can be added to call the isentropic nozzle model
+    if the flow area is constant
+    """
+        
+    cpdef double call(self, FlowPath FP):
+        """
+        Returns the mass flow rate from the isentropic nozzle model
+        """
+        return IsentropicNozzle(FP.A,
+                                FP.State_up,
+                                FP.State_down)
+    
+    def __call__(self, FlowPath FP):
+        """
+        This special method calls the call() function
+        """
+        return self.call(FP)
+    
+cdef class FlowFunctionWrapper(object):
+    """
+    A wrapper to contain the function that will be called
+    
+    Two methods are provided, call(FP) and __call__(FP).  The special method
+     __call__(FP) allows an instance of FlowFunctionWrapper to be called 
+     directly like:: 
+     
+         FFW = FlowFunctionWrapper()
+         FFW(FP)
+         
+     or you can call the call() method like::
+     
+         FFW.call(FP)
+         
+     Having both methods allows cython functions to stay at the C++ layer and not
+     need to come back to python layer for speed 
+     
+    """
+    cpdef double call(self, FlowPath FP):
+        pass
+        
+    def __call__(self, FlowPath FP):
+        """
+        This special method calls the call() function of the derived class
+        """
+        return self.call(FP)
+    
 cpdef double pow(double x, double y):
     return x**y
 

@@ -9,8 +9,8 @@ from CoolProp.State cimport State as StateClass
 import numpy as np
 cimport numpy as np
 
-from PDSim.flow._flow import _FlowPath
-from PDSim.flow._flow cimport _FlowPath
+from PDSim.flow._flow import FlowPath
+from PDSim.flow._flow cimport FlowPath
 
 from PDSim.misc._listmath import listm
 from PDSim.misc._listmath cimport listm
@@ -41,7 +41,7 @@ cpdef sumterms_helper(object Flows, list exists_keys, double omega):
     cdef double mdot, h_up
     cdef int I_up,I_down
     cdef bytes key_up, key_down
-    cdef _FlowPath Flow
+    cdef FlowPath Flow
     
     summerdm = [0.0 for _dummy in range(len(exists_keys))]
     summerdT = summerdm[:]

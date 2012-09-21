@@ -223,8 +223,8 @@ class WorkerThreadManager(Thread):
             for _thread in self.threadsList:
                 #Send the abort signal
                 _thread.abort()
-                #Wait for it to finish up
-                _thread.join(1)
+#                #Wait for it to finish up
+#                _thread.join()
             del busy
             
         dlg.Destroy()
@@ -538,10 +538,21 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
     
         self.IC = IntegratorChoices(self)
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Insert(0,self.IC)
+        
+        #Loads all the parameters from the config file (case-sensitive)
+        self.configdict, self.descdict = self.get_from_configfile('SolverInputsPanel')
+        
+        self.items = [dict(attr = 'eps_cycle')]
+        
+        sizer.Insert(0, self.IC)
         sizer.AddSpacer(10)
         
+        sizer_tols = wx.FlexGridSizer(cols = 2)        
+        self.ConstructItems(self.items, sizer_tols, self.configdict, self.descdict)
+        sizer.Add(sizer_tols)
+        
         sizer_advanced = wx.FlexGridSizer(cols = 1)
+        
         sizer.Add(wx.StaticText(self,label='Advanced/Debug options'))
         sizer.Add(wx.StaticLine(self, -1, (25, 50), (300,1)))
         self.OneCycle = wx.CheckBox(self,
@@ -553,9 +564,9 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         sizer.Add(sizer_advanced)
         sizer.Layout()
     
-        # Loads all the parameters from the config file - 
-        # it will call post_get_from_configfile 
-        self.get_from_configfile('SolverInputsPanel') 
+#        # Loads all the parameters from the config file - 
+#        # it will call post_get_from_configfile 
+#        self.get_from_configfile('SolverInputsPanel') 
         
     def post_get_from_configfile(self, key, config_string):
         """

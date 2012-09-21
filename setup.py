@@ -28,7 +28,8 @@ fp.close()
 
 if len(sys.argv) == 1:
     #sys.argv+=['build_ext','--inplace']
-    sys.argv+=['build','install']
+    sys.argv+=['build','--force','install','--clean']
+    #sys.argv+=['build','install']
     
 import Cython
 
@@ -51,9 +52,7 @@ pyx_list = [
             "PDSim/scroll/_scroll.pyx"
             ]
 
-# Try to remove the generated files in the source tree 
-# if you are doing an install to the normal location
-if '--inplace' not in sys.argv:
+def clean():
     for pyx_file in pyx_list:
         f_root = pyx_file.rsplit('.',1)[0]
         for ending in ['.pyd','.so']:
@@ -63,6 +62,13 @@ if '--inplace' not in sys.argv:
                 print 'removed',fname
             except OSError:
                 pass
+            
+# Try to remove the generated files in the source tree 
+# if you are doing an install to the normal location
+if '--inplace' not in sys.argv or '--clean' in sys.argv:
+    clean()
+    if '--clean' in sys.argv:
+        sys.argv.remove('--clean')
 
 ext_module_list = []
 for pyx_file in pyx_list:

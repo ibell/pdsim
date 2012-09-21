@@ -18,6 +18,7 @@ from CoolProp import State
 from math import pi,cos
 import numpy as np
 import copy
+import types
 
 class struct(object):
     pass
@@ -28,6 +29,12 @@ class Scroll(PDSimCore, _Scroll):
     
     It is inherited from the PDSimCore class
     """
+    
+    # Bind some of the cython methods from the base class so that they can
+    # pickle properly
+    # To add method to existing instance, see http://stackoverflow.com/questions/972/adding-a-method-to-an-existing-object
+    #RadialLeakage = _Scroll.RadialLeakage
+    
     def __init__(self):
         PDSimCore.__init__(self)
         
@@ -1016,7 +1023,7 @@ class Scroll(PDSimCore, _Scroll):
         
         #Want to return a list
         return [Qnet]
-    
+
     def TubeCode(self,Tube,**kwargs):
         Tube.Q = flow_models.IsothermalWallTube(Tube.mdot,
                                                 Tube.State1,
@@ -1110,7 +1117,7 @@ class Scroll(PDSimCore, _Scroll):
         """
         Calculate the radial leakge flow rate
         """
-        return _Scroll.RadialLeakage(self, FlowPath, kwargs)
+        return _Scroll.RadialLeakage(self, FlowPath)
     
         #Calculate the area
         #Arc length of the upstream part of the flow path

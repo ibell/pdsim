@@ -1107,6 +1107,9 @@ class PDSimCore(object):
             Number of conventional steps to be taken when not using newton-raphson prior to entering into a line search
         """
         
+        #Connect functions that have been serialized by saving the function name as a string
+        self.connect_flow_functions()
+        
         #Both inlet and outlet keys must be connected to invariant nodes - 
         # that is they must be part of the tubes which are all quasi-steady
         if not key_inlet == None and not key_inlet in self.Tubes.Nodes:
@@ -1327,7 +1330,7 @@ class PDSimCore(object):
                         # before the end of the rotation
                         continue
 
-                    if RSSE < 1e-3:
+                    if RSSE < getattr(self,'eps_cycle',1e-3):
                         break
                     else:
                         self.x_state = x_state_new
@@ -1674,5 +1677,22 @@ class PDSimCore(object):
     
         return error_list, new_list
     
+    def connect_flow_functions(self):
+        """
+        Reconnect function pointers
+        
+        For pickling purposes, it can sometimes be useful to just give the name
+        of the function relative to the PDSimCore (or derived class).  If the 
+        function is just a string, reconnect it to the function in the PDSimCore 
+        instance 
+        """
+        for Flow in self.Flows:
+            if hasattr(Flow.MdotFcn, 'Function'):
+                if isinstance(Flow.MdotFcn.Function, basestring):
+                    if hasattr(self,Flow.MdotFcn.Function):
+                        Flow.MdotFcn.Function = getattr(self, Flow.MdotFcn.Function)
+                    else:   
+                        raise AttributeError('The name of the function ['+Flow.MdotFcn.Function+']is not found in the PDSimCore derived class instance')
+            
 if __name__=='__main__':
     print 'This is the base class that is inherited by other compressor types.  Running this file doesn\'t do anything'

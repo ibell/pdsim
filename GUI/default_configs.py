@@ -115,6 +115,7 @@ Term1 = Term,Rotational speed [rad/s],250.0;300.0
 
 [SolverInputsPanel]
 Cycle = Cycle,RK45,1e-7
+eps_cycle = float, 0.001, Cycle-Cycle convergence tolerance (RSSE) [-]
 
 [OutputDataPanel]
 selected  = selected,['run_index'; 'mdot'; 'eta_v'; 'eta_a']

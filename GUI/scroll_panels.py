@@ -719,8 +719,6 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         else:
             raise ValueError('Your combination of motor terms is not valid')
         
-        
-        
         self.items = [
       
                     dict(attr='h_shell'),
