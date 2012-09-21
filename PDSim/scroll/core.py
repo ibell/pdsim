@@ -563,7 +563,7 @@ class Scroll(PDSimCore, _Scroll):
         #This gets called at every step, or partial step
         self.theta=t
         
-        def IsAtMerge(eps = 0.005, eps_d1_higher=0.005,eps_dd_higher=0.00001):
+        def IsAtMerge(eps = 0.001, eps_d1_higher=0.001,eps_dd_higher=0.00001):
             pressures = [self.CVs['d1'].State.p,
                          self.CVs['d2'].State.p,
                          self.CVs['dd'].State.p]
@@ -571,12 +571,12 @@ class Scroll(PDSimCore, _Scroll):
             p_min = min(pressures)
             if abs(p_min/p_max-1)<eps_dd_higher:
                 return True
-            elif self.CVs['d1'].State.p>self.CVs['dd'].State.p and abs(p_min/p_max-1)<eps_d1_higher:
-                print 'Merged with d1 higher'
-                return True
-            elif self.CVs['d1'].State.p<self.CVs['dd'].State.p and abs(p_min/p_max-1)<eps_dd_higher:
-                print 'Merged with dd higher'
-                return True
+#            elif self.CVs['d1'].State.p>self.CVs['dd'].State.p and abs(p_min/p_max-1)<eps_d1_higher:
+#                print 'Merged with d1 higher'
+#                return True
+#            elif self.CVs['d1'].State.p<self.CVs['dd'].State.p and abs(p_min/p_max-1)<eps_dd_higher:
+#                print 'Merged with dd higher'
+#                return True
             else:
                 return False
             
@@ -879,6 +879,32 @@ class Scroll(PDSimCore, _Scroll):
         PDSimCore.pre_run(self)
         
         
+    def guess_lump_temps(self, T0):
+        """
+        Guess the temperature of the lump
+        
+        Parameters
+        ----------
+        T0 : float
+            First guess for temperature [K]
+        """
+        
+        # First try to just alter the lump temperature with the gas heat transfer
+        # rate fixed
+        
+        def OBJECTIVE(x):
+            self.Tlumps[0] = x
+            #Run the tubes
+            for tube in self.Tubes:
+                tube.TubeFcn(tube)
+            #
+            return self.lump_energy_balance_callback()[0]
+        
+        print OBJECTIVE(T0-50)
+        print OBJECTIVE(T0+50)
+        return newton(OBJECTIVE,T0)
+        
+        
     def lump_energy_balance_callback(self):
         """
         .. math ::
@@ -896,9 +922,8 @@ class Scroll(PDSimCore, _Scroll):
         
         #For the single lump
         # HT terms are positive if heat transfer is TO the lump
-        Qnet=0.0
-        for Tube in self.Tubes:
-            Qnet-=Tube.Q
+        Qnet = 0.0
+        Qnet -= sum([Tube.Q for Tube in self.Tubes])
         
         self.Qamb = self.ambient_heat_transfer(self.Tlumps[0])
         
@@ -910,7 +935,6 @@ class Scroll(PDSimCore, _Scroll):
         # if heat is transfered to the gas in the working chamber, so flip the 
         # sign for the lump
         Qnet -= self.HTProcessed.mean_Q
-        
         
         
         #Shaft power from forces on the orbiting scroll from the gas in the pockets [kW]

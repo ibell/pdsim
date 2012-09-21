@@ -28,8 +28,8 @@ fp.close()
 
 if len(sys.argv) == 1:
     #sys.argv+=['build_ext','--inplace']
-    sys.argv+=['build','--force','install','--clean']
-    #sys.argv+=['build','install']
+    #sys.argv+=['build','--force','install','--clean']
+    sys.argv+=['build','install']
     
 import Cython
 

@@ -32,7 +32,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import time
 
-Injection = False
+Injection = True
 check_valve = False
 
 def Compressor(f = None):
@@ -42,8 +42,8 @@ def Compressor(f = None):
     
     ScrollComp.set_scroll_geo(104.8e-6, 2.4, 0.004, 0.007) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2=0)
-    ScrollComp.geo.delta_flank = 1.5e-6
-    ScrollComp.geo.delta_radial = 1.5e-6
+    ScrollComp.geo.delta_flank = 15e-6
+    ScrollComp.geo.delta_radial = 15e-6
     ScrollComp.omega = 3600/60*2*pi
     ScrollComp.Tamb = 298.0
     ScrollComp.eta_motor = 0.9
@@ -276,6 +276,7 @@ def Compressor(f = None):
     ScrollComp.RK45_eps = 1e-7
     ScrollComp.EulerN = 20000
     ScrollComp.HeunN = 6000
+    ScrollComp.eps_cycle = 0.003
     try:
         ScrollComp.precond_solve(key_inlet='inlet.1',key_outlet='outlet.2',
                      step_callback=ScrollComp.step_callback, 
@@ -284,7 +285,7 @@ def Compressor(f = None):
                      lump_energy_balance_callback=ScrollComp.lump_energy_balance_callback,
                      solver_method='RK45',
                      UseNR = False, #Use Newton-Raphson ND solver to determine the initial state
-                     OneCycle = True,
+                     OneCycle = False,
                      plot_every_cycle= False
                      )
     except:

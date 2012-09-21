@@ -214,15 +214,15 @@ def journal_bearing(**kwargs):
     #Frictional losses [W]
     Wdot_loss = omega*r_b*f*W
     
-    print 'W',W
-    print 'r_b',r_b
-    print 'omega',omega
-    print 'eta_0',eta_0
-    print 'S',S
-    print 'D_over_L_list',D_over_L_list
-    print 'log10_f_rb_c_list',log10_f_rb_c_list
-    print 'rb*f/c',rb_c_f
-    print 'f',f
+#    print 'W',W
+#    print 'r_b',r_b
+#    print 'omega',omega
+#    print 'eta_0',eta_0
+#    print 'S',S
+#    print 'D_over_L_list',D_over_L_list
+#    print 'log10_f_rb_c_list',log10_f_rb_c_list
+#    print 'rb*f/c',rb_c_f
+#    print 'f',f
     
     return dict(
                 S = S,

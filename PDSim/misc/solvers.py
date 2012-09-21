@@ -38,7 +38,7 @@ def MultiDimNewtRaph(f,x0,dx=1e-6,args=(),ytol=1e-5,w=1.0,JustOneStep=False):
             return x
     return x
         
-def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, w=1.0, wJ=1.0, itermax=10, JustOneStep=False):
+def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, J0 = None, w=1.0, wJ=1.0, itermax=10, JustOneStep=False):
     """
     Broyden's method
     
@@ -52,7 +52,8 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, w=1.0, wJ=1.0, itermax=
             (x0,*args) --> array
             
         that returns an array-like object the same shape as ``x0``
-        
+    J0 : ndarray
+        A square matrix that contains a first guess for the Jacobian
     x0 : array-like
         Initial values for the solver
     args : tuple
@@ -101,16 +102,23 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, w=1.0, wJ=1.0, itermax=
             else:
                 F0=array(f0)
             
-            #Build the Jacobian matrix by columns
-            for i in range(len(x0)):
-                epsilon=np.zeros_like(x0)
-                epsilon[i]=dx[i]
-                fplus = f(x0+epsilon,*args)
-                if fplus is None:
-                    return [None]*len(x0)
-                A0[:,i]=(array(fplus)-F0)/epsilon[i]
+            if J0 is None:
+                #Build the Jacobian matrix by columns
+                for i in range(len(x0)):
+                    epsilon=np.zeros_like(x0)
+                    epsilon[i]=dx[i]
+                    fplus = f(x0+epsilon,*args)
+                    if fplus is None:
+                        return [None]*len(x0)
+                    A0[:,i]=(array(fplus)-F0)/epsilon[i]
+            else:
+                #Use the guess value, but reset J0 so that in future calls
+                #it will use the Finite-approximation
+                A0 = J0
+                J0 = None
             #Get the difference vector
             x1=x0-w*np.dot(inv(A0),F0)
+            print 'Broyden x1', x1
             #Just do one step and stop
             if JustOneStep==True:
                 return x1
