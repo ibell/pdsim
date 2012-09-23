@@ -3,63 +3,66 @@ from __future__ import division
 import cython
 cimport cython
 
+import numpy as np
+cimport numpy as np
+
 #Import the listm type used in PDSim
 from PDSim.misc._listmath import listm
 from PDSim.misc._listmath cimport listm
 
-cdef class _PDSimCore:
+cpdef delimit_vector(np.ndarray[np.float_t, ndim = 1] x0, np.ndarray[np.float_t, ndim = 1] y0):
+        """
+        Break vectors into continuous chunks of real values as needed
         
-    cpdef _derivs(self,double theta, listm x, heat_transfer_callback=None):
-        cdef listm xL,V,dV,rho,dpdT,h,cv,p,m,summerdxL,summerdT,dmdtheta
-        #1. Calculate the volume and derivative of volume of each control volumes
-        #    Return two lists, one for the volumes, second for the derivatives of volumes 
-        V,dV=self.CVs.volumes(theta)
-    
-        if self.__hasLiquid__==True:
-            raise NotImplementedError('Not coded')
+        All the trailing NAN values have been removed already
+        """
+        cdef long i,L,R
+        cdef list real_bounds,nan_bounds,x_list,y_list
+        
+        real_bounds = []
+        nan_bounds = []
+        
+        if not np.any(np.isnan(y0)):
+            return [x0],[y0]
+        
+        if np.isnan(y0[0]):
+            nan_bounds += [0]
         else:
-            self.CVs.updateStates('T',x[0:self.CVs.Nexist],'D',x[self.CVs.Nexist:2*self.CVs.Nexist])
+            real_bounds += [0]
             
-        #2. Calculate the mass flow terms between the control volumes
-        self.Flows.calculate(self)
-        summerdT,summerdm=self.Flows.sumterms(self)
-        
-        #3. Calculate the heat transfer terms
-        if heat_transfer_callback is not None:
-            Q=heat_transfer_callback(theta)
-            if not len(Q) == self.CVs.Nexist:
-                raise ValueError
+        if np.isfinite(y0[-1]):
+            real_bounds += [len(y0)-1]
         else:
-            Q=0.0
+            nan_bounds += [len(y0)-1]
+            
+        for i in range(len(y0)-1):
+            if np.isnan(y0[i])==[False] and np.isnan(y0[i+1])==[True]:
+                real_bounds+=[i]
+                nan_bounds+=[i+1]
+            elif np.isnan(y0[i])==[True] and np.isnan(y0[i+1])==[False]:
+                nan_bounds += [i]
+                real_bounds += [i+1]
         
-        ## Calculate properties and property derivatives
-        ## needed for differential equations
-        rho = listm(self.CVs.rho)
-        v = 1.0/rho
-        m = V*rho
-        T = listm(self.CVs.T)
-        h = listm(self.CVs.h)
-        cv = listm(self.CVs.cv)
-        dpdT = listm(self.CVs.dpdT)
-        p = listm(self.CVs.p)
+        nan_bounds=sorted(nan_bounds)
+        real_bounds=sorted(real_bounds)
         
-        self.V_=V
-        self.dV_=dV
-        self.rho_=rho
-        self.m_=m
-        self.p_=p
-        self.T_=T
-                
-        dudxL=0.0
-        summerdxL=0.0*T
-        xL=0.0*T
+        #Check that all the NAN chunks are all NAN in fact        
+        for i in range(0,len(nan_bounds),2):
+            L = nan_bounds[i]
+            R = nan_bounds[i+1]+1
+            if not np.all(np.isnan(y0[L:R])):
+                raise ValueError('All the elements in NAN chunk are not NAN')
         
-        dmdtheta=summerdm
-        dxLdtheta=1.0/m*(summerdxL-xL*dmdtheta)
-        dTdtheta=1/(m*cv)*(-1.0*T*dpdT*(dV-v*dmdtheta)-m*dudxL*dxLdtheta-h*dmdtheta+Q/self.omega+summerdT)
-        drhodtheta = 1.0/V*(dmdtheta-rho*dV)
+        x_list,y_list = [],[]
+        #Calculate the 
+        for i in range(0,len(real_bounds),2):
+            L = real_bounds[i]
+            R = real_bounds[i+1]+1
+            x_list.append(x0[L:R])
+            y_list.append(y0[L:R])
         
-        if self.__hasLiquid__==True:
-            raise NotImplementedError('Not Coded')
-        else:
-            return listm(list(dTdtheta)+list(drhodtheta))
+        return x_list, y_list
+    
+cdef class _PDSimCore:
+    pass
+    

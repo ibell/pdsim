@@ -32,8 +32,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 import time
 
-Injection = True
+Injection = False
 check_valve = False
+
 
 def Compressor(f = None):
     global Injection
@@ -285,7 +286,7 @@ def Compressor(f = None):
                      lump_energy_balance_callback=ScrollComp.lump_energy_balance_callback,
                      solver_method='RK45',
                      UseNR = False, #Use Newton-Raphson ND solver to determine the initial state
-                     OneCycle = False,
+                     OneCycle = True,
                      plot_every_cycle= False
                      )
     except:

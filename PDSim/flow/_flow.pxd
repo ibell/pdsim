@@ -4,10 +4,14 @@ from CoolProp.State cimport State
 from PDSim.flow.flow_models import FlowFunctionWrapper
 from PDSim.flow.flow_models cimport FlowFunctionWrapper
 
-cpdef tuple sum_flows(bytes key, list Flows)
+cpdef sumterms_given_CV(bytes key, list flows)
 
-cdef class _FlowPathCollection(list):
+cdef class FlowPathCollection(list):
     cpdef calculate(self, Core, dict hdict)
+    cpdef get_deepcopy(self)
+    cpdef deepcopy(self)
+    cpdef sumterms_helper(self, list exists_keys, double omega)
+    cpdef sumterms(self,Core)
         
 #Make a stripped down class with the necessary terms included
 cdef class FlowPath(object):

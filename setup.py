@@ -28,8 +28,8 @@ fp.close()
 
 if len(sys.argv) == 1:
     #sys.argv+=['build_ext','--inplace']
-    #sys.argv+=['build','--force','install','--clean']
-    sys.argv+=['build','install']
+    sys.argv+=['build','--force','install','--clean']
+    #sys.argv+=['build','install']
     
 import Cython
 
@@ -48,6 +48,7 @@ pyx_list = [
             "PDSim/scroll/scroll_geo.py",
             "PDSim/misc/_listmath.pyx",
             "PDSim/misc/polymath.pyx",
+            "PDSim/core/_core.pyx",
             "PDSim/recip/_recip.pyx",
             "PDSim/scroll/_scroll.pyx"
             ]

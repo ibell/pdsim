@@ -1,8 +1,9 @@
 import copy
 import cPickle
 from flow_models import PyFlowFunctionWrapper
-    
-cpdef tuple sum_flows(bytes key, list Flows):
+from PDSim.misc._listmath import listm
+
+cpdef sumterms_given_CV(bytes key, list Flows):
     cdef FlowPath Flow
     cdef double summer_mdot,summer_mdoth
     
@@ -27,8 +28,15 @@ cpdef tuple sum_flows(bytes key, list Flows):
         
     return summer_mdot, summer_mdoth
 
-cdef class _FlowPathCollection(list):
-
+class struct(object):
+    def __init__(self,d):
+        self.__dict__.update(d)
+ 
+cdef class FlowPathCollection(list):
+    def __init__(self,d=None):
+        if d is not None and isinstance(d,dict):
+            self.__dict__.update(d)
+    
     cpdef calculate(self, Core, dict hdict):
         """
         Run the code for each flow path to calculate the flow rates & Update the states for the CVs and the Tubes.
@@ -69,6 +77,85 @@ cdef class _FlowPathCollection(list):
                 continue
             
             FP.calculate(hdict)
+        
+    @property
+    def N(self):
+        return self.__len__()
+        
+    cpdef sumterms_helper(self, list exists_keys, double omega):
+        cdef list summerdm, summerdT
+        cdef double mdot, h_up
+        cdef int I_up,I_down
+        cdef bytes key_up, key_down
+        cdef FlowPath Flow
+        
+        summerdm = [0.0 for _dummy in range(len(exists_keys))]
+        summerdT = summerdm[:]
+        
+        for Flow in self:
+            #One of the chambers doesn't exist if it doesn't have a mass flow term
+            if Flow.mdot==0:
+                continue
+            else:
+                mdot=Flow.mdot
+                h_up = Flow.h_up
+            
+            #Flow must exist then
+            key_up=Flow.key_up    
+            if key_up in exists_keys:
+                #The upstream node is a control volume
+                I_up=exists_keys.index(key_up)
+                #Flow is leaving the upstream control volume
+                summerdm[I_up]-=mdot/omega
+                summerdT[I_up]-=mdot/omega*h_up
+                
+            key_down=Flow.key_down
+            if key_down in exists_keys:
+                #The downstream node is a control volume                
+                I_down=exists_keys.index(key_down)
+                #Flow is entering the downstream control volume
+                summerdm[I_down]+=mdot/omega
+                summerdT[I_down]+=mdot/omega*h_up
+    
+        return summerdm, summerdT
+
+    
+    
+    cpdef sumterms(self,Core):
+        
+        #Call the Cython-version of the summer
+        summerdm,summerdT = self.sumterms_helper(Core.CVs.exists_keys, Core.omega)
+        
+        return listm(summerdT),listm(summerdm)
+    
+    def __reduce__(self):
+        return rebuildFPC,(self[:],)
+    
+    cpdef deepcopy(self):
+        newFPC = FlowPathCollection()
+        newFPC.__dict__.update(copy.deepcopy(self.__dict__))
+        return newFPC
+    
+    cpdef get_deepcopy(self):
+        """
+        Using this method, the link to the mass flow function is broken
+        """
+        return [Flow.get_deepcopy() for Flow in self]
+        FL=[]
+        for Flow in self:
+            FP=FlowPath()
+            FP.update(Flow.__cdict__())
+            FL.append(FP)
+        return FL
+
+def rebuildFPC(d):
+    """
+    Used with cPickle to recreate the (empty) flow path collection class
+    """
+    FPC = FlowPathCollection()
+    for Flow in d:
+        FPC.append(Flow)
+    return FPC
 
 cdef class FlowPath(object):
     

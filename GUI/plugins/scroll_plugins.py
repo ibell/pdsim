@@ -731,38 +731,40 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
             
             return attrs,vals
         
-        def apply_port_term():
-            pass
+        
+        def apply_port_terms(attrs,vals):
+            phi_params = [(par,val) for par, val in zip(attrs,vals) if par.startswith('injection_phi')]
+            num_phi_params = len(phi_params)        
+            
+            if num_phi_params > 0:
+                #Unzip the parameters (List of tuples -> tuple of lists)
+                phi_attrs, phi_vals = zip(*phi_params)
+                
+                # Remove all the entries that correspond to the angles 
+                # we need them and don't want to set them in the conventional way
+                for a in phi_attrs:
+                    i = attrs.index(a)
+                    vals.pop(i)
+                    attrs.pop(i)
+                    
+                for attr,val in zip(phi_attrs, phi_vals):
+    
+                    # Term might look like something like 'injection_phi_1_2'
+                    # i would be 0, j would be 1
+                    #indices are zero-based
+                    j = int(attr.rsplit('_',1)[1])-1
+                    i = int(attr.rsplit('_',2)[1])-1
+                    
+                    self.Lines[i].ports_list[j].phi_inj_port.SetValue(str(val))
+            
+            return attrs,vals
         
         #Apply all the line terms and get back the lists
         attrs, vals = apply_line_terms(attrs,vals)
-        
-#        phi_params = [(par,val) for par, val in zip(attrs,vals) if par.startswith('injection_phi')]
-#        num_phi_params = len(phi_params)        
-#        
-#        if num_phi_params > 0:
-#            #Unzip the parameters (List of tuples -> tuple of lists)
-#            phi_attrs, phi_vals = zip(*phi_params)
-#            
-#            # Remove all the entries that correspond to the angles 
-#            # we need them and don't want to set them in the conventional way
-#            for a in phi_attrs:
-#                i = attrs.index(a)
-#                vals.pop(i)
-#                attrs.pop(i)
-#                
-#            for attr,val in zip(phi_attrs, phi_vals):
-#
-#                # Term might look like something like 'injection_phi_1_2'
-#                # i would be 0, j would be 1
-#                #indices are zero-based
-#                j = int(attr.rsplit('_',1)[1])-1
-#                i = int(attr.rsplit('_',2)[1])-1
-#                
-#                self.Lines[i].ports_list[j].phi_inj_port.SetValue(str(val))
-        
-        return attrs,vals
+        #Apply all the line terms and get back the lists
+        attrs, vals = apply_port_terms(attrs,vals)
     
+        return attrs,vals
         
         
 class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
@@ -964,13 +966,13 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
             _i,_j = _i_j.split(',')
             
             #Add the output things for the ports
-            _T.append(dict(attr = "injection.phi['"+_i+","+_j+"']",
-                           text = "Injection inv. angle #" + _i + "," + _j + " [rad]",
+            _T.append(dict(attr = "injection.phi['"+_i+":"+_j+"']",
+                           text = "Injection inv. angle #" + _i + ":" + _j + " [rad]",
                            parent = self
                            )
                       )
-            _T.append(dict(attr = "injection.inner_outer['"+_i+","+_j+"']",
-                           text = "Injection involute #" + _i + "," + _j + " [-]",
+            _T.append(dict(attr = "injection.inner_outer['"+_i+":"+_j+"']",
+                           text = "Injection involute #" + _i + ":" + _j + " [-]",
                            parent = self
                            )
                       )
