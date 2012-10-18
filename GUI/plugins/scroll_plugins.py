@@ -849,14 +849,14 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                               )
             
             InjLine = Tube(key1='injection_line.'+str(i+1)+'.1',
-                                     key2='injection_line.'+str(i+1)+'.2',
-                                     L=L,
-                                     ID=ID,
-                                     mdot=0.001,
-                                     State1=ScrollComp.CVs[CVkey].State.copy(),
-                                     fixed=1,
-                                     TubeFcn=ScrollComp.TubeCode
-                                     )
+                         key2='injection_line.'+str(i+1)+'.2',
+                         L=L,
+                         ID=ID,
+                         mdot=0.001,
+                         State1=ScrollComp.CVs[CVkey].State.copy(),
+                         fixed=1,
+                         TubeFcn=ScrollComp.TubeCode
+                         )
             #Turn off heat transfer in the injection line
             InjLine.alpha = 0.0
             #Add the tube for the injection line
@@ -866,8 +866,9 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
             #Add the flow model between the injection line tube and the injection CV 
             ScrollComp.add_flow(FlowPath(key1='injection_line.'+str(i+1)+'.2',
                                          key2=CVkey,
-                                         MdotFcn=ScrollComp.IsentropicNozzleFM,
-                                         MdotFcn_kwargs = dict(A = pi*ID**2/4)
+                                         MdotFcn=ScrollComp.IsentropicNozzleFMSafe,
+                                         MdotFcn_kwargs = dict(A = pi*ID**2/4,
+                                                               DP_floor = 0.2)
                                          )
                                 )
             
@@ -881,7 +882,7 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                 partner_key_end = ScrollComp._get_injection_CVkey(phi, 2*pi, inner_outer)
                 
                 #Store the port parameters for writing in the collect_output_terms function
-                k = str(i+1)+','+str(j+1)
+                k = str(i+1)+':'+str(j+1)
                 ScrollComp.injection.phi[k]=phi
                 ScrollComp.injection.inner_outer[k]=inner_outer
                 ScrollComp.injection.check_valve[k]=check_valve
@@ -963,7 +964,7 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
         for _i_j in self.simulation.injection.phi:
             
             #Split the key back into its integer components (still as strings)
-            _i,_j = _i_j.split(',')
+            _i,_j = _i_j.split(':')
             
             #Add the output things for the ports
             _T.append(dict(attr = "injection.phi['"+_i+":"+_j+"']",
@@ -972,7 +973,13 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                            )
                       )
             _T.append(dict(attr = "injection.inner_outer['"+_i+":"+_j+"']",
-                           text = "Injection involute #" + _i + ":" + _j + " [-]",
+                           text = "Injection involute" + _i + ":" + _j + " [-]",
+                           parent = self
+                           )
+                      )
+            
+            _T.append(dict(attr = "injection.check_valve['"+_i+":"+_j+"']",
+                           text = "Injection check valve #" + _i + ":" + _j + " [-]",
                            parent = self
                            )
                       )

@@ -816,7 +816,7 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
     """
     The checklist that stores all the possible runs
     """
-    def __init__(self, parent, headers, values):
+    def __init__(self, parent, headers, values, structured = True):
         """
         Parameters
         ----------
@@ -825,6 +825,8 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
         headers : list
             A list of header strings
         values : 
+        structured : bool
+            If ``True``, use a structured parametric table to do the calcs
         """
         wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT)
         ListCtrlAutoWidthMixin.__init__(self)
@@ -837,7 +839,11 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
         for i, header in enumerate(headers):
             self.InsertColumn(i+1, header)
         
-        self.data = [list(row) for row in itertools.product(*values)]
+        if not structured:
+            #Transpose the nested lists
+            self.data = zip(*values)
+        else:
+            self.data = [list(row) for row in itertools.product(*values)]
         
         #Add the values one row at a time
         for i,row in enumerate(self.data):
@@ -934,7 +940,14 @@ class ParametricPanel(PDPanel):
         #Has no self.items, so all processing done through post_get_from_configfile
         self.get_from_configfile('ParametricPanel')
         
-    
+        # After all the building is done, check if it is unstructured, if so, 
+        # collect the temporary values that were set 
+        if self.Structured.GetStringSelection() == 'Unstructured':
+            for i, param in enumerate(self.ParamSizer.GetChildren()):
+                print param.Window.temporary_values
+#                name, _dummy = param.Window.get_values()
+#                values = ';'.join([str(row[i]) for row in self.ParaList.data])
+#                s += 'Term' + str(i+1) + ' = Term,' + name +',' + values + '\n' 
             
     def OnChangeStructured(self, event = None):
         
@@ -1003,11 +1016,10 @@ class ParametricPanel(PDPanel):
             if self.Structured.GetStringSelection() == 'Structured':
                 values.append(vals)
             else:
-                values.append([0.0])
+                values.append(param.Window.temporary_values.split(';'))
         
         #Build the list of parameters for the parametric study
         if self.ParamListSizer is None:
-            
             self.ParamListBox = wx.StaticBox(self, label = "Parametric Terms Ranges")
             self.ParamListSizer = wx.StaticBoxSizer(self.ParamListBox, wx.VERTICAL)
         else:
@@ -1040,7 +1052,8 @@ class ParametricPanel(PDPanel):
             self.GetSizer().Add(sizer)
                     
         self.GetSizer().Add(self.ParamListSizer,1,wx.EXPAND)
-        self.ParaList = ParametricCheckList(self,names,values)
+        self.ParaList = ParametricCheckList(self,names,values,
+                                            structured = self.Structured.GetStringSelection() == 'Structured')
             
         self.ParamListSizer.Add(self.ParaList,1,wx.EXPAND)
         self.ParaList.SetMinSize((400,-1))
@@ -1070,7 +1083,7 @@ class ParametricPanel(PDPanel):
         menu = wx.Menu()
         # add some items
         menuitem1 = wx.MenuItem(menu, -1, 'Fill from clipboard')
-        menuitem2 = wx.MenuItem(menu, -1, 'Fill from csv file')
+        menuitem2 = wx.MenuItem(menu, -1, 'Fill from csv file (future)')
         
         self.Bind(wx.EVT_MENU, self.OnPaste, menuitem1)
         menu.AppendItem(menuitem1)
@@ -1212,25 +1225,48 @@ class ParametricPanel(PDPanel):
         """
         This panel's outputs for the save file
         """
-        s = ''
-        for i, param in enumerate(self.ParamSizer.GetChildren()):
-            name, vals = param.Window.get_values()
-            if vals is not None:
-                values = ';'.join([str(val) for val in vals])
-            else:
-                values = ''
-            s += 'Term' + str(i+1) + ' = Term,' + name +',' + values + '\n'
+        if not hasattr(self, 'ParaList'):
+            return ''
+        
+        if self.Structured.GetStringSelection() == 'Structured':
+            s = 'Structured = PPStructured, True\n'
+            for i, param in enumerate(self.ParamSizer.GetChildren()):
+                name, vals = param.Window.get_values()
+                if vals is not None:
+                    values = ';'.join([str(val) for val in vals])
+                else:
+                    values = ''
+                s += 'Term' + str(i+1) + ' = Term,' + name +',' + values + '\n'
+        else:
+            s = 'Structured = PPStructured, False\n'
+            for i, param in enumerate(self.ParamSizer.GetChildren()):
+                name, _dummy = param.Window.get_values()
+                values = ';'.join([str(row[i]) for row in self.ParaList.data])
+                s += 'Term' + str(i+1) + ' = Term,' + name +',' + values + '\n' 
         return s
     
-    def post_get_from_configfile(self,key,value):
+    def post_get_from_configfile(self, key, value):
+        if not value.split(',')[0].startswith('Term'):
+            if value.split(',')[0].strip() == 'PPStructured':
+                if value.split(',')[1].strip() == 'True':
+                    self.Structured.SetStringSelection('Structured')
+                elif value.split(',')[1].strip() == 'False':
+                    self.Structured.SetStringSelection('Unstructured')
+                else:
+                    raise KeyError
+            return
         #value is something like "Term1,Piston diameter [m],0.02;0.025"
         string_, value = value.split(',')[1:3]
         #value = Piston diameter [m],0.02;0.025
         #Add a new entry to the table
         self.OnAddTerm()
         I = len(self.ParamSizer.GetChildren())-1
-        #Load the values into the variables in the list of variables
-        self.ParamSizer.GetItem(I).Window.set_values(string_,value.replace(';',', '))
+        if self.Structured.GetStringSelection() == 'Structured':
+            #Load the values into the variables in the list of variables
+            self.ParamSizer.GetItem(I).Window.set_values(string_,value.replace(';',', '))
+        else:
+            self.ParamSizer.GetItem(I).Window.Terms.SetStringSelection(string_)
+            self.ParamSizer.GetItem(I).Window.temporary_values = value
         
     def _get_attr(self, Name):
         """

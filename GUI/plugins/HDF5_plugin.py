@@ -5,21 +5,26 @@ import pdsim_plugins
 import pdsim_panels
 import wx
 import numpy as np
+import types
+import h5py
 
+class StubClass():
+    def __init__(self,d):
+        self.__dict__.update(d)
+        
 class HDF5Writer(object):
     
-    def _recursive_write(self,f,struct):
+    def _recursive_write(self, f, struct):
         
         for thing in dir(struct):
             #Skip everything starting with '_'
             if thing.startswith('_'):
                 continue
-            
             try:
                 #Get the attribute
                 value = getattr(struct, thing)
+                
             except AttributeError:
-                print "couldn't get",thing
                 #If it can't get the attribute, just go to the next thing
                 continue
             
@@ -28,10 +33,10 @@ class HDF5Writer(object):
                 #Save it as a value, go to next thing
                 f.create_dataset(thing, data = value)
                 continue
-            elif isinstance(value,list):
-                #Convert to numpy array
-                print np.array(value)
-                f.create_dataset(thing, data = np.array(value))
+            elif isinstance(value, basestring):
+                str_type = h5py.new_vlen(str)
+                f.create_dataset(thing, dtype=str_type, data = value)
+                continue
             
             import inspect
             #Skip methods, functions, built-in functions and routines
@@ -41,13 +46,19 @@ class HDF5Writer(object):
                 or inspect.isroutine(value)):
                     continue
             
-            import types
-            print thing, type(value),type(value) is types.InstanceType
-            
             if type(value) is types.DictType:
-                f.create_group(thing)
-                for k,v in value.iteritems():
-                    f[thing].create_dataset(k, data = v)
+                dict_group = f.create_group(thing)
+                # Recurse into the entries in the dictionary by turning the 
+                # dictionary into a class
+                self._recursive_write(dict_group, StubClass(value))
+            
+            elif isinstance(value, list):
+                dict_group = f.create_group(thing)
+                #Convert to numpy array
+                #List to a class
+                cls = StubClass({str(i):v for i,v in enumerate(value)})
+                #Write class recursively
+                self._recursive_write(dict_group, cls)
             else:
                 f.create_group(thing)
                 #Recurse into the class
@@ -57,7 +68,7 @@ class HDF5Writer(object):
         """
         Write the structure to the file given by fName
         """
-        import h5py
+        
         f = h5py.File(fName,'w')
         self._recursive_write(f, struct)
         f.close()

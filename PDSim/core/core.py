@@ -389,10 +389,10 @@ class PDSimCore(object):
         self.Valves.append(Valve)
         self.__hasValves__=True
         
-    def pre_run(self, N = 1000):
+    def pre_run(self, N = 20000):
         #Build the full numpy arrays for temperature, volume, etc.
-        self.t=np.zeros((10000,))
-        self.T=np.zeros((self.CVs.N,10000))
+        self.t=np.zeros((N,))
+        self.T=np.zeros((self.CVs.N,N))
         self.T.fill(np.nan)
         self.p=self.T.copy()
         self.h = self.T.copy()
@@ -402,7 +402,7 @@ class PDSimCore(object):
         self.rho=self.T.copy()
         self.Q=self.T.copy()
         self.xL=self.T.copy()
-        self.xValves=np.zeros((2*len(self.Valves),10000))
+        self.xValves=np.zeros((2*len(self.Valves),N))
         
         self.CVs.rebuild_exists()
         
@@ -934,6 +934,35 @@ class PDSimCore(object):
             
         self.__postprocess_flows()
         self.__postprocess_HT()
+        
+        if not hasattr(self,'Qamb'):
+            self.Qamb = 0
+        
+        #The total mass flow rate
+        self.mdot = self.FlowsProcessed.mean_mdot[self.key_inlet]
+        
+        for key, State in self.Tubes.Nodes.iteritems():
+            if key == self.key_inlet:
+                 inletState = State
+            if key == self.key_outlet:
+                 outletState = State
+        
+        if callable(self.Vdisp):
+            Vdisp = self.Vdisp()
+        else:
+            Vdisp = self.Vdisp
+            
+        self.eta_v = self.mdot / (self.omega/(2*pi)*Vdisp*inletState.rho)
+        h1 = inletState.h
+        h2 = outletState.h
+        s1 = inletState.s
+
+        T2s = newton(lambda T: Props('S','T',T,'P',outletState.p,outletState.Fluid)-s1,inletState.T+30)
+        h2s = Props('H','T',T2s,'P',outletState.p,outletState.Fluid)
+        self.eta_a = (h2s-h1)/(h2-h1)
+        self.Wdot_i = self.mdot*(h2s-h1)
+        # self.Qamb is positive if heat is being added to the lumped mass
+        self.Wdot = self.mdot*(h2-h1)-self.Qamb
     
     def _check_cycle_abort(self, index, I = 100):
         """
@@ -951,7 +980,7 @@ class PDSimCore(object):
             Check abort at this interval
         
         """
-        # % is the symbol for modulus
+        # % is the symbol for modulus in python
         if index % I == 0 and self.Abort():
             self._want_abort = True
             return True
@@ -1143,11 +1172,12 @@ class PDSimCore(object):
             p = self.Tubes.Nodes[key_outlet].p
             self.Tubes.Nodes[key_outlet].update({'T':self.Td,'P':p})
             
-            # (1). First, run all the tubes
-            for tube in self.Tubes:
-                tube.TubeFcn(tube)
-            
             def OBJECTIVE_CYCLE(x_state):
+                
+                # (1). First, run all the tubes
+                for tube in self.Tubes:
+                    tube.TubeFcn(tube)
+                
                 #The first time this function is run, save the initial state
                 # and the existence of the CV
                 if self.xstate_init is None:
@@ -1191,24 +1221,31 @@ class PDSimCore(object):
                 if aborted == 'abort':
                     return None
                 
-                if (key_inlet in self.FlowsProcessed.mean_mdot and 
-                    key_outlet in self.FlowsProcessed.mean_mdot):
+                assert (key_inlet in self.FlowsProcessed.mean_mdot)
+                assert (key_outlet in self.FlowsProcessed.mean_mdot)
                     
-                    mdot_out = self.FlowsProcessed.mean_mdot[key_outlet]
-                    mdot_in = self.FlowsProcessed.mean_mdot[key_inlet]
-                    print 'Mass flow difference',(mdot_out+mdot_in)/mdot_out*100,' %'
+                mdot_out = self.FlowsProcessed.mean_mdot[key_outlet]
+                mdot_in = self.FlowsProcessed.mean_mdot[key_inlet]
+                print 'Mass flow difference',(mdot_out+mdot_in)/mdot_out*100,' %'
+                
+                # We need to find the key at the inlet to the outlet tube.
+                for Tube in self.Tubes:
+                    if Tube.key1 == key_outlet:
+                        key_outtube_inlet = Tube.key2
+                        break
+                    elif Tube.key2 == key_outlet:
+                        key_outtube_inlet = Tube.key1
+                        break
                     
-                    h_outlet = (self.FlowsProcessed.integrated_mdoth[key_outlet]
-                                /self.FlowsProcessed.integrated_mdot[key_outlet])
-                    p = self.Tubes.Nodes[key_outlet].p
-                    Fluid = self.Tubes.Nodes[key_outlet].Fluid
-                    # Multiply the residual on the discharge temperature 
-                    # by the capacitance rate to get all the residuals in 
-                    # units of kW
-                    C_outlet = self.Tubes.Nodes[key_outlet].cp*mdot_out
-                    self.resid_Td = C_outlet*(Props('T','H',h_outlet,'P',p,Fluid) - self.Td)
-                else:
-                    raise KeyError
+                # This is the so-called hd' state at the outlet of the pump set
+                h_outlet = (self.FlowsProcessed.integrated_mdoth[key_outtube_inlet]
+                            /self.FlowsProcessed.integrated_mdot[key_outtube_inlet])
+                # It should be equal to the enthalpy of the fluid at the inlet
+                # to the outlet tube at the current Td value
+                h_outlet_Tube = self.Tubes.Nodes[key_outtube_inlet].h
+                # Residual is the difference of these two terms
+                # We put it in kW by multiplying by flow rate
+                self.resid_Td = mdot_out * (h_outlet_Tube - h_outlet)
                 
                 if plot_every_cycle:
                     debug_plots(self)
@@ -1314,6 +1351,8 @@ class PDSimCore(object):
                 print 'Quitting OBJECTIVE function in core.solve'
                 if hasattr(self,'mechanical_losses'):
                     self.mechanical_losses('low')
+                if hasattr(self,'lump_energy_balance_callback'):
+                    self.lump_energy_balance_callback()
                 return None
                     
             # (3) After convergence of the inner loop, check the energy balance on the lumps
@@ -1342,35 +1381,7 @@ class PDSimCore(object):
     def post_solve(self):
         """
         Do some post-processing to calculate flow rates, efficiencies, etc.  
-        """
-        if not hasattr(self,'Qamb'):
-            self.Qamb = 0
-            
-        #The total mass flow rate
-        self.mdot = self.FlowsProcessed.mean_mdot[self.key_inlet]
-        
-        for key, State in self.Tubes.Nodes.iteritems():
-            if key == self.key_inlet:
-                 inletState = State
-            if key == self.key_outlet:
-                 outletState = State
-        
-        if callable(self.Vdisp):
-            Vdisp = self.Vdisp()
-        else:
-            Vdisp = self.Vdisp
-            
-        self.eta_v = self.mdot / (self.omega/(2*pi)*Vdisp*inletState.rho)
-        h1 = inletState.h
-        h2 = outletState.h
-        s1 = inletState.s
-
-        T2s = newton(lambda T: Props('S','T',T,'P',outletState.p,outletState.Fluid)-s1,inletState.T+30)
-        h2s = Props('H','T',T2s,'P',outletState.p,outletState.Fluid)
-        self.eta_a = (h2s-h1)/(h2-h1)
-        self.Wdot_i = self.mdot*(h2s-h1)
-        # self.Qamb is positive if heat is being added to the lumped mass
-        self.Wdot = self.mdot*(h2-h1)-self.Qamb
+        """      
         
         #Resize all the matrices to keep only the real data
         print 'Ntheta is', self.Ntheta
@@ -1549,6 +1560,41 @@ class PDSimCore(object):
                                                 FlowPath.State_up,
                                                 FlowPath.State_down)
             return mdot
+        except ZeroDivisionError:
+            return 0.0
+        
+    def IsentropicNozzleFMSafe(self,FlowPath,A,DP_floor,**kwargs):
+        """
+        A generic isentropic nozzle flow model wrapper with the added consideration
+        that if the pressure drop is below the floor value, there is no flow.
+        This was added to handle the case of the injection line where there is
+        no flow out of the injection which greatly increases the numerical 
+        stiffness 
+        
+        Parameters
+        ----------
+        FlowPath : FlowPath instance
+            A fully-instantiated flow path model
+        A : float
+            throat area for isentropic nozzle model [:math:`m^2`]
+        DP_floor: float
+            The minimum pressure drop [kPa]
+            
+        Returns
+        -------
+        mdot : float
+            The mass flow through the flow path [kg/s]
+        """
+
+        try:
+            if FlowPath.State_up.p-FlowPath.State_down.p > DP_floor:
+                mdot = flow_models.IsentropicNozzle(A,
+                                                    FlowPath.State_up,
+                                                    FlowPath.State_down)
+                return mdot
+            else:
+                
+                return 0.0
         except ZeroDivisionError:
             return 0.0
 

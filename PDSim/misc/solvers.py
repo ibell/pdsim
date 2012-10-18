@@ -118,6 +118,7 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, J0 = None, w=1.0, wJ=1.
                 J0 = None
             #Get the difference vector
             x1=x0-w*np.dot(inv(A0),F0)
+            print 'Broyden x0', x0
             print 'Broyden x1', x1
             #Just do one step and stop
             if JustOneStep==True:

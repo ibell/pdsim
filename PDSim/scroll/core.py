@@ -802,11 +802,19 @@ class Scroll(PDSimCore, _Scroll):
         print 'mechanical losses: ', self.losses.bearings
         return self.losses.bearings #[kW]
     
+    def post_cycle(self):
+        #Run the base-class method to set HT terms, etc.
+        PDSimCore.post_cycle(self)
+        #Calculate the mechanical and motor losses 
+        self.lump_energy_balance_callback()
+        #Update the heat transfer to the gas in the shell
+        self.suction_heating()
+        
+        
     def post_solve(self):
         """
         """
         self.mechanical_losses('low')
-        print 'mean_Q', self.HTProcessed.mean_Q
         PDSimCore.post_solve(self)
         
     def ambient_heat_transfer(self, Tshell):
@@ -936,7 +944,6 @@ class Scroll(PDSimCore, _Scroll):
         # sign for the lump
         Qnet -= self.HTProcessed.mean_Q
         
-        
         #Shaft power from forces on the orbiting scroll from the gas in the pockets [kW]
         self.Wdot_forces = self.omega*self.forces.mean_tau
         
@@ -975,8 +982,9 @@ class Scroll(PDSimCore, _Scroll):
         #Electrical Power
         self.Wdot_electrical = self.Wdot_mechanical + self.motor.losses
         
-        #Overall isentropic efficiency
-        self.eta_oi = self.Wdot_i/self.Wdot_electrical
+        if hasattr(self,'Wdot_i'):
+            #Overall isentropic efficiency
+            self.eta_oi = self.Wdot_i/self.Wdot_electrical
         
 #        #Set the heat input to the suction line
 #        self.suction_heating()
@@ -1034,7 +1042,7 @@ class Scroll(PDSimCore, _Scroll):
         used to calculate the flow area.  Otherwise the conventional analysis 
         will be used.
         """
-        if self.geo.phi_ie_offset > 0:
+        if abs(self.geo.phi_ie_offset) > 1e-12:
             FlowPath.A = X_d*scroll_geo.Area_s_s1_offset(self.theta, self.geo)
         else:
             FlowPath.A = X_d*scroll_geo.Area_s_sa(self.theta, self.geo)
@@ -1179,6 +1187,7 @@ class Scroll(PDSimCore, _Scroll):
         #1. Figure out what CV is connected to the port
         partner_key = self._get_injection_CVkey(phi, self.theta, inner_outer)
 
+        FlowPath.A = 3*pi*(0.001)**2/4.0
         #2. Based on what CV is connected to the port, maybe quit
         if partner_key in ['d1', 'd2'] and 'ddd' in [FlowPath.key_up, 
                                                      FlowPath.key_down]:
@@ -1194,20 +1203,29 @@ class Scroll(PDSimCore, _Scroll):
             return 0.0
         # If the pressure in the injection line is below the other chamber and 
         # you are using a theoretical check valve with instantaneous closing, 
-        # then you need to 
-        elif check_valve and FlowPath.key_down.startswith('injCV'):
-            return 0.0
-        #3. Find the distance of the scroll from the point on the involute
-        #   where the port is tangent
-        FlowPath.A = 3*pi*(0.001)**2/4.0
-        try:
-            mdot = flow_models.IsentropicNozzle(FlowPath.A,
-                                                FlowPath.State_up,
-                                                FlowPath.State_down)
-            return mdot
-        except ZeroDivisionError:
-            return 0.0
+        # then there is no back flow, and hence no flow at all
+        elif check_valve:
+            if FlowPath.key_down.startswith('inj'):
+                return 0.0
+            
+#                #This will be negative
+#                DELTAp = FlowPath.State_down.p - FlowPath.State_up.p
+#            else:
+#                #This will be positive
+#                DELTAp = FlowPath.State_up.p - FlowPath.State_down.p 
+#            
+#            # Using an approximation to a Heaviside step function to close off the
+#            # port gradually and improve numerical convergence due to continuous
+#            # first derivative
+#            if -10 < DELTAp < 10.0:
+#                FlowPath.A *=  1/(1+np.exp(-10*(DELTAp-2)))
+#            elif DELTAp < -10.0:
+#                return 0.0
         
+        mdot = flow_models.IsentropicNozzle(FlowPath.A,
+                                            FlowPath.State_up,
+                                            FlowPath.State_down)
+        return mdot
         
     def calculate_force_terms(self,
                               orbiting_back_pressure=None):
@@ -1231,7 +1249,8 @@ class Scroll(PDSimCore, _Scroll):
         ####################################################
         #############  Normal force components #############
         ####################################################
-        #The force of the in each chamber pushes the orbiting scroll away
+        # The force of the gas in each chamber pushes the orbiting scroll away
+        # from the working chambers
         self.forces.Fz = self.p*self.V/self.geo.h
         
         if isinstance(orbiting_back_pressure, float):
@@ -1358,7 +1377,11 @@ class Scroll(PDSimCore, _Scroll):
 #        print 'self.forces.mean_Fz', self.forces.mean_Fz
 #        print 'self.forces.corr_Fz', self.forces.corr_Fz
         
-        
+    def IsentropicNozzleFMSafe(self,*args,**kwargs):
+        """
+        A thin wrapper around the base class function for pickling purposes
+        """
+        return PDSimCore.IsentropicNozzleFMSafe(self,*args,**kwargs)
         
     def IsentropicNozzleFM(self,*args,**kwargs):
         """

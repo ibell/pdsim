@@ -106,7 +106,7 @@ class Run1(Process):
         plot_every_cycle = self.sim.plot_every_cycle if hasattr(self.sim,'plot_every_cycle')  else False
             
         # These parameters are common to all compressor types, so put them all
-        # in one dictionary an unpack it into each function call
+        # in one dictionary and unpack it into each function call
         commons = dict(key_inlet='inlet.1',
                        key_outlet='outlet.2',
                        endcycle_callback=self.sim.endcycle_callback,
@@ -308,7 +308,10 @@ class RedirectedWorkerThread(Thread):
                 
                 identifier = 'PDSim recip ' + time.strftime('%Y-%m-%d-%H-%M-%S')+'_t'+self.name.split('-')[1]
                 file_path = os.path.join(temp_folder, identifier + '.mdl')
-                print 'Trying to write to', file_path
+                hdf5_path = os.path.join(temp_folder, identifier + '.h5')
+                
+                print 'Wrote pickled file to', file_path
+                print 'Wrote hdf5 file to', hdf5_path
                 if not os.path.exists(file_path):
                     fName = file_path
                 else:
@@ -328,6 +331,11 @@ class RedirectedWorkerThread(Thread):
                 print "Warning: removing FlowStorage since it doesn't pickle properly"
                 cPickle.dump(sim, fp, protocol = -1)
                 fp.close()
+                
+                from plugins.HDF5_plugin import HDF5Writer
+                HDF5 = HDF5Writer()
+                HDF5.write_to_file(sim, hdf5_path)
+                
                 "Send the data back to the GUI"
                 wx.CallAfter(self.done_callback, sim)
             else:
@@ -1143,7 +1151,8 @@ class FileOutputDialog(wx.Dialog):
         sizer.Add(self.file_list)
         
         sizer.AddSpacer(10)
-        self.chkPickled = wx.CheckBox(self,label='Pickled data files (Warning! Can be quite large)')
+        self.chkPickled = wx.CheckBox(self,label='HDF5 data files (Warning! Can be quite large)')
+        self.chkPickled.SetToolTipString('Hint: You can use ViTables (search Google) to open the HDF5 files')
         self.chkPickled.SetValue(True)
         sizer.Add(self.chkPickled)
         
@@ -1198,9 +1207,10 @@ class FileOutputDialog(wx.Dialog):
         self.Destroy()
     
     def write_pickle(self, dir_path, sim):
-        fp = open(os.path.join(dir_path,'PickledSimulation.mdl'),'wb')
-        cPickle.dump(sim, fp, -1)
-        fp.close()
+        from plugins.HDF5_plugin import HDF5Writer
+        hdf5_path = os.path.join(dir_path,'Simulation.h5')
+        HDF5 = HDF5Writer()
+        HDF5.write_to_file(sim, hdf5_path)
         
     def write_csv_files(self, dir_path, sim):
         """
@@ -1929,6 +1939,7 @@ class MainFrame(wx.Frame):
         """
         Run a single simulation
         """
+            
         #Make single-run into a list in order to use the code for the batch
         self.run_batch([sim])
     
@@ -2241,7 +2252,7 @@ class MainFrame(wx.Frame):
 #            from plugins.HDF5_plugin import HDF5Writer
 #            HDF5 = HDF5Writer()
 #            HDF5.write_to_file(sim,'sim.hd5')
-                
+            
             self.MTB.OutputsTB.plot_outputs(sim)
             self.MTB.OutputsTB.DataPanel.add_runs([sim])
             self.MTB.OutputsTB.DataPanel.rebuild()

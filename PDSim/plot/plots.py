@@ -61,10 +61,11 @@ class PlotNotebook(wx.Panel):
     
     def build_main_page(self):
         page = wx.Panel(self.nb,-1)
-        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer = wx.FlexGridSizer(cols=2)
         label1=wx.StaticText(page,label='Click on the buttons below to add plot')
         sizer.Add(label1)
-        self.plot_buttons=[('Volume v. crank angle',self.V_theta),
+        self.plot_buttons=[('Stepsize',self.stepsize_theta),
+                           ('Volume v. crank angle',self.V_theta),
                       ('Derivative of Volume v. crank angle',self.dV_dtheta),
                       ('Temperature v. crank angle',self.T_theta),
                       ('Pressure v. crank angle',self.p_theta),
@@ -92,7 +93,16 @@ class PlotNotebook(wx.Panel):
             btn.Bind(wx.EVT_BUTTON,callbackfcn)
         page.SetSizer(sizer)
         self.nb.AddPage(page,"Main")
-
+    
+    def stepsize_theta(self,event=None):
+        #Stepsize
+        axes = self.add('Volume').gca()
+        theta=self.Sim.t
+        h = theta[1::]-theta[0:len(theta)-1]
+        axes.plot(theta,h)
+        axes.set_ylabel('Stepsize [rad]')
+        axes.set_xlabel(r'$\theta$ [rad]')
+        
     def V_theta(self,event=None):
         #Volume
         axes = self.add('Volume').gca()

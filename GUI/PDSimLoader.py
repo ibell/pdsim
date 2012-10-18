@@ -75,7 +75,7 @@ def ScrollBuilder(scroll):
     
     if hasattr(scroll,'pre_solve'):
         scroll.pre_solve()
-    
+
     T2s = scroll.guess_outlet_temp(scroll.inletState, scroll.discharge_pressure)
     
     outletState=CPState.State(scroll.inletState.Fluid,{'T':T2s,'P':scroll.discharge_pressure})
