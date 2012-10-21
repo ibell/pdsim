@@ -563,7 +563,16 @@ class Scroll(PDSimCore, _Scroll):
         #This gets called at every step, or partial step
         self.theta=t
         
-        def IsAtMerge(eps = 0.001, eps_d1_higher=0.001,eps_dd_higher=0.00001):
+        def angle_difference(angle1,angle2):
+            # Due to the periodicity of angles, you need to handle the case where the
+            # angles wrap around - suppose theta_d is 6.28 and you are at an angles of 0.1 rad
+            #, the difference should be around 0.1, not -6.27
+            # 
+            # This brilliant method is from http://blog.lexique-du-net.com/index.php?post/Calculate-the-real-difference-between-two-angles-keeping-the-sign
+            # and the comment of user tk
+            return (angle1-angle2+pi)%(2*pi)-pi
+        
+        def IsAtMerge(eps = 0.001, eps_d1_higher=0.002,eps_dd_higher=0.00001):
             pressures = [self.CVs['d1'].State.p,
                          self.CVs['d2'].State.p,
                          self.CVs['dd'].State.p]
@@ -571,12 +580,11 @@ class Scroll(PDSimCore, _Scroll):
             p_min = min(pressures)
             if abs(p_min/p_max-1)<eps_dd_higher:
                 return True
-#            elif self.CVs['d1'].State.p>self.CVs['dd'].State.p and abs(p_min/p_max-1)<eps_d1_higher:
-#                print 'Merged with d1 higher'
-#                return True
-#            elif self.CVs['d1'].State.p<self.CVs['dd'].State.p and abs(p_min/p_max-1)<eps_dd_higher:
-#                print 'Merged with dd higher'
-#                return True
+            # For over compression cases, the derivatives don't tend to drive
+            # the pressures together, and as a result you need to relax the 
+            # convergence quite a bit
+            elif angle_difference(t, scroll_geo.theta_d(self.geo))>1.2 and abs(p_min/p_max-1)<eps_d1_higher:
+                return True
             else:
                 return False
             

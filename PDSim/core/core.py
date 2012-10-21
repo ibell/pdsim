@@ -1186,34 +1186,35 @@ class PDSimCore(object):
                     
                 #Convert numpy array to listm
                 x_state = listm(x_state)
-                
-                t1 = clock()
-                if solver_method == 'Euler':
-                    
-                    #Default to 7000 steps if not provided
-                    N = getattr(self,'EulerN', 7000)
-                    aborted = self.cycle_SimpleEuler(N,x_state,step_callback=step_callback,
-                                    heat_transfer_callback=heat_transfer_callback,
-                                    valves_callback=valves_callback)
-                elif solver_method == 'Heun':
-                    #Default to 7000 steps if not provided
-                    N = getattr(self,'HeunN', 7000)
-                    aborted = self.cycle_Heun(N,x_state,step_callback=step_callback,
-                                           heat_transfer_callback=heat_transfer_callback,
-                                           valves_callback=valves_callback)
-                elif solver_method == 'RK45':
-                    #Default to tolerance of 1e-8 if not provided
-                    eps_allowed = getattr(self,'RK45_eps', 1e-8)
-                    
-                    aborted = self.cycle_RK45(x_state,
-                                    eps_allowed = eps_allowed,
-                                    step_callback=step_callback,
-                                    heat_transfer_callback=heat_transfer_callback,
-                                    valves_callback=valves_callback,
-                                    **kwargs)
-                else:
-                    raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
-                
+                try:
+                    t1 = clock()
+                    if solver_method == 'Euler':
+                        
+                        #Default to 7000 steps if not provided
+                        N = getattr(self,'EulerN', 7000)
+                        aborted = self.cycle_SimpleEuler(N,x_state,step_callback=step_callback,
+                                        heat_transfer_callback=heat_transfer_callback,
+                                        valves_callback=valves_callback)
+                    elif solver_method == 'Heun':
+                        #Default to 7000 steps if not provided
+                        N = getattr(self,'HeunN', 7000)
+                        aborted = self.cycle_Heun(N,x_state,step_callback=step_callback,
+                                               heat_transfer_callback=heat_transfer_callback,
+                                               valves_callback=valves_callback)
+                    elif solver_method == 'RK45':
+                        #Default to tolerance of 1e-8 if not provided
+                        eps_allowed = getattr(self,'RK45_eps', 1e-8)
+                        
+                        aborted = self.cycle_RK45(x_state,
+                                        eps_allowed = eps_allowed,
+                                        step_callback=step_callback,
+                                        heat_transfer_callback=heat_transfer_callback,
+                                        valves_callback=valves_callback,
+                                        **kwargs)
+                    else:
+                        raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
+                except ValueError:
+                    debug_plots(self)
                 t2 = clock()
                 print 'Elapsed time for cycle is {0:g} s'.format(t2-t1)
                 

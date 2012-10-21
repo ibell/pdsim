@@ -842,6 +842,8 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
         if not structured:
             #Transpose the nested lists
             self.data = zip(*values)
+            #Turn back from tuples to lists
+            self.data = [list(row) for row in self.data]
         else:
             self.data = [list(row) for row in itertools.product(*values)]
         
@@ -943,11 +945,8 @@ class ParametricPanel(PDPanel):
         # After all the building is done, check if it is unstructured, if so, 
         # collect the temporary values that were set 
         if self.Structured.GetStringSelection() == 'Unstructured':
-            for i, param in enumerate(self.ParamSizer.GetChildren()):
-                print param.Window.temporary_values
-#                name, _dummy = param.Window.get_values()
-#                values = ';'.join([str(row[i]) for row in self.ParaList.data])
-#                s += 'Term' + str(i+1) + ' = Term,' + name +',' + values + '\n' 
+            self.OnBuildTable()
+        self.Layout()
             
     def OnChangeStructured(self, event = None):
         
@@ -1016,7 +1015,10 @@ class ParametricPanel(PDPanel):
             if self.Structured.GetStringSelection() == 'Structured':
                 values.append(vals)
             else:
-                values.append(param.Window.temporary_values.split(';'))
+                if hasattr(param.Window,'temporary_values'):
+                    values.append(param.Window.temporary_values.split(';'))
+                else:
+                    values.append(['0.0'])
         
         #Build the list of parameters for the parametric study
         if self.ParamListSizer is None:

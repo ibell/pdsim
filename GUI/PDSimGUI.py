@@ -62,6 +62,13 @@ class InfiniteList(object):
         self.values.pop(0)
         self.values.append(val1)
         return val1
+    
+    def prepend(self,item):
+        """
+        Put the item back to the front of the list
+        """
+        self.values.remove(item)
+        self.values.insert(0,item)
        
 class RedirectText2Pipe(object):
     """
@@ -140,7 +147,7 @@ class Run1(Process):
         if not self.sim._want_abort:
             #Send simulation result back to calling thread
             self.pipe_results.send(self.sim)
-            print 'Sent simulation back to calling thread'
+            print 'Sent simulation back to calling thread',
             #Wait for an acknowledgment of receipt
             while not self.pipe_results.poll():
                 time.sleep(0.1)
@@ -202,9 +209,9 @@ class WorkerThreadManager(Thread):
             
             for _thread in reversed(self.threadsList):
                 if not _thread.is_alive():
-                    wx.CallAfter(self.main_stdout.AppendText, 'Joining zombie thread\n')
                     _thread.join()
                     self.threadsList.remove(_thread)
+                    self.stdout_list.prepend(_thread.stdout_target_)
                     wx.CallAfter(self.main_stdout.AppendText, 'Thread finished; now '+str(len(self.threadsList))+ ' threads active\n')
             
             time.sleep(2.0)
@@ -289,8 +296,6 @@ class RedirectedWorkerThread(Thread):
         while pipe_outlet.poll():
             wx.CallAfter(self.stdout_target_.AppendText, pipe_outlet.recv())
         
-        
-                    
         if self._want_abort == True:
             print self.name+": Process has aborted successfully"
         else:
@@ -401,7 +406,6 @@ class InputsToolBook(wx.Toolbook):
                                                    configfile,
                                                    name='StatePanel')
                          )
-        
         
         for Name, index, panel in zip(['Geometry','Mass Flow - Valves','Mechanical','State Points'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
@@ -2230,7 +2234,7 @@ class MainFrame(wx.Frame):
         
         #Add results from the pipe to the GUI
         if not self.results_list.empty():
-            print 'readying to get simulation'
+            print 'readying to get simulation',
             sim = self.results_list.get()
             print 'got a simulation'
             
