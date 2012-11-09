@@ -1,7 +1,19 @@
+
+#Other imports in _flow.pxd
 import copy
 import cPickle
 from flow_models import PyFlowFunctionWrapper
 from PDSim.misc._listmath import listm
+
+from CoolProp.State import State as StateClass
+from CoolProp.State cimport State as StateClass
+
+from PDSim.core._containers import TubeCollection
+from PDSim.core._containers cimport TubeCollection
+
+from PDSim.misc.stl_utilities cimport is_in_vector, get_map_sd
+
+from libcpp.vector cimport vector
 
 cpdef sumterms_given_CV(bytes key, list Flows):
     cdef FlowPath Flow
@@ -31,15 +43,16 @@ cpdef sumterms_given_CV(bytes key, list Flows):
 class struct(object):
     def __init__(self,d):
         self.__dict__.update(d)
- 
+    
 cdef class FlowPathCollection(list):
     def __init__(self,d=None):
         if d is not None and isinstance(d,dict):
             self.__dict__.update(d)
     
-    cpdef calculate(self, Core, dict hdict):
+    cpdef update_existence(self, Core):
         """
-        Run the code for each flow path to calculate the flow rates & Update the states for the CVs and the Tubes.
+        A function to update the pointers for the flow path as well as check existence
+        of the states on either end of the path
         
         This is required whenever the existence of any of the CV or tubes 
         changes.  Calling this function will update the pointers to the states
@@ -47,36 +60,53 @@ cdef class FlowPathCollection(list):
         Parameters
         ----------
         Core : PDSimCore instance or derived class thereof
-        hdict : dictionary
-            Maps CV key to enthalpy
+        
         """
         cdef FlowPath FP
-        cdef dict Tubes_Nodes
-        cdef list exists_keys
-        exists_keys = Core.CVs.exists_keys
-        Tubes_Nodes = Core.Tubes.Nodes
-                
-        for FP in self:
+        cdef dict Tube_Nodes = Core.Tubes.get_Nodes()
+        cdef list exists_keys = Core.CVs.exists_keys
+        cdef list flow_paths = self
+        
+        for FP in flow_paths:
             ## Update the pointers to the states for the ends of the flow path
             if FP.key1 in exists_keys:
-                FP.State1=Core.CVs[FP.key1].State
-            elif FP.key1 in Tubes_Nodes:
-                FP.State1=Tubes_Nodes[FP.key1]
+                CV = Core.CVs[FP.key1]
+                FP.State1=CV.State
+            elif FP.key1 in Tube_Nodes:
+                FP.State1=Tube_Nodes[FP.key1]
             else:
-                FP.mdot=0.0
-                #Doesn't exist, go to next flow
-                continue                   
-            
-            if FP.key2 in exists_keys:
-                FP.State2=Core.CVs[FP.key2].State
-            elif FP.key2 in Tubes_Nodes:
-                FP.State2=Tubes_Nodes[FP.key2]
-            else:
-                FP.mdot=0.0
+                FP.exists=False
                 #Doesn't exist, go to next flow
                 continue
             
-            FP.calculate(hdict)
+            if FP.key2 in exists_keys:
+                CV = Core.CVs[FP.key2]
+                FP.State2=CV.State
+            elif FP.key2 in Tube_Nodes:
+                FP.State2=Tube_Nodes[FP.key2]
+            else:
+                FP.exists=False
+                #Doesn't exist, go to next flow
+                continue
+            
+            #Made it this far, so both states exist
+            FP.exists = True
+    
+    cpdef calculate(self, dict hdict):
+        """
+        Run the code for each flow path to calculate the flow rates
+        
+        Parameters
+        ----------
+        hdict : dictionary
+            Maps CV key to enthalpy value [kJ/kg]
+        """
+        cdef FlowPath FP
+        cdef list flow_paths = self
+                
+        for FP in flow_paths:
+            if FP.exists:
+                FP.calculate(hdict)
         
     @property
     def N(self):
@@ -118,8 +148,6 @@ cdef class FlowPathCollection(list):
                 summerdT[I_down]+=mdot/omega*h_up
     
         return summerdm, summerdT
-
-    
     
     cpdef sumterms(self,Core):
         
@@ -177,7 +205,7 @@ cdef class FlowPath(object):
         Returns a dictionary with all the terms that are defined at the Cython level
         """
         cdef list items=['mdot','h_up','T_up','p_up','p_down','key_up','key_down'
-                         ,'key1','key2','Gas']
+                         ,'key1','key2','Gas','exists']
         cdef list States=[('State1',self.State1),('State2',self.State2),
                           ('State_up',self.State_up),('State_down',self.State_down)]
         cdef dict dic={}
@@ -201,7 +229,7 @@ cdef class FlowPath(object):
         """
         calculate
         """
-        cdef double p1,p2
+        cdef double p1, p2
         cdef FlowFunctionWrapper FW
         #The states of the chambers
         p1=self.State1.get_p()

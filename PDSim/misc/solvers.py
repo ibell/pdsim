@@ -38,7 +38,7 @@ def MultiDimNewtRaph(f,x0,dx=1e-6,args=(),ytol=1e-5,w=1.0,JustOneStep=False):
             return x
     return x
         
-def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, J0 = None, w=1.0, wJ=1.0, itermax=10, JustOneStep=False):
+def Broyden(f, x0, dx=1e-5, args=(), kwargs = {}, ytol=1e-5, Nfd = 1, J0 = None, w=1.0, wJ=1.0, itermax=10, JustOneStep=False):
     """
     Broyden's method
     
@@ -57,7 +57,9 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, J0 = None, w=1.0, wJ=1.
     x0 : array-like
         Initial values for the solver
     args : tuple
-        Positional arguments to pass to the objective function 
+        Positional arguments to pass to the objective function
+    kwargs : dictionary
+        Keyword arguments to pass to the objective function
     ytol : float
         The allowed root-sum-square-error
     itermax : int
@@ -95,7 +97,7 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, J0 = None, w=1.0, wJ=1.
             # calculated below
             if not_improving():
                 x0 = error_vec[-2][1]
-            f0=f(x0,*args)
+            f0=f(x0,*args,**kwargs)
             
             if f0 is None:
                 return [None]*len(x0)
@@ -107,7 +109,7 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, J0 = None, w=1.0, wJ=1.
                 for i in range(len(x0)):
                     epsilon=np.zeros_like(x0)
                     epsilon[i]=dx[i]
-                    fplus = f(x0+epsilon,*args)
+                    fplus = f(x0+epsilon,*args,**kwargs)
                     if fplus is None:
                         return [None]*len(x0)
                     A0[:,i]=(array(fplus)-F0)/epsilon[i]
@@ -132,7 +134,7 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, J0 = None, w=1.0, wJ=1.
             #Jacobian updating parameters
             S=x1-x0
             d=np.dot(S.T,S)
-            f1=f(x1,*args)
+            f1=f(x1,*args,**kwargs)
             F1=array(f1)
             if f1 is None:
                 return [None]*len(x0)
@@ -158,6 +160,31 @@ def Broyden(f, x0, dx=1e-5, args=(), ytol=1e-5, Nfd = 1, J0 = None, w=1.0, wJ=1.
             
     return x1
                 
+def newton(f, x0, dx = 1e-4, args = (), kwargs = {}, tol = 1e-8, ytol = 1e-8):
+    iter = 1
+    
+    while (iter<3 or (abs(change) > tol and abs(y2) > ytol)):
+        
+        if (iter==1):
+            x1=x0
+            x=x1
+        if (iter==2):
+            x2=x0+dx 
+            x=x2
+        if (iter>2): 
+            x=x2
+
+        if (iter==1):
+            y1=f(x,*args,**kwargs)
+            assert (isinstance(y1,float))
+        if (iter>1):
+            y2=f(x,*args,**kwargs)
+            x3=x2-y2/(y2-y1)*(x2-x1)
+            change=abs(y2/(y2-y1)*(x2-x1))
+            y1=y2; x1=x2; x2=x3
+        iter=iter+1
+    return x3
+
 if __name__=='__main__':
     pass
 ##     def OBJECTIVE(x):

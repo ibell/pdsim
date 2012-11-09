@@ -52,9 +52,6 @@ cdef class PyFlowFunctionWrapper(FlowFunctionWrapper):
         
     cpdef double call(self,FlowPath FP):
         return self.Function(FP,**self.kwargs)
-        
-    def __call__(self, FlowPath FP):
-        return self.call(FP)
     
     def __reduce__(self):
         if not isinstance(self.Function,str):
@@ -79,12 +76,6 @@ cdef class IsentropicNozzleWrapper(FlowFunctionWrapper):
         return IsentropicNozzle(FP.A,
                                 FP.State_up,
                                 FP.State_down)
-    
-    def __call__(self, FlowPath FP):
-        """
-        This special method calls the call() function
-        """
-        return self.call(FP)
     
 cdef class FlowFunctionWrapper(object):
     """

@@ -618,6 +618,7 @@ class Scroll(PDSimCore, _Scroll):
             self.__before_discharge1__=True
             
             self.CVs.rebuild_exists()
+            self.Flows.update_existence(self)
             #Re-calculate the CV volumes
             V,dV = self.CVs.volumes(t)
             #Update the matrices using the new CV definitions
@@ -685,6 +686,7 @@ class Scroll(PDSimCore, _Scroll):
                 self.CVs['ddd'].exists=True
                 
                 self.CVs.rebuild_exists()
+                self.Flows.update_existence(self)
                 
                 #Re-calculate the CV
                 V,dV=self.CVs.volumes(t)
@@ -1254,16 +1256,19 @@ class Scroll(PDSimCore, _Scroll):
         # at intermediate iterations it will be a subset of the indices
         _slice = range(self.Itheta)
         
+        t = self.t[_slice]
+        
         ####################################################
         #############  Normal force components #############
         ####################################################
         # The force of the gas in each chamber pushes the orbiting scroll away
         # from the working chambers
-        self.forces.Fz = self.p*self.V/self.geo.h
+        # It is only the active slice
+        self.forces.Fz = self.p[:,_slice]/self.geo.h*self.V[:,_slice]
         
         if isinstance(orbiting_back_pressure, float):
             #The back gas pressure on the orbiting scroll pushes the scroll back down
-            self.forces.Fz -= 0.4*orbiting_back_pressure*self.V/self.geo.h
+            self.forces.Fz -= 0.4*orbiting_back_pressure/self.geo.h*self.V[:,_slice]
             pass
         else:
             raise NotImplementedError('calculate_force_terms must get a float back pressure for now')
@@ -1278,7 +1283,7 @@ class Scroll(PDSimCore, _Scroll):
         #Sum the terms
         self.forces.summed_Fz = np.sum(self.forces.Fz, axis = 0) #kN    
         #Calculate the mean axial force
-        self.forces.mean_Fz = np.trapz(self.forces.summed_Fz[_slice], self.t[_slice])/(2*pi)
+        self.forces.mean_Fz = np.trapz(self.forces.summed_Fz, t)/(2*pi)
         
         # The corrected axial load accounts for the fact that the area of the 
         # thrust bearing does not contribute to compensating for the load

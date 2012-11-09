@@ -271,7 +271,6 @@ class PDSimCore(object):
             
         self.mdot = self.FlowsProcessed.mean_mdot[self.key_inlet]
             
-        
     def __postprocess_HT(self):    
         self.HTProcessed=struct()
         r = range(self.Ntheta)
@@ -326,6 +325,8 @@ class PDSimCore(object):
                 CV.exists = False
 
         self.CVs.rebuild_exists()
+        self.Flows.update_existence(self)
+        
         self.x_state = self.xstate_init
         x = listm(self.xstate_init)
         if self.__hasValves__:
@@ -366,7 +367,7 @@ class PDSimCore(object):
         
     def add_tube(self,Tube):
         """
-        Add a tube to the model.  Alternatively call PDSimCore.Tubes.append(Tube)
+        Add a tube to the model.
         
         Parameters
         ----------
@@ -375,6 +376,7 @@ class PDSimCore(object):
         """
         #Add it to the list
         self.Tubes.append(Tube)
+        self.Tubes.update()
         
     def add_valve(self,Valve):
         """
@@ -405,6 +407,7 @@ class PDSimCore(object):
         self.xValves=np.zeros((2*len(self.Valves),N))
         
         self.CVs.rebuild_exists()
+        self.Flows.update_existence(self)
         
         #Initialize the control volumes
         self.__hasLiquid__=False
@@ -907,16 +910,16 @@ class PDSimCore(object):
         
         def Wdot_one_CV(CVindex):
             """ calculate the p-v work for one CV """
-            t = self.t[0:self.Ntheta]
-            y0 = self.p[CVindex, 0:self.Ntheta]
-            x0 = self.V[CVindex, 0:self.Ntheta]
-                
-            x0, y0 = delimit_vector(x0, y0)
+            
+            x0_raw = self.V[CVindex, 0:self.Ntheta]
+            y0_raw = self.p[CVindex, 0:self.Ntheta]
+            
+            x0, y0 = delimit_vector(x0_raw, y0_raw)
             
             summer=0.0
             for x_chunk, y_chunk in zip(x0, y0):
                 summer += -trapz(y_chunk, x_chunk)*self.omega/(2*pi)
-            #print 'index',CVindex,'Nchunk',len(x0), summer
+           
             return summer
             
         self.Wdot_pv = 0.0
@@ -1482,7 +1485,7 @@ class PDSimCore(object):
         hdict.update(self.Tubes_hdict)
         
         #2. Calculate the mass flow terms between the model components
-        self.Flows.calculate(self, hdict)
+        self.Flows.calculate(hdict)
         summerdT,summerdm=self.Flows.sumterms(self)
         
         #3. Calculate the heat transfer terms
@@ -1665,6 +1668,7 @@ class PDSimCore(object):
             self.CVs[key].exists=True
             
         self.CVs.rebuild_exists()
+        self.Flows.update_existence(self)
 
         # Error values are based on density and temperature independent of 
         # selection of state variables 

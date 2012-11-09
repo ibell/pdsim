@@ -309,10 +309,10 @@ def Compressor(f = None):
     
 if __name__=='__main__':
     
-    profile=False
+    profile=True
     if profile==True:
         import line_profiler as LP
-        profiler=LP.LineProfiler(Scroll.cycle_RK45)
+        profiler=LP.LineProfiler(Scroll.calculate_force_terms)
         profiler.run("Compressor()")
         profiler.print_stats()
     else:

@@ -41,6 +41,9 @@ import recip_panels
 import scroll_panels
 import default_configs 
 
+home = os.getenv('USERPROFILE') or os.getenv('HOME')
+pdsim_home_folder = os.path.join(home,'.pdsim-temp')
+
 class InfiniteList(object):
     """
     Creates a special list where removing an element just puts it back at the end of the list
@@ -301,9 +304,8 @@ class RedirectedWorkerThread(Thread):
         else:
             wx.CallAfter(self.stdout_target_.AppendText, self.name+": Process is done")
             if sim is not None:
-                #Get a unique identifier for the model run for pickling purposes
-                home = os.getenv('USERPROFILE') or os.getenv('HOME')
-                temp_folder = os.path.join(home,'.pdsim-temp')
+                
+                temp_folder = pdsim_home_folder
                 try:
                     os.mkdir(temp_folder)
                 except OSError:

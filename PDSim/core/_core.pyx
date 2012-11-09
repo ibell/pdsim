@@ -10,58 +10,45 @@ cimport numpy as np
 from PDSim.misc._listmath import listm
 from PDSim.misc._listmath cimport listm
 
-cpdef delimit_vector(np.ndarray[np.float_t, ndim = 1] x0, np.ndarray[np.float_t, ndim = 1] y0):
+cpdef delimit_vector(np.ndarray[np.float_t, ndim = 1] x, np.ndarray[np.float_t, ndim = 1] y):
         """
-        Break vectors into continuous chunks of real values as needed
+        Break vectors into continuous chunks of real values as needed by splitting based on the y numpy array
         
-        All the trailing NAN values have been removed already
+        Parameters
+        ----------
+        x : numpy array
+          May not contain NAN values  
+        y : numpy array
         """
-        cdef long i,L,R
-        cdef list real_bounds,nan_bounds,x_list,y_list
         
-        real_bounds = []
-        nan_bounds = []
+        #Return the arrays back if there are no NAN values in y
+        if not np.any(np.isnan(y)):
+            return [x],[y]
         
-        if not np.any(np.isnan(y0)):
-            return [x0],[y0]
+        #A list of all the transitions between NAN and non-NAN values in y vector
+        #Values are the indices at the left
+        indices = list(np.where(np.diff(np.isnan(y)))[0])
         
-        if np.isnan(y0[0]):
-            nan_bounds += [0]
+        segments = []
+        
+        if not np.isnan(y[0]):
+            segments.append((0,indices[0]))
+            keep = False
         else:
-            real_bounds += [0]
+            keep = True
             
-        if np.isfinite(y0[-1]):
-            real_bounds += [len(y0)-1]
-        else:
-            nan_bounds += [len(y0)-1]
+        for i in range(len(indices)-1):
+            if keep:
+                segments.append((indices[i]+1,indices[i+1]))
             
-        for i in range(len(y0)-1):
-            if np.isnan(y0[i])==[False] and np.isnan(y0[i+1])==[True]:
-                real_bounds+=[i]
-                nan_bounds+=[i+1]
-            elif np.isnan(y0[i])==[True] and np.isnan(y0[i+1])==[False]:
-                nan_bounds += [i]
-                real_bounds += [i+1]
+            #Flip the keep flag
+            keep = not keep
         
-        nan_bounds=sorted(nan_bounds)
-        real_bounds=sorted(real_bounds)
-        
-        #Check that all the NAN chunks are all NAN in fact        
-        for i in range(0,len(nan_bounds),2):
-            L = nan_bounds[i]
-            R = nan_bounds[i+1]+1
-            if not np.all(np.isnan(y0[L:R])):
-                raise ValueError('All the elements in NAN chunk are not NAN')
-        
-        x_list,y_list = [],[]
-        #Calculate the 
-        for i in range(0,len(real_bounds),2):
-            L = real_bounds[i]
-            R = real_bounds[i+1]+1
-            x_list.append(x0[L:R])
-            y_list.append(y0[L:R])
-        
-        return x_list, y_list
+        if indices[-1] < len(y)-1:
+            if keep:
+                segments.append((indices[-1]+1,len(y)-1))
+            
+        return [x[L:R+1] for L,R in segments], [y[L:R+1] for L,R in segments]
     
 cdef class _PDSimCore:
     pass

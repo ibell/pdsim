@@ -4,24 +4,15 @@ import collections
 from cPickle import dumps,loads
 from CoolProp.State import State
 
-class TubeCollection(list):
+from _containers import TubeCollection, _Tube
     
-    def _Nodes(self):
-        """
-        Nodes is a dictionary of flow states for any tubes that exist
-        """
-        list1=[(Tube.key1,Tube.State1) for Tube in self if Tube.exists==True]
-        list2=[(Tube.key2,Tube.State2) for Tube in self if Tube.exists==True]
-        return dict(list1+list2)
-    Nodes=property(_Nodes)
-    
-class Tube():
+class Tube(object):
     """
     A tube is a component of the model that allows for heat transfer and pressure drop.
     
     With this class, the state of at least one of the points is fixed.  For instance, at the inlet of the compressor, the state well upstream is quasi-steady.
     """
-    def __init__(self,key1,key2,L,ID,OD=None,State1=None,State2=None,fixed=-1,TubeFcn=None,mdot=-1,exists=True):
+    def __init__(self,key1,key2,L,ID,State1=None,State2=None,OD=-1,fixed=-1,TubeFcn=None,mdot=-1,exists=True):
         self.key1 = key1
         self.key2 = key2
         self.fixed = fixed
@@ -29,8 +20,8 @@ class Tube():
         #: Additional heat to be added to the tube
         self.Q_add = 0.0
         
-        #: Fixed heat transfer coefficient if desired (if None will use correlation - default)
-        self.alpha = None
+        #: Fixed heat transfer coefficient if desired (if less than zero will use correlation - default)
+        self.alpha = -1.0
         
         self.exists = exists
         if fixed<0:
@@ -57,7 +48,6 @@ class Tube():
         self.L=L
         self.ID=ID
         self.OD=OD
-        
         
 def rebuildCVCollection(CVs):
     CVC = ControlVolumeCollection()

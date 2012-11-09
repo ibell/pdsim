@@ -1524,6 +1524,11 @@ class StatePanel(wx.Panel):
         
         self.SetSizer(sizer)
         
+        # create event class so that you can fire an event for when the state is changed
+        # Other panels can await this event and do something when it happens
+        import wx.lib.newevent as newevent
+        self.StateUpdateEvent, self.EVT_STATE_UPDATE_EVENT = newevent.NewEvent()
+        
     def GetState(self):
         """
         returns a :class:`CoolProp.State.State` instance from the given values
@@ -1574,6 +1579,11 @@ class StatePanel(wx.Panel):
             self.p.SetValue(str(p))
             self.rho.SetValue(str(rho))
         SCfrm.Destroy()
+        
+        # post the update event, with arbitrary data attached
+        wx.PostEvent(self, self.StateUpdateEvent())
+        
+        
 
 class StateInputsPanel(PDPanel):
     
@@ -1629,6 +1639,9 @@ class StateInputsPanel(PDPanel):
         self.OnChangeDischargeValue()
         #Bind the selection of discharge value event
         self.OnChangeDischargeVariable()
+        
+        # bind it as usual
+        self.SuctionState.Bind(self.SuctionState.EVT_STATE_UPDATE_EVENT, self.OnChangeDischargeVariable)
         
     def OnChangeDischargeValue(self, event = None):
         """ 

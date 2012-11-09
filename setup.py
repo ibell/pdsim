@@ -28,8 +28,8 @@ fp.close()
 
 if len(sys.argv) == 1:
     #sys.argv+=['build_ext','--inplace']
-    #sys.argv+=['build','--force','install','--clean']
     sys.argv+=['build','install']
+    #sys.argv+=['build','install']
     
 import Cython
 
@@ -45,13 +45,16 @@ pyx_list = [
             "PDSim/flow/flow_models.pyx",
             "PDSim/flow/_sumterms.pyx",
             "PDSim/flow/_flow.pyx",
-            "PDSim/scroll/scroll_geo.py",
+            "PDSim/scroll/scroll_geo.pyx",
             "PDSim/misc/_listmath.pyx",
             "PDSim/misc/polymath.pyx",
+            "PDSim/misc/stl_utilities.pyx",
             "PDSim/core/_core.pyx",
+            "PDSim/core/_containers.pyx",
             "PDSim/recip/_recip.pyx",
             "PDSim/scroll/_scroll.pyx"
             ]
+
 
 def clean():
     for pyx_file in pyx_list:
@@ -71,6 +74,8 @@ if '--inplace' not in sys.argv or '--clean' in sys.argv:
     if '--clean' in sys.argv:
         sys.argv.remove('--clean')
 
+pxd_files = []
+
 ext_module_list = []
 for pyx_file in pyx_list:
     sources = [pyx_file]
@@ -78,12 +83,14 @@ for pyx_file in pyx_list:
     pxd_file = pyx_file.rsplit('.',1)[0]+'.pxd'
     if os.path.exists(pxd_file):
         sources+=[pxd_file]
+    pxd_files.append(pxd_file)
     
     #Build an extension with the sources
     ext_name = pyx_file.rsplit('.',1)[0].replace('/','.')
 
     ext_module_list.append(CyExtension(ext_name,sources,language='c++'))
        
+
 setup(
   name = 'PDSim',
   version = version,
@@ -94,7 +101,7 @@ setup(
   packages = ['PDSim','PDSim.core','PDSim.flow','PDSim.plot','PDSim.scroll','PDSim.misc','PDSim.recip'],
   cmdclass={'build_ext': build_ext},
   ext_modules = ext_module_list,
-  package_data = {'PDSim':['scroll/scroll_geo.pxd']},
+  package_data = {'PDSim':pxd_files},
   include_dirs = [numpy.get_include()]
 )
 
