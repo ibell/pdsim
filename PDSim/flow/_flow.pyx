@@ -11,9 +11,9 @@ from CoolProp.State cimport State as StateClass
 from PDSim.core._containers import TubeCollection
 from PDSim.core._containers cimport TubeCollection
 
-from PDSim.misc.stl_utilities cimport is_in_vector, get_map_sd
+from libc.stdlib cimport malloc, free, calloc
 
-from libcpp.vector cimport vector
+import cython
 
 cpdef sumterms_given_CV(bytes key, list Flows):
     cdef FlowPath Flow
@@ -72,20 +72,28 @@ cdef class FlowPathCollection(list):
             if FP.key1 in exists_keys:
                 CV = Core.CVs[FP.key1]
                 FP.State1=CV.State
+                FP.key1_exists = True
+                FP.ikey1 = exists_keys.index(FP.key1)
             elif FP.key1 in Tube_Nodes:
                 FP.State1=Tube_Nodes[FP.key1]
+                FP.key1_exists = False
             else:
                 FP.exists=False
+                FP.key1_exists = False
                 #Doesn't exist, go to next flow
                 continue
             
             if FP.key2 in exists_keys:
                 CV = Core.CVs[FP.key2]
                 FP.State2=CV.State
+                FP.key2_exists = True
+                FP.ikey2 = exists_keys.index(FP.key2)
             elif FP.key2 in Tube_Nodes:
                 FP.State2=Tube_Nodes[FP.key2]
+                FP.key2_exists = False
             else:
                 FP.exists=False
+                FP.key2_exists = False
                 #Doesn't exist, go to next flow
                 continue
             
@@ -112,49 +120,48 @@ cdef class FlowPathCollection(list):
     def N(self):
         return self.__len__()
         
-    cpdef sumterms_helper(self, list exists_keys, double omega):
-        cdef list summerdm, summerdT
+    @cython.cdivision(True)
+    cpdef sumterms(self, Core):
+        cdef list exists_keys = Core.CVs.exists_keys
+        cdef double omega = Core.omega
+        cdef list summerdm_list, summerdT_list
         cdef double mdot, h_up
         cdef int I_up,I_down
-        cdef bytes key_up, key_down
         cdef FlowPath Flow
+        cdef int N = len(exists_keys)
         
-        summerdm = [0.0 for _dummy in range(len(exists_keys))]
-        summerdT = summerdm[:]
+        #calloc initializes the values to zero
+        cdef double *summerdm = <double*> calloc(N, sizeof(double))
+        cdef double *summerdT = <double*> calloc(N, sizeof(double))
         
         for Flow in self:
             #One of the chambers doesn't exist if it doesn't have a mass flow term
-            if Flow.mdot==0:
+            if not Flow.exists:
                 continue
             else:
                 mdot=Flow.mdot
                 h_up = Flow.h_up
             
-            #Flow must exist then
-            key_up=Flow.key_up    
-            if key_up in exists_keys:
-                #The upstream node is a control volume
-                I_up=exists_keys.index(key_up)
+            #Flow must exist then    
+            if Flow.key_up_exists:
                 #Flow is leaving the upstream control volume
-                summerdm[I_up]-=mdot/omega
-                summerdT[I_up]-=mdot/omega*h_up
+                summerdm[Flow.ikey_up]-=mdot/omega
+                summerdT[Flow.ikey_up]-=mdot/omega*h_up
                 
-            key_down=Flow.key_down
-            if key_down in exists_keys:
-                #The downstream node is a control volume                
-                I_down=exists_keys.index(key_down)
+            if Flow.key_down_exists:
                 #Flow is entering the downstream control volume
-                summerdm[I_down]+=mdot/omega
-                summerdT[I_down]+=mdot/omega*h_up
+                summerdm[Flow.ikey_down]+=mdot/omega
+                summerdT[Flow.ikey_down]+=mdot/omega*h_up
     
-        return summerdm, summerdT
-    
-    cpdef sumterms(self,Core):
+        #Convert c-array to list
+        summerdm_list = [summerdm[i] for i in range(N)]
+        summerdT_list = [summerdT[i] for i in range(N)]
         
-        #Call the Cython-version of the summer
-        summerdm,summerdT = self.sumterms_helper(Core.CVs.exists_keys, Core.omega)
+        #Free the memory that was allocated
+        free(summerdm)
+        free(summerdT)
         
-        return listm(summerdT),listm(summerdm)
+        return listm(summerdT_list), listm(summerdm_list)
     
     def __reduce__(self):
         return rebuildFPC,(self[:],)
@@ -249,7 +256,10 @@ cdef class FlowPath(object):
                 self.h_up = hdict[self.key_up]
             self.p_up=p1
             self.p_down=p2
-            
+            self.key_up_exists = self.key1_exists
+            self.key_down_exists = self.key2_exists
+            self.ikey_up = self.ikey1
+            self.ikey_down = self.ikey2
             self.Gas=self.State1.Fluid
         else:
             self.key_up=self.key2
@@ -263,7 +273,10 @@ cdef class FlowPath(object):
                 self.h_up = hdict[self.key_up]
             self.p_up=p2
             self.p_down=p1
-            
+            self.key_up_exists = self.key2_exists
+            self.key_down_exists = self.key1_exists
+            self.ikey_up = self.ikey2
+            self.ikey_down = self.ikey1
             self.Gas=self.State2.Fluid
             
         FW = self.MdotFcn

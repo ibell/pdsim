@@ -18,12 +18,12 @@ cdef class FlowPathCollection(list):
     cpdef calculate(self, dict hdict)
     cpdef get_deepcopy(self)
     cpdef deepcopy(self)
-    cpdef sumterms_helper(self, list exists_keys, double omega)
     cpdef sumterms(self,Core)
         
 #Make a stripped down class with the necessary terms included
 cdef class FlowPath(object):
-    cdef public bool exists    
+    cdef public bint exists, key1_exists, key2_exists, key_up_exists, key_down_exists
+    cdef int ikey1, ikey2, ikey_up, ikey_down
     cdef public double mdot, h_up, T_up, p_up, p_down, A
     cdef public bytes key_up, key_down, key1, key2, Gas
     cdef public FlowFunctionWrapper MdotFcn

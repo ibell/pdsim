@@ -619,6 +619,7 @@ class Scroll(PDSimCore, _Scroll):
             
             self.CVs.rebuild_exists()
             self.Flows.update_existence(self)
+            
             #Re-calculate the CV volumes
             V,dV = self.CVs.volumes(t)
             #Update the matrices using the new CV definitions
@@ -1117,8 +1118,7 @@ class Scroll(PDSimCore, _Scroll):
         """
         #Calculate the area
         FlowPath.A=self.geo.h*self.geo.delta_flank
-        try:
-            return flow_models.FrictionCorrectedIsentropicNozzle(
+        return flow_models.FrictionCorrectedIsentropicNozzle(
                                  FlowPath.A,
                                  FlowPath.State_up,
                                  FlowPath.State_down,
@@ -1126,8 +1126,6 @@ class Scroll(PDSimCore, _Scroll):
                                  Type = 'flank',
                                  ro = self.geo.ro
                                  )
-        except ZeroDivisionError:
-            return 0.0
         
     def _get_injection_CVkey(self,phi,theta,inner_outer):
         """

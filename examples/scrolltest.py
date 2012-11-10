@@ -35,7 +35,6 @@ import time
 Injection = False
 check_valve = False
 
-
 def Compressor(f = None):
     global Injection
     ScrollComp=Scroll()
@@ -312,7 +311,7 @@ if __name__=='__main__':
     profile=True
     if profile==True:
         import line_profiler as LP
-        profiler=LP.LineProfiler(Scroll.calculate_force_terms)
+        profiler=LP.LineProfiler(Scroll.derivs)
         profiler.run("Compressor()")
         profiler.print_stats()
     else:

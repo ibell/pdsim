@@ -1218,6 +1218,8 @@ class PDSimCore(object):
                         raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
                 except ValueError:
                     debug_plots(self)
+                    raise
+                
                 t2 = clock()
                 print 'Elapsed time for cycle is {0:g} s'.format(t2-t1)
                 
