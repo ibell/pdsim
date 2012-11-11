@@ -1,78 +1,213 @@
 import cython
 cimport cython
+
+import numpy as np
+cimport numpy as np
     
 cimport cpython.array
 from libc.stdlib cimport calloc, free
+from libc.string cimport memcpy
 from cpython cimport bool
-#cdef class arraym(object):
-#    def __init__(self, data = None):
-#        """
-#        Parameters
-#        ----------
-#        If data not included, make an empty arraym
-#        """
-#        cdef int N = len(data)
-#        cdef bytes format = bytes("d")
-#        cdef tuple shape = (N,)
-#        cdef long item_size = sizeof(double)
-#        if data is not None:
-#            
-#            #Allocate the memory for the array that will be used internally
-#            self.data = cvarray(shape, item_size, format)
-#            
-#            #Low-level copy of the data
-#            self.data[:] = data
-#        
-#    cpdef copy(self):   
-#        cdef double* ptr = <double*> malloc(sizeof(double) * 100)
-#        free(ptr)
-##        cdef double data[100]
-##        for i in range(100):
-##            data[i]=4
-#        #cdef double[:] vdata = data
-#        #vdata[:] = 2
-#        pass
-#        #cdef cvarray data = cvarray(shape=(100,), itemsize=sizeof(double), format="d")
-#        #Allocate the memory for the array that will be used internally
-#        #cdef cvarray data = self.data[:]#cvarray(shape=(self.data.shape[0],), itemsize=sizeof(double), format="d")
-#        
-#         
-#    def __add__(x, y):
-#        cdef int i, N, isarray_x, isarray_y
-#        cdef double[:] xdata
-#        cdef double[:] ydata
-#        cdef double[:] zdata
-#        isarray_x = isinstance(x, arraym)
-#        isarray_y = isinstance(y, arraym)
-#
-#        if isarray_x & isarray_y:
-#            xdata = (<arraym>x).vdata
-#            ydata = (<arraym>y).vdata
-#            zdata = xdata.copy()
-#            for i in range(xdata.shape[0]):
-#                zdata[i] += ydata[i]
-#            return arraym(zdata)
-#    
-#    def __iadd__(self,y):
-#        cdef int i, isarray_y
-#        cdef double[:] ydata
-#        isarray_y = isinstance(y, arraym)
-#
-#        if isarray_y:
-#            ydata = (<arraym>y).vdata
-#            for i in range(self.vdata.shape[0]):
-#                self.vdata[i] += ydata[i]
-#        
-#    def __repr__(self):
-#        return str(list(self.data))
 
-#cdef class arraym(cvarray):
-#    def __init__(self, data):
-#        cdef int i
-#        carray = cvarray(shape = (len(data),), itemsize=sizeof(double), format='d')
-#        for i in range(len(data)):
-#            carray[i]=data[i]
-#        print carray[0]
+cdef class arraym(object):
+    def __init__(self, data = None):
+        """
+        data : list, array.array, numpy array, etc.
+        
+        Notes
+        -----
+        If a numpy array is provided, the numpy buffer is used internally to access the data
+        Otherwise, as long as the iterable contains floating point values it should work
+        """
+        cdef int i
+        cdef double el
+        cdef np.ndarray[np.float_t, ndim = 1] npdata
+        
+        if data is not None:
+            self.N = len(data)
+            #Allocate the memory for the array that will be used internally
+            self.data = <double *> calloc(self.N, sizeof(double))
+            
+            #If a numpy array use the buffering interface
+            if isinstance(data, np.ndarray):
+                npdata = data
+                for i in range(self.N):
+                    self.data[i] = npdata[i]
+            elif isinstance(data, list):
+                for i,el in enumerate(data):
+                    self.data[i] = el
+        else:
+            self.data = NULL
+            
+    cdef set_data(self, double *data, int N):
+        cdef int i
+        if self.data is NULL:
+            #Allocate the memory for the array that will be used internally
+            self.data = <double *> calloc(N, sizeof(double))
+            self.N = N
+        memcpy(self.data,data,N*sizeof(double))
+            
+    def __dealloc__(self):
+        #Clean up the memory we allocated
+        if self.data is not NULL:
+            free(self.data)
+          
+    def __add__(x, y):
+        cdef int i, N
+        cdef bint isarray_x, isarray_y
+        cdef double *zdata,*ydata,*xdata
+        cdef double yd
+        cdef arraym z
+        
+        isarray_x = isinstance(x, arraym)
+        isarray_y = isinstance(y, arraym)
+
+        if isarray_x & isarray_y:
+            N = (<arraym>x).N
+            z = (<arraym>x).copy()
+            zdata = (<arraym>z).data
+            ydata = (<arraym>y).data
+            # Add on the other array values
+            for i in range(N):
+                zdata[i] += ydata[i]
+        elif isarray_x != isarray_y:
+            if isarray_y:
+                x,y = y,x
+            N = (<arraym>x).N
+            z = (<arraym>x).copy()
+            zdata = (<arraym>z).data
+            # Cast to a double
+            yd = <double> y
+            # Add on the other array values
+            for i in range(N):
+                zdata[i] += yd
+        
+        return z
+    
+    def __mul__(x, y):
+        cdef int i, N
+        cdef bint isarray_x, isarray_y
+        cdef double *zdata,*ydata
+        cdef double yd
+        cdef arraym z
+        
+        isarray_x = isinstance(x, arraym)
+        isarray_y = isinstance(y, arraym)
+
+        if isarray_x & isarray_y:
+            N = (<arraym>x).N
+            z = (<arraym>x).copy()
+            zdata = (<arraym>z).data
+            ydata = (<arraym>y).data
+            for i in range(N):
+                zdata[i] *= ydata[i]
+        elif isarray_x != isarray_y:
+            if isarray_y:
+                x,y = y,x
+            N = (<arraym>x).N
+            z = (<arraym>x).copy()
+            zdata = (<arraym>z).data
+            # Cast to a double
+            yd = <double> y
+            # Add on the other array values
+            for i in range(N):
+                zdata[i] *= yd
+            
+        return z
+    
+    def __truediv__(x, y):
+        cdef int i, N
+        cdef bint isarray_x, isarray_y
+        cdef double *zdata, *ydata
+        cdef double yd,xd
+        cdef arraym z
+        
+        isarray_x = isinstance(x, arraym)
+        isarray_y = isinstance(y, arraym)
+
+        if isarray_x & isarray_y:
+            N = (<arraym>x).N
+            z = (<arraym>x).copy()
+            zdata = (<arraym>z).data
+            ydata = (<arraym>y).data
+            # Add on the other array values
+            for i in range(N):
+                zdata[i] /= ydata[i]
+        elif isarray_x != isarray_y:
+            if isarray_y:
+                N = (<arraym>y).N
+                z = (<arraym>y).copy()
+                zdata = (<arraym>z).data
+                 # Cast lhs to a double and rhs to a double*
+                xd = <double> x
+                ydata = (<arraym>y).data
+                # Add on the other array values
+                for i in range(N):
+                    zdata[i] = xd/ydata[i]
+            else:
+                N = (<arraym>x).N
+                z = (<arraym>x).copy()
+                zdata = (<arraym>z).data
+                 # Cast rhs to a double
+                yd = <double> y
+                # Add on the other array values
+                for i in range(N):
+                    zdata[i] /= yd
+            
+        return z
+    
+    def __sub__(x, y):
+        cdef int i, N
+        cdef bint isarray_x, isarray_y
+        cdef double *zdata, *ydata
+        cdef double yd,xd
+        cdef arraym z
+        
+        isarray_x = isinstance(x, arraym)
+        isarray_y = isinstance(y, arraym)
+
+        if isarray_x & isarray_y:
+            N = (<arraym>x).N
+            z = (<arraym>x).copy()
+            zdata = (<arraym>z).data
+            ydata = (<arraym>y).data
+            # Add on the other array values
+            for i in range(N):
+                zdata[i] -= ydata[i]
+        elif isarray_x != isarray_y:
+            if isarray_y:
+                N = (<arraym>y).N
+                z = (<arraym>y).copy()
+                zdata = (<arraym>z).data
+                 # Cast lhs to a double and rhs to a double*
+                xd = <double> x
+                ydata = (<arraym>y).data
+                # Add on the other array values
+                for i in range(N):
+                    zdata[i] = xd - ydata[i]
+            else:
+                N = (<arraym>x).N
+                z = (<arraym>x).copy()
+                zdata = (<arraym>z).data
+                 # Cast rhs to a double
+                yd = <double> y
+                # Add on the other array values
+                for i in range(N):
+                    zdata[i] -= yd
+            
+        return z
+        
+    cdef arraym copy(self):
+        cdef arraym arr = arraym()
+        arr.set_data(self.data, self.N)
+        return arr
+    
+    def __iter__(self):
+        for i in range(self.N):
+            yield float(self.data[i])
+        
+    def __repr__(self):
+        return str(list(self))
 
 cdef class listm(list):
     """

@@ -139,19 +139,23 @@ cdef class FlowPathCollection(list):
             if not Flow.exists:
                 continue
             else:
-                mdot=Flow.mdot
+                #Do these once for each flow path to cut down on lookups
+                mdot = Flow.mdot
                 h_up = Flow.h_up
             
-            #Flow must exist then    
+            #Flow must exist then
+            
+            #If the upstream node is a control volume    
             if Flow.key_up_exists:
                 #Flow is leaving the upstream control volume
-                summerdm[Flow.ikey_up]-=mdot/omega
-                summerdT[Flow.ikey_up]-=mdot/omega*h_up
+                summerdm[Flow.ikey_up] -= mdot/omega
+                summerdT[Flow.ikey_up] -= mdot/omega*h_up
                 
+            #If the downstream node is a control volume
             if Flow.key_down_exists:
                 #Flow is entering the downstream control volume
-                summerdm[Flow.ikey_down]+=mdot/omega
-                summerdT[Flow.ikey_down]+=mdot/omega*h_up
+                summerdm[Flow.ikey_down] += mdot/omega
+                summerdT[Flow.ikey_down] += mdot/omega*h_up
     
         #Convert c-array to list
         summerdm_list = [summerdm[i] for i in range(N)]
@@ -176,12 +180,12 @@ cdef class FlowPathCollection(list):
         Using this method, the link to the mass flow function is broken
         """
         return [Flow.get_deepcopy() for Flow in self]
-        FL=[]
-        for Flow in self:
-            FP=FlowPath()
-            FP.update(Flow.__cdict__())
-            FL.append(FP)
-        return FL
+#        FL=[]
+#        for Flow in self:
+#            FP=FlowPath()
+#            FP.update(Flow.__cdict__())
+#            FL.append(FP)
+#        return FL
 
 def rebuildFPC(d):
     """
