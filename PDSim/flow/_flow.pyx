@@ -11,8 +11,7 @@ from CoolProp.State cimport State as StateClass
 from PDSim.core._containers import TubeCollection
 from PDSim.core._containers cimport TubeCollection
 
-from PDSim.misc.datatypes import arraym
-from PDSim.misc.datatypes cimport arraym
+
 
 
 from libc.stdlib cimport malloc, free, calloc
@@ -275,7 +274,7 @@ cdef class FlowPath(object):
         FP.key2_exists = self.key2_exists
         return FP
         
-    cpdef calculate(self, harray = None):
+    cpdef calculate(self, arraym harray):
         """
         calculate
         """
@@ -293,13 +292,7 @@ cdef class FlowPath(object):
             self.State_up=self.State1
             self.State_down=self.State2
             self.T_up=self.State1.get_T()
-            if harray is None:
-                self.h_up=self.State1.get_h()
-            else:
-                if isinstance(harray,dict):
-                    self.h_up = harray[self.key_up]
-                else:
-                    self.h_up = (<arraym>harray)[self.ikey1]
+            self.h_up = harray.data[self.ikey1]
             self.p_up=p1
             self.p_down=p2
             self.key_up_exists = self.key1_exists
@@ -313,13 +306,7 @@ cdef class FlowPath(object):
             self.State_up=self.State2
             self.State_down=self.State1
             self.T_up=self.State2.get_T()
-            if harray is None:
-                self.h_up=self.State2.get_h()
-            else:
-                if isinstance(harray, dict):
-                    self.h_up = harray[self.key_up]
-                else:
-                    self.h_up = (<arraym>harray)[self.ikey2]
+            self.h_up = harray.data[self.ikey2]                    
             self.p_up=p2
             self.p_down=p1
             self.key_up_exists = self.key2_exists

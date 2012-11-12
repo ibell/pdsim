@@ -11,6 +11,9 @@ from cython.operator cimport dereference as deref, preincrement as inc
 from PDSim.flow.flow_models import FlowFunctionWrapper
 from PDSim.flow.flow_models cimport FlowFunctionWrapper
 
+from PDSim.misc.datatypes import arraym
+from PDSim.misc.datatypes cimport arraym
+
 cdef class FlowPathCollection(list):
     cpdef update_existence(self, Core)
     cpdef calculate(self, hdict)
@@ -28,4 +31,4 @@ cdef class FlowPath(object):
     
     cpdef dict __cdict__(self, AddStates = *)
     cpdef FlowPath get_deepcopy(self)
-    cpdef calculate(self, harray = *)
+    cpdef calculate(self, arraym harray)

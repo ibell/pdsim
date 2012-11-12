@@ -6,7 +6,7 @@ from CoolProp.State import State
 
 import numpy as np
 import cython
-
+cimport cython
 
 
 #Uncomment this line to use the python math functions
@@ -83,6 +83,7 @@ cdef class IsentropicNozzleWrapper(FlowFunctionWrapper):
                                 FP.State_up,
                                 FP.State_down)
     
+@cython.final
 cdef class FlowFunctionWrapper(object):
     """
     A wrapper to contain the function that will be called

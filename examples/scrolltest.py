@@ -285,7 +285,7 @@ def Compressor(f = None):
                      lump_energy_balance_callback=ScrollComp.lump_energy_balance_callback,
                      solver_method='RK45',
                      UseNR = False, #Use Newton-Raphson ND solver to determine the initial state
-                     OneCycle = True,
+                     OneCycle = False,
                      plot_every_cycle= False
                      )
     except:
