@@ -74,7 +74,7 @@ cdef class IsentropicNozzleWrapper(FlowFunctionWrapper):
     A wrapper that can be added to call the isentropic nozzle model
     if the flow area is constant
     """
-        
+    
     cpdef double call(self, FlowPath FP):
         """
         Returns the mass flow rate from the isentropic nozzle model
@@ -83,7 +83,7 @@ cdef class IsentropicNozzleWrapper(FlowFunctionWrapper):
                                 FP.State_up,
                                 FP.State_down)
     
-@cython.final
+
 cdef class FlowFunctionWrapper(object):
     """
     A wrapper to contain the function that will be called

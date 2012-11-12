@@ -16,7 +16,7 @@ from PDSim.misc.datatypes cimport arraym
 
 cdef class FlowPathCollection(list):
     cpdef update_existence(self, Core)
-    cpdef calculate(self, hdict)
+    cpdef calculate(self, arraym harray)
     cpdef get_deepcopy(self)
     cpdef tuple sumterms(self,Core)
         

@@ -54,7 +54,8 @@ cpdef tuple sumterms_given_CV(bytes key, list Flows):
 class struct(object):
     def __init__(self,d):
         self.__dict__.update(d)
-    
+ 
+@cython.final
 cdef class FlowPathCollection(list):
     
     cpdef update_existence(self, Core):
@@ -118,7 +119,7 @@ cdef class FlowPathCollection(list):
             #Made it this far, so both states exist
             FP.exists = True
     
-    cpdef calculate(self, harray):
+    cpdef calculate(self, arraym harray):
         """
         Run the code for each flow path to calculate the flow rates
         
