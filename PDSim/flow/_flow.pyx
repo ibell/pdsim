@@ -11,11 +11,15 @@ from CoolProp.State cimport State as StateClass
 from PDSim.core._containers import TubeCollection
 from PDSim.core._containers cimport TubeCollection
 
+from PDSim.misc.datatypes import arraym
+from PDSim.misc.datatypes cimport arraym
+
+
 from libc.stdlib cimport malloc, free, calloc
 
 import cython
 
-cpdef sumterms_given_CV(bytes key, list Flows):
+cpdef tuple sumterms_given_CV(bytes key, list Flows):
     """
     A function to sum all the mdot terms for a given control volume
     
@@ -80,8 +84,12 @@ cdef class FlowPathCollection(list):
                 FP.key1_exists = True
                 FP.ikey1 = exists_keys.index(FP.key1)
             elif FP.key1 in Tube_Nodes:
-                FP.State1=Tube_Nodes[FP.key1]
+                FP.State1 = Tube_Nodes[FP.key1]
                 FP.key1_exists = False
+                if Core.Tubes[FP.key1].key1 == FP.key1:
+                    FP.ikey1 = Core.Tubes[FP.key1].i1
+                else:
+                    FP.ikey1 = Core.Tubes[FP.key1].i2
             else:
                 FP.exists=False
                 FP.key1_exists = False
@@ -97,6 +105,10 @@ cdef class FlowPathCollection(list):
             elif FP.key2 in Tube_Nodes:
                 FP.State2=Tube_Nodes[FP.key2]
                 FP.key2_exists = False
+                if Core.Tubes[FP.key2].key1 == FP.key2:
+                    FP.ikey2 = Core.Tubes[FP.key2].i1
+                else:
+                    FP.ikey2 = Core.Tubes[FP.key2].i2
             else:
                 FP.exists=False
                 FP.key2_exists = False
@@ -107,31 +119,31 @@ cdef class FlowPathCollection(list):
             #Made it this far, so both states exist
             FP.exists = True
     
-    cpdef calculate(self, dict hdict):
+    cpdef calculate(self, harray):
         """
         Run the code for each flow path to calculate the flow rates
         
         Parameters
         ----------
-        hdict : dictionary, optional
-            Maps CV key to enthalpy value [kJ/kg]
+        harray : arraym, optional
+            Arraym that maps index to enthalpy - CVs+Tubes
         """
         cdef FlowPath FP
         cdef list flow_paths = self
                 
         for FP in flow_paths:
             if FP.exists:
-                FP.calculate(hdict)
+                FP.calculate(harray)
         
     @property
     def N(self):
         return self.__len__()
         
     @cython.cdivision(True)
-    cpdef sumterms(self, Core):
+    cpdef tuple sumterms(self, Core):
         """
         Sum all the mass flow and mdot*h for each CV in existence at a given 
-        step
+        step for the derivatives in the ODE solver
         
         Meant to be called by PDSimCore.derivs()
         
@@ -142,13 +154,13 @@ cdef class FlowPathCollection(list):
         """
         cdef list exists_keys = Core.CVs.exists_keys
         cdef double omega = Core.omega
-        cdef list summerdm_list, summerdT_list
+        cdef arraym summerdm_array, summerdT_array
         cdef double mdot, h_up
         cdef int I_up,I_down
         cdef FlowPath Flow
         cdef int N = len(exists_keys)
         
-        #calloc initializes the values to zero
+        # calloc initializes the values to zero
         cdef double *summerdm = <double*> calloc(N, sizeof(double))
         cdef double *summerdT = <double*> calloc(N, sizeof(double))
         
@@ -175,15 +187,21 @@ cdef class FlowPathCollection(list):
                 summerdm[Flow.ikey_down] += mdot/omega
                 summerdT[Flow.ikey_down] += mdot/omega*h_up
     
-        #Convert c-array to list
-        summerdm_list = [summerdm[i] for i in range(N)]
-        summerdT_list = [summerdT[i] for i in range(N)]
+        # Create the arraym instances and copy the data over to them
+        summerdT_array = arraym()
+        summerdT_array.set_data(summerdT,N)
+        summerdm_array = arraym()
+        summerdm_array.set_data(summerdm,N)
+        
+#        # Convert c-array to list
+#        summerdm_list = [summerdm[i] for i in range(N)]
+#        summerdT_list = [summerdT[i] for i in range(N)]
         
         #Free the memory that was allocated
         free(summerdm)
         free(summerdT)
         
-        return listm(summerdT_list), listm(summerdm_list)
+        return summerdT_array, summerdm_array
     
     def __reduce__(self):
         return rebuildFPC,(self[:],)
@@ -257,7 +275,7 @@ cdef class FlowPath(object):
         FP.key2_exists = self.key2_exists
         return FP
         
-    cpdef calculate(self, dict hdict = None):
+    cpdef calculate(self, harray = None):
         """
         calculate
         """
@@ -275,10 +293,13 @@ cdef class FlowPath(object):
             self.State_up=self.State1
             self.State_down=self.State2
             self.T_up=self.State1.get_T()
-            if hdict is None:
+            if harray is None:
                 self.h_up=self.State1.get_h()
             else:
-                self.h_up = hdict[self.key_up]
+                if isinstance(harray,dict):
+                    self.h_up = harray[self.key_up]
+                else:
+                    self.h_up = (<arraym>harray)[self.ikey1]
             self.p_up=p1
             self.p_down=p2
             self.key_up_exists = self.key1_exists
@@ -292,10 +313,13 @@ cdef class FlowPath(object):
             self.State_up=self.State2
             self.State_down=self.State1
             self.T_up=self.State2.get_T()
-            if hdict is None:
+            if harray is None:
                 self.h_up=self.State2.get_h()
             else:
-                self.h_up = hdict[self.key_up]
+                if isinstance(harray, dict):
+                    self.h_up = harray[self.key_up]
+                else:
+                    self.h_up = (<arraym>harray)[self.ikey2]
             self.p_up=p2
             self.p_down=p1
             self.key_up_exists = self.key2_exists

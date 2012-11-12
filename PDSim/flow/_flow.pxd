@@ -13,9 +13,9 @@ from PDSim.flow.flow_models cimport FlowFunctionWrapper
 
 cdef class FlowPathCollection(list):
     cpdef update_existence(self, Core)
-    cpdef calculate(self, dict hdict)
+    cpdef calculate(self, hdict)
     cpdef get_deepcopy(self)
-    cpdef sumterms(self,Core)
+    cpdef tuple sumterms(self,Core)
         
 #Make a stripped down class with the necessary terms included
 cdef class FlowPath(object):
@@ -28,4 +28,4 @@ cdef class FlowPath(object):
     
     cpdef dict __cdict__(self, AddStates = *)
     cpdef FlowPath get_deepcopy(self)
-    cpdef calculate(self, dict hdict = *)
+    cpdef calculate(self, harray = *)

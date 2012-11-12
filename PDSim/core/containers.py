@@ -120,8 +120,8 @@ class ControlVolumeCollection(collections.OrderedDict):
     def exists_CV(self):
         return self._exists_CV
             
-    def exists_arrays(self, theta):
-        return CVArrays(self._exists_CV, theta)
+    def exists_arrays(self, theta, state_vars, x):
+        return CVArrays(self._exists_CV, theta, state_vars, x)
     
     @property
     def T(self):

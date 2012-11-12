@@ -5,7 +5,7 @@ import numpy as np
 cimport numpy as np
     
 cimport cpython.array
-from libc.stdlib cimport calloc, free
+from libc.stdlib cimport calloc, free, realloc
 from libc.string cimport memcpy
 from cpython cimport bool
 
@@ -81,6 +81,7 @@ cdef class arraym(object):
         isarray_y = isinstance(y, arraym)
 
         if isarray_x & isarray_y:
+            check_dims(x, y)
             N = (<arraym>x).N
             z = (<arraym>x).copy()
             zdata = z.data
@@ -113,6 +114,7 @@ cdef class arraym(object):
         isarray_y = isinstance(y, arraym)
 
         if isarray_x & isarray_y:
+            check_dims(x, y)
             N = (<arraym>x).N
             z = (<arraym>x).copy()
             zdata = (<arraym>z).data
@@ -144,6 +146,7 @@ cdef class arraym(object):
         isarray_y = isinstance(y, arraym)
 
         if isarray_x & isarray_y:
+            check_dims(x, y)
             N = (<arraym>x).N
             z = (<arraym>x).copy()
             zdata = (<arraym>z).data
@@ -185,6 +188,7 @@ cdef class arraym(object):
         isarray_y = isinstance(y, arraym)
 
         if isarray_x & isarray_y:
+            check_dims(x, y)
             N = (<arraym>x).N
             z = (<arraym>x).copy()
             zdata = (<arraym>z).data
@@ -227,6 +231,29 @@ cdef class arraym(object):
     def __getitem__(self, int i):
         return self.data[i]
     
+    cdef arraym slice(self, int i, int j):
+        cdef int k
+        cdef arraym arr = arraym()
+        if j < i:
+            raise IndexError('Indices must be increasing')
+        if j == i:
+            raise IndexError('Length of slice must be greater than 1')
+        if j > self.N:
+            raise IndexError('End of slice out of bounds. Length of arraym is '+str(self.N))
+        
+        arr.set_size(j-i)
+        memcpy(arr.data,self.data+i,(j-i)*sizeof(double))
+        return arr
+    
+    cpdef extend(self, arraym array2):
+        cdef int N = array2.N + self.N
+        self.data = <double*>realloc(self.data, N*sizeof(double))        
+        memcpy(self.data+self.N, array2.data, array2.N*sizeof(double))
+        self.N = N
+        
+    def __getslice__(self, Py_ssize_t i, Py_ssize_t j):
+        return self.slice(i,j)
+    
     def __iter__(self):
         for i in range(self.N):
             yield float(self.data[i])
@@ -236,90 +263,3 @@ cdef class arraym(object):
         
     def __len__(self):
         return self.N
-
-cdef class listm(list):
-    """
-    See http://docs.cython.org/src/userguide/special_methods.html
-    """
-    def __add__(x,y):
-        cdef int i,N
-        cdef bool isarray_x,isarray_y
-        
-        isarray_x = isinstance(x,listm)
-        isarray_y = isinstance(y,listm)
-        
-        if isarray_x and isarray_y:
-            return listm([x[i]+y[i] for i in range(x.__len__())])
-        else:
-            ### it is backwards, self is something else, y is a listm
-            N=len(y)
-            if isinstance(x,(int,float)) and not isinstance(y,(int,float)):
-                x,y = y,x
-                return listm([y[i]+x for i in range(N)])
-            else: 
-                return listm([x[i]+y[i] for i in range(N)])
-                
-    def __mul__(self,y):
-        cdef int i,N
-        
-        if isinstance(self,listm):
-            N=len(self)
-            if isinstance(y,int) or isinstance(y,float):
-                return listm([self[i]*y for i in range(N)])
-            else:
-                return listm([self[i]*y[i] for i in range(N)])
-        else:
-            ### it is backwards, self is something else, y is a listm
-            N=len(y)
-            if isinstance(self,int) or isinstance(self,float):
-                return listm([y[i]*self for i in range(N)])
-            else:
-                return listm([self[i]*y[i] for i in range(N)])
-                
-    def __truediv__(self,y):
-        cdef int i,N
-        
-        if isinstance(self,listm):
-            N=len(self)
-            if isinstance(y,int) or isinstance(y,float):
-                return listm([self[i]/y for i in range(N)])
-            else:
-                return listm([self[i]/y[i] for i in range(N)])
-        else:
-            ### it is backwards, self is something else, y is a listm
-            N=len(y)
-            if isinstance(self,int) or isinstance(self,float):
-                return listm([self/y[i] for i in range(N)])
-            else:
-                return listm([self[i]/y[i] for i in range(N)])
-    
-    def __sub__(self,y):
-        cdef int i,N
-        
-        if isinstance(self,listm):
-            N=len(self)
-            if isinstance(y,int) or isinstance(y,float):
-                return listm([self[i]-y for i in range(N)])
-            else:
-                return listm([self[i]-y[i] for i in range(N)])
-        else:
-            ### it is backwards, self is something else, y is a listm
-            N=len(y)
-            if isinstance(self,int) or isinstance(self,float):
-                return listm([self-y[i] for i in range(N)])
-            else:
-                return listm([self[i]-y[i] for i in range(N)])
-    
-    def __reduce__(self):
-        d={}
-        d['data']=list(self)
-        return rebuildListm,(d,)
-    
-    def copy(self):
-        """
-        Return a copy of the listm instance
-        """
-        return listm(self[:])
-          
-def rebuildListm(d):
-    return listm(d['data'])

@@ -617,8 +617,7 @@ class Scroll(PDSimCore, _Scroll):
             self.__before_discharge2__=False
             self.__before_discharge1__=True
             
-            self.CVs.rebuild_exists()
-            self.Flows.update_existence(self)
+            self.update_existence()
             
             #Re-calculate the CV volumes
             V,dV = self.CVs.volumes(t)
@@ -686,8 +685,7 @@ class Scroll(PDSimCore, _Scroll):
                 self.CVs['dd'].exists=False
                 self.CVs['ddd'].exists=True
                 
-                self.CVs.rebuild_exists()
-                self.Flows.update_existence(self)
+                self.update_existence()
                 
                 #Re-calculate the CV
                 V,dV=self.CVs.volumes(t)

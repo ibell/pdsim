@@ -7,6 +7,8 @@ from CoolProp.State import State
 import numpy as np
 import cython
 
+
+
 #Uncomment this line to use the python math functions
 #from math import log,pi,e,pow,sqrt
 
@@ -14,8 +16,9 @@ import cython
 This is the module that contains all the flow models
 """
 
-TYPE_RADIAL = 1001
-TYPE_FLANK = 1002
+cdef public enum:
+    TYPE_RADIAL
+    TYPE_FLANK
 
 cdef double ar_0 = 25932.1070099
 cdef double ar_1 = 0.914825434095

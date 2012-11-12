@@ -22,11 +22,13 @@ from CoolProp.State import State
 ##--  Package imports  --
 from PDSim.flow._sumterms import setcol, getcol
 from PDSim.flow import _flow,flow_models
+from PDSim.core._containers import STATE_VARS_TM
 from PDSim.flow.flow import FlowPathCollection, FlowPath
 from containers import ControlVolumeCollection,Tube,TubeCollection
 from PDSim.plot.plots import debug_plots
 from PDSim.misc._listmath import listm 
 from PDSim.misc.solvers import Broyden,MultiDimNewtRaph
+from PDSim.misc.datatypes import arraym
 from _core import delimit_vector
 
 def _pickle_method(method):
@@ -324,8 +326,7 @@ class PDSimCore(object):
             else:
                 CV.exists = False
 
-        self.CVs.rebuild_exists()
-        self.Flows.update_existence(self)
+        self.update_existence()
         
         self.x_state = self.xstate_init
         x = listm(self.xstate_init)
@@ -336,6 +337,24 @@ class PDSimCore(object):
         self.xstate_init = None
         self.exists_CV_init = None
                 
+    def update_existence(self):
+        """
+        Update existence flags for Tubes and control volumes
+        
+        This function is required to be called when the existence of any control
+        volume or tube changes in order to ensure that internal flags are set
+        properly
+        """
+        
+        # Update the existence flags in all the control volumes
+        self.CVs.rebuild_exists()
+        
+        # Update the array of enthalpies in the tubes
+        self.Tubes.update_existence(self.CVs.Nexist)
+        
+        # Update the existence of each of the flows
+        self.Flows.update_existence(self)
+        
     def add_flow(self,FlowPath):
         """
         Add a flow path to the model
@@ -406,8 +425,7 @@ class PDSimCore(object):
         self.xL=self.T.copy()
         self.xValves=np.zeros((2*len(self.Valves),N))
         
-        self.CVs.rebuild_exists()
-        self.Flows.update_existence(self)
+        self.update_existence()
         
         #Initialize the control volumes
         self.__hasLiquid__=False
@@ -1188,6 +1206,9 @@ class PDSimCore(object):
                 # (1). First, run all the tubes
                 for tube in self.Tubes:
                     tube.TubeFcn(tube)
+                    
+                # Call update_existence to save the enthalpies for the tubes 
+                self.update_existence()
                 
                 #The first time this function is run, save the initial state
                 # and the existence of the CV
@@ -1445,6 +1466,49 @@ class PDSimCore(object):
         dfdt : ``listm`` instance
         
         """
+        # Updates the state, calculates the volumes, prepares all the things needed for derivatives
+        x = arraym(x)
+        o = self.CVs.exists_arrays(theta, STATE_VARS_TM, x)
+        
+        #Join the enthalpies of the CV and the tubes
+        harray = o.h.copy()
+        harray.extend(self.Tubes.get_h())
+        
+        # Calculate the flows and sum up all the terms
+        o.calculate_flows(self.Flows, harray, self)
+        
+        # Calculate the heat transfer terms
+        if heat_transfer_callback is not None:
+            o.Q=arraym(heat_transfer_callback(theta))
+            if not len(o.Q) == self.CVs.Nexist:
+                raise ValueError('Length of Q is not equal to length of number of CV')
+        else:
+            o.Q=0.0
+            
+        # Calculate the derivative terms and set the derivative of the state vector
+        o.calculate_derivs(self.omega, False)
+        
+        self.V_ = listm(o.V)
+        self.dV_ = listm(o.dV)
+        self.h_  = listm(o.h)
+        self.rho_ = listm(o.rho)
+        self.m_ = listm(o.m)
+        self.p_ = listm(o.p)
+        self.T_ = listm(o.T)
+        
+        
+        return listm(o.property_derivs)
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         
         #1. Calculate the volume and derivative of volume of each control volumes
         #    Return two lists, one for the volumes, second for the derivatives of volumes 
@@ -1491,12 +1555,18 @@ class PDSimCore(object):
         
         #Build a dictionary of enthalpy values to speed up _calculate
         #Halves the number of calls to get_h which calculates the enthalpy
+        #This is going to be an arraym instead
         hdict = {key:h_ for key, h_ in zip(self.CVs.exists_keys, h)}
         hdict.update(self.Tubes_hdict)
+        
         
         #2. Calculate the mass flow terms between the model components
         self.Flows.calculate(hdict)
         summerdT,summerdm=self.Flows.sumterms(self)
+        
+        #TEmporarily cast it back
+        summerdT = listm(summerdT)
+        summerdm = listm(summerdm)
         
         #3. Calculate the heat transfer terms
         if heat_transfer_callback is not None:
@@ -1535,7 +1605,7 @@ class PDSimCore(object):
                     raise KeyError
             if self.__hasValves__==True:
                 f+=f_valves
-
+            
             return listm(f)
     
     def valves_callback(self):
@@ -1677,8 +1747,7 @@ class PDSimCore(object):
         for key in RHS:
             self.CVs[key].exists=True
             
-        self.CVs.rebuild_exists()
-        self.Flows.update_existence(self)
+        self.update_existence()
 
         # Error values are based on density and temperature independent of 
         # selection of state variables 

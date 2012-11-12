@@ -285,7 +285,7 @@ def Compressor(f = None):
                      lump_energy_balance_callback=ScrollComp.lump_energy_balance_callback,
                      solver_method='RK45',
                      UseNR = False, #Use Newton-Raphson ND solver to determine the initial state
-                     OneCycle = False,
+                     OneCycle = True,
                      plot_every_cycle= False
                      )
     except:
@@ -311,7 +311,7 @@ if __name__=='__main__':
     profile=False
     if profile==True:
         import line_profiler as LP
-        profiler=LP.LineProfiler(Scroll.cycle_RK45)
+        profiler=LP.LineProfiler(Scroll.derivs)
         profiler.run("Compressor()")
         profiler.print_stats()
     else:
