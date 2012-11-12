@@ -16,22 +16,30 @@ from libc.stdlib cimport malloc, free, calloc
 import cython
 
 cpdef sumterms_given_CV(bytes key, list Flows):
-    cdef FlowPath Flow
-    cdef double summer_mdot,summer_mdoth
+    """
+    A function to sum all the mdot terms for a given control volume
     
-    summer_mdot = 0.0
-    summer_mdoth = 0.0
+    Searches the list of flows and for each element in the flows, checks whether
+    the key matches one of upstream or downstream key
+    
+    Parameters
+    ----------
+    key: string
+    Flows: FlowPathCollection instance 
+    """
+    cdef FlowPath Flow
+    cdef double summer_mdot = 0.0, summer_mdoth = 0.0
     
     for Flow in Flows:
 
-        if abs(Flow.mdot)<1e-12:
+        if not Flow.exists or abs(Flow.mdot)<1e-12:
             continue
-    
-        if Flow.key_down==key:
+                
+        if Flow.key_down == key:
             summer_mdot+=Flow.mdot
             summer_mdoth+=Flow.mdot*Flow.h_up
         
-        elif Flow.key_up==key:
+        elif Flow.key_up == key:
             summer_mdot-=Flow.mdot
             summer_mdoth-=Flow.mdot*Flow.h_up
             
@@ -45,9 +53,6 @@ class struct(object):
         self.__dict__.update(d)
     
 cdef class FlowPathCollection(list):
-    def __init__(self,d=None):
-        if d is not None and isinstance(d,dict):
-            self.__dict__.update(d)
     
     cpdef update_existence(self, Core):
         """
@@ -80,6 +85,7 @@ cdef class FlowPathCollection(list):
             else:
                 FP.exists=False
                 FP.key1_exists = False
+                FP.mdot = 0.0
                 #Doesn't exist, go to next flow
                 continue
             
@@ -94,6 +100,7 @@ cdef class FlowPathCollection(list):
             else:
                 FP.exists=False
                 FP.key2_exists = False
+                FP.mdot = 0.0
                 #Doesn't exist, go to next flow
                 continue
             
@@ -106,7 +113,7 @@ cdef class FlowPathCollection(list):
         
         Parameters
         ----------
-        hdict : dictionary
+        hdict : dictionary, optional
             Maps CV key to enthalpy value [kJ/kg]
         """
         cdef FlowPath FP
@@ -122,6 +129,17 @@ cdef class FlowPathCollection(list):
         
     @cython.cdivision(True)
     cpdef sumterms(self, Core):
+        """
+        Sum all the mass flow and mdot*h for each CV in existence at a given 
+        step
+        
+        Meant to be called by PDSimCore.derivs()
+        
+        Parameters
+        ----------
+        Core: PDSimCore instance
+            
+        """
         cdef list exists_keys = Core.CVs.exists_keys
         cdef double omega = Core.omega
         cdef list summerdm_list, summerdT_list
@@ -145,7 +163,7 @@ cdef class FlowPathCollection(list):
             
             #Flow must exist then
             
-            #If the upstream node is a control volume    
+            #If the upstream node is a control volume 
             if Flow.key_up_exists:
                 #Flow is leaving the upstream control volume
                 summerdm[Flow.ikey_up] -= mdot/omega
@@ -170,22 +188,11 @@ cdef class FlowPathCollection(list):
     def __reduce__(self):
         return rebuildFPC,(self[:],)
     
-    cpdef deepcopy(self):
-        newFPC = FlowPathCollection()
-        newFPC.__dict__.update(copy.deepcopy(self.__dict__))
-        return newFPC
-    
     cpdef get_deepcopy(self):
         """
         Using this method, the link to the mass flow function is broken
         """
         return [Flow.get_deepcopy() for Flow in self]
-#        FL=[]
-#        for Flow in self:
-#            FP=FlowPath()
-#            FP.update(Flow.__cdict__())
-#            FL.append(FP)
-#        return FL
 
 def rebuildFPC(d):
     """
@@ -215,25 +222,39 @@ cdef class FlowPath(object):
         """
         Returns a dictionary with all the terms that are defined at the Cython level
         """
-        cdef list items=['mdot','h_up','T_up','p_up','p_down','key_up','key_down'
-                         ,'key1','key2','Gas','exists']
-        cdef list States=[('State1',self.State1),('State2',self.State2),
-                          ('State_up',self.State_up),('State_down',self.State_down)]
-        cdef dict dic={}
+        
+        cdef list items
+        cdef list States
+        cdef dict d={}
+        cdef bytes item
+        
+        items=['mdot','h_up','T_up','p_up','p_down','key_up','key_down','key1','key2','Gas','exists']
         for item in items:
-            dic[item]=getattr(self,item)
-        if AddStates==True:
+            d[item]=getattr(self,item)
+        
+        if AddStates:
+            States=[('State1',self.State1),('State2',self.State2),('State_up',self.State_up),('State_down',self.State_down)]
             for k,State in States:
                 if State is not None:
-                    dic[k]=State.copy()
-        return dic
+                    d[k]=State.copy()
+        return d
     
     cpdef FlowPath get_deepcopy(self):
-        cdef dict d = self.__cdict__()
         cdef FlowPath FP = FlowPath()
-        
-        for k,v in d.iteritems():
-            setattr(FP,k,v)
+        FP.Gas = self.Gas
+        FP.exists = self.exists
+        FP.mdot = self.mdot
+        FP.h_up = self.h_up
+        FP.T_up = self.T_up
+        FP.p_up = self.p_up
+        FP.p_down = self.p_down
+        FP.key_up = self.key_up
+        FP.key_down = self.key_down
+        FP.key_up_exists = self.key_up_exists
+        FP.key_down_exists = self.key_down_exists
+        FP.A = self.A
+        FP.key1_exists = self.key1_exists
+        FP.key2_exists = self.key2_exists
         return FP
         
     cpdef calculate(self, dict hdict = None):

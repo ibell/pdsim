@@ -4,7 +4,7 @@ import collections
 from cPickle import dumps,loads
 from CoolProp.State import State
 
-from _containers import TubeCollection, _Tube
+from _containers import TubeCollection, CVArrays
     
 class Tube(object):
     """
@@ -120,6 +120,9 @@ class ControlVolumeCollection(collections.OrderedDict):
     def exists_CV(self):
         return self._exists_CV
             
+    def exists_arrays(self, theta):
+        return CVArrays(self._exists_CV, theta)
+    
     @property
     def T(self):
         """

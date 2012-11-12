@@ -9,6 +9,9 @@ from PDSim.scroll.scroll_geo cimport Area_s_sa
 
 from libc.math cimport M_PI as pi
 
+cdef int TYPE_RADIAL = flow_models.TYPE_RADIAL
+cdef int TYPE_FLANK = flow_models.TYPE_FLANK
+
 cdef class _Scroll(object):
     
     cpdef dict __cdict__(self):
@@ -53,8 +56,24 @@ cdef class _Scroll(object):
                                                              FP.State_up, 
                                                              FP.State_down, 
                                                              self.geo.delta_radial, 
-                                                             str('radial'), 
+                                                             TYPE_RADIAL, 
                                                              self.geo.t)
+        
+    cpdef double FlankLeakage(self,FlowPath FP):
+        """
+        Calculate the flank leakge flow rate
+        """
+        #Calculate the area
+        FP.A=self.geo.h*self.geo.delta_flank
+        return flow_models.FrictionCorrectedIsentropicNozzle(
+                                 FP.A,
+                                 FP.State_up,
+                                 FP.State_down,
+                                 self.geo.delta_flank,
+                                 TYPE_FLANK,
+                                 -1,
+                                 self.geo.ro
+                                 )
         
     cpdef double calcHT(self, double theta, bytes key, double HTC_tune, double dT_dphi, double phim):
         cdef scroll_geo.HTAnglesClass angles

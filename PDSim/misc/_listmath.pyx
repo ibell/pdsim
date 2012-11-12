@@ -55,7 +55,7 @@ cdef class arraym(object):
     def __add__(x, y):
         cdef int i, N
         cdef bint isarray_x, isarray_y
-        cdef double *zdata,*ydata,*xdata
+        cdef double *zdata,*ydata
         cdef double yd
         cdef arraym z
         
@@ -65,7 +65,7 @@ cdef class arraym(object):
         if isarray_x & isarray_y:
             N = (<arraym>x).N
             z = (<arraym>x).copy()
-            zdata = (<arraym>z).data
+            zdata = z.data
             ydata = (<arraym>y).data
             # Add on the other array values
             for i in range(N):
@@ -77,7 +77,7 @@ cdef class arraym(object):
             z = (<arraym>x).copy()
             zdata = (<arraym>z).data
             # Cast to a double
-            yd = <double> y
+            yd = (<double>y)
             # Add on the other array values
             for i in range(N):
                 zdata[i] += yd
@@ -108,7 +108,7 @@ cdef class arraym(object):
             z = (<arraym>x).copy()
             zdata = (<arraym>z).data
             # Cast to a double
-            yd = <double> y
+            yd = (<double>y)
             # Add on the other array values
             for i in range(N):
                 zdata[i] *= yd
@@ -139,7 +139,7 @@ cdef class arraym(object):
                 z = (<arraym>y).copy()
                 zdata = (<arraym>z).data
                  # Cast lhs to a double and rhs to a double*
-                xd = <double> x
+                xd = (<double>x)
                 ydata = (<arraym>y).data
                 # Add on the other array values
                 for i in range(N):
@@ -180,7 +180,7 @@ cdef class arraym(object):
                 z = (<arraym>y).copy()
                 zdata = (<arraym>z).data
                  # Cast lhs to a double and rhs to a double*
-                xd = <double> x
+                xd = (<double>x)
                 ydata = (<arraym>y).data
                 # Add on the other array values
                 for i in range(N):

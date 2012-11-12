@@ -49,6 +49,7 @@ pyx_list = [
             "PDSim/misc/_listmath.pyx",
             "PDSim/misc/polymath.pyx",
             "PDSim/misc/stl_utilities.pyx",
+            "PDSim/misc/datatypes.pyx",
             "PDSim/core/_core.pyx",
             "PDSim/core/_containers.pyx",
             "PDSim/recip/_recip.pyx",

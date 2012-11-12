@@ -151,7 +151,7 @@ class PDSimCore(object):
             self.T[:,i]=x[0:self.NCV]
             self.m[:,i]=x[self.NCV:2*self.NCV]
             self.xL[:,i]=x[2*self.NCV:3*self.NCV]
-        else: #(self.__hasLiquid__==False)
+        else: # self.__hasLiquid__==False
             for iS, s in enumerate(self.stateVariables):
                 x_=listm(x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)])
                 if s=='T':
@@ -211,6 +211,7 @@ class PDSimCore(object):
                     keys.append(Flow.key2)
             return keys
         
+        
         #Get all the nodes that can exist for tubes and CVs
         keys=collect_keys(self.Tubes,self.Flows)
         
@@ -246,7 +247,6 @@ class PDSimCore(object):
             self.FlowsProcessed.integrated_mdot[key]=trapz(self.FlowsProcessed.summed_mdot[key], 
                                                            self.t[0:self.Ntheta]/self.omega)*self.omega/(2*pi)
             self.FlowsProcessed.mean_mdot[key]=np.mean(self.FlowsProcessed.integrated_mdot[key])
-            
             
         # Special-case the tubes.  Only one of the nodes can have flow.  
         # The other one is invariant because it is quasi-steady.
@@ -793,6 +793,9 @@ class PDSimCore(object):
                     f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
                     xnew1=xold+h*(+1.0/4.0*f1)
                     
+                    #Store a copy of the flows for future use
+                    Flows_temporary = self.Flows.get_deepcopy()
+                    
                     f2=self.derivs(t0+1.0/4.0*h,xnew1,heat_transfer_callback,valves_callback)
                     xnew2=xold+h*(+3.0/32.0*f1+9.0/32.0*f2)
     
@@ -815,6 +818,9 @@ class PDSimCore(object):
                     # Step 1: derivatives evaluated at old values
                     f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
                     xnew1=xold+h*(+1.0/5.0*f1)
+                    
+                    #Store a copy of the flows for future use - faster than calling derivs again later on
+                    Flows_temporary = self.Flows.get_deepcopy()
                     
                     f2=self.derivs(t0+1.0/5.0*h,xnew1,heat_transfer_callback,valves_callback)
                     xnew2=xold+h*(+3.0/40.0*f1+9.0/40.0*f2)
@@ -858,13 +864,15 @@ class PDSimCore(object):
             #
             #Store crank angle at the current index (first run at Itheta=0)
             self.t[Itheta] = t0
+            
+            
             # Re-evaluate derivs at the starting value for the step in order 
             # to use the correct values in the storage containers
             self.derivs(t0, xold, heat_transfer_callback, valves_callback)
             # Store the values for volumes and state vars in the matrices
             self.__put_to_matrices(xold, Itheta)
             # Store the flows for the beginning of the step
-            self.FlowStorage.append(self.Flows.get_deepcopy())
+            self.FlowStorage.append(Flows_temporary)
             
             if Itheta >= 0.98*self.T.shape[1]:
                 debug_plots(self)
@@ -1430,19 +1438,19 @@ class PDSimCore(object):
             
             If ``None``, no heat transfer is used
                 
+        valves_callback: ``None`` or function
+        
         Returns
         -------
         dfdt : ``listm`` instance
         
         """
         
-        #Call the Cython method
-        #return self._derivs(theta,x,heat_transfer_callback)
-        
         #1. Calculate the volume and derivative of volume of each control volumes
         #    Return two lists, one for the volumes, second for the derivatives of volumes 
         V, dV=self.CVs.volumes(theta)
-
+        
+        #Set the state variables in each control volume
         if self.__hasLiquid__==True:
             raise NotImplementedError
         else:

@@ -2,6 +2,9 @@ from CoolProp.State cimport State as StateClass
 from PDSim.misc._listmath cimport listm
 from libcpp cimport bool
 
+from PDSim.misc.datatypes cimport arraym
+from PDSim.misc.datatypes import arraym
+
 cdef class _ControlVolume:
     cdef public StateClass State
     
@@ -17,3 +20,6 @@ cdef class _Tube(object):
     cdef public double Q_add,alpha,L,ID,OD,mdot
     cdef public bool exists
     
+    
+cdef class CVArrays(object):
+    cdef public arraym T,p,h,rho,V,dV,cp,cv,m,v

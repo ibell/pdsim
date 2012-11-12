@@ -14,6 +14,9 @@ import cython
 This is the module that contains all the flow models
 """
 
+TYPE_RADIAL = 1001
+TYPE_FLANK = 1002
+
 cdef double ar_0 = 25932.1070099
 cdef double ar_1 = 0.914825434095
 cdef double ar_2 = -177.588568125
@@ -529,7 +532,7 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, bytes 
         return Ma
      
 @cython.cdivision(True)
-cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State State_down, double delta, bytes Type, double t = -1.0, double ro = -1.0, bint full_output = False):
+cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State State_down, double delta, int Type, double t = -1.0, double ro = -1.0, bint full_output = False):
     """
     Frictionally-corrected nozzle model - the so-called hybrid leakage model
     
@@ -545,8 +548,8 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
         The State instance corresponding to the downstream side of the flow path
     delta : float
         Gap width in meters
-    Type : string
-        Valid options are 'radial' or 'flank'
+    Type : int
+        One of flow_models.TYPE_RADIAL or flow_models.TYPE_FLANK
     t : float
         Scroll wrap thickness in m
     ro : float
@@ -583,22 +586,23 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
     v = mdot/rho_up/A
     Re=rho_up*v*Dh/mu
 
-    if (Type == 'radial' and t<=0):
+    if (Type == <int>TYPE_RADIAL and t<=0):
         raise ValueError("Type 'radial' provided, but thickness of scroll [{0:g}] is not positive".format(t))
-    elif (Type == 'radial' and Re > 1e-12):
+    elif (Type == <int>TYPE_RADIAL and Re > 1e-12):
         Re_star=Re_star_radial
         xi=1.0/(1.0+exp(-0.01*(Re-Re_star)))
         Lstar=t/0.005
         delta_star=delta/10e-6
         mdot_ratio=ar_0*pow(Lstar,ar_1)/(ar_2*delta_star+ar_3)*(xi*(ar_4*pow(Re,ar_5)+ar_6)+(1-xi)*(ar_7*pow(Re,ar_8)+ar_9))+ar_10
-    elif (Type == 'flank' and ro <= 0):
+    elif (Type == <int>TYPE_FLANK and ro <= 0):
         raise ValueError("Type 'flank' provided, but orbiting radius of scroll [{0:g}] is not positive".format(ro))
-    elif (Type == 'flank' and Re > 1e-12):
+    elif (Type == <int>TYPE_FLANK and Re > 1e-12):
         Re_star=Re_star_flank
         xi=1.0/(1.0+exp(-0.01*(Re-Re_star)))
         Lstar=ro/0.005
         delta_star=delta/10e-6
         mdot_ratio=af_0*pow(Lstar,af_1)/(af_2*delta_star+af_3)*(xi*(af_4*pow(Re,af_5)+af_6)+(1-xi)*(af_7*pow(Re,af_8)+af_9))+af_10
+        #print Re,xi,mdot_ratio,af_4*pow(Re,af_5)+af_6,af_7*pow(Re,af_8)+af_9
     else:
         mdot_ratio=1.0
     mdot=mdot/mdot_ratio

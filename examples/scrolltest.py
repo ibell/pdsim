@@ -285,7 +285,7 @@ def Compressor(f = None):
                      lump_energy_balance_callback=ScrollComp.lump_energy_balance_callback,
                      solver_method='RK45',
                      UseNR = False, #Use Newton-Raphson ND solver to determine the initial state
-                     OneCycle = True,
+                     OneCycle = False,
                      plot_every_cycle= False
                      )
     except:
@@ -303,15 +303,15 @@ def Compressor(f = None):
         
         ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
-        
+    
     return ScrollComp
     
 if __name__=='__main__':
     
-    profile=True
+    profile=False
     if profile==True:
         import line_profiler as LP
-        profiler=LP.LineProfiler(Scroll.derivs)
+        profiler=LP.LineProfiler(Scroll.cycle_RK45)
         profiler.run("Compressor()")
         profiler.print_stats()
     else:

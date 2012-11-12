@@ -691,10 +691,10 @@ class Scroll(PDSimCore, _Scroll):
                 
                 #Re-calculate the CV
                 V,dV=self.CVs.volumes(t)
-                self.T[self.CVs.exists_indices,Itheta]=self.CVs.T
-                self.p[self.CVs.exists_indices,Itheta]=self.CVs.p
-                self.m[self.CVs.exists_indices,Itheta]=listm(self.CVs.rho)*V
-                self.rho[self.CVs.exists_indices,Itheta]=listm(self.CVs.rho)
+                self.T[self.CVs.exists_indices,Itheta] = self.CVs.T
+                self.p[self.CVs.exists_indices,Itheta] = self.CVs.p
+                self.m[self.CVs.exists_indices,Itheta] = listm(self.CVs.rho)*V
+                self.rho[self.CVs.exists_indices,Itheta] = listm(self.CVs.rho)
                 
             else:
                 raise NotImplementedError('no flooding yet')
@@ -1112,20 +1112,20 @@ class Scroll(PDSimCore, _Scroll):
 #        except ZeroDivisionError:
 #            return 0.0
 #            
-    def FlankLeakage(self,FlowPath):
-        """
-        Calculate the flank leakge flow rate
-        """
-        #Calculate the area
-        FlowPath.A=self.geo.h*self.geo.delta_flank
-        return flow_models.FrictionCorrectedIsentropicNozzle(
-                                 FlowPath.A,
-                                 FlowPath.State_up,
-                                 FlowPath.State_down,
-                                 self.geo.delta_flank,
-                                 Type = 'flank',
-                                 ro = self.geo.ro
-                                 )
+#    def FlankLeakage(self,FlowPath):
+#        """
+#        Calculate the flank leakge flow rate
+#        """
+#        #Calculate the area
+#        FlowPath.A=self.geo.h*self.geo.delta_flank
+#        return flow_models.FrictionCorrectedIsentropicNozzle(
+#                                 FlowPath.A,
+#                                 FlowPath.State_up,
+#                                 FlowPath.State_down,
+#                                 self.geo.delta_flank,
+#                                 Type = TYPE_FLANK,
+#                                 ro = self.geo.ro
+#                                 )
         
     def _get_injection_CVkey(self,phi,theta,inner_outer):
         """

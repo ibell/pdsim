@@ -40,8 +40,6 @@ class PlotNotebook(wx.Panel):
                 #Not matched, quit
                 if not matched:
                     raise ValueError("Could not match the name: '"+plot_name+'"')
-                    
-                
 
     def update(self,Simulation):
         """
@@ -66,27 +64,27 @@ class PlotNotebook(wx.Panel):
         sizer.Add(label1)
         self.plot_buttons=[('Stepsize',self.stepsize_theta),
                            ('Volume v. crank angle',self.V_theta),
-                      ('Derivative of Volume v. crank angle',self.dV_dtheta),
-                      ('Temperature v. crank angle',self.T_theta),
-                      ('Pressure v. crank angle',self.p_theta),
-                      ('Pressure v. volume',self.p_V),
-                      ('Density v. crank angle',self.rho_theta),
-                      ('Mass v. crank angle',self.m_theta),
-                      ('Mass flow v. crank angle',self.mdot_theta),
-                      ('Valve lift v. crank angle',self.valve_theta),
-                      ('Temperature-pressure',self.temperature_pressure),
-                      ('Heat transfer v. crank angle', self.heat_transfer),
-                      ('Axial force v. crank angle',self.axial_force),
-                      ('X-direction force v. crank angle',self.x_direction_force),
-                      ('Y-direction force v. crank angle',self.y_direction_force),
-                      ('Crank pin force magnitude v. crank angle',self.magnitude_force),
-                      ('Gas Torque v. crank angle',self.torque),
-                      ('Force trace', self.force_trace),
-                      ('Force component trace',self.force_component_trace),
-                      ('Radial force', self.radial_force),
-                      ('Tangential force', self.tangential_force)
-                      
-                      ]
+                          ('Derivative of Volume v. crank angle',self.dV_dtheta),
+                          ('Temperature v. crank angle',self.T_theta),
+                          ('Pressure v. crank angle',self.p_theta),
+                          ('Pressure v. volume',self.p_V),
+                          ('Density v. crank angle',self.rho_theta),
+                          ('Mass v. crank angle',self.m_theta),
+                          ('Mass flow v. crank angle',self.mdot_theta),
+                          ('Valve lift v. crank angle',self.valve_theta),
+                          ('Temperature-pressure',self.temperature_pressure),
+                          ('Heat transfer v. crank angle', self.heat_transfer),
+                          ('Axial force v. crank angle',self.axial_force),
+                          ('X-direction force v. crank angle',self.x_direction_force),
+                          ('Y-direction force v. crank angle',self.y_direction_force),
+                          ('Crank pin force magnitude v. crank angle',self.magnitude_force),
+                          ('Gas Torque v. crank angle',self.torque),
+                          ('Force trace', self.force_trace),
+                          ('Force component trace',self.force_component_trace),
+                          ('Radial force', self.radial_force),
+                          ('Tangential force', self.tangential_force)
+                          
+                          ]
         for value,callbackfcn in self.plot_buttons:
             btn = wx.Button(page,label=value)
             sizer.Add(btn)
@@ -96,10 +94,10 @@ class PlotNotebook(wx.Panel):
     
     def stepsize_theta(self,event=None):
         #Stepsize
-        axes = self.add('Volume').gca()
+        axes = self.add('Stepsize').gca()
         theta=self.Sim.t
         h = theta[1::]-theta[0:len(theta)-1]
-        axes.plot(theta,h)
+        axes.semilogy(theta[0:len(theta)-1],h)
         axes.set_ylabel('Stepsize [rad]')
         axes.set_xlabel(r'$\theta$ [rad]')
         
@@ -121,7 +119,7 @@ class PlotNotebook(wx.Panel):
         dV[np.abs(dV)<1e-15]=np.nan
         axes.plot(theta,dV)
         axes.set_ylabel('Volume Derivative [cm$^{3}$/rad]')
-        axes.set_xlabel(r'$\theta$ [rad]') 
+        axes.set_xlabel(r'$\theta$ [rad]')
     
     def T_theta(self,event=None):
         #Temperature
