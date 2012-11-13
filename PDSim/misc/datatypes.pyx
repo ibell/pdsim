@@ -11,6 +11,13 @@ from cpython cimport bool
 
 cimport cython
 
+cpdef many_arraym():
+    cdef long i     
+    a1 = arraym([0])
+    a = arraym(range(10))
+    for i in xrange(10**7):
+        a.extend(a1)
+        
 @cython.final
 cdef class arraym(object):
     def __init__(self, data = None):
@@ -57,12 +64,16 @@ cdef class arraym(object):
             #Allocate the memory for the array that will be used internally
             self.data = <double *> calloc(N, sizeof(double))
             self.N = N
+        else:
+            raise AttributeError('Trying to set size for an arraym that is already allocated')
             
     cdef void set_data(self, double *data, int N):
         if self.data is NULL:
             #Allocate the memory for the array that will be used internally
             self.data = <double *> calloc(N, sizeof(double))
             self.N = N
+        elif not self.N == N:
+            raise ValueError('Memory already allocated for arraym, but sizes of arraym ('+str(self.N)+') and data ('+str(N)+') do not match')
         memcpy(self.data,data,N*sizeof(double))
             
     def __dealloc__(self):
@@ -246,9 +257,17 @@ cdef class arraym(object):
         return arr
     
     cpdef extend(self, arraym array2):
+        cdef double* new_data
         cdef int N = array2.N + self.N
-        self.data = <double*>realloc(self.data, N*sizeof(double))        
-        memcpy(self.data+self.N, array2.data, array2.N*sizeof(double))
+        #Reallocate the array to extend its length
+        new_data = <double*>realloc(self.data, N*sizeof(double))
+        #Copy into the new array
+        memcpy(new_data+self.N, array2.data, array2.N*sizeof(double))
+        #Free the old array
+        free(self.data)
+        #Make self.data point to the newly allocated array
+        self.data = new_data
+        #Set the length
         self.N = N
         
     def __getslice__(self, Py_ssize_t i, Py_ssize_t j):
