@@ -1,10 +1,10 @@
-from PDSim.misc._listmath import listm
 import copy
 import collections
 from cPickle import dumps,loads
 from CoolProp.State import State
 
 from _containers import TubeCollection, CVArrays
+from PDSim.misc.datatypes import arraym
     
 class Tube(object):
     """
@@ -119,9 +119,6 @@ class ControlVolumeCollection(collections.OrderedDict):
     @property
     def exists_CV(self):
         return self._exists_CV
-            
-    def exists_arrays(self, theta, state_vars, x):
-        return CVArrays(self._exists_CV, theta, state_vars, x)
     
     @property
     def T(self):
@@ -201,7 +198,7 @@ class ControlVolumeCollection(collections.OrderedDict):
             
         Returns
         -------
-        A tuple of volumes and derivatives of volumes as listm instances
+        A tuple of volumes and derivatives of volumes as arraym instances
         
         """
             
@@ -211,7 +208,7 @@ class ControlVolumeCollection(collections.OrderedDict):
         V_dV=map(func,self.exists_CV)
         V,dV=zip(*V_dV)
         if not as_dict:
-            return listm(V),listm(dV)
+            return arraym(V),arraym(dV)
         else:
             V_dict = {key:_V for key,_V in zip(self.exists_keys,V)}
             dV_dict = {key:_dV for key,_dV in zip(self.exists_keys,dV)}

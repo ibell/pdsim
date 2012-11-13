@@ -66,8 +66,47 @@ cdef class CVArrays(object):
     all the control volumes that are passed into the instantiator
     """
     
-    @cython.cdivision(True)
-    def __init__(self, CVs, double theta, int state_vars, arraym x):
+    def __init__(self, int N):
+        self.array_list = ['T','p','h','rho','V','dV','cp','cv','m','v','dpdT_constV','Q','xL','dudxL']
+        self.build_all(N)
+        
+    cdef build_all(self, int N):
+        """
+        Allocate the arrays, each the length of the number of CV in existence
+        """
+        for array_name in self.array_list:
+            arr = arraym()
+            arr.set_size(N)
+            setattr(self,array_name,arr)
+        
+    cdef free_all(self):
+        """
+        Free all the arrays allocated
+        """
+        for array_name in self.array_list:
+            if hasattr(self,array_name):
+                delattr(self,array_name)
+        
+    cpdef update_size(self, int N):
+        self.free_all()
+        self.build_all(N)
+        
+    @cython.cdivision(True)    
+    cpdef properties_and_volumes(self, CVs, double theta, int state_vars, arraym x):
+        """
+        Calculate all the required thermodynamic properties as well as the volumes
+        for each control volume.
+        
+        Parameters
+        ----------
+        CVs : list of control volumes
+        theta : double
+            Crank angle [radians]
+        state_vars : int
+            Flag for the set of input variables - one of STATE_VARS_TM or STATE_VARS_TD
+        x : arraym
+            List of state variables corresponding to the state_vars flag
+        """
         cdef StateClass State
         cdef tuple V_dV
         cdef int N = len(CVs)
@@ -75,23 +114,10 @@ cdef class CVArrays(object):
         cdef arraym T,rho,m
         cdef arraym var1, var2 #Arrays to hold the state values for T,rho for instance
         
-        # Allocate the arrays, each the length of the number of CV in existence
-        self.T = arraym(); self.T.set_size(N)
-        self.p = arraym(); self.p.set_size(N)
-        self.h = arraym(); self.h.set_size(N)
-        self.rho = arraym(); self.rho.set_size(N)
-        self.cp = arraym(); self.cp.set_size(N)
-        self.cv = arraym(); self.cv.set_size(N)
-        self.V = arraym(); self.V.set_size(N)
-        self.dV = arraym(); self.dV.set_size(N)
-        self.m = arraym(); self.m.set_size(N)
-        self.v = arraym(); self.v.set_size(N)
-        self.dpdT_constV = arraym(); self.dpdT_constV.set_size(N)
-        
         # Split the state variable array into chunks
         T = x.slice(0,N)
         if state_vars == STATE_VARS_TM:
-            m = x.slice(N,2*N)
+            m = x.slice(N, 2*N)
         elif state_vars == STATE_VARS_TD:
             rho = x.slice(N, 2*N)
         
@@ -190,6 +216,18 @@ cdef class CVArrays(object):
             self.property_derivs.extend(self.dmdtheta)
         elif self.state_vars == STATE_VARS_TD:
             self.property_derivs.extend(self.drhodtheta)
+            
+    cpdef copy(self):
+        CVA = CVArrays(self.T.N)
+        #Loop over the names of the arrays
+        for array_name in self.array_list:
+            #Get the array from this class
+            arr = getattr(self,array_name)
+            #Put a copy of it into the new class
+            setattr(CVA,array_name,arr.copy())
+        
+        return CVA
+        
     
 cdef class _ControlVolume:
     pass

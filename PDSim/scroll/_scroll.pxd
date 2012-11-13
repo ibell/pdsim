@@ -1,9 +1,6 @@
 from PDSim.flow._flow import FlowPath
 from PDSim.flow._flow cimport FlowPath
 
-from PDSim.misc._listmath import listm
-from PDSim.misc._listmath cimport listm
-
 from PDSim.scroll import scroll_geo
 from PDSim.scroll cimport scroll_geo
 

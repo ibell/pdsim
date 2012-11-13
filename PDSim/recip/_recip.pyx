@@ -2,8 +2,8 @@
     
 from libc.math cimport cos, sin, sqrt, M_PI as pi
 
-from PDSim.misc._listmath import listm
-from PDSim.misc._listmath cimport listm
+from PDSim.misc.datatypes import arraym
+from PDSim.misc.datatypes cimport arraym
 
 from CoolProp.State import State
 from CoolProp.State cimport State
@@ -27,7 +27,7 @@ cdef class _Recip(object):
              (2*sqrt(self.connecting_rod_length**2 - self.crank_length**2*sin(theta)**2)))*self.A_piston
         return V, dV
     
-    cpdef listm heat_transfer_callback(self, double theta):
+    cpdef arraym heat_transfer_callback(self, double theta):
         cdef double T_w, V,dV,D_h,A_ht,Pr,rho,k,mu,T,u,Re,h_c,Q,cp
         cdef State S
         
@@ -49,6 +49,6 @@ cdef class _Recip(object):
         h_c = 0.053*(k/D_h)*Pr**(0.6)*Re**(0.8) #[kW/m2/K]
         Q = h_c*A_ht*(T_w-T)   #Net heat into control volume [kW]
         if self.CVs.N > 1:
-            return listm([Q,0])
+            return arraym([Q,0])
         else:
-            return listm([Q])
+            return arraym([Q])

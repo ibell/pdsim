@@ -17,6 +17,8 @@ cdef class arraym(object):
     cdef arraym slice(self, int i, int j)
     cpdef extend(self, arraym array2)
     
+cpdef arraym empty_arraym(int N)
+    
 cdef inline check_dims(arraym x, arraym y):
     if x.N != y.N:
         raise ValueError('Cannot apply unary operator to arraym instances with lengths of '+str(x.N)+' and '+str(y.N))

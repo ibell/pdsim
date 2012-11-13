@@ -4,7 +4,7 @@ from scipy.integrate import simps
 from PDSim.misc.scipylike import trapz
 from PDSim.flow import flow_models
 from PDSim.core.core import PDSimCore
-from PDSim.misc._listmath import listm
+from PDSim.misc.datatypes import arraym
 from _recip import _Recip
 
 class Recip(PDSimCore,_Recip):

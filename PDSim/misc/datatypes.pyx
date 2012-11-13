@@ -46,13 +46,13 @@ cdef class arraym(object):
                 npdata = data
                 for i in range(self.N):
                     self.data[i] = npdata[i]
-            #If it is an array.array, use the buffer interface
-            #elif isinstance(data, array.array):
-            #    vdata = data
-            #    self.data[:] = vdata
-            elif isinstance(data, list):
-                for i,el in enumerate(data):
-                    self.data[i] = el
+            else:
+                #Now it must either be an iterable or a failure
+                try:
+                    for i,el in enumerate(data):
+                        self.data[i] = el
+                except TypeError:
+                    raise TypeError("Sorry but you provided a type to arraym that doesn't work.  Good types are arraym, numpy arrays, or any iterable.")
         else:
             self.data = NULL
             
@@ -60,6 +60,11 @@ cdef class arraym(object):
         """
         Set the size of the internal array, initialized to zeros
         """
+        #If a zero or negative length passed in, don't allocate memory, but set length flag 
+        if N <= 0:
+            self.N = 0
+            return
+        
         if self.data is NULL:
             #Allocate the memory for the array that will be used internally
             self.data = <double *> calloc(N, sizeof(double))
@@ -106,11 +111,22 @@ cdef class arraym(object):
             N = (<arraym>x).N
             z = (<arraym>x).copy()
             zdata = (<arraym>z).data
-            # Cast to a double
-            yd = (<double>y)
-            # Add on the other array values
-            for i in range(N):
-                zdata[i] += yd
+            
+            try:
+                #Try to make an iterator out of y
+                iterator = iter(y)
+            except TypeError:
+                # not iterable - int, float, etc.
+                
+                # Cast y to a double
+                yd = (<double>y)
+                # Add on the other array values
+                for i in range(N):
+                    zdata[i] += yd
+            else:
+                # iterable - list, tuple, numpy array, etc.
+                for i in range(N):
+                    zdata[i] += y[i]
         
         return z
     
@@ -138,11 +154,23 @@ cdef class arraym(object):
             N = (<arraym>x).N
             z = (<arraym>x).copy()
             zdata = (<arraym>z).data
-            # Cast to a double
-            yd = (<double>y)
-            # Add on the other array values
-            for i in range(N):
-                zdata[i] *= yd
+            
+            try:
+                #Try to make an iterator out of y
+                iterator = iter(y)
+            except TypeError:
+                # not iterable - int, float, etc.
+                
+                # Cast to a double
+                yd = (<double>y)
+                # Multiply by the other value
+                for i in range(N):
+                    zdata[i] *= yd
+            else:
+                # iterable - list, tuple, numpy array, etc.
+                #No type introspection possible
+                for i in range(N):
+                    zdata[i] *= y[i]
             
         return z
     
@@ -156,6 +184,7 @@ cdef class arraym(object):
         isarray_x = isinstance(x, arraym)
         isarray_y = isinstance(y, arraym)
 
+        #Both x and y are arraym instances
         if isarray_x & isarray_y:
             check_dims(x, y)
             N = (<arraym>x).N
@@ -165,27 +194,39 @@ cdef class arraym(object):
             # Add on the other array values
             for i in range(N):
                 zdata[i] /= ydata[i]
+                
+        #One of x and y is an arraym
         elif isarray_x != isarray_y:
             if isarray_y:
                 N = (<arraym>y).N
                 z = (<arraym>y).copy()
                 zdata = (<arraym>z).data
-                 # Cast lhs to a double and rhs to a double*
-                xd = (<double>x)
-                ydata = (<arraym>y).data
-                # Add on the other array values
-                for i in range(N):
-                    zdata[i] = xd/ydata[i]
+                if isinstance(x,(int,float)):
+                    # Cast lhs to a double and rhs to a double*
+                    xd = (<double>x)
+                    ydata = (<arraym>y).data
+                    # Add on the other array values
+                    for i in range(N):
+                        zdata[i] = xd/ydata[i]
+                else:
+                    #Hopefully it is an iterable
+                    for i in range(len(x)):
+                        z[i] = x[i]/y[i]                    
             else:
                 N = (<arraym>x).N
                 z = (<arraym>x).copy()
                 zdata = (<arraym>z).data
-                 # Cast rhs to a double
-                yd = <double> y
-                # Add on the other array values
-                for i in range(N):
-                    zdata[i] /= yd
-            
+                if isinstance(y,(int,float)):
+                    # Cast rhs to a double
+                    yd = <double> y
+                    # Add on the other array values
+                    for i in range(N):
+                        zdata[i] /= yd
+                else:
+                    #Hopefully it is an iterable
+                    for i in range(len(x)):
+                        z[i] = x[i]/y[i]
+                    
         return z
     
     def __sub__(x, y):
@@ -207,26 +248,38 @@ cdef class arraym(object):
             # Add on the other array values
             for i in range(N):
                 zdata[i] -= ydata[i]
+                
+        #One of x and y is an arraym
         elif isarray_x != isarray_y:
             if isarray_y:
                 N = (<arraym>y).N
                 z = (<arraym>y).copy()
                 zdata = (<arraym>z).data
-                 # Cast lhs to a double and rhs to a double*
-                xd = (<double>x)
-                ydata = (<arraym>y).data
-                # Add on the other array values
-                for i in range(N):
-                    zdata[i] = xd - ydata[i]
+                if isinstance(x,(int,float)):
+                    # Cast lhs to a double and rhs to a double*
+                    xd = (<double>x)
+                    ydata = (<arraym>y).data
+                    # Add on the other array values
+                    for i in range(N):
+                        zdata[i] = xd - ydata[i]
+                else:
+                    #Hopefully it is an iterable
+                    for i in range(len(x)):
+                        z[i] = x[i] - y[i]                    
             else:
                 N = (<arraym>x).N
                 z = (<arraym>x).copy()
                 zdata = (<arraym>z).data
-                 # Cast rhs to a double
-                yd = <double> y
-                # Add on the other array values
-                for i in range(N):
-                    zdata[i] -= yd
+                if isinstance(y,(int,float)):
+                    # Cast rhs to a double
+                    yd = <double> y
+                    # Add on the other array values
+                    for i in range(N):
+                        zdata[i] -= yd
+                else:
+                    #Hopefully it is an iterable
+                    for i in range(len(x)):
+                        z[i] = x[i] - y[i]
             
         return z
         
@@ -250,7 +303,7 @@ cdef class arraym(object):
         if j == i:
             raise IndexError('Length of slice must be greater than 1')
         if j > self.N:
-            raise IndexError('End of slice out of bounds. Length of arraym is '+str(self.N))
+            raise IndexError('End of slice out of bounds. Length of arraym is '+str(self.N)+' requested end is '+str(j))
         
         arr.set_size(j-i)
         memcpy(arr.data,self.data+i,(j-i)*sizeof(double))
@@ -259,16 +312,19 @@ cdef class arraym(object):
     cpdef extend(self, arraym array2):
         cdef double* new_data
         cdef int N = array2.N + self.N
-        #Reallocate the array to extend its length
-        new_data = <double*>realloc(self.data, N*sizeof(double))
-        #Copy into the new array
-        memcpy(new_data+self.N, array2.data, array2.N*sizeof(double))
-        #Free the old array
-        free(self.data)
-        #Make self.data point to the newly allocated array
-        self.data = new_data
-        #Set the length
-        self.N = N
+        
+        #Only extend if there is something in the extension array
+        if N > self.N:
+            #Reallocate the array to extend its length
+            new_data = <double*>realloc(self.data, N*sizeof(double))
+            #Copy into the new array
+            memcpy(new_data+self.N, array2.data, array2.N*sizeof(double))
+            #Free the old array
+            free(self.data)
+            #Make self.data point to the newly allocated array
+            self.data = new_data
+            #Set the length
+            self.N = N
         
     def __getslice__(self, Py_ssize_t i, Py_ssize_t j):
         return self.slice(i,j)
@@ -282,3 +338,118 @@ cdef class arraym(object):
         
     def __len__(self):
         return self.N
+
+cpdef arraym empty_arraym(int N):
+    """
+    A convenience function to return an arraym with the given size initialized to zero
+    
+    Parameters
+    ----------
+    N: int
+        Size of the arraym to return initialized to zero
+    """
+    cdef arraym arr = arraym()
+    arr.set_size(N)
+    return arr
+
+
+
+
+
+###############################################################################
+###############################################################################
+##          LISTM - Enhanced list with element-wise operators                ##
+###############################################################################
+###############################################################################
+
+
+cdef class listm(list):
+    """
+    See http://docs.cython.org/src/userguide/special_methods.html
+    """
+    def __add__(self,y):
+        cdef int i,N
+        cdef bool isarray_x,isarray_y
+        
+        isarray_x = isinstance(self,listm)
+        isarray_y = isinstance(y,listm)
+        
+        if isinstance(self,listm):
+            N=len(self)
+            if isinstance(y,int) or isinstance(y,float):
+                return listm([self[i]*y for i in range(N)])
+            else:
+                return listm([self[i]*y[i] for i in range(N)])
+        else:
+            ### it is backwards, self is something else, y is a listm
+            N=len(y)
+            if isinstance(self,(int,float)) and not isinstance(y,(int,float)):
+                self,y = y,self
+                return listm([y[i]+self for i in range(N)])
+            else: 
+                return listm([self[i]+y[i] for i in range(N)])
+                
+    def __mul__(self,y):
+        cdef int i,N
+        
+        if isinstance(self,listm):
+            N=len(self)
+            if isinstance(y,int) or isinstance(y,float):
+                return listm([self[i]*y for i in range(N)])
+            else:
+                return listm([self[i]*y[i] for i in range(N)])
+        else:
+            ### it is backwards, self is something else, y is a listm
+            N=len(y)
+            if isinstance(self,int) or isinstance(self,float):
+                return listm([y[i]*self for i in range(N)])
+            else:
+                return listm([self[i]*y[i] for i in range(N)])
+                
+    def __truediv__(self,y):
+        cdef int i,N
+        
+        if isinstance(self,listm):
+            N=len(self)
+            if isinstance(y,int) or isinstance(y,float):
+                return listm([self[i]/y for i in range(N)])
+            else:
+                return listm([self[i]/y[i] for i in range(N)])
+        else:
+            ### it is backwards, self is something else, y is a listm
+            N=len(y)
+            if isinstance(self,int) or isinstance(self,float):
+                return listm([self/y[i] for i in range(N)])
+            else:
+                return listm([self[i]/y[i] for i in range(N)])
+    
+    def __sub__(self,y):
+        cdef int i,N
+        
+        if isinstance(self,listm):
+            N=len(self)
+            if isinstance(y,int) or isinstance(y,float):
+                return listm([self[i]-y for i in range(N)])
+            else:
+                return listm([self[i]-y[i] for i in range(N)])
+        else:
+            ### it is backwards, self is something else, y is a listm
+            N=len(y)
+            if isinstance(self,int) or isinstance(self,float):
+                return listm([self-y[i] for i in range(N)])
+            else:
+                return listm([self[i]-y[i] for i in range(N)])
+    
+    def __reduce__(self):
+        d={}
+        d['data']=list(self)
+        return rebuildListm,(d,)
+    
+    def copy(self):
+        """
+        Return a copy of the listm instance
+        """
+        return listm(self[:])
+          
+def rebuildListm(d):
+    return listm(d['data'])

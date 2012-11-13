@@ -1,9 +1,9 @@
 from __future__ import division
 ##--- package imports
+from PDSim.misc.datatypes import arraym
 from PDSim.core.containers import ControlVolume
 from PDSim.flow.flow import FlowPath
 from PDSim.core.core import PDSimCore
-from PDSim.misc._listmath import listm
 from PDSim.flow import flow_models
 from PDSim.plot.plots import debug_plots
 from PDSim.core.bearings import journal_bearing
@@ -548,10 +548,10 @@ class Scroll(PDSimCore, _Scroll):
         dT_dphi = (Tsuction - Tdischarge) / (self.geo.phi_ie - self.geo.phi_os)
         phim = 0.5*self.geo.phi_ie + 0.5*self.geo.phi_os
         
-        Q = listm([])
+        Q = []
         for key in self.CVs.exists_keys:
             Q.append(self.calcHT(theta,key,HTC_tune,dT_dphi,phim))
-        return Q
+        return arraym(Q)
         
     def step_callback(self,t,h,Itheta,**kwargs):
         """
@@ -624,8 +624,8 @@ class Scroll(PDSimCore, _Scroll):
             #Update the matrices using the new CV definitions
             self.T[self.CVs.exists_indices,Itheta]=self.CVs.T
             self.p[self.CVs.exists_indices,Itheta]=self.CVs.p
-            self.m[self.CVs.exists_indices,Itheta]=listm(self.CVs.rho)*V
-            self.rho[self.CVs.exists_indices,Itheta]=listm(self.CVs.rho)
+            self.m[self.CVs.exists_indices,Itheta]=arraym(self.CVs.rho)*V
+            self.rho[self.CVs.exists_indices,Itheta]=arraym(self.CVs.rho)
             
             # Adaptive makes steps of h/4 3h/8 12h/13 and h/2 and h
             # Make sure step does not hit any *right* at theta_d
@@ -691,8 +691,8 @@ class Scroll(PDSimCore, _Scroll):
                 V,dV=self.CVs.volumes(t)
                 self.T[self.CVs.exists_indices,Itheta] = self.CVs.T
                 self.p[self.CVs.exists_indices,Itheta] = self.CVs.p
-                self.m[self.CVs.exists_indices,Itheta] = listm(self.CVs.rho)*V
-                self.rho[self.CVs.exists_indices,Itheta] = listm(self.CVs.rho)
+                self.m[self.CVs.exists_indices,Itheta] = arraym(self.CVs.rho)*V
+                self.rho[self.CVs.exists_indices,Itheta] = arraym(self.CVs.rho)
                 
             else:
                 raise NotImplementedError('no flooding yet')

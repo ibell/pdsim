@@ -3,16 +3,12 @@
 import copy
 import cPickle
 from flow_models import PyFlowFunctionWrapper
-from PDSim.misc._listmath import listm
 
 from CoolProp.State import State as StateClass
 from CoolProp.State cimport State as StateClass
 
 from PDSim.core._containers import TubeCollection
 from PDSim.core._containers cimport TubeCollection
-
-
-
 
 from libc.stdlib cimport malloc, free, calloc
 

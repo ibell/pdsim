@@ -1,35 +1,35 @@
-##-- Non-package imports  --
-from __future__ import division
 
-import numpy as np
+from __future__ import division
+import gc
 from math import pi
 import textwrap
-
-from scipy.integrate import trapz, simps
-from scipy.optimize import newton
 import copy
-import pylab
 from time import clock
 from cPickle import loads, dumps
 
-## matplotlib imports
-import matplotlib.pyplot as plt
-
-##   Coolprop imports
-from CoolProp.CoolProp import Props
-from CoolProp.State import State
-
 ##--  Package imports  --
-from PDSim.flow._sumterms import setcol, getcol
 from PDSim.flow import _flow,flow_models
-from PDSim.core._containers import STATE_VARS_TM
+from PDSim.core._containers import STATE_VARS_TM, CVArrays
 from PDSim.flow.flow import FlowPathCollection, FlowPath
 from containers import ControlVolumeCollection,Tube,TubeCollection
 from PDSim.plot.plots import debug_plots
-from PDSim.misc._listmath import listm 
 from PDSim.misc.solvers import Broyden,MultiDimNewtRaph
-from PDSim.misc.datatypes import arraym
-from _core import delimit_vector
+from PDSim.misc.datatypes import arraym, empty_arraym
+from _core import delimit_vector, setcol, getcol
+
+##-- Non-package imports  --
+import numpy as np
+
+from scipy.integrate import trapz, simps
+from scipy.optimize import newton
+
+## matplotlib imports
+import matplotlib.pyplot as plt
+import pylab
+
+## Coolprop imports
+from CoolProp.CoolProp import Props
+from CoolProp.State import State
 
 def _pickle_method(method):
     func_name = method.im_func.__name__
@@ -115,24 +115,22 @@ class PDSimCore(object):
             exists_indices = self.CVs.exists_indices
             for s in self.stateVariables:
                 if s=='T':
-                    #VarList+=list(self.T[exists_indices,i])
                     VarList+=getcol(self.T,i,exists_indices)
                 elif s=='D':
-                    #VarList+=list(self.rho[exists_indices,i])
                     VarList+=getcol(self.rho,i,exists_indices)
                 elif s=='M':
-                    #VarList+=list(self.rho[exists_indices,i]*self.V_)
                     VarList+=getcol(self.m,i,exists_indices)
                 else:
                     raise KeyError
             if self.__hasValves__:
                 VarList+=list(self.xValves[:,i])
-            return listm(VarList)
+                
+            return arraym(VarList)
         
     def __statevars_to_dict(self,x):
         d={}
         for iS,s in enumerate(self.stateVariables):
-            x_=listm(x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)])
+            x_=(x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)])
             if s=='T':
                 d['T']=x_
             elif s=='D':
@@ -155,7 +153,7 @@ class PDSimCore(object):
             self.xL[:,i]=x[2*self.NCV:3*self.NCV]
         else: # self.__hasLiquid__==False
             for iS, s in enumerate(self.stateVariables):
-                x_=listm(x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)])
+                x_=arraym(x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)])
                 if s=='T':
                     setcol(self.T, i, exists_indices, x_)
                 elif s=='D':
@@ -166,18 +164,21 @@ class PDSimCore(object):
             if self.__hasValves__:
                 setcol(self.xValves, i, 
                        range(len(self.Valves)*2), 
-                       listm(x[Ns*Nexist::])
+                       arraym(x[Ns*Nexist::])
                        )
-        if hasattr(self,'rho_') and len(self.rho_) == len(exists_indices):
-            setcol(self.rho, i, exists_indices, self.rho_)
-            setcol(self.m, i, exists_indices, self.rho_*self.V_)
-            setcol(self.V, i, exists_indices, self.V_)
-            setcol(self.dV, i, exists_indices, self.dV_)
-            setcol(self.p, i, exists_indices, self.p_)
-        if hasattr(self,'h_') and len(self.h_) == len(exists_indices):
-            setcol(self.h, i, exists_indices, self.h_)
-        if hasattr(self,'Q_') and len(self.Q_) == len(exists_indices):       
-            setcol(self.Q, i, exists_indices, self.Q_)
+            
+            # In the first iteration, self.core has not been filled, so do not 
+            # overwrite with the values in self.core.m and self.core.rho
+            if self.core.m[0] > 0.0 :
+                setcol(self.m, i, exists_indices, self.core.m)
+            if self.core.rho[0] > 0.0 :
+                setcol(self.rho, i, exists_indices, self.core.rho)
+            
+            setcol(self.V, i, exists_indices, self.core.V)
+            setcol(self.dV, i, exists_indices, self.core.dV)
+            setcol(self.p, i, exists_indices, self.core.p)
+            setcol(self.h, i, exists_indices, self.core.h)    
+            setcol(self.Q, i, exists_indices, self.core.Q)
     
     def __postprocess_flows(self):
         """
@@ -329,9 +330,9 @@ class PDSimCore(object):
         self.update_existence()
         
         self.x_state = self.xstate_init
-        x = listm(self.xstate_init)
+        x = self.xstate_init.copy()
         if self.__hasValves__:
-            x.extend([0.0]*len(self.Valves)*2)
+            x.extend(empty_arraym(len(self.Valves)*2))
         self.__put_to_matrices(x, 0)
         #Reset the temporary variables
         self.xstate_init = None
@@ -354,6 +355,9 @@ class PDSimCore(object):
         
         # Update the existence of each of the flows
         self.Flows.update_existence(self)
+        
+        # Update the internal arrays for the  
+        self.core.update_size(self.CVs.Nexist)
         
     def add_flow(self,FlowPath):
         """
@@ -425,7 +429,10 @@ class PDSimCore(object):
         self.xL=self.T.copy()
         self.xValves=np.zeros((2*len(self.Valves),N))
         
-        self.update_existence()
+        #Initialize the core class that contains the arrays and the derivs
+        self.core = CVArrays(0)
+        
+        self.update_existence()        
         
         #Initialize the control volumes
         self.__hasLiquid__=False
@@ -440,21 +447,7 @@ class PDSimCore(object):
     def pre_cycle(self, x0 = None):
         """
         This runs before the cycle is run but after pre_run has been called
-        """
-        self.temp_vectors_list=[]
-        def add_thing(name,item):
-            #Actually create the array
-            setattr(self,name,item)
-            #Add the name of the vector to the list (for easy removal)
-            self.temp_vectors_list.append(name)
-            
-        #Build temporary arrays to avoid constantly creating numpy arrays
-        add_thing('T_',listm([0.0]*self.CVs.Nexist))
-        add_thing('p_',listm([0.0]*self.CVs.Nexist))
-        add_thing('V_',listm([0.0]*self.CVs.Nexist))
-        add_thing('dV_',listm([0.0]*self.CVs.Nexist))
-        add_thing('rho_',listm([0.0]*self.CVs.Nexist))
-        add_thing('Q_',listm([0.0]*self.CVs.Nexist))
+        """        
         
         self.t.fill(np.nan)
         self.T.fill(np.nan)
@@ -470,7 +463,9 @@ class PDSimCore(object):
         
         #Get the volumes at theta=0
         #Note: needs to occur in this function because V needed to calculate mass a few lines below
-        V,dV=self.CVs.volumes(0)
+        VdV=[CV.V_dV(0.0,**CV.V_dV_kwargs) for CV in self.CVs.exists_CV]
+        V,dV = zip(*VdV)
+        
         self.t[0]=0
         
         # if x0 is provided, use its values to initialize the chamber states
@@ -480,7 +475,8 @@ class PDSimCore(object):
             self.T[self.CVs.exists_indices, 0] = self.CVs.T
             self.p[self.CVs.exists_indices, 0] = self.CVs.p
             self.rho[self.CVs.exists_indices, 0] = self.CVs.rho
-            self.m[self.CVs.exists_indices, 0] = self.CVs.rho*V
+            self.m[self.CVs.exists_indices, 0] = self.CVs.rho*arraym(V)
+
         else:
             x0_ = copy.copy(x0)
             #x0 is provided
@@ -504,7 +500,7 @@ class PDSimCore(object):
         ----------
         N : integer
             Number of steps taken.  There will be N+1 entries in the state matrices
-        x_state : listm
+        x_state : 
             The initial values of the variables (only the state variables)
         tmin : float, optional
             Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
@@ -520,9 +516,9 @@ class PDSimCore(object):
         heat_transfer_callback : function, optional
             If provided, the heat_transfer_callback function should have a format like::
             
-                Q_listm=heat_transfer_callback(t)
+                Q_=heat_transfer_callback(t)
             
-            It should return a ``listm`` instance with the same length as the number of CV in existence.  The entry in the ``listm`` is positive if the heat transfer is TO the fluid in the CV in order to maintain the sign convention that energy (or mass) input is positive.  Will raise an error otherwise
+            It should return a ```` instance with the same length as the number of CV in existence.  The entry in the ```` is positive if the heat transfer is TO the fluid in the CV in order to maintain the sign convention that energy (or mass) input is positive.  Will raise an error otherwise
         
         """
         #Do some initialization - create arrays, etc.
@@ -534,7 +530,7 @@ class PDSimCore(object):
         
         #Get the beginning of the cycle configured
         x_state.extend([0.0]*len(self.Valves)*2)
-        xold = listm(x_state[:])
+        xold = (x_state[:])
         self.__put_to_matrices(xold, 0)
         
         for Itheta in range(N):
@@ -598,7 +594,7 @@ class PDSimCore(object):
         ----------
         N : integer
             Number of steps to take (N+1 entries in the state vars matrices)
-        x_state : listm
+        x_state : 
             The initial values of the variables (only the state variables)
         tmin : float
             Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
@@ -614,9 +610,9 @@ class PDSimCore(object):
         heat_transfer_callback : function, optional
             If provided, the heat_transfer_callback function should have a format like::
             
-                Q_listm=heat_transfer_callback(t)
+                Q_=heat_transfer_callback(t)
             
-            It should return a ``listm`` instance with the same length as the number of CV in existence.  The entry in the ``listm`` is positive if the heat transfer is TO the fluid in the CV in order to maintain the sign convention that energy (or mass) input is positive.  Will raise an error otherwise
+            It should return a ```` instance with the same length as the number of CV in existence.  The entry in the ```` is positive if the heat transfer is TO the fluid in the CV in order to maintain the sign convention that energy (or mass) input is positive.  Will raise an error otherwise
         
         """
         #Do some initialization - create arrays, etc.
@@ -629,7 +625,7 @@ class PDSimCore(object):
         
         #Get the beginning of the cycle configured
         x_state.extend([0.0]*len(self.Valves)*2)
-        xold = listm(x_state[:])
+        xold = (x_state[:])
         self.__put_to_matrices(xold, 0)
     
         for Itheta in range(N):
@@ -692,7 +688,7 @@ class PDSimCore(object):
         
         Parameters
         ----------
-        x_state : listm
+        x_state : 
             The initial values of the variables (only the state variables)
         hmin : float
             Minimum step size, something like 1e-5 usually is good.  Don't make this too big or you may not be able to get a stable solution
@@ -717,9 +713,9 @@ class PDSimCore(object):
         heat_transfer_callback : function, optional
             If provided, the heat_transfer_callback function should have a format like::
             
-                Q_listm=heat_transfer_callback(t)
+                Q_=heat_transfer_callback(t)
             
-            It should return a ``listm`` instance with the same length as the number of CV in existence.  The entry in the ``listm`` is positive if the heat transfer is TO the fluid in the CV in order to maintain the sign convention that energy (or mass) input is positive.  Will raise an error otherwise
+            It should return a ``arraym`` instance with the same length as the number of CV in existence.  The entry in the ``arraym`` is positive if the heat transfer is TO the fluid in the CV in order to maintain the sign convention that energy (or mass) input is positive.  Will raise an error otherwise
         
         Notes
         -----
@@ -764,9 +760,13 @@ class PDSimCore(object):
         gamma5=-9.0/50.0
         gamma6=2.0/55.0
         
-        #Get the beginning of the cycle configured
-        x_state.extend([0.0]*len(self.Valves)*2)
-        xold = listm(x_state[:])
+        # Get the beginning of the cycle configured
+        #
+        # Add on the valve values to the arraym instance
+        x_state.extend(empty_arraym(len(self.Valves)*2))
+        # Make a copy
+        xold = x_state.copy()
+        # Put the values into the matrices
         self.__put_to_matrices(xold, 0)
         
         #t is the independent variable here, where t takes on values in the bounded range [tmin,tmax]
@@ -811,8 +811,9 @@ class PDSimCore(object):
                     f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
                     xnew1=xold+h*(+1.0/4.0*f1)
                     
-                    #Store a copy of the flows for future use
+                    #Store a copy of the flows for future use as well as a buffered set of state variables
                     Flows_temporary = self.Flows.get_deepcopy()
+                    core_temporary = self.core.copy()
                     
                     f2=self.derivs(t0+1.0/4.0*h,xnew1,heat_transfer_callback,valves_callback)
                     xnew2=xold+h*(+3.0/32.0*f1+9.0/32.0*f2)
@@ -837,8 +838,9 @@ class PDSimCore(object):
                     f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
                     xnew1=xold+h*(+1.0/5.0*f1)
                     
-                    #Store a copy of the flows for future use - faster than calling derivs again later on
+                    #Store a copy of the flows for future use as well as a buffered set of state variables
                     Flows_temporary = self.Flows.get_deepcopy()
+                    core_temporary = self.core.copy()
                     
                     f2=self.derivs(t0+1.0/5.0*h,xnew1,heat_transfer_callback,valves_callback)
                     xnew2=xold+h*(+3.0/40.0*f1+9.0/40.0*f2)
@@ -883,11 +885,14 @@ class PDSimCore(object):
             #Store crank angle at the current index (first run at Itheta=0)
             self.t[Itheta] = t0
             
+#            # Re-evaluate derivs at the starting value for the step in order 
+#            # to use the correct values in the storage containers
+            self.core = core_temporary.copy()
+#            self.derivs(t0, xold, heat_transfer_callback, valves_callback)
+            del core_temporary
             
-            # Re-evaluate derivs at the starting value for the step in order 
-            # to use the correct values in the storage containers
-            self.derivs(t0, xold, heat_transfer_callback, valves_callback)
             # Store the values for volumes and state vars in the matrices
+            # In the first step this will over-write the values in the matrices 
             self.__put_to_matrices(xold, Itheta)
             # Store the flows for the beginning of the step
             self.FlowStorage.append(Flows_temporary)
@@ -956,8 +961,6 @@ class PDSimCore(object):
         """
         This stuff all happens at the end of the cycle.  It is a private method not meant to be called externally
         """
-        for name in self.temp_vectors_list:
-            delattr(self,name)
             
         self.__calc_boundary_work()
             
@@ -1128,7 +1131,7 @@ class PDSimCore(object):
             Use a range of ``(1-alpha)*dx, (1+alpha)*dx`` for line search if needed
         plot_every_cycle : boolean
             If ``True``, make the plots after every cycle (primarily for debug purposes)
-        x0 : list
+        x0 : arraym
             The starting values for the solver that modifies the discharge temperature and lump temperatures
         reset_initial_state : boolean
             If ``True``, use the stored initial state from the previous call to ``solve``
@@ -1183,14 +1186,14 @@ class PDSimCore(object):
             self.pre_cycle()
             #x_state only includes the values for the chambers, the valves start closed
             #Since indexed, yields a copy
-            self.x_state = self.__get_from_matrices(0)[0:len(self.stateVariables)*self.CVs.N]
+            self.x_state = self.__get_from_matrices(0)[0:len(self.stateVariables)*self.CVs.Nexist]
         
         if x0 is None:
             x0 = [self.Tubes.Nodes[key_outlet].T, self.Tubes.Nodes[key_outlet].T]
                 
         def OBJECTIVE_ENERGY_BALANCE(Td_Tlumps):
             print Td_Tlumps,'Td,Tlumps inputs'
-            # Td_Tlumps is a list (or listm or np.ndarray)
+            # Td_Tlumps is a list (or  or np.ndarray)
             Td_Tlumps = list(Td_Tlumps)
             # Consume the first element as the discharge temp 
             self.Td = float(Td_Tlumps.pop(0))
@@ -1202,6 +1205,10 @@ class PDSimCore(object):
             self.Tubes.Nodes[key_outlet].update({'T':self.Td,'P':p})
             
             def OBJECTIVE_CYCLE(x_state):
+                """
+                x_state: arraym instance
+                    Contains the state variables for all the control volumes in existence, as well as the valve values
+                """
                 
                 # (1). First, run all the tubes
                 for tube in self.Tubes:
@@ -1216,8 +1223,6 @@ class PDSimCore(object):
                     self.xstate_init = x_state
                     self.exists_CV_init = self.CVs.exists_keys
                     
-                #Convert numpy array to listm
-                x_state = listm(x_state)
                 try:
                     t1 = clock()
                     if solver_method == 'Euler':
@@ -1293,10 +1298,11 @@ class PDSimCore(object):
                 if endcycle_callback is None:
                     return None #Stop
                 else:
-                    #endcycle_callback returns the errors and new initial st
-                    errors, x_state_ = endcycle_callback()
-                    self.x_state = x_state_[:] #Make a copy
+                    #endcycle_callback returns the errors and new initial state for the solver
+                    errors, x_state_new = endcycle_callback()
+                    self.x_state = x_state_new.copy() #Make a copy
                     return errors
+                
             
             ##################################
             ## End OBJECTIVE_CYCLE function ##
@@ -1321,13 +1327,13 @@ class PDSimCore(object):
                     # (when old state is not defined)
                     # This means taking a full step
                     if x_state_prior is None or init_state_counter < LS_start:
-                        x_state_prior = listm(self.x_state).copy()
+                        x_state_prior = self.x_state.copy()
                         errors = OBJECTIVE_CYCLE(x_state_prior)
                         if errors is None:
                             break
                         else:
                             errors *= 100
-                            x_state_new = listm(self.x_state).copy()
+                            x_state_new = self.x_state.copy()
                             RSSE_prior = np.sqrt(np.sum(np.power(errors, 2)))
                     try:  
                         
@@ -1393,13 +1399,17 @@ class PDSimCore(object):
             # (3) After convergence of the inner loop, check the energy balance on the lumps
             if lump_energy_balance_callback is not None:
                 resid_HT = lump_energy_balance_callback()
-                if not isinstance(resid_HT,list) and not isinstance(resid_HT,listm):
-                    resid_HT = [resid_HT]
+                if not isinstance(resid_HT,arraym):
+                    resid_HT = arraym(resid_HT)
                 
-            print [self.resid_Td]+resid_HT,'resids'
-            return [self.resid_Td]+resid_HT
+            resids = [self.resid_Td]
+            resids.extend(resid_HT) #Need to extend because resid_HT is an arraym
+            print resids,'resids'
+            return resids
         
-        #end of OJECTIVE
+        ##################################
+        ## End OBJECTIVE_ENERGY_BALANCE ##
+        ##################################
         
         x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,x0, dx=1.0, ytol=0.01, itermax=30)
         print 'Solution is', x_soln,'Td, Tlumps'
@@ -1446,14 +1456,14 @@ class PDSimCore(object):
         ----------
         theta : float
             The value of the independent variable
-        x : ``listm`` instance
+        x : ``arraym`` instance
             The array of the state variables (plus valve parameters) 
         heat_transfer_callback : ``None`` or function
             A function that has the form::
             
                 Q=heat_transfer_callback(theta)
             
-            where ``Q`` is the ``listm`` instance of heat transfer rates to the control 
+            where ``Q`` is the ``arraym`` instance of heat transfer rates to the control 
             volume.  If an entry of ``Q`` is positive, heat is being transferred 
             TO the fluid contained in the control volume
             
@@ -1463,40 +1473,39 @@ class PDSimCore(object):
         
         Returns
         -------
-        dfdt : ``listm`` instance
+        dfdt : ``arraym`` instance
         
         """
         # Updates the state, calculates the volumes, prepares all the things needed for derivatives
-        x = arraym(x)
-        o = self.CVs.exists_arrays(theta, STATE_VARS_TM, x)
+        self.core.properties_and_volumes(self.CVs.exists_CV, theta, STATE_VARS_TM, x)
         
-        #Join the enthalpies of the CV and the tubes
-        harray = o.h.copy()
+        #Join the enthalpies of the CV in existence and the tubes
+        harray = self.core.h.copy()
         harray.extend(self.Tubes.get_h())
         
         # Calculate the flows and sum up all the terms
-        o.calculate_flows(self.Flows, harray, self)
+        self.core.calculate_flows(self.Flows, harray, self)
         
         # Calculate the heat transfer terms
         if heat_transfer_callback is not None:
-            o.Q=arraym(heat_transfer_callback(theta))
-            if not len(o.Q) == self.CVs.Nexist:
+            self.core.Q=arraym(heat_transfer_callback(theta))
+            if not len(self.core.Q) == self.CVs.Nexist:
                 raise ValueError('Length of Q is not equal to length of number of CV')
         else:
-            o.Q=0.0
+            self.core.Q=0.0
             
         # Calculate the derivative terms and set the derivative of the state vector
-        o.calculate_derivs(self.omega, False)
+        self.core.calculate_derivs(self.omega, False)
         
-        self.V_ = listm(o.V)
-        self.dV_ = listm(o.dV)
-        self.h_  = listm(o.h)
-        self.rho_ = listm(o.rho)
-        self.m_ = listm(o.m)
-        self.p_ = listm(o.p)
-        self.T_ = listm(o.T)
+        #Liquid not yet supported
+        if self.__hasLiquid__:
+            return NotImplementedError()
         
-        return listm(o.property_derivs)
+        #Valves not yet supported
+        if self.__hasValves__:
+            return NotImplementedError()
+        
+        return self.core.property_derivs
         
     def valves_callback(self):
         """
@@ -1666,7 +1675,7 @@ class PDSimCore(object):
             else:
                 raise KeyError
     
-        return error_list, new_list
+        return arraym(error_list), arraym(new_list)
     
     def connect_flow_functions(self):
         """

@@ -6,9 +6,28 @@ cimport cython
 import numpy as np
 cimport numpy as np
 
-#Import the listm type used in PDSim
-from PDSim.misc._listmath import listm
-from PDSim.misc._listmath cimport listm
+from PDSim.misc.datatypes import arraym
+from PDSim.misc.datatypes cimport arraym
+
+cpdef list getcol(np.ndarray[np.float_t, ndim=2] mat, int colIndex, list indices):
+    cdef int i,j
+    cdef list values = []
+    for i in indices: 
+        values.append(mat[i,colIndex])
+    #print 'getcol,i=',i,'indices=',indices,'vals=',values
+    return values
+
+cpdef setcol(np.ndarray[np.float_t, ndim=2] mat, int colIndex, list indices, arraym x):
+    cdef int i,j
+    cdef double val
+    if not len(indices) == len(x):
+        print 'indices:',indices, 'x:',x
+        raise ValueError('Length of indices [{0:d}] and x [{1:d}] are not the same'.format(len(indices),len(x)))
+    for j in range(len(x)):
+        i = indices[j]
+        val = x[j]
+        mat[i,colIndex]=val
+    return None
 
 cpdef delimit_vector(np.ndarray[np.float_t, ndim = 1] x, np.ndarray[np.float_t, ndim = 1] y):
         """

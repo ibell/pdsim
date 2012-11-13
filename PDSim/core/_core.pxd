@@ -1,9 +1,6 @@
 import cython
 cimport cython
 
-#Import the listm type used in PDSim
-from PDSim.misc._listmath cimport listm
-
 cdef class _PDSimCore:
     pass
     #cdef bint __hasLiquid__

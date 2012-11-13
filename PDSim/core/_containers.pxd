@@ -1,5 +1,4 @@
 from CoolProp.State cimport State as StateClass
-from PDSim.misc._listmath cimport listm
 from libcpp cimport bool
 
 from PDSim.misc.datatypes cimport arraym
@@ -24,18 +23,27 @@ cdef class _Tube(object):
     cdef public bool exists
     
 cdef class CVArrays(object):
+    cdef list array_list
+    
     #Storage arrays
     cdef public arraym T,p,h,rho,V,dV,cp,cv,m,v,dpdT_constV,Q,xL,dudxL
+    
+    #Property derivative arrays
+    cdef public arraym drhodtheta, dTdtheta, dmdtheta, dxLdtheta, summerdm, summerdT, summerdxL, property_derivs
     
     # Other variables
     cdef int state_vars,N
     cdef double omega
     
-    #Property derivative arrays
-    cdef public arraym drhodtheta, dTdtheta, dmdtheta, dxLdtheta, summerdm, summerdT, summerdxL, property_derivs
+    cpdef update_size(self, int N)
+    cdef build_all(self, int N)
+    cdef free_all(self)
     
+    cpdef properties_and_volumes(self, CVs, double theta, int state_vars, arraym x)
     #
     cpdef calculate_flows(self, Flows, harray, Core)
     
     cpdef calculate_derivs(self, double omega, bint has_liquid)
+    
+    cpdef copy(self)
     

@@ -12,7 +12,8 @@ from math import pi
 # If the following line is uncommented, python will try to use a local version
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
-#sys.path.insert(0, os.path.abspath('..'))
+# PDSim should also be build using a command like python build_ext --inplace to keep all the extension modules next to the .pyx files
+sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
@@ -304,6 +305,7 @@ def Compressor(f = None):
         ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
     
+    #debug_plots(ScrollComp)
     return ScrollComp
     
 if __name__=='__main__':
