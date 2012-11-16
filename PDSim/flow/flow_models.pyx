@@ -576,6 +576,7 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
     """
     
     cdef double mdot,Re,v,mdot_ratio
+    
     #Get the flow velocity and mass flow rate using the Isentropic nozzle model
     mdot = IsentropicNozzle(A, State_up, State_down)
     
@@ -583,8 +584,9 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
         return mdot
     # Hydraulic diameter
     Dh=2 * delta
+    
     # Viscosity for Re
-    mu = State_up.get_visc()
+    mu = State_up.get_visc()  
     rho_up = State_up.get_rho()
     # Reynolds number
     v = mdot/rho_up/A

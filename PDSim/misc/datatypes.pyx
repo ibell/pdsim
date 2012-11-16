@@ -11,15 +11,9 @@ from cpython cimport bool
 
 cimport cython
 
-cpdef many_arraym():
-    cdef long i     
-    a1 = arraym([0])
-    a = arraym(range(10))
-    for i in xrange(10**7):
-        a.extend(a1)
-        
 @cython.final
 cdef class arraym(object):
+    
     def __init__(self, data = None):
         """
         data : list, array.array, numpy array, etc.
@@ -55,7 +49,11 @@ cdef class arraym(object):
                     raise TypeError("Sorry but you provided a type to arraym that doesn't work.  Good types are arraym, numpy arrays, or any iterable.")
         else:
             self.data = NULL
-            
+
+    def __cinit__(self):
+        self.N = 0
+        self.data = NULL
+        
     cpdef set_size(self, int N):
         """
         Set the size of the internal array, initialized to zeros
@@ -65,26 +63,33 @@ cdef class arraym(object):
             self.N = 0
             return
         
-        if self.data is NULL:
+        if self.data == NULL:
             #Allocate the memory for the array that will be used internally
             self.data = <double *> calloc(N, sizeof(double))
             self.N = N
-        else:
-            raise AttributeError('Trying to set size for an arraym that is already allocated')
             
     cdef void set_data(self, double *data, int N):
-        if self.data is NULL:
+        if self.data == NULL:
             #Allocate the memory for the array that will be used internally
             self.data = <double *> calloc(N, sizeof(double))
             self.N = N
         elif not self.N == N:
             raise ValueError('Memory already allocated for arraym, but sizes of arraym ('+str(self.N)+') and data ('+str(N)+') do not match')
         memcpy(self.data,data,N*sizeof(double))
-            
+    
+    cpdef dealloc(self):
+        #Clean up the memory we allocated
+        if not self.data == NULL:
+            free(self.data)
+            self.data = NULL
+            self.N = 0
+    
     def __dealloc__(self):
         #Clean up the memory we allocated
-        if self.data is not NULL:
+        if not self.data == NULL:
             free(self.data)
+            self.data = NULL
+            self.N = 0
           
     def __add__(x, y):
         cdef int i, N
@@ -111,7 +116,6 @@ cdef class arraym(object):
             N = (<arraym>x).N
             z = (<arraym>x).copy()
             zdata = (<arraym>z).data
-            
             try:
                 #Try to make an iterator out of y
                 iterator = iter(y)
@@ -154,7 +158,6 @@ cdef class arraym(object):
             N = (<arraym>x).N
             z = (<arraym>x).copy()
             zdata = (<arraym>z).data
-            
             try:
                 #Try to make an iterator out of y
                 iterator = iter(y)
@@ -282,9 +285,9 @@ cdef class arraym(object):
                         z[i] = x[i] - y[i]
             
         return z
-        
+    
     cpdef arraym copy(self):
-        cdef arraym arr = arraym()
+        cdef arraym arr = arraym.__new__(arraym)
         arr.set_data(self.data, self.N)
         return arr
     

@@ -63,17 +63,18 @@ cdef class _Scroll(object):
         """
         Calculate the flank leakge flow rate
         """
+        cdef double t = -1.0 #Default (not-provided) value
         #Calculate the area
-        FP.A=self.geo.h*self.geo.delta_flank
+        FP.A = self.geo.h*self.geo.delta_flank
         return flow_models.FrictionCorrectedIsentropicNozzle(
-                                 FP.A,
-                                 FP.State_up,
-                                 FP.State_down,
-                                 self.geo.delta_flank,
-                                 TYPE_FLANK,
-                                 -1,
-                                 self.geo.ro
-                                 )
+                             FP.A,
+                             FP.State_up,
+                             FP.State_down,
+                             self.geo.delta_flank,
+                             TYPE_FLANK,
+                             t,
+                             self.geo.ro
+                             )
         
     cpdef double calcHT(self, double theta, bytes key, double HTC_tune, double dT_dphi, double phim):
         cdef scroll_geo.HTAnglesClass angles

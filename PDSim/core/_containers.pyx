@@ -67,7 +67,10 @@ cdef class CVArrays(object):
     """
     
     def __init__(self, int N):
-        self.array_list = ['T','p','h','rho','V','dV','cp','cv','m','v','dpdT_constV','Q','xL','dudxL']
+        self.array_list = ['T','p','h','rho','V','dV','cp','cv','m','v',
+                           'dpdT_constV','Q','xL','dudxL','drhodtheta', 
+                           'dTdtheta', 'dmdtheta', 'dxLdtheta', 'summerdm', 
+                           'summerdT', 'summerdxL', 'property_derivs']
         self.build_all(N)
         
     cdef build_all(self, int N):
@@ -156,6 +159,9 @@ cdef class CVArrays(object):
         """
         Calculate the flows between tubes and control volumes and sum up the flow-related terms 
         """
+        cdef int i
+        cdef arraym summerdm, summerdT
+        
         Flows.calculate(harray)
         self.summerdT, self.summerdm = Flows.sumterms(Core)
     
@@ -224,7 +230,7 @@ cdef class CVArrays(object):
             #Get the array from this class
             arr = getattr(self,array_name)
             #Put a copy of it into the new class
-            setattr(CVA,array_name,arr.copy())
+            setattr(CVA,array_name,<arraym>arr.copy())
         
         return CVA
         

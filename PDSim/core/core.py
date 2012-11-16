@@ -824,7 +824,7 @@ class PDSimCore(object):
                     f4=self.derivs(t0+12.0/13.0*h,xnew3,heat_transfer_callback,valves_callback)
                     xnew4=xold+h*(+439.0/216.0*f1-8.0*f2+3680.0/513.0*f3-845.0/4104.0*f4)
                     
-                    f5=self.derivs(t0+h,xnew4,heat_transfer_callback,valves_callback);
+                    f5=self.derivs(t0+h,xnew4,heat_transfer_callback,valves_callback)
                     xnew5=xold+h*(-8.0/27.0*f1+2.0*f2-3544.0/2565.0*f3+1859.0/4104.0*f4-11.0/40.0*f5)
                     
                     #Updated values at the next step
@@ -851,7 +851,7 @@ class PDSimCore(object):
                     f4=self.derivs(t0+3.0/5.0*h,xnew3,heat_transfer_callback,valves_callback)
                     xnew4=xold+h*(-11.0/54.0*f1+5.0/2.0*f2-70/27.0*f3+35.0/27.0*f4)
                     
-                    f5=self.derivs(t0+h,xnew4,heat_transfer_callback,valves_callback);
+                    f5=self.derivs(t0+h,xnew4,heat_transfer_callback,valves_callback)
                     xnew5=xold+h*(1631.0/55296*f1+175.0/512.0*f2+575.0/13824.0*f3+44275.0/110592.0*f4+253.0/4096.0*f5)
                     
                     f6=self.derivs(t0+7/8*h,xnew5,heat_transfer_callback,valves_callback)
@@ -860,7 +860,7 @@ class PDSimCore(object):
                     xnew=xold+h*(37/378*f1 + 250/621*f3 + 125/594*f4 + 512/1771*f6)
                     
                     error = h*(-277/64512*f1+6925/370944*f3-6925/202752*f4-277.0/14336*f5+277/7084*f6)
-                
+                    
                 max_error=np.sqrt(np.sum(np.power(error,2)))
                 
                 # If the error is too large, make the step size smaller and try
@@ -884,16 +884,14 @@ class PDSimCore(object):
             #
             #Store crank angle at the current index (first run at Itheta=0)
             self.t[Itheta] = t0
-            
-#            # Re-evaluate derivs at the starting value for the step in order 
-#            # to use the correct values in the storage containers
+
+            # Use the copy that was stored before
             self.core = core_temporary.copy()
-#            self.derivs(t0, xold, heat_transfer_callback, valves_callback)
-            del core_temporary
             
             # Store the values for volumes and state vars in the matrices
             # In the first step this will over-write the values in the matrices 
             self.__put_to_matrices(xold, Itheta)
+            
             # Store the flows for the beginning of the step
             self.FlowStorage.append(Flows_temporary)
             
@@ -912,8 +910,6 @@ class PDSimCore(object):
                 h *= step_relax*(eps_allowed/max_error)**(0.2)
 #                print h, eps_allowed, max_error
         
-        #Run this at the end of the rotation
-        V,dV=self.CVs.volumes(t0)
         #Store crank angle at the last index (first run at Itheta=0)
         self.t[Itheta] = t0
         # Re-evaluate derivs at the starting value for the step in order 
@@ -927,7 +923,7 @@ class PDSimCore(object):
         if sorted(self.stateVariables) == ['D','T']:
             self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
         elif sorted(self.stateVariables) == ['M','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
+            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/self.core.V)
         else:
             raise NotImplementedError
         
@@ -1260,9 +1256,6 @@ class PDSimCore(object):
                 #Quit if you have aborted in one of the cycle solvers
                 if aborted == 'abort':
                     return None
-                
-                assert (key_inlet in self.FlowsProcessed.mean_mdot)
-                assert (key_outlet in self.FlowsProcessed.mean_mdot)
                     
                 mdot_out = self.FlowsProcessed.mean_mdot[key_outlet]
                 mdot_in = self.FlowsProcessed.mean_mdot[key_inlet]
@@ -1476,6 +1469,7 @@ class PDSimCore(object):
         dfdt : ``arraym`` instance
         
         """
+        
         # Updates the state, calculates the volumes, prepares all the things needed for derivatives
         self.core.properties_and_volumes(self.CVs.exists_CV, theta, STATE_VARS_TM, x)
         
