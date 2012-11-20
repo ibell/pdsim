@@ -111,35 +111,44 @@ class Run1(Process):
         sys.stdout = redir
         sys.stderr = redir
         
-        #Set solver parameters from the GUI
-        OneCycle = self.sim.OneCycle if hasattr(self.sim,'OneCycle') else False
-        plot_every_cycle = self.sim.plot_every_cycle if hasattr(self.sim,'plot_every_cycle')  else False
-            
-        # These parameters are common to all compressor types, so put them all
-        # in one dictionary and unpack it into each function call
-        commons = dict(key_inlet='inlet.1',
-                       key_outlet='outlet.2',
-                       endcycle_callback=self.sim.endcycle_callback,
-                       heat_transfer_callback=self.sim.heat_transfer_callback,
-                       lump_energy_balance_callback = self.sim.lump_energy_balance_callback, 
-                       OneCycle=OneCycle,
-                       solver_method = self.sim.cycle_integrator_type,
-                       pipe_abort = self.pipe_abort,
-                       plot_every_cycle = plot_every_cycle
-                       )
+        # Build now happens through a dynamically generated build script while 
+        # thankfully removes the requirement for pickability
+        from script import build, run
+        sim = build()
+        run(sim, pipe_abort = self.pipe_abort)
         
-        if isinstance(self.sim, Recip):
-            self.sim.precond_solve(UseNR = True,
-                                   valves_callback =self.sim.valves_callback,
-                                   **commons
-                                   )
-        elif isinstance(self.sim, Scroll):
-            self.sim.precond_solve(UseNR = False, #Use Newton-Raphson ND solver to determine the initial state if True
-                                   step_callback = self.sim.step_callback,                                   
-                                   **commons
-                                   )
-        else:
-            raise TypeError
+        print 'done running from script'
+
+#        
+#        #Set solver parameters from the GUI
+#        OneCycle = self.sim.OneCycle if hasattr(self.sim,'OneCycle') else False
+#        plot_every_cycle = self.sim.plot_every_cycle if hasattr(self.sim,'plot_every_cycle')  else False
+#            
+#        # These parameters are common to all compressor types, so put them all
+#        # in one dictionary and unpack it into each function call
+#        commons = dict(key_inlet='inlet.1',
+#                       key_outlet='outlet.2',
+#                       endcycle_callback=self.sim.endcycle_callback,
+#                       heat_transfer_callback=self.sim.heat_transfer_callback,
+#                       lump_energy_balance_callback = self.sim.lump_energy_balance_callback, 
+#                       OneCycle=OneCycle,
+#                       solver_method = self.sim.cycle_integrator_type,
+#                       pipe_abort = self.pipe_abort,
+#                       plot_every_cycle = plot_every_cycle
+#                       )
+#        
+#        if isinstance(self.sim, Recip):
+#            self.sim.precond_solve(UseNR = True,
+#                                   valves_callback =self.sim.valves_callback,
+#                                   **commons
+#                                   )
+#        elif isinstance(self.sim, Scroll):
+#            self.sim.precond_solve(UseNR = False, #Use Newton-Raphson ND solver to determine the initial state if True
+#                                   step_callback = self.sim.step_callback,                                   
+#                                   **commons
+#                                   )
+#        else:
+#            raise TypeError
         
         #Delete a few items that cannot pickle properly
         if hasattr(self.sim,'pipe_abort'):
@@ -364,9 +373,9 @@ class InputsToolBook(wx.Toolbook):
         il = wx.ImageList(32, 32)
         indices=[]
         for imgfile in ['Geometry.png',
+                        'StatePoint.png',
                         'MassFlow.png',
-                        'MechanicalLosses.png',
-                        'StatePoint.png']:
+                        'MechanicalLosses.png']:
             ico_path = os.path.join('ico',imgfile)
             indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
         self.AssignImageList(il)
@@ -381,15 +390,16 @@ class InputsToolBook(wx.Toolbook):
             self.panels=(recip_panels.GeometryPanel(self, 
                                                     configfile,
                                                     name='GeometryPanel'),
+                         pdsim_panels.StateInputsPanel(self,
+                                                       configfile,
+                                                       name='StatePanel'),
                          recip_panels.MassFlowPanel(self,
                                                     configfile,
                                                     name='MassFlowPanel'),
                          recip_panels.MechanicalLossesPanel(self,
                                                             configfile,
                                                             name='MechanicalLossesPanel'),
-                         pdsim_panels.StateInputsPanel(self,
-                                                       configfile,
-                                                       name='StatePanel')
+                         
                          )
             
         elif Main.SimType == 'scroll':
@@ -398,20 +408,37 @@ class InputsToolBook(wx.Toolbook):
             self.panels=(scroll_panels.GeometryPanel(self, 
                                                     configfile,
                                                     name='GeometryPanel'),
+                         pdsim_panels.StateInputsPanel(self,
+                                                   configfile,
+                                                   name='StatePanel'),
                          scroll_panels.MassFlowPanel(self,
                                                     configfile,
                                                     name='MassFlowPanel'),
                          scroll_panels.MechanicalLossesPanel(self,
                                                     configfile,
                                                     name='MechanicalLossesPanel'),
-                         pdsim_panels.StateInputsPanel(self,
-                                                   configfile,
-                                                   name='StatePanel')
                          )
         
-        for Name, index, panel in zip(['Geometry','Mass Flow - Valves','Mechanical','State Points'],indices,self.panels):
+        for Name, index, panel in zip(['Geometry','State Points','Mass Flow - Valves','Mechanical'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
-            
+    
+    def get_script_chunks(self):
+        """
+        Pull all the values out of the child panels, using the values in 
+        self.items and the function get_script_chunks if the panel implements
+        it
+        
+        The values are written into the script file that will be execfile-d
+        """
+        chunks = []
+        for panel in self.panels:
+            chunks.append('#############\n# From '+panel.Name+'\n############\n')
+            if hasattr(panel,'get_script_params'):
+                chunks.append(panel.get_script_params())
+            if hasattr(panel,'get_script_chunks'):
+                chunks.append(panel.get_script_chunks())
+        return chunks
+                
     def set_params(self, simulation):
         """
         Pull all the values out of the child panels, using the values in 
@@ -577,7 +604,37 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
                                 self.plot_every_cycle])
         sizer.Add(sizer_advanced)
         sizer.Layout()
+    
+    def get_script_chunks(self):
         
+        item = self._get_item_by_attr('eps_cycle')
+        eps_cycle = item['textbox']
+        
+        return textwrap.dedent(
+            """
+            sim.RK45_eps = {RK_eps:s}
+            t1=time.clock()
+            sim.precond_solve(key_inlet='inlet.1',
+                              key_outlet='outlet.2',
+                              step_callback = sim.step_callback, 
+                              endcycle_callback = sim.endcycle_callback,
+                              heat_transfer_callback = sim.heat_transfer_callback,
+                              lump_energy_balance_callback = sim.lump_energy_balance_callback,
+                              pipe_abort = pipe_abort,
+                              solver_method = 'RK45',
+                              UseNR = False, #Don't use Newton-Raphson ND solver to determine the initial state
+                              OneCycle = {OneCycle:s},
+                              plot_every_cycle = {plot_every_cycle:s},
+                              hmin = 1e-8
+                              )
+            print 'time taken',time.clock()-t1
+            """.format(RK_eps = self.IC.RK45_eps.GetValue(),
+                       eps_cycle = str(eps_cycle.GetValue()),
+                       OneCycle = str(self.OneCycle.GetValue()),
+                       plot_every_cycle = str(self.plot_every_cycle.GetValue())
+                       )
+                   )
+            
     def post_get_from_configfile(self, key, config_string):
         """
         Build the integrator chooser 
@@ -594,7 +651,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         self.IC.set_sim(simulation)
         simulation.OneCycle = self.OneCycle.IsChecked()
         simulation.plot_every_cycle = self.plot_every_cycle.IsChecked()
-            
+    
     def supply_parametric_term(self):
         pass
         
@@ -617,6 +674,23 @@ class SolverToolBook(wx.Toolbook):
         for Name,index,panel in zip(['Params','Parametric'],indices,self.panels):
             self.AddPage(panel, Name, imageId=index)
             
+    def get_script_chunks(self):
+        """
+        Pull all the values out of the child panels, using the values in 
+        self.items and the function get_script_chunks if the panel implements
+        it
+        
+        The values are written into the script file that will be execfile-d
+        """
+        chunks = []
+        for panel in self.panels:
+            chunks.append('#############\n# From '+panel.Name+'\n############\n')
+            if hasattr(panel,'get_script_params'):
+                chunks.append(panel.get_script_params())
+            if hasattr(panel,'get_script_chunks'):
+                chunks.append(panel.get_script_chunks())
+        return chunks
+    
     def set_params(self,simulat):
         for panel in self.panels:
             panel.set_params(simulat)
@@ -1881,6 +1955,55 @@ class MainFrame(wx.Frame):
         #Destroy the current MainFrame
         self.Destroy()
         
+    def script_header(self):
+        time_generation = time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime())
+        import PDSim
+        pdsim_version = PDSim.__version__
+        import CoolProp
+        coolprop_version = CoolProp.__version__+ ' svn revision: '+str(CoolProp.__svnrevision__)
+        
+        return textwrap.dedent(
+            """
+            # This file was automatically generated by PDSimGUI on {time_generation:s}
+            # Versions used:
+            # PDSim: {pdsim_version:s}
+            # CoolProp: {coolprop_version:s}
+            # 
+            # To run this file, in a console, type
+            #
+            #     python this_file_name.py
+            #
+            # where this_file_name.py is the name of this file
+            #
+            # In python 2.7 make a/b always give the double division even 
+            # if both a and b are integers - thus 2/3 gives 0.666666666... 
+            # rather than 0
+            from __future__ import division
+            
+            # General python imports
+            import time, sys, os
+            
+            # Plotting and numeric things
+            from math import pi
+            import numpy as np
+            from matplotlib import pyplot as plt
+            
+            # Imports from PDSim that are needed for all types of compressors
+            from PDSim.flow.flow import FlowPath
+            from PDSim.flow.flow_models import IsentropicNozzleWrapper
+            from PDSim.core.containers import ControlVolume
+            from PDSim.core.core import Tube
+            from PDSim.plot.plots import debug_plots
+            from PDSim.core.motor import Motor
+            
+            # Imports from CoolProp
+            from CoolProp import State
+            from CoolProp import CoolProp as CP
+            """.format(coolprop_version = coolprop_version,
+                       pdsim_version = pdsim_version,
+                       time_generation = time_generation)
+            )
+        
     def build(self):
         self.make_menu_bar()
         
@@ -1923,6 +2046,46 @@ class MainFrame(wx.Frame):
         apply_plugins: boolean, optional
             If ``True``, all the plugins will be applied when this function is called
         """
+        self.script_chunks = []
+        
+        #Get the header for the script
+        self.script_chunks.append(self.script_header())
+        
+        self.script_chunks.extend(['\nfrom PDSim.scroll.core import Scroll\nsim = Scroll()\n'])
+        
+        def indent_chunk(chunks, N):
+            lines = '\n'.join(chunks)
+            lines = lines.split('\n')
+            
+            new_lines = []
+            for line in lines:
+                new_lines.append('    '*N+line)
+            return '\n'.join(new_lines)+'\n'
+        
+        if apply_plugins:
+            #Apply any plugins in use - this is the last step in the building process
+            if hasattr(self,'plugins_list'):
+                for plugin in self.plugins_list:
+                    if plugin.is_activated():
+                        plugin.get_script_chunks()
+            
+        self.script_chunks.extend(['def build():\n'])
+        inputs_chunks = self.MTB.InputsTB.get_script_chunks()
+        self.script_chunks.extend(indent_chunk(inputs_chunks,1))
+        self.script_chunks.extend(['    return sim\n\n'])
+
+        self.script_chunks.extend(['def run(sim, pipe_abort = None):\n'])
+        solver_chunks = self.MTB.SolverTB.get_script_chunks()
+        self.script_chunks.extend(indent_chunk(solver_chunks,1))
+        
+        self.script_chunks.extend(["if __name__ == '__main__':\n    sim = build()\n    run(sim)"])
+        
+        #Write to file
+        f = open('script.py','w')
+        for chunk in self.script_chunks:
+            f.write(chunk)
+        f.close()
+        
         #Instantiate the scroll class
         scroll=Scroll()
         #Pull things from the GUI as much as possible

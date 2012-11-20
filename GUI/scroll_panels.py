@@ -260,11 +260,14 @@ class GeometryPanel(pdsim_panels.PDPanel):
             scroll.geo.phi_ie_offset = pi
         else:
             scroll.geo.phi_ie_offset = 0
-            
-        print self.post_set_params_str()
         
-    def post_set_params_str(self):
+    def get_script_chunks(self):
     
+        if self.UseOffset.IsChecked():
+            phi_ie_offset = str(pi)
+        else:
+            phi_ie_offset = str(0)
+            
         #Parameters to be set in the string:
         str_params = dict(Vdisp = self.Vdisp.GetValue(),
                           Vratio = self.Vratio.GetValue(),
@@ -272,7 +275,8 @@ class GeometryPanel(pdsim_panels.PDPanel):
                           ro = self.ro.GetValue(),
                           phi_i0 = self.phi_fi0.GetValue(),
                           phi_is = self.phi_fis.GetValue(),
-                          phi_os = self.phi_fos.GetValue())
+                          phi_os = self.phi_fos.GetValue(),
+                          phi_ie_offset = phi_ie_offset)
 
         return textwrap.dedent(
             """
@@ -286,21 +290,18 @@ class GeometryPanel(pdsim_panels.PDPanel):
             phi_os = {phi_os:s} #[rad]
             
             #Set the scroll wrap geometry
-            scroll.set_scroll_geo(Vdisp,Vratio,t,ro,
-                                       phi_i0 = phi_i0, 
-                                       phi_os = phi_os,
-                                       phi_is = phi_is)
-            scroll.set_disc_geo('2Arc', r2 = 0)
+            sim.set_scroll_geo(Vdisp, Vratio, t, ro,
+                               phi_i0 = phi_i0,
+                               phi_os = phi_os,
+                               phi_is = phi_is)
+            sim.set_disc_geo('2Arc', r2 = 0) #hard-coded
             
             # self.delta_flank and self.delta_radial are set in the conventional way
             # using the parametric table
-            scroll.geo.delta_flank = scroll.delta_flank
-            scroll.geo.delta_radial = scroll.delta_radial
+            sim.geo.delta_flank = sim.delta_flank
+            sim.geo.delta_radial = sim.delta_radial
             
-            if self.UseOffset.IsChecked():
-                scroll.geo.phi_ie_offset = pi
-            else:
-                scroll.geo.phi_ie_offset = 0        
+            sim.geo.phi_ie_offset = {phi_ie_offset:s}        
             """.format(**str_params))
     
     def collect_output_terms(self):
@@ -311,9 +312,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         print 'changing params'
         Main = self.GetTopLevelParent()
         Main.MTB.OutputsTB.DataPanel.change_output_attrs(dict(t = 'geo.t',
-                                                              ro = 'geo.ro',
-                                                              )
-                                                         )
+                                                              ro = 'geo.ro',))
         return []
         
 class FlankLeakageFlowChoice(pdsim_panels.MassFlowOption):
@@ -440,6 +439,88 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         min_width = max([flow.label.GetSize()[0] for flow in flows])
         for flow in flows:
             flow.label.SetMinSize((min_width,-1))
+     
+    def get_script_chunks(self):
+        
+        Xd_dict = {}
+        for flow in self.flows:          
+            param_dict = {p['attr']:p['value'] for p in flow.params_dict}
+            Xd_dict[flow.key1+'-'+flow.key2] = str(param_dict.pop('X_d'))
+          
+          
+        return textwrap.dedent(
+            """
+            # Add both the inlet and outlet tubes
+            mdot_guess = inletState.rho*sim.Vdisp*sim.omega/(2*pi)
+    
+            sim.add_tube(Tube(key1 = 'inlet.1',
+                              key2 = 'inlet.2',
+                              L = sim.inlet_tube_length,
+                              ID = sim.inlet_tube_ID,
+                              mdot = mdot_guess, 
+                              State1 = inletState.copy(),
+                              fixed = 1,
+                              TubeFcn = sim.TubeCode))
+            sim.add_tube(Tube(key1 = 'outlet.1',
+                              key2 = 'outlet.2',
+                              L = sim.outlet_tube_length,
+                              ID = sim.outlet_tube_ID,
+                              mdot = mdot_guess, 
+                              State2 = outletState.copy(),
+                              fixed = 2,
+                              TubeFcn = sim.TubeCode))
+                                     
+            # Add all the leakage flows
+            sim.auto_add_leakage(flankFunc = sim.FlankLeakage, 
+                                 radialFunc = sim.RadialLeakage)
+                                 
+            # Add the inlet-to-shell flow with a fixed area
+            FP = FlowPath(key1='inlet.2',
+                  key2='sa', 
+                  MdotFcn=IsentropicNozzleWrapper(),
+                  )
+            FP.A = pi*sim.inlet_tube_ID**2/4*{Xd_inlet:s}
+            sim.add_flow(FP)
+            
+            # Add the suction-area to suction chambers flows
+            sim.add_flow(FlowPath(key1='sa', 
+                                  key2='s1',
+                                  MdotFcn=sim.SA_S1,
+                                  MdotFcn_kwargs = dict(X_d = {Xd_sa_s1:s})
+                                  )
+                        )
+            sim.add_flow(FlowPath(key1 = 'sa',
+                                  key2 = 's2',
+                                  MdotFcn = sim.SA_S2,
+                                  MdotFcn_kwargs = dict(X_d = {Xd_sa_s2:s})
+                                  )
+                        )
+            
+            FP = FlowPath(key1='outlet.1',
+                          key2='dd',
+                          MdotFcn=IsentropicNozzleWrapper(),
+                          )
+            FP.A = pi*sim.d_discharge**2/4
+            sim.add_flow(FP)
+            
+            FP = FlowPath(key1='outlet.1', 
+                          key2='ddd', 
+                          MdotFcn=IsentropicNozzleWrapper(),
+                          )
+            FP.A = pi*sim.d_discharge**2/4
+            sim.add_flow(FP)
+            
+            sim.add_flow(FlowPath(key1='d1',
+                                  key2='dd',
+                                  MdotFcn=sim.D_to_DD))
+            sim.add_flow(FlowPath(key1='d2',
+                                  key2='dd',
+                                  MdotFcn=sim.D_to_DD))
+            """.format(Xd_sa_s1 = Xd_dict['sa-s1'],
+                       Xd_sa_s2 = Xd_dict['sa-s2'],
+                       Xd_inlet = Xd_dict['inlet.2-sa'],
+                       )
+            )
         
     def post_set_params(self, simulation):
         #Create and add each of the flow paths based on the flow model selection
@@ -795,6 +876,36 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         self.SetSizer(box_sizer)
         sizer.Layout()
         
+    def get_script_chunks(self):
+        """
+        Returns a formatted string for the script that will be execfile-d
+        """
+        if self.motor_choices.GetSelection() == 0:
+            #Use the value for the motor efficiency
+            return textwrap.dedent(
+               """
+               sim.motor = Motor()
+               sim.motor.set_eta({eta_motor:s})
+               sim.motor.suction_fraction = 1.0 #hard-coded
+               """.format(eta_motor = self.motor_choices.eta_motor.GetValue()))
+        elif self.motor_choices.GetSelection() == 1:
+            # Get the tuple of list of coeffs from the MCT, then unpack the tuple
+            # back into the call to set the coefficients
+            c = self.motor_choices.MCT.get_coeffs()
+            #Will set the type flag itself
+            return textwrap.dedent(
+               """
+               sim.motor = Motor()
+               sim.motor.set_coeffs(tau_coeffs = {tau_coeffs:s},
+                                    eta_coeffs = {eta_coeffs:s},
+                                    omega_coeffs = {omega_coeffs:s})
+               """.format(tau_coeffs = str(c[0]),
+                          eta_coeffs = str(c[1]),
+                          omega_coeffs = str(c[2])
+                          )        )
+        else:
+            raise NotImplementedError
+        
     def post_set_params(self, sim):
         """
         Set other parameters after loading all the conventional terms
@@ -824,7 +935,6 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         
         sim.motor.suction_fraction = 1.0
         
-            
     def post_get_from_configfile(self,key,value):
         """
         Parse the coefficients or other things that are not handled in the normal way

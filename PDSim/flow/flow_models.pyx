@@ -99,7 +99,8 @@ cdef class FlowFunctionWrapper(object):
      
          FFW.call(FP)
          
-     Having both methods allows cython functions to stay at the C++ layer and not
+     Having both methods allows cython functions to stay at the C++ layer since they
+     can call the .call() function with defined argument types and not
      need to come back to python layer for speed 
      
     """

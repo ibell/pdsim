@@ -7,6 +7,7 @@ from CoolProp.State import State
 from CoolProp import CoolProp as CP
 from ConfigParser import SafeConfigParser
 import codecs
+import textwrap
 import numpy as np
 import os
 import itertools
@@ -250,6 +251,24 @@ class PDPanel(wx.Panel):
             except ValueError:
                 return value
              
+    def get_script_params(self):
+        if not hasattr(self,'items'):
+            return ''
+        else:
+            items = self.items
+        
+        if hasattr(self,'skip_list'):
+            # Don't actually set these attributes (they might over-write 
+            # methods or attributes in the simulation)
+            items = [item for item in items if item['attr'] not in self.skip_list()]
+        
+        values = ''
+        for item in items:
+            values += 'sim.{attr:s} = {val:s}\n'.format(attr = item['attr'],
+                                                        val = str(self._get_value(item['textbox'])))
+        
+        return values
+    
     def set_params(self, sim):
         
         if not hasattr(self,'items'):
@@ -1708,6 +1727,26 @@ class StateInputsPanel(PDPanel):
         self.Discharge_key = key
         self.Discharge_value = str(value)
         
+    def get_script_chunks(self):
+        """
+        Get a string for the script file that will be run
+        """
+        inletState = self.SuctionState.GetState()
+        
+        return textwrap.dedent(
+            """
+            inletState = State.State("{Ref:s}", {{'T': {Ti:s}, 'P' : {pi:s} }})
+    
+            T2s = sim.guess_outlet_temp(inletState,{po:s})
+            outletState = State.State("{Ref:s}", {{'T':T2s,'P':{po:s} }})
+            
+            #Add all the control volumes
+            sim.auto_add_CVs(inletState, outletState)
+            """.format(Ref = inletState.Fluid,
+                       Ti = str(inletState.T),
+                       pi= str(inletState.p),
+                       po= str(self._discharge_pressure))
+            )
     def post_set_params(self, simulation):
         Fluid = self.SuctionState.GetState().Fluid
         

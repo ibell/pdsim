@@ -27,9 +27,9 @@ for line in lines:
 fp.close()
 
 if len(sys.argv) == 1:
-    sys.argv+=['build_ext','--inplace']
+    #sys.argv+=['build_ext','--inplace']
     #sys.argv+=['build','--force','install']
-    #sys.argv+=['build','install']
+    sys.argv+=['build','install']
     
 import Cython
 
@@ -53,7 +53,6 @@ pyx_list = [
             "PDSim/recip/_recip.pyx",
             "PDSim/scroll/_scroll.pyx"
             ]
-
 
 def clean():
     for pyx_file in pyx_list:

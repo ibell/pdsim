@@ -1,5 +1,8 @@
+import abc
 
 class PDSimPlugin(object):
+    __metaclass__ = abc.ABCMeta
+     
     def __init__(self):
         """
         A base class that is to be subclassed for other plugins to PDSim.
@@ -17,12 +20,17 @@ class PDSimPlugin(object):
         """
         return True
     
+    @abc.abstractmethod
     def apply(self, sim, **kwargs):
         """
         Apply the plugin's code - it can do whatever it wants to the simulation 
         """
         raise NotImplementedError("Subclasses of PDSimPlugin must provide the apply() function")
         
+
+    def get_script_chunks(self):
+        return ''
+
     def set_GUI(self, Main):
         self.GUI = Main
         
