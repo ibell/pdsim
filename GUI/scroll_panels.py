@@ -7,6 +7,7 @@ import numpy as np
 from math import pi
 from PDSim.scroll.core import Scroll
 import matplotlib as mpl
+import textwrap
 
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as WXCanvas
 from matplotlib.backends.backend_wxagg import NavigationToolbar2Wx as WXToolbar
@@ -235,7 +236,6 @@ class GeometryPanel(pdsim_panels.PDPanel):
         self.PP.canvas.draw()
     
     def post_set_params(self, scroll):
-        
         Vdisp=float(self.Vdisp.GetValue())
         Vratio=float(self.Vratio.GetValue())
         t=float(self.t.GetValue())
@@ -255,13 +255,53 @@ class GeometryPanel(pdsim_panels.PDPanel):
         # using the parametric table
         scroll.geo.delta_flank = scroll.delta_flank
         scroll.geo.delta_radial = scroll.delta_radial
-#        del scroll.delta_flank
-#        del scroll.delta_radial
         
         if self.UseOffset.IsChecked():
             scroll.geo.phi_ie_offset = pi
         else:
             scroll.geo.phi_ie_offset = 0
+            
+        print self.post_set_params_str()
+        
+    def post_set_params_str(self):
+    
+        #Parameters to be set in the string:
+        str_params = dict(Vdisp = self.Vdisp.GetValue(),
+                          Vratio = self.Vratio.GetValue(),
+                          t = self.t.GetValue(),
+                          ro = self.ro.GetValue(),
+                          phi_i0 = self.phi_fi0.GetValue(),
+                          phi_is = self.phi_fis.GetValue(),
+                          phi_os = self.phi_fos.GetValue())
+
+        return textwrap.dedent(
+            """
+            #Parameters from the GUI
+            Vdisp = {Vdisp:s} #[m]
+            Vratio = {Vratio:s} #[-] 
+            t = {t:s} #[m]
+            ro = {ro:s} #[m]
+            phi_i0 = {phi_i0:s} #[rad]
+            phi_is = {phi_is:s} #[rad]
+            phi_os = {phi_os:s} #[rad]
+            
+            #Set the scroll wrap geometry
+            scroll.set_scroll_geo(Vdisp,Vratio,t,ro,
+                                       phi_i0 = phi_i0, 
+                                       phi_os = phi_os,
+                                       phi_is = phi_is)
+            scroll.set_disc_geo('2Arc', r2 = 0)
+            
+            # self.delta_flank and self.delta_radial are set in the conventional way
+            # using the parametric table
+            scroll.geo.delta_flank = scroll.delta_flank
+            scroll.geo.delta_radial = scroll.delta_radial
+            
+            if self.UseOffset.IsChecked():
+                scroll.geo.phi_ie_offset = pi
+            else:
+                scroll.geo.phi_ie_offset = 0        
+            """.format(**str_params))
     
     def collect_output_terms(self):
         """

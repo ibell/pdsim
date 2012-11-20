@@ -985,7 +985,7 @@ class PDSimCore(object):
         h2 = outletState.h
         s1 = inletState.s
 
-        T2s = newton(lambda T: Props('S','T',T,'P',outletState.p,outletState.Fluid)-s1,inletState.T+30)
+        T2s = Props('T','P',outletState.p,'S',s1,outletState.Fluid)
         h2s = Props('H','T',T2s,'P',outletState.p,outletState.Fluid)
         self.eta_a = (h2s-h1)/(h2-h1)
         self.Wdot_i = self.mdot*(h2s-h1)
@@ -1058,7 +1058,7 @@ class PDSimCore(object):
             h2 = IS.h + self.Wdot_pv/self.mdot
             
             #Find temperature as a function of enthalpy
-            T2 = newton(lambda T: Props('H','T',T,'P',OS.p,OS.Fluid)-h2, OS.T+30)
+            T2 = Props('T','H',h2,'P',OS.p,OS.Fluid)
             
             #Now run using the old value 
             if not OneCycle_oldval:

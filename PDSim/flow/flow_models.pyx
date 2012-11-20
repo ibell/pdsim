@@ -608,7 +608,6 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
         Lstar=ro/0.005
         delta_star=delta/10e-6
         mdot_ratio=af_0*pow(Lstar,af_1)/(af_2*delta_star+af_3)*(xi*(af_4*pow(Re,af_5)+af_6)+(1-xi)*(af_7*pow(Re,af_8)+af_9))+af_10
-        #print Re,xi,mdot_ratio,af_4*pow(Re,af_5)+af_6,af_7*pow(Re,af_8)+af_9
     else:
         mdot_ratio=1.0
     mdot=mdot/mdot_ratio
