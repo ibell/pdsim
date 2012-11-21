@@ -41,7 +41,7 @@ def Compressor(f = None):
     ScrollComp=Scroll()
     #This runs if the module code is run directly
     
-    ScrollComp.set_scroll_geo(40e-6, 2.7, 0.005, 0.006) #Set the scroll wrap geometry
+    ScrollComp.set_scroll_geo(100e-6, 2.4, 0.005, 0.006) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2=0)
     ScrollComp.geo.delta_flank = 15e-6
     ScrollComp.geo.delta_radial = 15e-6
@@ -140,10 +140,10 @@ def Compressor(f = None):
     if f is None:
         Injection = False
         
-    Ref='R245fa'
+    Ref='R410A'
     
-    Te = 40 + 273.15
-    Tc = 83 + 273.15
+    Te = -10 + 273.15
+    Tc = 40 + 273.15
     Tin = Te + 11.1
     DT_sc = 7
     pe = CP.Props('P','T',Te,'Q',1.0,Ref)
