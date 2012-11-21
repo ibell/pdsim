@@ -67,6 +67,7 @@ cdef class PyFlowFunctionWrapper(FlowFunctionWrapper):
         return makePyFlowFunctionWrapper, ({'kwargs': self.kwargs,'Function':Function_str},)
 
 def makePyFlowFunctionWrapper(kwds):
+    # A stub function to rebuild for pickling
     return PyFlowFunctionWrapper(**kwds)
         
 cdef class IsentropicNozzleWrapper(FlowFunctionWrapper):
@@ -82,7 +83,13 @@ cdef class IsentropicNozzleWrapper(FlowFunctionWrapper):
         return IsentropicNozzle(FP.A,
                                 FP.State_up,
                                 FP.State_down)
-    
+        
+    def __reduce__(self):
+        return makeIsentropicNozzleWrapper, ({},)
+
+def makeIsentropicNozzleWrapper(kwds):
+    # A stub function to rebuild for pickling
+    return IsentropicNozzleWrapper()
 
 cdef class FlowFunctionWrapper(object):
     """

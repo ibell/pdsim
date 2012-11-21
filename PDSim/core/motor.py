@@ -23,6 +23,12 @@ class Motor(object):
     def set_coeffs(self, tau_coeffs, eta_coeffs, omega_coeffs):
         """
         Set the coefficients
+        tau_coeffs: iterable
+            Values for the torque [N-m]
+        eta_coeffs: iterable
+            Values for the efficiency [-] (in the range 0 to 1)
+        omega_coeffs: iterable
+            Values for the rotational speed [rad/s]
         """
         #Only accept coefficients if they are all the same length
         assert len(tau_coeffs) == len(eta_coeffs) == len(omega_coeffs)
@@ -64,6 +70,7 @@ class Motor(object):
             return self.eta_motor,None
         else:
             Wdot_coeffs = [tau*omega/1000 for tau,omega in zip(self.tau_coeffs, self.omega_coeffs)]
+            print 'invert_map',Wdot,Wdot_coeffs,self.eta_coeffs
             #Do the 1D interpolation
             eta = float(interp1d(Wdot_coeffs, self.eta_coeffs, kind = kind)(Wdot))
             omega = float(interp1d(Wdot_coeffs, self.omega_coeffs, kind = kind)(Wdot))
@@ -89,10 +96,16 @@ class Motor(object):
         omega : float
             Rotational speed [rad/s]
         """
+        print 'apply_map',tau,self.tau_coeffs,self.eta_coeffs
+        import scipy.interpolate
+        eta_interp = scipy.interpolate.splrep(self.tau_coeffs, self.eta_coeffs, k=2, s=0)
+        eta = scipy.interpolate.splev(tau, eta_interp)
+        omega_interp = scipy.interpolate.splrep(self.tau_coeffs, self.omega_coeffs, k=2, s=0)
+        omega = scipy.interpolate.splev(tau, omega_interp)
         
         #Do the 1D interpolation
-        eta = float(interp1d(self.tau_coeffs, self.eta_coeffs, kind = kind)(tau))
-        omega = float(interp1d(self.tau_coeffs, self.omega_coeffs, kind = kind)(tau))
+        #eta = float(interp1d(self.tau_coeffs, self.eta_coeffs, kind = kind)(tau))
+        #omega = float(interp1d(self.tau_coeffs, self.omega_coeffs, kind = kind)(tau))
         
         #Return the values
         return eta, omega
