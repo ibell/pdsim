@@ -233,33 +233,15 @@ class GeometryPanel(pdsim_panels.PDPanel):
                       axis = self.ax, 
                       geo = self.Scroll.geo,
                       offsetScroll = self.Scroll.geo.phi_ie_offset > 0)
+        
+        # Plot the discharge port if the variable _d_discharge has been set
+        if hasattr(self,'_d_discharge'):
+            t = np.linspace(0,2*np.pi)
+            x = self.Scroll.geo.xa_arc1 + self._d_discharge/2*np.cos(t)
+            y = self.Scroll.geo.ya_arc1 + self._d_discharge/2*np.sin(t)
+            self.ax.plot(x,y,'--')
+            
         self.PP.canvas.draw()
-    
-    def post_set_params(self, scroll):
-        Vdisp=float(self.Vdisp.GetValue())
-        Vratio=float(self.Vratio.GetValue())
-        t=float(self.t.GetValue())
-        ro=float(self.ro.GetValue())
-        phi_i0 = float(self.phi_fi0.GetValue())
-        phi_is = float(self.phi_fis.GetValue())
-        phi_os = float(self.phi_fos.GetValue())
-        
-        #Set the scroll wrap geometry
-        scroll.set_scroll_geo(Vdisp,Vratio,t,ro,
-                                   phi_i0 = phi_i0, 
-                                   phi_os = phi_os,
-                                   phi_is = phi_is)
-        scroll.set_disc_geo('2Arc', r2 = 0)
-        
-        # self.delta_flank and self.delta_radial are set in the conventional way
-        # using the parametric table
-        scroll.geo.delta_flank = scroll.delta_flank
-        scroll.geo.delta_radial = scroll.delta_radial
-        
-        if self.UseOffset.IsChecked():
-            scroll.geo.phi_ie_offset = pi
-        else:
-            scroll.geo.phi_ie_offset = 0
         
     def get_script_chunks(self):
     
@@ -432,6 +414,22 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         
         self.items=self.items1
         
+        # When discharge port diameter changes, update the value for the plot 
+        # in the geometry panel
+        self.d_discharge = self._get_item_by_attr('d_discharge')['textbox']
+        self.d_discharge.Bind(wx.EVT_KILL_FOCUS, self.OnChangeDdisc) 
+    
+    def OnChangeDdisc(self, event = None):
+        """
+        Callback to set the variable _d_discharge in the Geometry Panel
+        """
+        GeoPanel = self.Parent.panels_dict['GeometryPanel']
+        # Set the internal variable
+        GeoPanel._d_discharge = float(self.d_discharge.GetValue())
+        # Re-plot
+        GeoPanel.OnChangeParam()
+        
+        
     def resize_flows(self, flows):
         """
         Resize the labels for the flows to all be the same size
@@ -443,7 +441,7 @@ class MassFlowPanel(pdsim_panels.PDPanel):
     def get_script_chunks(self):
         
         Xd_dict = {}
-        for flow in self.flows:          
+        for flow in self.flows:
             param_dict = {p['attr']:p['value'] for p in flow.params_dict}
             Xd_dict[flow.key1+'-'+flow.key2] = str(param_dict.pop('X_d'))
           
@@ -521,88 +519,6 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                        Xd_inlet = Xd_dict['inlet.2-sa'],
                        )
             )
-        
-    def post_set_params(self, simulation):
-        #Create and add each of the flow paths based on the flow model selection
-        for flow in self.flows:
-            func_name = flow.get_function_name()
-            #func is a pointer to the actual function in the simulation instance
-            func = getattr(simulation, func_name)
-            
-            param_dict = {p['attr']:p['value'] for p in flow.params_dict}
-            if isinstance(flow, InletFlowChoice):
-                #Get the diameter from the inlet_tube_ID item
-                D = float(self._get_item_by_attr('inlet_tube_ID')['textbox'].GetValue())
-                #Apply the correction factor
-                A = pi * D**2/4 * param_dict.pop('X_d')
-                param_dict['A']=A
-                
-            simulation.add_flow(FlowPath(key1 = flow.key1,
-                                         key2 = flow.key2,
-                                         MdotFcn = func,
-                                         MdotFcn_kwargs = param_dict
-                                         )
-                                )
-            
-        A_discharge_port = pi*simulation.d_discharge**2/4
-        
-        for _key in ['dd','ddd']:
-            simulation.add_flow(FlowPath(key1='outlet.1', 
-                                         key2=_key, 
-                                         MdotFcn=simulation.IsentropicNozzleFM,
-                                         MdotFcn_kwargs = dict(A = A_discharge_port)
-                                         )
-                                )
-    
-        if callable(simulation.Vdisp):
-            Vdisp = simulation.Vdisp()
-        else:
-            Vdisp = simulation.Vdisp
-        
-        # Set omega and inlet state
-        # omega is set in the conventional way, so you want to make sure you 
-        # don't overwrite it with the GUI value if you are doing a parametric table
-        # state is set using the special method for additional parametric terms
-        
-        parent = self.GetParent() #InputsToolBook
-        for child in parent.GetChildren():
-            if hasattr(child,'Name') and child.Name == 'StatePanel':
-                if hasattr(simulation,'omega'): 
-                    omega = simulation.omega
-                    child.set_params(simulation)
-                    child.post_set_params(simulation)
-                    simulation.omega = omega
-                else:
-                    child.set_params(simulation)
-                    child.post_set_params(simulation)
-                    omega = simulation.omega
-                        
-        Vdot = Vdisp*simulation.omega/(2*pi)
-        
-        T2s = simulation.guess_outlet_temp(simulation.inletState, simulation.discharge_pressure)
-        outletState=CPState.State(simulation.inletState.Fluid,{'T':T2s,'P':simulation.discharge_pressure})
-        
-        simulation.auto_add_leakage(flankFunc = simulation.FlankLeakage, 
-                                    radialFunc = simulation.RadialLeakage)
-            
-        #Create and add each of the inlet and outlet tubes
-        simulation.add_tube( Tube(key1='inlet.1',
-                                  key2='inlet.2',
-                                  L=simulation.inlet_tube_length, 
-                                  ID=simulation.inlet_tube_ID,
-                                  mdot=simulation.inletState.copy().rho*Vdot, 
-                                  State1=simulation.inletState.copy(),
-                                  fixed=1, 
-                                  TubeFcn=simulation.TubeCode) )
-    
-        simulation.add_tube( Tube(key1='outlet.1',
-                                  key2='outlet.2',
-                                  L=simulation.outlet_tube_length,
-                                  ID=simulation.outlet_tube_ID,
-                                  mdot=simulation.inletState.copy().rho*Vdot, 
-                                  State2=outletState.copy(),
-                                  fixed=2,
-                                  TubeFcn=simulation.TubeCode) )
         
        
 #    def collect_output_terms(self):
@@ -905,35 +821,6 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                           )        )
         else:
             raise NotImplementedError
-        
-    def post_set_params(self, sim):
-        """
-        Set other parameters after loading all the conventional terms
-        
-        Parameters
-        ----------
-        sim : PDSimCore instance (or derived class)
-            The simulation instance
-        """
-        #Create the motor if if doesn't have one
-        if not hasattr(sim,'motor'):
-            sim.motor = Motor()
-        
-        if self.motor_choices.GetSelection() == 0:
-            #Use the value for the motor efficiency
-            sim.eta_motor = float(self.motor_choices.eta_motor.GetValue())
-            sim.motor.set_eta(sim.eta_motor)
-        elif self.motor_choices.GetSelection() == 1:
-            # Get the tuple of list of coeffs from the MCT, then unpack the tuple
-            # back into the call to set the coefficients
-            c = self.motor_choices.MCT.get_coeffs()
-            #Set the coefficients for the motor model
-            sim.motor.set_coeffs(tau_coeffs = c[0], eta_coeffs = c[1], omega_coeffs = c[2])
-            #Will set the type flag itself
-        else:
-            raise NotImplementedError
-        
-        sim.motor.suction_fraction = 1.0
         
     def post_get_from_configfile(self,key,value):
         """

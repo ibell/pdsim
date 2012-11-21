@@ -22,6 +22,7 @@ import cPickle
 from ConfigParser import SafeConfigParser
 import StringIO
 import warnings
+import random
 
 #Other packages that are required
 import numpy as np
@@ -395,6 +396,13 @@ class InputsToolBook(wx.Toolbook):
         
         for Name, index, panel in zip(['Geometry','State Points','Mass Flow - Valves','Mechanical'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
+            
+        #: A dictionary that maps name to panel 
+        self.panels_dict = {panel.Name:panel for panel in self.panels}
+        
+        #Update the discharge geometry
+        if Main.SimType == 'scroll':
+            self.panels_dict['MassFlowPanel'].OnChangeDdisc()
     
     def get_script_chunks(self):
         """
@@ -412,20 +420,6 @@ class InputsToolBook(wx.Toolbook):
             if hasattr(panel,'get_script_chunks'):
                 chunks.append(panel.get_script_chunks())
         return chunks
-                
-    def set_params(self, simulation):
-        """
-        Pull all the values out of the child panels, using the values in 
-        self.items and the function post_set_params if the panel implements
-        it
-        """
-        for panel in self.panels:
-            panel.set_params(simulation)
-    
-    def post_set_params(self, simulation):
-        for panel in self.panels:
-            if hasattr(panel,'post_set_params'):
-                panel.post_set_params(simulation)
                 
     def collect_parametric_terms(self):
         """
@@ -620,11 +614,6 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         
     def post_prep_for_configfile(self):
         return self.IC.save_to_string()+'\n'
-        
-    def post_set_params(self, simulation):
-        self.IC.set_sim(simulation)
-        simulation.OneCycle = self.OneCycle.IsChecked()
-        simulation.plot_every_cycle = self.plot_every_cycle.IsChecked()
     
     def supply_parametric_term(self):
         pass
@@ -664,15 +653,6 @@ class SolverToolBook(wx.Toolbook):
             if hasattr(panel,'get_script_chunks'):
                 chunks.append(panel.get_script_chunks())
         return chunks
-    
-    def set_params(self,simulat):
-        for panel in self.panels:
-            panel.set_params(simulat)
-            
-    def post_set_params(self, simulat):
-        for panel in self.panels:
-            if hasattr(panel,'post_set_params'):
-                panel.post_set_params(simulat)
     
     def collect_parametric_terms(self):
         """
@@ -2021,8 +2001,6 @@ class MainFrame(wx.Frame):
         #Get the header for the script
         self.script_chunks.append(self.script_header())
         
-        
-        
         def indent_chunk(chunks, N):
             lines = '\n'.join(chunks)
             lines = lines.split('\n')
@@ -2053,7 +2031,7 @@ class MainFrame(wx.Frame):
         self.script_chunks.extend(["if __name__ == '__main__':\n    sim = build()\n    run(sim)"])
         
         #Write to file
-        import random
+        
         #Create a string in the form xxxxxxxx where each x is in '0123456789abcdef'
         random_string = ''.join([random.choice('0123456789abcdef') for i in range(8)])
         

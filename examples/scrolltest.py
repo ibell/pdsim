@@ -13,7 +13,7 @@ from math import pi
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
 # PDSim should also be build using a command like python build_ext --inplace to keep all the extension modules next to the .pyx files
-sys.path.insert(0, os.path.abspath('..'))
+#sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
@@ -41,10 +41,14 @@ def Compressor(f = None):
     ScrollComp=Scroll()
     #This runs if the module code is run directly
     
-    ScrollComp.set_scroll_geo(104.8e-6, 2.4, 0.004, 0.007) #Set the scroll wrap geometry
+    ScrollComp.set_scroll_geo(40e-6, 2.7, 0.005, 0.006) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2=0)
     ScrollComp.geo.delta_flank = 15e-6
     ScrollComp.geo.delta_radial = 15e-6
+    
+    ScrollComp.geo.delta_suction_offset = 0.0e-3
+    ScrollComp.geo.phi_ie_offset = 0.0
+    
     ScrollComp.omega = 3600/60*2*pi
     ScrollComp.Tamb = 298.0
     ScrollComp.eta_motor = 0.9
@@ -66,9 +70,6 @@ def Compressor(f = None):
     ScrollComp.h_shell = 10
     ScrollComp.A_shell = 0.05
     ScrollComp.HTC = 0.0
-    
-    ScrollComp.geo.delta_suction_offset = 0.0e-3
-    ScrollComp.geo.phi_ie_offset = 0.0
     
     ScrollComp.mu_oil = 0.008
     ScrollComp.motor = Motor()
@@ -134,13 +135,15 @@ def Compressor(f = None):
 #            pass
 #    plt.show()
     
+    State.debug(0)
+    
     if f is None:
         Injection = False
         
-    Ref='R404A'
+    Ref='R245fa'
     
-    Te = -10 + 273.15
-    Tc =  43 + 273.15
+    Te = 40 + 273.15
+    Tc = 83 + 273.15
     Tin = Te + 11.1
     DT_sc = 7
     pe = CP.Props('P','T',Te,'Q',1.0,Ref)
@@ -151,8 +154,8 @@ def Compressor(f = None):
     outletState = State.State(Ref,{'T':T2s,'P':pc})
 
 #    inletState = State.State(Ref,{'T':300.0,'P':300.0})
-#    p_outlet = inletState.p*4.0
-#    T2s = ScrollComp.isentropic_outlet_temp(inletState,p_outlet)
+#    p_outlet = inletState.p*3.0
+#    T2s = ScrollComp.guess_outlet_temp(inletState,p_outlet)
 #    outletState = State.State(Ref,{'T':T2s,'P':p_outlet})    
     
     mdot_guess = inletState.rho*ScrollComp.Vdisp*ScrollComp.omega/(2*pi)
@@ -201,68 +204,34 @@ def Compressor(f = None):
                   key2='sa', 
                   MdotFcn=IsentropicNozzleWrapper(),
                   )
-    FP.A = pi*0.02**2/4
+    FP.A = pi*0.01**2/4
     ScrollComp.add_flow(FP)
     
     ScrollComp.add_flow(FlowPath(key1='sa', 
                                  key2='s1',
                                  MdotFcn=ScrollComp.SA_S1,
-                                 MdotFcn_kwargs = dict(X_d = 1.0)
+                                 MdotFcn_kwargs = dict(X_d = 0.5)
                                  )
                         )
     ScrollComp.add_flow(FlowPath(key1 = 'sa',
                                  key2 = 's2',
                                  MdotFcn = ScrollComp.SA_S2,
-                                 MdotFcn_kwargs = dict(X_d = 1.0)
+                                 MdotFcn_kwargs = dict(X_d = 0.5)
                                  )
                         )
-    
-    if Injection:
-        #Injection flow paths
-        ScrollComp.add_flow(FlowPath(key1= 'c1.1', 
-                                     key2 = 'injCV.1', 
-                                     MdotFcn=ScrollComp.Injection_to_Comp,
-                                     MdotFcn_kwargs = dict(phi = phi + pi,
-                                                           inner_outer = 'i',
-                                                           check_valve = check_valve)
-                                    )
-                            )
-        ScrollComp.add_flow(FlowPath(key1 = 'c2.1', 
-                                     key2 = 'injCV.1', 
-                                     MdotFcn=ScrollComp.Injection_to_Comp,
-                                     MdotFcn_kwargs = dict(phi = phi,
-                                                           inner_outer = 'o',
-                                                           check_valve = check_valve)
-                                    )
-                            )
-        
-        ScrollComp.add_tube(Tube(key1='injection.1',key2='injection.2',
-                                 L=0.3,ID=0.02,
-                                 mdot=mdot_guess, 
-                                 State1=ScrollComp.CVs['injCV.1'].State.copy(),
-                                 fixed=1,
-                                 TubeFcn=ScrollComp.TubeCode
-                                 )
-                            )
-        ScrollComp.add_flow(FlowPath(key1='injection.2',
-                                     key2='injCV.1',
-                                     MdotFcn=ScrollComp.IsentropicNozzleFM,
-                                     MdotFcn_kwargs = dict(A=pi*0.02**2/4)
-                                     )
-                            )
     
     FP = FlowPath(key1='outlet.1', 
                   key2='dd', 
                   MdotFcn=IsentropicNozzleWrapper(),
                   )
-    FP.A = pi*0.01**2/4
+    FP.A = pi*0.006**2/4
     ScrollComp.add_flow(FP)
     
     FP = FlowPath(key1='outlet.1', 
                   key2='ddd', 
                   MdotFcn=IsentropicNozzleWrapper(),
                   )
-    FP.A = pi*0.01**2/4
+    FP.A = pi*0.006**2/4
     ScrollComp.add_flow(FP)
     
     ScrollComp.add_flow(FlowPath(key1='d1',
@@ -274,7 +243,7 @@ def Compressor(f = None):
 
     from time import clock
     t1=clock()
-    ScrollComp.RK45_eps = 1e-7
+    ScrollComp.RK45_eps = 1e-9
     ScrollComp.EulerN = 20000
     ScrollComp.HeunN = 6000
     ScrollComp.eps_cycle = 0.003
@@ -287,7 +256,8 @@ def Compressor(f = None):
                      solver_method='RK45',
                      UseNR = False, #Use Newton-Raphson ND solver to determine the initial state
                      OneCycle = False,
-                     plot_every_cycle= False
+                     plot_every_cycle= False,
+                     hmin = 1e-8
                      )
     except:
         
@@ -305,7 +275,7 @@ def Compressor(f = None):
         ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
     
-    #debug_plots(ScrollComp)
+    debug_plots(ScrollComp)
     return ScrollComp
     
 if __name__=='__main__':
@@ -313,7 +283,7 @@ if __name__=='__main__':
     profile=False
     if profile==True:
         import line_profiler as LP
-        profiler=LP.LineProfiler(Scroll.derivs)
+        profiler=LP.LineProfiler(Scroll.cycle_RK45)
         profiler.run("Compressor()")
         profiler.print_stats()
     else:

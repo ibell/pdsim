@@ -269,21 +269,6 @@ class PDPanel(wx.Panel):
         
         return values
     
-    def set_params(self, sim):
-        
-        if not hasattr(self,'items'):
-            return
-        else:
-            items = self.items
-        
-        if hasattr(self,'skip_list'):
-            # Don't actually set these attributes (they might over-write 
-            # methods or attributes in the simulation)
-            items = [item for item in items if item['attr'] not in self.skip_list()]
-            
-        for item in items:
-            setattr(sim, item['attr'],self._get_value(item['textbox']))
-    
     def ConstructItems(self, items, sizer, configdict = None, descdict=None, parent = None):
         
         """
@@ -595,7 +580,7 @@ class ChangeParamsDialog(wx.Dialog):
     
     def CancelValues(self, event = None):
         self.EndModal(wx.ID_CANCEL)
-            
+        
 class MassFlowOption(wx.Panel):
     def __init__(self,
                  parent,
@@ -619,13 +604,12 @@ class MassFlowOption(wx.Panel):
         options = self.model_options()
         
         self.label = wx.StaticText(self, label=label)
-        self.choices = wx.ComboBox(self)
+        self.choices = wx.Choice(self)
         
         #Load up the combobox with the options possible
         for option in options:
             self.choices.Append(option['desc'])
         self.choices.SetSelection(0)
-        self.choices.SetEditable(False)
         
         #Store all the options in a list
         self.options_list = options
@@ -645,6 +629,21 @@ class MassFlowOption(wx.Panel):
         sizer.Add(self.params)
         self.SetSizer(sizer)
         sizer.Layout()
+        
+    def model_options(self):
+        """
+        This function should return a list of dictionaries.  
+        In each dictionary, the following terms must be defined:
+        
+        * desc : string
+            Very terse description of the term 
+        * function_name : function
+            the function in the main machine class to be called
+        * params : list of dictionaries with the keys 'attr', 'value', 'desc'
+        
+        MUST be implemented in the sub-class
+        """
+        raise NotImplementedError
     
     def update_tooltip(self):
         for option in self.options_list:
@@ -703,21 +702,6 @@ class MassFlowOption(wx.Panel):
                 
         raise KeyError('Did not find the attribute '+attr)
         
-    def model_options(self):
-        """
-        This function should return a list of dictionaries.  
-        In each dictionary, the following terms must be defined:
-        
-        * desc : string
-            Very terse description of the term 
-        * function_name : function
-            the function in the main machine class to be called
-        * params : list of dictionaries with the keys 'attr', 'value', 'desc'
-        
-        MUST be implemented in the sub-class
-        """
-        raise NotImplementedError
-    
 class ParaSelectDialog(wx.Dialog):
     def __init__(self):
         wx.Dialog.__init__(self, None, title = "State Chooser",)
