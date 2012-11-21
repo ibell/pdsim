@@ -414,7 +414,7 @@ class PDSimCore(object):
         self.Valves.append(Valve)
         self.__hasValves__=True
         
-    def pre_run(self, N = 20000):
+    def pre_run(self, N = 40000):
         #Build the full numpy arrays for temperature, volume, etc.
         self.t=np.zeros((N,))
         self.T=np.zeros((self.CVs.N,N))
@@ -985,8 +985,11 @@ class PDSimCore(object):
         h2 = outletState.h
         s1 = inletState.s
 
-        T2s = Props('T','P',outletState.p,'S',s1,outletState.Fluid)
-        h2s = Props('H','T',T2s,'P',outletState.p,outletState.Fluid)
+        # Can't use intermediate temperature because the state might be two-phase
+        # for some conditions and you are better off just calculating the enthalpy
+        # directly
+        h2s = Props('H','P',outletState.p,'S',s1,outletState.Fluid)
+        
         self.eta_a = (h2s-h1)/(h2-h1)
         self.Wdot_i = self.mdot*(h2s-h1)
         # self.Qamb is positive if heat is being added to the lumped mass

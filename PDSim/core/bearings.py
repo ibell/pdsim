@@ -1,7 +1,7 @@
 import quantities as pq
 from math import pi,sqrt,log
 import numpy as np
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, splev, splrep
 
 class struct: pass
 
@@ -190,17 +190,15 @@ def journal_bearing(**kwargs):
             x = np.log10(v[0])
             y = np.log10(v[1])
             
-            #1D interpolation for log10(S)
-            log10_f_rb_c_list.append(interp1d(x, y)(np.log10(S)))
+            #1D interpolation for log10(S) using 2nd order splines
+            log10_f_rb_c_list.append(splev(np.log10(S), splrep(x,y,k=2,s=0)))
             
             D_over_L_list.append(k)
             
         
-        
-        
-        
-        #get log10(f*rb/c) by 1-D interpolation for D/L
-        log10_f_rb_c = interp1d(D_over_L_list, log10_f_rb_c_list)(2*r_b/L)
+        #get log10(f*rb/c) by 1-D 2nd order interpolation for D/L
+        log10_f_rb_c_spline = splrep(D_over_L_list, log10_f_rb_c_list,k=2,s=0)
+        log10_f_rb_c = splev(2*r_b/L, log10_f_rb_c_spline)
         
         #Get f*rb/c
         rb_c_f = 10.0**log10_f_rb_c

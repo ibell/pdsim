@@ -1189,6 +1189,7 @@ class ParametricPanel(PDPanel):
                     names.append(self.ParaList.GetColumn(Icol+1).Text)
                     
                 attrs = [self._get_attr(name) for name in names]
+                textboxes = [self._get_textbox(name) for name in names]
                 
                 # Run the special handler for any additional terms that are
                 # not handled in the conventional way using self.items in the 
@@ -1206,38 +1207,26 @@ class ParametricPanel(PDPanel):
                 except ValueError:
                     raise
                 
+                #Anything left will be set in the GUI for further processing
+                prior_values = {}
+                for val, textbox in zip(vals, textboxes):
+                    # Store the old value
+                    prior_values[textbox] = val
+                    # Actually set the value in the GUI's textbox
+                    textbox.SetValue(str(val))
+                
                 #Build the recip or the scroll using the GUI parameters
                 #Don't apply the plugins or call the post_set functions
                 if Main.SimType == 'recip':
-                    sim = Main.build_recip(post_set = False, apply_plugins = False)
+                    raise NotImplementedError
+                    script_name = Main.build_recip(post_set = False, apply_plugins = False)
                 elif Main.SimType == 'scroll':
-                    sim = Main.build_scroll(post_set = False, apply_plugins = False)
+                    script_name = Main.build_scroll(run_index = Irow)
                 else:
                     raise AttributeError('Invalid Main.SimType : '+str(Main.SimType))
-                    
-                for val, attr in zip(vals, attrs):
-                    # Actually set the attr in the model
-                    setattr(sim, attr, float(val))
-                    
-                #Run the post_set_params for all the panels
-                Main.MTB.InputsTB.post_set_params(sim)
-                Main.MTB.SolverTB.post_set_params(sim)
-                
-                if Main.SimType == 'recip':
-                    RecipBuilder(sim)
-                elif Main.SimType == 'scroll':
-                    ScrollBuilder(sim)
-                    
-                #Apply any plugins in use - this is the last step
-                if hasattr(Main,'plugins_list') and Main.plugins_list:
-                    for plugin in Main.plugins_list:
-                        if plugin.is_activated():
-                            plugin.apply(sim)
-                    
-                #Add an index for the run so that it can be sorted properly
-                sim.run_index = Irow + 1
+                            
                 #Add sim to the list
-                sims.append(sim)
+                sims.append(script_name)
         
         #Actually run the batch with the sims that have been built
         Main.run_batch(sims)
@@ -1289,6 +1278,19 @@ class ParametricPanel(PDPanel):
             self.ParamSizer.GetItem(I).Window.Terms.SetStringSelection(string_)
             self.ParamSizer.GetItem(I).Window.temporary_values = value
         
+    def _get_textbox(self, Name):
+        """
+        Returns the textbox corresponding to the given name
+        
+        Raises
+        ------
+        ``KeyError`` if not found
+        """
+        for item in self.variables:
+            if item['text'] == Name:
+                return item['textbox']
+        raise KeyError
+    
     def _get_attr(self, Name):
         """
         Returns the attribute name corresponding to the given name
