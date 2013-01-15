@@ -160,8 +160,8 @@ class GeometryPanel(pdsim_panels.PDPanel):
         
         #Do the layout of all the panels
         scrolled_panel.SetSizer(sizer)
-        main_sizer.Add(scrolled_panel,1,wx.EXPAND)
-        self.SetSizer(main_sizer)   
+        main_sizer.Add(scrolled_panel, 1, wx.EXPAND)
+        self.SetSizer(main_sizer)
         
         self.OnChangeOffset()
         self.OnChangeParam()
@@ -297,10 +297,10 @@ class GeometryPanel(pdsim_panels.PDPanel):
                                                               ro = 'geo.ro',))
         return []
         
-class FlankLeakageFlowChoice(pdsim_panels.MassFlowOption):
+class FlankLeakageFlowChoice(pdsim_panels.MassFlowOptionPanel):
     
     def __init__(self,parent,**kwargs):
-        pdsim_panels.MassFlowOption.__init__(self,parent,**kwargs)
+        pdsim_panels.MassFlowOptionPanel.__init__(self,parent,**kwargs)
     
     def model_options(self):
         return [
@@ -308,20 +308,20 @@ class FlankLeakageFlowChoice(pdsim_panels.MassFlowOption):
                      function_name = 'FlankLeakage',)
                 ]
         
-class RadialLeakageFlowChoice(pdsim_panels.MassFlowOption):
+class RadialLeakageFlowChoice(pdsim_panels.MassFlowOptionPanel):
     
     def __init__(self,parent,**kwargs):
-        pdsim_panels.MassFlowOption.__init__(self,parent,**kwargs)
+        pdsim_panels.MassFlowOptionPanel.__init__(self,parent,**kwargs)
     
     def model_options(self):
         return [
                 dict(desc = 'Hybrid leakage model',function_name = 'RadialLeakage')
                 ]
 
-class SuctionFlowChoice(pdsim_panels.MassFlowOption):
+class SuctionFlowChoice(pdsim_panels.MassFlowOptionPanel):
     
     def __init__(self,parent,**kwargs):
-        pdsim_panels.MassFlowOption.__init__(self,parent,**kwargs)
+        pdsim_panels.MassFlowOptionPanel.__init__(self,parent,**kwargs)
     
     def model_options(self):
         return [
@@ -333,10 +333,10 @@ class SuctionFlowChoice(pdsim_panels.MassFlowOption):
                      )
                 ]
                 
-class InletFlowChoice(pdsim_panels.MassFlowOption):
+class InletFlowChoice(pdsim_panels.MassFlowOptionPanel):
     
     def __init__(self,parent,**kwargs):
-        pdsim_panels.MassFlowOption.__init__(self,parent,**kwargs)
+        pdsim_panels.MassFlowOptionPanel.__init__(self,parent,**kwargs)
         self.parent = parent
         
     def model_options(self):
@@ -377,31 +377,28 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         box_sizer.AddSpacer(10)
         box_sizer.Add(wx.StaticText(self,-1,"Flow Models"))
         box_sizer.Add(wx.StaticLine(self,-1,(25, 50), (300,1)))
-#        self.flankflow = FlankLeakageFlowChoice(parent = self,
-#                                           label = 'Flank leakage')
-#        self.radialflow = RadialLeakageFlowChoice(parent = self,
-#                                           label = 'Radial leakage')
+
         self.suctionflow1 = SuctionFlowChoice(parent = self,
                                               key1 = 'sa',
                                               key2 = 's1',
                                               label = 'Flow to suction chamber #1')
-#        Xd_sa_s1 = self.get_from_configfile('MassFlowPanel','Xd_sa_s1')
-#        self.suctionflow1.set_attr('X_d', float(Xd_sa_s1))
+        Xd_sa_s1,Xd_sa_s1_desc = self.get_from_configfile('MassFlowPanel','Xd_sa_s1')
+        self.suctionflow1.set_attr('X_d', float(Xd_sa_s1))
         
         self.suctionflow2 = SuctionFlowChoice(parent = self,
                                               key1 = 'sa',
                                               key2 = 's2',
                                               label = 'Flow to suction chamber #2')    
-#        Xd_sa_s2 = self.get_from_configfile('MassFlowPanel','Xd_sa_s2')
-#        self.suctionflow2.set_attr('X_d', float(Xd_sa_s2))
+        Xd_sa_s2,Xd_sa_s2_desc = self.get_from_configfile('MassFlowPanel','Xd_sa_s2')
+        self.suctionflow2.set_attr('X_d', float(Xd_sa_s2))
         
         self.inletflow = InletFlowChoice(parent = self,
                                          key1 = 'inlet.2',
                                          key2 = 'sa',
                                          label = 'Flow into shell',
                                          )
-#        Xd_shell_sa = self.get_from_configfile('MassFlowPanel','Xd_shell_sa')
-#        self.inletflow.set_attr('X_d', float(Xd_shell_sa))
+        Xd_shell_sa,Xd_shell_sa_desc = self.get_from_configfile('MassFlowPanel','Xd_inlet.2_sa')
+        self.inletflow.set_attr('X_d', float(Xd_shell_sa))
         
         self.flows = [self.suctionflow1, self.suctionflow2, self.inletflow]
         
@@ -438,6 +435,18 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         for flow in flows:
             flow.label.SetMinSize((min_width,-1))
      
+    def post_prep_for_configfile(self):
+        """
+        Prepare a string that saves the flow coefficients to file
+        """
+        s=''
+        for flow in self.flows:
+            param_dict = {p['attr']:p['value'] for p in flow.params_dict}
+            s += 'Xd_{key1:s}_{key2:s} = float, {Xd:g}, flow coefficient\n'.format(key1 = flow.key1,
+                                                          key2 = flow.key2,
+                                                          Xd = param_dict.pop('X_d'))
+        return s
+        
     def get_script_chunks(self):
         
         Xd_dict = {}
@@ -815,6 +824,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                sim.motor.set_coeffs(tau_coeffs = {tau_coeffs:s},
                                     eta_coeffs = {eta_coeffs:s},
                                     omega_coeffs = {omega_coeffs:s})
+               sim.motor.suction_fraction = 1.0 #hard-coded
                """.format(tau_coeffs = str(c[0]),
                           eta_coeffs = str(c[1]),
                           omega_coeffs = str(c[2])

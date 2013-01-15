@@ -2,9 +2,7 @@
 #cython: embedsignature=True
 
 from __future__ import division
-from CoolProp.State import State
 
-import numpy as np
 import cython
 cimport cython
 

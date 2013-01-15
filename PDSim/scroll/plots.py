@@ -871,7 +871,7 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
         
         # This is the part of the fixed scroll forming the extension for
         # the offset scroll pocket
-        phi  = np.linspace(geo.phi_ie,geo.phi_ie+1.02*pi,1000)
+        phi  = np.linspace(geo.phi_ie,geo.phi_ie+1.03*pi,1000)
         x,y = coords_inv(phi,geo,0.0,'fi')
         axis.plot(x,y,'k')
 #        phi  = np.linspace(geo.phi_ie,geo.phi_ie+1.02*pi,1000)
@@ -890,7 +890,9 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
         
         beta = math.atan2(yee-y0,xee-x0)
         t = np.linspace(beta,beta+pi,1000)
-        axis.plot(x0+r*np.cos(t),y0+r*np.sin(t),'k',lw=lw)
+        x,y = x0+r*np.cos(t),y0+r*np.sin(t)
+        axis.plot(x,y,'k',lw=lw)
+        axis.plot([x[0],x[-1]],[y[0],y[-1]],'b-')
     
     xarc1=geo.xa_arc1+geo.ra_arc1*cos(np.linspace(geo.t2_arc1,geo.t1_arc1,100))
     yarc1=geo.ya_arc1+geo.ra_arc1*sin(np.linspace(geo.t2_arc1,geo.t1_arc1,100))

@@ -977,12 +977,12 @@ cpdef dict SA_forces(double theta, geoVals geo, bint poly = False, bint use_offs
         
     fx_p=rb*h*(cos(phi_ie)*phi_o0+sin(phi_ie)-phi_ie*cos(phi_ie) - sin(phi_ie-pi+B)-(phi_o0-phi_ie+pi-B)*cos(phi_ie-pi+B) )
     fy_p=-rb*h*((phi_ie-phi_o0)*sin(phi_ie)+cos(phi_ie) - cos(phi_ie-pi+B) - (phi_ie-pi-phi_o0+B)*sin(phi_ie-pi+B))
-    M_O=-h*rb**2*(B-2*phi_o0+2*phi_ie-2*pi)*(B-pi)/2
+    M_O_p=-h*rb**2*(B-2*phi_o0+2*phi_ie-2*pi)*(B-pi)/2
     
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
                       fz_p = 0,
-                      M_O = M_O,
+                      M_O_p = M_O_p,
                       cx = 0,
                       cy = 0
                       )
@@ -1219,12 +1219,12 @@ cpdef dict S1_forces(double theta, geoVals geo, bint poly = False, double theta_
     
     fx_p=-rb*h*(sin(B+phi_e)-(B-phi_o0+phi_e-pi)*cos(B+phi_e)+sin(theta-phi_e)-(theta+phi_o0-phi_e+pi)*cos(theta-phi_e))
     fy_p=rb*h*((B-phi_o0+phi_e-pi)*sin(B+phi_e)+cos(B+phi_e)-(theta+phi_o0-phi_e+pi)*sin(theta-phi_e)-cos(theta-phi_e))
-    M_O=(h*rb**2*(B-theta-2*phi_o0+2*phi_e-2*pi)*(B+theta))/2
+    M_O_p=(h*rb**2*(B-theta-2*phi_o0+2*phi_e-2*pi)*(B+theta))/2
     fz_p = Vs/h
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
                       fz_p = fz_p,
-                      M_O = M_O,
+                      M_O_p = M_O_p,
                       cx = cx,
                       cy = cy
                       )
@@ -1333,13 +1333,13 @@ cpdef dict S2_forces(double theta, geoVals geo, bint poly=False, double theta_0_
 
     fx_p=-rb*h*(sin(theta-phi_e)-(theta+phi_i0-phi_e)*cos(theta-phi_e)+cos(phi_e)*(phi_i0-phi_e)+sin(phi_e))
     fy_p=-rb*h*((theta+phi_i0-phi_e)*sin(theta-phi_e)+cos(theta-phi_e)+sin(phi_e)*(phi_i0-phi_e)-cos(phi_e))
-    M_O=(h*rb**2*theta*(theta+2*phi_i0-2*phi_e))/2
+    M_O_p=(h*rb**2*theta*(theta+2*phi_i0-2*phi_e))/2
     fz_p = S1_terms['fz_p'] #By symmetry
     
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
                       fz_p = fz_p,
-                      M_O = M_O,
+                      M_O_p = M_O_p,
                       cx = cx,
                       cy = cy
                       )
@@ -1444,12 +1444,12 @@ cpdef dict C1_forces(double theta, int alpha, geoVals geo, bint poly = False):
     cy=+2.0*rb*sin(theta-phi_ie)-psi*cos(theta-phi_ie) 
     fx_p= 2.0*pi*rb*h*cos(theta-phi_e)
     fy_p=-2.0*pi*rb*h*sin(theta-phi_e)
-    M_O=-2*pi*h*rb*rb*(theta+phi_o0-phi_e+2*pi*alpha)
+    M_O_p=-2*pi*h*rb*rb*(theta+phi_o0-phi_e+2*pi*alpha)
     fz_p = C1(theta,alpha,geo)[0]/h
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
                       fz_p = fz_p,
-                      M_O = M_O,
+                      M_O_p = M_O_p,
                       cx = cx,
                       cy = cy
                       )
@@ -1549,13 +1549,13 @@ cpdef dict C2_forces(double theta, int alpha, geoVals geo, bint poly=False):
     (cx,cy)=(-cxc1+ro*cos(phi_ie-pi/2-theta),-cyc1+ro*sin(phi_ie-pi/2-theta))
     fx_p= 2.0*pi*rb*h*cos(theta-phi_e)
     fy_p=-2.0*pi*rb*h*sin(theta-phi_e)
-    M_O=2*pi*h*rb*rb*(theta+phi_i0-phi_e+2*pi*alpha-pi)
+    M_O_p=2*pi*h*rb*rb*(theta+phi_i0-phi_e+2*pi*alpha-pi)
     fz_p = C2(theta,alpha,geo)[0]/h 
     
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
                       fz_p = fz_p,
-                      M_O = M_O,
+                      M_O_p = M_O_p,
                       cx = cx,
                       cy = cy
                       )
@@ -1713,13 +1713,13 @@ cpdef dict D1_forces(double theta, geoVals geo, bint poly = False):
     
     fx_p=rb*hs*(sin(theta-phi_e)+(-theta-phi_o0+phi_e-2*pi*Nc-pi)*cos(theta-phi_e)-sin(phi_os)-(phi_o0-phi_os)*cos(phi_os))
     fy_p=-rb*hs*((-theta-phi_o0+phi_e-2*pi*Nc-pi)*sin(theta-phi_e)-cos(theta-phi_e)-(phi_os-phi_o0)*sin(phi_os)-cos(phi_os))
-    M_O=(hs*rb**2*(theta-phi_os+2*phi_o0-phi_e+2*pi*Nc+pi)*(theta+phi_os-phi_e+2*pi*Nc+pi))/2.0
+    M_O_p=(hs*rb**2*(theta-phi_os+2*phi_o0-phi_e+2*pi*Nc+pi)*(theta+phi_os-phi_e+2*pi*Nc+pi))/2.0
     fz_p = Vd1/hs
     
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
                       fz_p = fz_p,
-                      M_O = M_O,
+                      M_O_p = M_O_p,
                       cx = cx,
                       cy = cy
                       )
@@ -1846,7 +1846,7 @@ cpdef dict D2_forces(double theta, geoVals geo, bint poly = False):
     
     fx_p=-hs*rb*(-sin(theta-phi_e)+(theta+phi_i0-phi_e+2*pi*Nc)*cos(theta-phi_e)+sin(phi_os)-(phi_os-phi_i0+pi)*cos(phi_os))
     fy_p=hs*rb*((theta+phi_i0-phi_e+2*pi*Nc)*sin(theta-phi_e)+cos(theta-phi_e)-(-phi_os+phi_i0-pi)*sin(phi_os)+cos(phi_os))
-    M_O=-(hs*rb**2*(theta-phi_os+2*phi_i0-phi_e+2*pi*Nc-pi)*(theta+phi_os-phi_e+2*pi*Nc+pi))/2
+    M_O_p=-(hs*rb**2*(theta-phi_os+2*phi_i0-phi_e+2*pi*Nc-pi)*(theta+phi_os-phi_e+2*pi*Nc+pi))/2
     
     (cx,cy)=(-cxd1+ro*cos(phi_ie-pi/2-theta),-cyd1+ro*sin(phi_ie-pi/2-theta))
     fz_p = Vd1/hs
@@ -1854,7 +1854,7 @@ cpdef dict D2_forces(double theta, geoVals geo, bint poly = False):
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
                       fz_p = fz_p,
-                      M_O = M_O,
+                      M_O_p = M_O_p,
                       cx = cx,
                       cy = cy
                       )
@@ -2012,11 +2012,11 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
     #Arc 1
     fx_p =-hs*geo.ra_arc1*(sin(geo.t2_arc1)-sin(geo.t1_arc1))
     fy_p =+hs*geo.ra_arc1*(cos(geo.t2_arc1)-cos(geo.t1_arc1))
-    M_O  =-hs*geo.ra_arc1*((sin(geo.t2_arc1)-sin(geo.t1_arc1))*geo.ya_arc1+(cos(geo.t2_arc1)-cos(geo.t1_arc1))*geo.xa_arc1)
+    M_O_p  =-hs*geo.ra_arc1*((sin(geo.t2_arc1)-sin(geo.t1_arc1))*geo.ya_arc1+(cos(geo.t2_arc1)-cos(geo.t1_arc1))*geo.xa_arc1)
     #Arc 2
     fx_p+=+hs*geo.ra_arc2*(sin(geo.t2_arc2)-sin(geo.t1_arc2))
     fy_p+=-hs*geo.ra_arc2*(cos(geo.t2_arc2)-cos(geo.t1_arc2))
-    M_O +=+hs*geo.ra_arc2*((sin(geo.t2_arc2)-sin(geo.t1_arc2))*geo.ya_arc2+(cos(geo.t2_arc2)-cos(geo.t1_arc2))*geo.xa_arc2)
+    M_O_p +=+hs*geo.ra_arc2*((sin(geo.t2_arc2)-sin(geo.t1_arc2))*geo.ya_arc2+(cos(geo.t2_arc2)-cos(geo.t1_arc2))*geo.xa_arc2)
     
     #Line
     x1t=-geo.xa_arc1-geo.ra_arc1*cos(geo.t1_arc1)+ro*cos(om)
@@ -2038,12 +2038,12 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
         fy_p+=hs*ny*L
         rx=(x1t+x2t)/2-ro*cos(om)
         ry=(y2t+y2t)/2-ro*sin(om)
-        M_O+=rx*hs*ny*L-ry*hs*nx*L
+        M_O_p+=rx*hs*ny*L-ry*hs*nx*L
     
     #Involute portion
     fx_p+=-hs*(-sin(phi_os)+(phi_os-phi_i0+pi)*cos(phi_os)-sin(phi_is)-(phi_i0-phi_is)*cos(phi_is))*rb
     fy_p+=hs*((-phi_os+phi_i0-pi)*sin(phi_os)-cos(phi_os)-(phi_is-phi_i0)*sin(phi_is)-cos(phi_is))*rb
-    M_O +=-(hs*(phi_os-phi_is+pi)*(phi_os+phi_is-2*phi_i0+pi)*rb*rb)/2
+    M_O_p +=-(hs*(phi_os-phi_is+pi)*(phi_os+phi_is-2*phi_i0+pi)*rb*rb)/2
     
     cx=ro*cos(om)/2.0
     cy=ro*sin(om)/2.0
@@ -2054,7 +2054,7 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
                       fz_p = fz_p,
-                      M_O = M_O,
+                      M_O_p = M_O_p,
                       cx = cx,
                       cy = cy
                       )

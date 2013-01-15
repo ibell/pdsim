@@ -713,8 +713,8 @@ class Scroll(PDSimCore, _Scroll):
                              c = self.c_crank_bearing,
                              eta_0 = self.mu_oil
                              )
+        self.losses.crank_bearing_dict = JB
     
-        #print 'Crank pin journal loss is',JB['Wdot_loss'],'W'
         return JB['Wdot_loss']/1000.0
         
     def upper_bearing(self):
@@ -730,7 +730,8 @@ class Scroll(PDSimCore, _Scroll):
                              c = self.c_upper_bearing,
                              eta_0 = self.mu_oil
                              )
-        #print 'Upper bearing journal loss is',JB['Wdot_loss'],'W'
+        self.losses.upper_bearing_dict = JB
+
         return JB['Wdot_loss']/1000.0
     
     def lower_bearing(self):
@@ -746,8 +747,8 @@ class Scroll(PDSimCore, _Scroll):
                              c = self.c_lower_bearing,
                              eta_0 = self.mu_oil
                              )
-        
-        #print 'Lower bearing journal loss is',JB['Wdot_loss'],'W'
+        self.losses.lower_bearing_dict = JB
+
         return JB['Wdot_loss']/1000.0
     
     def thrust_bearing(self):
@@ -761,6 +762,7 @@ class Scroll(PDSimCore, _Scroll):
         TB = thrust_bearing(mu = self.thrust_friction_coefficient,
                             V = V,
                             N = N)
+        self.losses.thrust_bearing_dict = TB
         return TB['Wdot_loss']/1000.0
     
     def mechanical_losses(self, shell_pressure = 'low'):
@@ -818,7 +820,6 @@ class Scroll(PDSimCore, _Scroll):
         self.lump_energy_balance_callback()
         #Update the heat transfer to the gas in the shell
         self.suction_heating()
-        
         
     def post_solve(self):
         """
@@ -1001,6 +1002,8 @@ class Scroll(PDSimCore, _Scroll):
         print 'At this iteration'
         print '    Electrical power:', self.Wdot_electrical
         print '    Mass flow rate:', self.mdot
+        if hasattr(self,'Wdot_i'):
+            print '    Over. isentropic:', self.eta_oi
         
         #Want to return a list
         return [Qnet]
@@ -1080,50 +1083,6 @@ class Scroll(PDSimCore, _Scroll):
             return mdot
         except ZeroDivisionError:
             return 0.0
-    
-#    def RadialLeakage(self,FlowPath,**kwargs):
-#        """
-#        Calculate the radial leakge flow rate
-#        """
-#        return _Scroll.RadialLeakage(self, FlowPath)
-#    
-#        #Calculate the area
-#        #Arc length of the upstream part of the flow path
-#        try:
-#            FlowPath.A= scroll_geo.radial_leakage_area(self.theta,
-#                                                       self.geo,
-#                                                       FlowPath.key1,
-#                                                       FlowPath.key2)
-#        except KeyError:
-#            print FlowPath.key1,FlowPath.key2,'caused a KeyError'
-#            return 0.0
-#            
-#        try:
-#            return flow_models.FrictionCorrectedIsentropicNozzle(
-#                                 FlowPath.A,
-#                                 FlowPath.State_up,
-#                                 FlowPath.State_down,
-#                                 self.geo.delta_radial,
-#                                 Type = 'radial',
-#                                 t = self.geo.t
-#                                 )
-#        except ZeroDivisionError:
-#            return 0.0
-#            
-#    def FlankLeakage(self,FlowPath):
-#        """
-#        Calculate the flank leakge flow rate
-#        """
-#        #Calculate the area
-#        FlowPath.A=self.geo.h*self.geo.delta_flank
-#        return flow_models.FrictionCorrectedIsentropicNozzle(
-#                                 FlowPath.A,
-#                                 FlowPath.State_up,
-#                                 FlowPath.State_down,
-#                                 self.geo.delta_flank,
-#                                 Type = TYPE_FLANK,
-#                                 ro = self.geo.ro
-#                                 )
         
     def _get_injection_CVkey(self,phi,theta,inner_outer):
         """
@@ -1250,7 +1209,7 @@ class Scroll(PDSimCore, _Scroll):
         #Get the slice of indices that are in use.  At the end of the simulation
         #execution this will be the full range of the indices, but when used
         # at intermediate iterations it will be a subset of the indices
-        _slice = range(self.Itheta)
+        _slice = range(self.Itheta+1)
         
         t = self.t[_slice]
         
@@ -1264,7 +1223,7 @@ class Scroll(PDSimCore, _Scroll):
         
         if isinstance(orbiting_back_pressure, float):
             #The back gas pressure on the orbiting scroll pushes the scroll back down
-            self.forces.Fz -= 0.4*orbiting_back_pressure/self.geo.h*self.V[:,_slice]
+            self.forces.Fz -= 1.0*orbiting_back_pressure/self.geo.h*self.V[:,_slice]
             pass
         else:
             raise NotImplementedError('calculate_force_terms must get a float back pressure for now')
@@ -1275,7 +1234,7 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.Fz[Isa,:] = 0.0
         
         #Remove all the NAN placeholders and replace them with zero values
-        self.forces.Fz[np.isnan(self.forces.Fz)]=0
+        self.forces.Fz[np.isnan(self.forces.Fz)] = 0
         #Sum the terms
         self.forces.summed_Fz = np.sum(self.forces.Fz, axis = 0) #kN    
         #Calculate the mean axial force
@@ -1285,16 +1244,19 @@ class Scroll(PDSimCore, _Scroll):
         # thrust bearing does not contribute to compensating for the load
         
         #: Corrected axial load [kN-m]
-        self.forces.corr_Fz = self.forces.mean_Fz# + pi*(self.thrust_OD**2-self.thrust_ID**2)/4 * orbiting_back_pressure
+        self.forces.corr_Fz = self.forces.mean_Fz
         
         ####################################################
         #############  "Radial" force components ###########
         ####################################################
-        self.forces.Fx = np.zeros((self.CVs.N,len(self.t)))
+        self.forces.Fx = np.zeros((self.CVs.N,len(self.t[_slice])))
         self.forces.Fy = np.zeros_like(self.forces.Fx)
-        self.forces.Fr = np.zeros_like(self.forces.Fx)
         self.forces.fxp = np.zeros_like(self.forces.Fx)
         self.forces.fyp = np.zeros_like(self.forces.Fx)
+        self.forces.cx = np.zeros_like(self.forces.Fx)
+        self.forces.cy = np.zeros_like(self.forces.Fx)
+        self.forces.Mz = np.zeros_like(self.forces.Fx)
+        
         # A map of CVkey to function to be called to get force components
         # All functions in this map use the same call signature and are "boring"
         # Each function returns a dictionary of terms
@@ -1336,45 +1298,66 @@ class Scroll(PDSimCore, _Scroll):
             if geo_components:
                 I = self.CVs.index(CVkey)
                 p = self.p[I,_slice]
-                self.forces.fxp[I,_slice] = [comp['fx_p'] for comp in geo_components]
-                self.forces.fyp[I,_slice] = [comp['fy_p'] for comp in geo_components]
-                self.forces.Fx[I,_slice] = [comp['fx_p'] for comp in geo_components]*p
-                self.forces.Fy[I,_slice] = [comp['fy_p'] for comp in geo_components]*p
+                self.forces.fxp[I,:] = [comp['fx_p'] for comp in geo_components]
+                self.forces.fyp[I,:] = [comp['fy_p'] for comp in geo_components]
+                self.forces.Fx[I,:] = [comp['fx_p'] for comp in geo_components]*p
+                self.forces.Fy[I,:] = [comp['fy_p'] for comp in geo_components]*p
+                self.forces.cx[I,:] = [comp['cx'] for comp in geo_components]
+                self.forces.cy[I,:] = [comp['cy'] for comp in geo_components]
+                self.forces.Mz[I,:] = [comp['M_O_p'] for comp in geo_components]*p
         
-        #Remove all the NAN placeholders
-        self.forces.Fx[np.isnan(self.forces.Fx)]=0
-        self.forces.Fy[np.isnan(self.forces.Fy)]=0
-        #Sum the terms at each crank angle
+        # Point of action of the thrust forces - weighted by the axial force
+        self.forces.cx_thrust = np.sum(self.forces.cx*self.forces.Fz, axis = 0) / np.sum(self.forces.Fz, axis = 0)
+        self.forces.cy_thrust = np.sum(self.forces.cy*self.forces.Fz, axis = 0) / np.sum(self.forces.Fz, axis = 0)
+        
+        # Remove all the NAN placeholders
+        self.forces.Fx[np.isnan(self.forces.Fx)] = 0
+        self.forces.Fy[np.isnan(self.forces.Fy)] = 0
+        self.forces.Mz[np.isnan(self.forces.Mz)] = 0
+        
+        # Sum the terms at each crank angle
         self.forces.summed_Fx = np.sum(self.forces.Fx,axis = 0) #kN
         self.forces.summed_Fy = np.sum(self.forces.Fy,axis = 0) #kN
-        
-        #Position of the pin as a function of crank angle
-        self.forces.xpin = self.geo.ro*np.cos(self.geo.phi_ie-pi/2-self.t)
-        self.forces.ypin = self.geo.ro*np.sin(self.geo.phi_ie-pi/2-self.t)
+        self.forces.summed_Mz = np.sum(self.forces.Mz,axis = 0) #kN-m
         
         #Calculate the radial force on the crank pin at each crank angle
-        
+        #
+        #Position of the pin as a function of crank angle
+        self.forces.xpin = self.geo.ro*np.cos(self.geo.phi_ie-pi/2-self.t[_slice])
+        self.forces.ypin = self.geo.ro*np.sin(self.geo.phi_ie-pi/2-self.t[_slice])
+        #
         #The radial component magnitude is just the projection of the force onto a vector going from origin to center of orbiting coordinate system 
-        self.forces.Fr = (self.forces.xpin*self.forces.summed_Fx+self.forces.ypin*self.forces.summed_Fy)/self.geo.ro
+        self.forces.Fr = (self.forces.xpin*self.forces.Fx+self.forces.ypin*self.forces.Fy)/self.geo.ro
         
         #The tangent component magnitude is just the projection of the force onto a vector going from origin to center of orbiting coordinate system
-        
+        #
         #Components of the unit vector in the direction of rotation
-        x_dot =  np.sin(self.geo.phi_ie-pi/2-self.t)
-        y_dot =  -np.cos(self.geo.phi_ie-pi/2-self.t)
-        self.forces.Ft = (x_dot*self.forces.summed_Fx+y_dot*self.forces.summed_Fy)
+        x_dot =  np.sin(self.geo.phi_ie-pi/2-self.t[_slice])
+        y_dot = -np.cos(self.geo.phi_ie-pi/2-self.t[_slice])
+        self.forces.Ft = (x_dot*self.forces.Fx+y_dot*self.forces.Fy)
+        
+        #Remove all the NAN placeholders
+        self.forces.Fr[np.isnan(self.forces.Fr)]=0
+        self.forces.Ft[np.isnan(self.forces.Ft)]=0
+        #Sum the terms at each crank angle
+        self.forces.summed_Fr = np.sum(self.forces.Fr,axis = 0) #kN
+        self.forces.summed_Ft = np.sum(self.forces.Ft,axis = 0) #kN
 
         self.forces.Fm = np.sqrt(np.power(self.forces.summed_Fx,2)
                                  +np.power(self.forces.summed_Fy,2)
+                                 )
+        self.forces.Fm2 = np.sqrt(np.power(self.forces.summed_Fr,2)
+                                 +np.power(self.forces.summed_Ft,2)
                                  )
         
         self.forces.tau = self.forces.xpin*self.forces.summed_Fy-self.forces.ypin*self.forces.summed_Fx
         # Calculate the mean normal force on the crank pin
         # This assumes a quasi-steady bearing where the film is well-behaved
-        self.forces.mean_Fm = np.trapz(self.forces.Fm[_slice], self.t[_slice])/(2*pi)
-        self.forces.mean_Fr = np.trapz(self.forces.Fr[_slice], self.t[_slice])/(2*pi)
-        self.forces.mean_Ft = np.trapz(self.forces.Ft[_slice], self.t[_slice])/(2*pi)
-        self.forces.mean_tau = np.trapz(self.forces.tau[_slice], self.t[_slice])/(2*pi)
+        self.forces.mean_Fm = np.trapz(self.forces.Fm, self.t[_slice])/(2*pi)
+        self.forces.mean_Fr = np.trapz(self.forces.summed_Fr, self.t[_slice])/(2*pi)
+        self.forces.mean_Ft = np.trapz(self.forces.summed_Ft, self.t[_slice])/(2*pi)
+        self.forces.mean_tau = np.trapz(self.forces.tau, self.t[_slice])/(2*pi)
+        self.forces.mean_Mz = np.trapz(self.forces.summed_Mz, self.t[_slice])/(2*pi)
                 
         #: The interial forces on the orbiting scroll
         self.forces.inertial = self.orbiting_scroll_mass * self.omega**2 * self.geo.ro / 1000
@@ -1390,12 +1373,12 @@ class Scroll(PDSimCore, _Scroll):
         """
         A thin wrapper around the base class function for pickling purposes
         """
-        return PDSimCore.IsentropicNozzleFMSafe(self,*args,**kwargs)
+        return PDSimCore.IsentropicNozzleFMSafe(self, *args, **kwargs)
         
     def IsentropicNozzleFM(self,*args,**kwargs):
         """
         A thin wrapper around the base class function for pickling purposes
         """
-        return PDSimCore.IsentropicNozzleFM(self,*args,**kwargs)
+        return PDSimCore.IsentropicNozzleFM(self, *args, **kwargs)
         
         

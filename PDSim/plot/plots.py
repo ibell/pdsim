@@ -195,12 +195,12 @@ class PlotNotebook(wx.Panel):
         if not hasattr(self.Sim,'__hasLiquid__') or not self.Sim.__hasLiquid__:
             #Fluid T-p plot
             axes = self.add('T-P phase').gca()
-            Fluid=self.Sim.CVs[0].State.Fluid
+            Fluid=self.Sim.CVs.exists_CV[0].State.Fluid
             #Saturation curve
-            Tsat=np.linspace(Props(Fluid,'Ttriple'),Props(Fluid,'Tcrit'))
+            Tsat=np.linspace(Props(Fluid,'Tmin')+0.1,Props(Fluid,'Tcrit')-1e-6)
             psat=np.array([Props('P','T',T_,'Q',1.0,Fluid) for T_ in Tsat])
             axes.plot(Tsat,psat)
-            axes.plot(T,p,'.')
+            axes.plot(self.Sim.T,self.Sim.p,'.')
             axes.set_xlabel('Temperature [K]')
             axes.set_ylabel(r'Pressure [kPa]')
             

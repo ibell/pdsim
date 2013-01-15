@@ -12,7 +12,7 @@ from distutils.core import setup, Extension
 from Cython.Build import cythonize
 from Cython.Distutils import build_ext
 from Cython.Distutils.extension import Extension as CyExtension
-import sys, shutil, os
+import sys, shutil, os, glob
 
 version = '1.2'
 
@@ -27,10 +27,11 @@ for line in lines:
 fp.close()
 
 if len(sys.argv) == 1:
+    #sys.argv+=['build_ext','--force','--inplace']
     #sys.argv+=['build_ext','--inplace']
-    #sys.argv+=['build','--force','install']
-    sys.argv+=['build','install']
-    
+    sys.argv+=['build','--force','install']
+    #sys.argv+=['build','install']
+
 import Cython
 
 #This will generate HTML to show where there are still pythonic bits hiding out
@@ -99,7 +100,7 @@ setup(
   packages = ['PDSim','PDSim.core','PDSim.flow','PDSim.plot','PDSim.scroll','PDSim.misc','PDSim.recip'],
   cmdclass={'build_ext': build_ext},
   ext_modules = ext_module_list,
-  package_data = {'PDSim':pxd_files},
-  include_dirs = [numpy.get_include()]
+  package_data = {'PDSim':pxd_files,'PDSim.include':glob.glob(os.path.join('CoolProp','*.h'))},
+  include_dirs = [numpy.get_include(),CoolProp.get_include_directory()]
 )
 

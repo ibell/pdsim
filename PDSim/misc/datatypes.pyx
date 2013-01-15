@@ -11,6 +11,22 @@ from cpython cimport bool
 
 cimport cython
 
+class Collector(object):
+    def __init__(self):
+        self.vec = []
+        
+    def __lshift__(self, other):
+        self.vec.append(other)
+        
+    def __getitem__(self, item):
+        return self.vec[item]
+        
+    def __repr__(self):
+        return str(self.vec)
+    
+    def v(self):
+        return np.array(self.vec, ndmin = 2)
+    
 @cython.final
 cdef class arraym(object):
     

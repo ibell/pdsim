@@ -17,11 +17,11 @@ if len(sys.argv)==1:
 # Process the includes, excludes and packages first
 
 include_files = []
-includes = []
+includes = ['numpy',]
 excludes = ['_gtkagg', '_tkagg', 'bsddb', 'curses', 'email', 'PyQt4',
             'pywin.debugger', 'pywin.debugger.dbgcon', 'pywin.dialogs',
             'tcl', 'Tkconstants', 'Tkinter']
-packages = []
+packages = ['h5py']
 path = []
 
 # This is a place where the user custom code may go. You can do almost

@@ -23,9 +23,13 @@ class HDF5Writer(object):
                 continue
             
             #If it is an integer, floating point value, or numpy array
-            if isinstance(value,(int, float, np.ndarray)):
+            if isinstance(value,(int, float)):
                 #Save it as a value, go to next thing
                 f.create_dataset(thing, data = value)
+                continue
+            elif isinstance(value, np.ndarray):
+                #Save it with compression, go to next thing
+                f.create_dataset(thing, data = value, compression = 'gzip')
                 continue
             elif isinstance(value, basestring):
                 str_type = h5py.new_vlen(str)

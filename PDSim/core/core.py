@@ -356,7 +356,7 @@ class PDSimCore(object):
         # Update the existence of each of the flows
         self.Flows.update_existence(self)
         
-        # Update the internal arrays for the  
+        # Update the sizes of the internal arrays in self.core  
         self.core.update_size(self.CVs.Nexist)
         
     def add_flow(self,FlowPath):
@@ -1191,6 +1191,10 @@ class PDSimCore(object):
             x0 = [self.Tubes.Nodes[key_outlet].T, self.Tubes.Nodes[key_outlet].T]
                 
         def OBJECTIVE_ENERGY_BALANCE(Td_Tlumps):
+            """
+            Td_Tlumps: arraym instance
+                Contains the discharge temperature followed by the temperatures of each lumped mass
+            """
             print Td_Tlumps,'Td,Tlumps inputs'
             # Td_Tlumps is a list (or  or np.ndarray)
             Td_Tlumps = list(Td_Tlumps)
@@ -1299,10 +1303,9 @@ class PDSimCore(object):
                     self.x_state = x_state_new.copy() #Make a copy
                     return errors
                 
-            
-            ##################################
-            ## End OBJECTIVE_CYCLE function ##
-            ##################################
+                ##################################
+                ## End OBJECTIVE_CYCLE function ##
+                ##################################
             
             if UseNR:
                 self.x_state = Broyden(OBJECTIVE_CYCLE, 
@@ -1362,6 +1365,8 @@ class PDSimCore(object):
                             
                         else:
                             if errors is not None:
+                                if not len(x_state_new) == len(x_state_prior):
+                                    raise IndexError
                                 diff = (x_state_prior - x_state_new) / x_state_prior * 100
                                 diff_abs = [abs(dx) for dx in diff]
                                 RSSE = np.sqrt(np.sum(np.power(errors, 2)))
@@ -1375,6 +1380,8 @@ class PDSimCore(object):
                         # before the end of the rotation
                         continue
 
+                    # If the attribute eps_cycle is set, use that to determine 
+                    # the convergence criterion, otherwise, use the default
                     if RSSE < getattr(self,'eps_cycle',1e-3):
                         break
                     else:
@@ -1403,9 +1410,9 @@ class PDSimCore(object):
             print resids,'resids'
             return resids
         
-        ##################################
-        ## End OBJECTIVE_ENERGY_BALANCE ##
-        ##################################
+            ##################################
+            ## End OBJECTIVE_ENERGY_BALANCE ##
+            ##################################
         
         x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,x0, dx=1.0, ytol=0.01, itermax=30)
         print 'Solution is', x_soln,'Td, Tlumps'

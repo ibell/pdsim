@@ -581,7 +581,14 @@ class ChangeParamsDialog(wx.Dialog):
     def CancelValues(self, event = None):
         self.EndModal(wx.ID_CANCEL)
         
-class MassFlowOption(wx.Panel):
+
+class MassFlowOptionPanel(wx.Panel):
+    """
+    A wx.Panel for selecting the flow model and associated parameters
+    
+    Should not be instantiated directly, rather subclassed in order to provide the list of dictionaries
+    of flow models for a given type of machine
+    """
     def __init__(self,
                  parent,
                  key1, 
@@ -589,44 +596,46 @@ class MassFlowOption(wx.Panel):
                  label = 'NONE',
                  types = None,
                  ):
-        """
-        A wx.Panel for selecting the flow model and associated parameters
         
-        Should not be instantiated directly, rather subclassed in order to provide the list of dictionaries
-        of flow models for a given type of machine
-        """
         wx.Panel.__init__(self, parent)
         
         self.key1 = key1
         self.key2 = key2
         
-        #Get the options from the derived class
-        options = self.model_options()
-        
+        #Build the panel
         self.label = wx.StaticText(self, label=label)
-        self.choices = wx.Choice(self)
+        self.flowmodel_choices = wx.Choice(self)
         
-        #Load up the combobox with the options possible
-        for option in options:
-            self.choices.Append(option['desc'])
-        self.choices.SetSelection(0)
+        #Get the options from the derived class and store in a list
+        self.options_list = self.model_options()
         
-        #Store all the options in a list
-        self.options_list = options
+        #Load up the choicebox with the possible flow models possible
+        for option in self.options_list:
+            self.flowmodel_choices.Append(option['desc'])
+        self.flowmodel_choices.SetSelection(0)
         
         #A button to fire the chooser
-        self.params = wx.Button(self, label='Params...')
-        if not 'params' in option or not option['params']:
-            self.params.Enable(False)
-        else:
-            self.params_dict = option['params']
-            self.update_tooltip()            
-            self.params.Bind(wx.EVT_BUTTON, self.OnChangeParams)
+        self.params_button = wx.Button(self, label='Params...')
+        
+        for option in self.options_list:
+            
+            if option['desc'] == self.flowmodel_choices.GetStringSelection():
+                
+                #If parameters not provided (or not needed), disable the button
+                if not 'params' in option or not option['params']:
+                    self.params_button.Enable(False)
+                else:
+                    self.params_dict = option['params']
+                    self.update_tooltip()            
+                    self.params_button.Bind(wx.EVT_BUTTON, self.OnChangeParams)
+                    
+                TTS = self.dict_to_tooltip_string(option['params'])
+                self.params_button.SetToolTipString(TTS)
         
         sizer = wx.BoxSizer(wx.HORIZONTAL)
         sizer.Add(self.label)
-        sizer.Add(self.choices)
-        sizer.Add(self.params)
+        sizer.Add(self.flowmodel_choices)
+        sizer.Add(self.params_button)
         self.SetSizer(sizer)
         sizer.Layout()
         
@@ -647,9 +656,9 @@ class MassFlowOption(wx.Panel):
     
     def update_tooltip(self):
         for option in self.options_list:
-            if option['desc'] == self.choices.GetStringSelection():
-                TTS = self.dict_to_tooltip_string(option['params'])
-                self.params.SetToolTipString(TTS)
+            if option['desc'] == self.flowmodel_choices.GetStringSelection():
+                TTS = self.dict_to_tooltip_string(self.params_dict)
+                self.params_button.SetToolTipString(TTS)
         
     def OnChangeParams(self, event):
         """
@@ -675,7 +684,7 @@ class MassFlowOption(wx.Panel):
     
     def get_function_name(self):
         for option in self.options_list:
-            if option['desc'] == self.choices.GetStringSelection():
+            if option['desc'] == self.flowmodel_choices.GetStringSelection():
                 return option['function_name']
         raise AttributeError
     
@@ -1172,8 +1181,8 @@ class ParametricPanel(PDPanel):
                     vals.append(self.ParaList.GetFloatCell(Irow, Icol))
                     names.append(self.ParaList.GetColumn(Icol+1).Text)
                     
-                attrs = [self._get_attr(name) for name in names]
-                textboxes = [self._get_textbox(name) for name in names]
+                # The attributes corresponding to the names
+                attrs = [self._get_attr_from_name(name) for name in names]
                 
                 # Run the special handler for any additional terms that are
                 # not handled in the conventional way using self.items in the 
@@ -1191,6 +1200,9 @@ class ParametricPanel(PDPanel):
                 except ValueError:
                     raise
                 
+                # Get the textboxes for the remaining attributes
+                textboxes = [self._get_textbox_from_attr(attr) for attr in attrs]
+                
                 #Anything left will be set in the GUI for further processing
                 prior_values = {}
                 for val, textbox in zip(vals, textboxes):
@@ -1205,11 +1217,11 @@ class ParametricPanel(PDPanel):
                     raise NotImplementedError
                     script_name = Main.build_recip(post_set = False, apply_plugins = False)
                 elif Main.SimType == 'scroll':
-                    script_name = Main.build_scroll(run_index = Irow)
+                    script_name = Main.build_scroll(run_index = Irow+1)
                 else:
                     raise AttributeError('Invalid Main.SimType : '+str(Main.SimType))
                             
-                #Add sim to the list
+                #Add sim to the list (actually append the path to the script)
                 sims.append(script_name)
         
         #Actually run the batch with the sims that have been built
@@ -1262,7 +1274,7 @@ class ParametricPanel(PDPanel):
             self.ParamSizer.GetItem(I).Window.Terms.SetStringSelection(string_)
             self.ParamSizer.GetItem(I).Window.temporary_values = value
         
-    def _get_textbox(self, Name):
+    def _get_textbox_from_name(self, Name):
         """
         Returns the textbox corresponding to the given name
         
@@ -1272,10 +1284,11 @@ class ParametricPanel(PDPanel):
         """
         for item in self.variables:
             if item['text'] == Name:
+                print item
                 return item['textbox']
         raise KeyError
     
-    def _get_attr(self, Name):
+    def _get_attr_from_name(self, Name):
         """
         Returns the attribute name corresponding to the given name
         
@@ -1286,6 +1299,19 @@ class ParametricPanel(PDPanel):
         for item in self.variables:
             if item['text'] == Name:
                 return item['attr']
+        raise KeyError
+    
+    def _get_textbox_from_attr(self, attr):
+        """
+        Returns the attribute name corresponding to the given attribute
+        
+        Raises
+        ------
+        ``KeyError`` if not found
+        """
+        for item in self.variables:
+            if item['attr'] == attr:
+                return item['textbox']
         raise KeyError
         
     def update_parametric_terms(self, items):

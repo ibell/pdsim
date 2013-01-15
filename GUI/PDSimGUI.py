@@ -111,25 +111,35 @@ class Run1(Process):
         sys.stderr = redir
         
         # Build happens through a dynamically generated build script while 
-        # thankfully removes the requirement for pickability
+        # thankfully removes the requirement for picklability
         
         #Get the module name (file name without the .py)
         script_name = self.script_name.split('.', 1)[0]
         
         #Import the script module
-        scipt_module = __import__(script_name, globals(), locals(), [], -1)
+        script_module = __import__(script_name, globals(), locals(), [], -1)
         
         #Build the simulation
-        self.sim = scipt_module.build()
+        self.sim = script_module.build()
+        
+        #Save the script in the simulation as a string
+        self.sim.build_script = open(self.script_name, 'r').read()
         
         #Run the simulation
-        scipt_module.run(self.sim, pipe_abort = self.pipe_abort)
+        script_module.run(self.sim, pipe_abort = self.pipe_abort)
         
         #Delete a few items that cannot pickle properly
         if hasattr(self.sim,'pipe_abort'):
             del self.sim.pipe_abort
             del self.sim.FlowStorage
             del self.sim.Abort #Can't pickle because it is a pointer to a bound method
+            
+        #Delete the script and the byte-compiled version of the script
+        for f in [script_name+'.py',script_name+'.pyc']:
+            try:
+                os.remove(f)
+            except:
+                pass
         
         if not self.sim._want_abort:
             #Send simulation result back to calling thread

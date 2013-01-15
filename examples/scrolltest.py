@@ -13,7 +13,7 @@ from math import pi
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
 # PDSim should also be build using a command like python build_ext --inplace to keep all the extension modules next to the .pyx files
-#sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
@@ -49,16 +49,16 @@ def Compressor(f = None):
     ScrollComp.geo.delta_suction_offset = 0.0e-3
     ScrollComp.geo.phi_ie_offset = 0.0
     
-    ScrollComp.omega = 3600/60*2*pi
+    ScrollComp.omega = 4500/60*2*pi
     ScrollComp.Tamb = 298.0
     ScrollComp.eta_motor = 0.9
     
     #Temporarily set the bearing dimensions
-    ScrollComp.D_upper_bearing = 0.025
-    ScrollComp.L_upper_bearing = 0.025
+    ScrollComp.D_upper_bearing = 0.04
+    ScrollComp.L_upper_bearing = 0.04
     ScrollComp.c_upper_bearing = 20e-6
-    ScrollComp.D_crank_bearing = 0.025
-    ScrollComp.L_crank_bearing = 0.025
+    ScrollComp.D_crank_bearing = 0.04
+    ScrollComp.L_crank_bearing = 0.04
     ScrollComp.c_crank_bearing = 20e-6
     ScrollComp.D_lower_bearing = 0.025
     ScrollComp.L_lower_bearing = 0.025
@@ -276,6 +276,12 @@ def Compressor(f = None):
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
     
     debug_plots(ScrollComp)
+    
+    del ScrollComp.FlowStorage
+    from PDSim.misc.hdf5 import HDF5Writer
+    h5 = HDF5Writer()
+    h5.write_to_file(ScrollComp, 'Simulation.h5')
+    
     return ScrollComp
     
 if __name__=='__main__':

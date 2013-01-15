@@ -1,5 +1,6 @@
 import operator
-from scipy.interpolate import interp1d
+import scipy.interpolate
+import warnings
 
 class Motor(object):
     """
@@ -65,16 +66,19 @@ class Motor(object):
         
         If a constant efficiency, just return (efficiency,None) tuple
         """
-        
+        if not kind == 'linear':
+            warnings.warn('invert_map does not take parameter "kind" anymore')
+            
         if self.type == 'const_eta_motor':
             return self.eta_motor,None
         else:
             Wdot_coeffs = [tau*omega/1000 for tau,omega in zip(self.tau_coeffs, self.omega_coeffs)]
-            print 'invert_map',Wdot,Wdot_coeffs,self.eta_coeffs
             #Do the 1D interpolation
-            eta = float(interp1d(Wdot_coeffs, self.eta_coeffs, kind = kind)(Wdot))
-            omega = float(interp1d(Wdot_coeffs, self.omega_coeffs, kind = kind)(Wdot))
-            
+            eta_interp = scipy.interpolate.splrep(Wdot_coeffs, self.eta_coeffs, k=2, s=0)
+            eta = scipy.interpolate.splev(Wdot, eta_interp)
+            omega_interp = scipy.interpolate.splrep(Wdot_coeffs, self.omega_coeffs, k=2, s=0)
+            omega = scipy.interpolate.splev(Wdot, omega_interp)
+        
             return eta,omega
     
     def apply_map(self, tau, kind = 'linear'):
@@ -87,7 +91,7 @@ class Motor(object):
         tau : float
             Torque [N-m]
         kind : string, optional
-            The kind of interpolation to do (see scipy.interpolate.interp1d)
+            The kind of interpolation to do (see scipy.interpolate.interp1d) - deprecated
             
         Returns
         -------
@@ -96,8 +100,9 @@ class Motor(object):
         omega : float
             Rotational speed [rad/s]
         """
-        print 'apply_map',tau,self.tau_coeffs,self.eta_coeffs
-        import scipy.interpolate
+        if not kind == 'linear':
+            warnings.warn('apply_map does not take parameter "kind" anymore')
+            
         eta_interp = scipy.interpolate.splrep(self.tau_coeffs, self.eta_coeffs, k=2, s=0)
         eta = scipy.interpolate.splev(tau, eta_interp)
         omega_interp = scipy.interpolate.splrep(self.tau_coeffs, self.omega_coeffs, k=2, s=0)

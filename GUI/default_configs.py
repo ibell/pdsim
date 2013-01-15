@@ -78,9 +78,9 @@ inlet_tube_length = float,0.3,Inlet tube length [m]
 inlet_tube_ID = float,0.02,Inlet tube inner diameter [m]
 outlet_tube_length = float,0.3,Outlet tube length [m]
 outlet_tube_ID = float, 0.02, Outlet tube inner diameter [m]
-Xd_sa_s1 = 0.8
-Xd_sa_s2 = 0.8
-Xd_shell_sa = 0.8
+Xd_sa_s1 = float, 0.8, Discharge coefficient for sa-s1 flow
+Xd_sa_s2 = float, 0.8, Discharge coefficient for sa-s1 flow
+Xd_inlet.2_sa = float, 0.8, Discharge coefficient for sa-s1 flow
 
 [MechanicalLossesPanel]
 eta_motor = float,0.95,Motor efficiency [-]

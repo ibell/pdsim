@@ -46,7 +46,17 @@ def thrust_bearing(**kwargs):
 
     .. math::
     
-        \left| v \\right| = \sqrt {{{\left( {\\frac{{dx}}{{d\\theta }}} \\right)}^2} + {{\left( {\\frac{{dy}}{{d\\theta }}} \\right)}^2}}  = {r_o}\omega 
+        \left| v \\right| = \sqrt {{{\left( {\\frac{{dx}}{{d\\theta }}} \\right)}^2} + {{\left( {\\frac{{dy}}{{d\\theta }}} \\right)}^2}}  = {r_o}\omega
+        
+    But it is quite possible that you do not have hydro-dynamic lubrication, and 
+    as a result you can get asperity-asperity contact and much higher friction
+    coefficients - see for example Kobayashi et al. "Experimental Study on Journal Bearing
+    Characteristics in Reciprocating Compressors for HFC-134a" Purdue Compressor
+    Conferences 1998.  http://docs.lib.purdue.edu/cgi/viewcontent.cgi?article=2257&context=icec
+    
+    Can be off by a factor of as much as 10 times at low
+    Sommerfeld number
+     
     """
     #Friction coefficient
     mu = kwargs.pop('mu', None)
@@ -176,8 +186,21 @@ def journal_bearing(**kwargs):
         f_coeffs[4.0]=[[16.2,7.57,2.83,1.07,0.261,0.0736,0.0101,1e-8],
                        [322,153,61.1,26.7,8.8,3.5,0.922,1e-8]]
         
+        # hminc_coeffs is a dictionary with keys of values of D/L
+        # values are lists of S, hmin/c
+        hminc_coeffs = {}
+        hminc_coeffs[0.0]=[[0.24,0.123,0.0626,0.0389,0.021,0.0115,1e-8],
+                      [0.9,0.8,0.6,0.4,0.2,0.1,1e-8]]
+        hminc_coeffs[1.0]=[[1.33,0.631,0.264,0.121,0.0446,0.0188,0.00474,1e-8],
+                      [0.9,0.8,0.6,0.4,0.2,0.1,0.03,1e-8]]
+        hminc_coeffs[2.0]=[[4.31,2.03,0.779,0.319,0.0923,0.0313,0.00609,1e-8],
+                      [0.9,0.8,0.6,0.4,0.2,0.1,0.03,1e-8]]
+        hminc_coeffs[4.0]=[[16.2,7.57,2.83,1.07,0.261,0.0736,0.0101,1e-8],
+                       [0.9,0.8,0.6,0.4,0.2,0.1,0.03,1e-8]]
+        
         #for each D/L, find the value of f*r_b/c by 1-D interpolation
         log10_f_rb_c_list = []
+        hmin_c_list = []
         D_over_L_list = []
         
         for k,v in f_coeffs.iteritems():
@@ -195,10 +218,22 @@ def journal_bearing(**kwargs):
             
             D_over_L_list.append(k)
             
-        
+        for k,v in hminc_coeffs.iteritems():
+            # input vectors for interp1d must be increasing, so flip both vectors
+            # in-place
+            v[0].reverse()
+            v[1].reverse()
+            
+            #1D interpolation for hmin/c using 2nd order splines
+            hmin_c_list.append(splev(S, splrep(v[0],v[1],k=2,s=0)))
+            
         #get log10(f*rb/c) by 1-D 2nd order interpolation for D/L
-        log10_f_rb_c_spline = splrep(D_over_L_list, log10_f_rb_c_list,k=2,s=0)
+        log10_f_rb_c_spline = splrep(D_over_L_list, log10_f_rb_c_list, k = 2, s = 0)
         log10_f_rb_c = splev(2*r_b/L, log10_f_rb_c_spline)
+        
+        #get hmin/c by 1-D 2nd order interpolation for D/L
+        hmin_c_spline = splrep(D_over_L_list, hmin_c_list, k = 2, s = 0)
+        hm_over_c = splev(2*r_b/L, hmin_c_spline)
         
         #Get f*rb/c
         rb_c_f = 10.0**log10_f_rb_c
@@ -221,11 +256,16 @@ def journal_bearing(**kwargs):
 #    print 'log10_f_rb_c_list',log10_f_rb_c_list
 #    print 'rb*f/c',rb_c_f
 #    print 'f',f
-    
+    print 'hmin =',hm_over_c*(r_b/rb_c)
     return dict(
                 S = S,
                 f = f,
                 c = r_b/rb_c,
+                Load = W,
+                r_b = r_b,
+                h_min = hm_over_c*(r_b/rb_c),
+                omega = omega,
+                eta_0 = eta_0,
                 Wdot_loss = Wdot_loss
                 )
                 

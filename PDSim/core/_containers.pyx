@@ -1,8 +1,5 @@
 
 cimport cython
-
-from CoolProp.State import State as StateClass
-from CoolProp.State cimport State as StateClass
     
 cdef public enum STATE_VARS:
     STATE_VARS_TD

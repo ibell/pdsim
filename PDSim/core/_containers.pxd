@@ -1,4 +1,6 @@
+from CoolProp.State import State as StateClass
 from CoolProp.State cimport State as StateClass
+
 from libcpp cimport bool
 
 from PDSim.misc.datatypes cimport arraym
