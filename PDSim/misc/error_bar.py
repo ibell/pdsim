@@ -1,7 +1,7 @@
 
 from math import log10
 
-def error_ascii_bar(val, tol, N = 50, min_p = -4, max_p = 2):
+def error_ascii_bar(val, tol, N = 50, min_p = -5, max_p = 2):
 
     assert log10(tol) > min_p
     

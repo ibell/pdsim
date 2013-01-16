@@ -6,6 +6,7 @@ from __future__ import division
 import cython
 cimport cython
 
+from PDSim.misc.datatypes import arraym, empty_arraym
 
 #Uncomment this line to use the python math functions
 #from math import log,pi,e,pow,sqrt
@@ -406,7 +407,7 @@ cdef class ValveModel(object):
         dxdot_dt = (0.5*self.C_D*rho*(V-xdot)**2*self.A_valve+rho*(V-xdot)**2*self.A_port-self.k_valve*x)/(self.m_eff)
         return (dxdt,dxdot_dt)
     
-    cpdef set_xv(self, list xv):
+    cpdef set_xv(self, arraym xv):
         #If xv[0] is less than zero, just use zero
         if xv[0]<0.0:
             xv[0]=0.0
@@ -424,35 +425,59 @@ cdef class ValveModel(object):
         """
         For a given set of states, and a known valve lift, first
         check whether it is within the valve lift range, and then
+        calculate the flow velocity
         """
         if State_up.get_p()<State_down.get_p():
             return 0.0
         try:
             #Need a dummy value for the area to get a flow velocity even when the valve is closed
             A_dummy=0.001 
-            mdot,others=IsentropicNozzle(A_dummy,State_up,State_down,full_output=True)
-            return others['v']
+            return IsentropicNozzle(A_dummy,State_up,State_down,other_output=bytes('v'))
         except ZeroDivisionError:
             return 0.0
         
     @cython.cdivision(True)
-    cpdef list derivs(self,Core): 
+    cpdef arraym derivs(self, Core):
+        """
+        Return the position and velocity as an arraym for the valve
+        
+        Parameters
+        ----------
+        Core: PDSimCore instance
+        
+        Returns
+        -------
+        out_array: arraym instance
+        
+        """ 
+        cdef arraym out_array = empty_arraym(2)
         x=self.xv[0]
         xdot=self.xv[1]
+        
         self.get_States(Core)
+        
         rho=self.State_up.get_rho()
         p_high=self.State_up.get_p()
         p_low=self.State_down.get_p()
         deltap=(p_high-p_low)*1000
-        if deltap<0.0:
-            return [0.0,0.0]
+        
+        # Not clear why this conditional is here... 
+        if deltap < 0.0:
+            return out_array #(Its filled with zeros)
+        
         V = self.flow_velocity(self.State_up, self.State_down)
+        
         x_tr = 0.25*(self.d_port**2/self.d_valve)
+        
         if x>=x_tr:
             f=self._pressure_dominant(x,xdot,rho,V,deltap)
         else:
             f=self._flux_dominant(x,xdot,rho,V)
-        return [_dummy/Core.omega for _dummy in f] #[dxdtheta, dxdot_dtheta]
+            
+        out_array[0] = f[0]/Core.omega
+        out_array[1] = f[1]/Core.omega
+        
+        return out_array #[dxdtheta, dxdot_dtheta]
     
     cpdef dict __cdict__(self):
         items=['A_port','A_valve','d_valve','h_valve','d_port','m_eff','C_D','a_valve','l_valve',

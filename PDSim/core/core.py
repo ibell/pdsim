@@ -164,7 +164,7 @@ class PDSimCore(object):
             if self.__hasValves__:
                 setcol(self.xValves, i, 
                        range(len(self.Valves)*2), 
-                       arraym(x[Ns*Nexist::])
+                       arraym(x[Ns*Nexist:len(x)])
                        )
             
             # In the first iteration, self.core has not been filled, so do not 
@@ -320,6 +320,10 @@ class PDSimCore(object):
             return Props('T','H',h2,'P',p_outlet, inletState.Fluid)
     
     def reset_initial_state(self):
+        """
+        Reset the initial state of the core class, typically after doing a 
+        preconditioning run
+        """
         
         for k,CV in self.CVs.iteritems():
             if k in self.exists_CV_init:
@@ -327,12 +331,16 @@ class PDSimCore(object):
             else:
                 CV.exists = False
 
+        #Update the existence of each of the CV
         self.update_existence()
-        
+             
+        #Only the State variables, not the valves
         self.x_state = self.xstate_init
+        #Make a copy
         x = self.xstate_init.copy()
+        #Add the values from the valves
         if self.__hasValves__:
-            x.extend(empty_arraym(len(self.Valves)*2))
+            x.extend(empty_arraym(2*len(self.Valves)))
         self.__put_to_matrices(x, 0)
         #Reset the temporary variables
         self.xstate_init = None
@@ -468,7 +476,7 @@ class PDSimCore(object):
         
         self.t[0]=0
         
-        # if x0 is provided, use its values to initialize the chamber states
+        # If x0 is provided, use its values to initialize the chamber states
         if x0 is None:
             # self.CVs.exists_indices is a list of indices of the CV with the same order of entries
             # as the entries in self.CVs.T
@@ -478,10 +486,15 @@ class PDSimCore(object):
             self.m[self.CVs.exists_indices, 0] = self.CVs.rho*arraym(V)
 
         else:
-            x0_ = copy.copy(x0)
-            #x0 is provided
-            if self.__hasValves__:
-                x0_.extend([0]*len(self.Valves)*2)
+            #x0 is provided, but need to pad it out to include valve values
+            x0_ = x0.copy()
+            
+            # If x0 is longer than the product of the number of state variables 
+            # and CV in existence, the valve data is already included and must not be 
+            # added to the array of independent variables
+            if self.__hasValves__ and len(x0) == self.CVs.Nexist*len(self.stateVariables):
+                #Load up the rest of the array with zeros since the valves start closed and at rest
+                x0_.extend(empty_arraym(len(self.Valves)*2))
             self.__put_to_matrices(x0_, 0)
         
         # Assume all the valves to be fully closed and stationary at the beginning of cycle
@@ -501,7 +514,7 @@ class PDSimCore(object):
         N : integer
             Number of steps taken.  There will be N+1 entries in the state matrices
         x_state : 
-            The initial values of the variables (only the state variables)
+            The initial values of the variables (ONLY the state variables, no valves)
         tmin : float, optional
             Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
         tmax : float, optional
@@ -518,7 +531,7 @@ class PDSimCore(object):
             
                 Q_=heat_transfer_callback(t)
             
-            It should return a ```` instance with the same length as the number of CV in existence.  The entry in the ```` is positive if the heat transfer is TO the fluid in the CV in order to maintain the sign convention that energy (or mass) input is positive.  Will raise an error otherwise
+            It should return a ``arraym`` instance with the same length as the number of CV in existence.  The entry in the ``arraym`` is positive if the heat transfer is TO the fluid in the CV in order to maintain the sign convention that energy (or mass) input is positive.  Will raise an error otherwise
         
         """
         #Do some initialization - create arrays, etc.
@@ -528,9 +541,12 @@ class PDSimCore(object):
         t0=tmin
         h=(tmax-tmin)/(N)
         
-        #Get the beginning of the cycle configured
-        x_state.extend([0.0]*len(self.Valves)*2)
-        xold = (x_state[:])
+        # Get the beginning of the cycle configured
+        # Put a copy of the values into the matrices
+        xold = x_state.copy()
+        #Add zeros for the valves as they are assumed to start closed and at rest
+        if self.__hasValves__:
+            xold.extend(empty_arraym(len(self.Valves)*2))
         self.__put_to_matrices(xold, 0)
         
         for Itheta in range(N):
@@ -623,10 +639,9 @@ class PDSimCore(object):
         t0=tmin
         h=(tmax-tmin)/(N)
         
-        #Get the beginning of the cycle configured
-        x_state.extend([0.0]*len(self.Valves)*2)
-        xold = (x_state[:])
-        self.__put_to_matrices(xold, 0)
+        # Get the beginning of the cycle configured
+        # Put a copy of the values into the matrices
+        self.__put_to_matrices(x_state.copy(), 0)
     
         for Itheta in range(N):
             
@@ -688,7 +703,7 @@ class PDSimCore(object):
         
         Parameters
         ----------
-        x_state : 
+        x_state : arraym
             The initial values of the variables (only the state variables)
         hmin : float
             Minimum step size, something like 1e-5 usually is good.  Don't make this too big or you may not be able to get a stable solution
@@ -761,13 +776,8 @@ class PDSimCore(object):
         gamma6=2.0/55.0
         
         # Get the beginning of the cycle configured
-        #
-        # Add on the valve values to the arraym instance
-        x_state.extend(empty_arraym(len(self.Valves)*2))
-        # Make a copy
-        xold = x_state.copy()
-        # Put the values into the matrices
-        self.__put_to_matrices(xold, 0)
+        # Put a copy of the values into the matrices
+        self.__put_to_matrices(x_state.copy(), 0)
         
         #t is the independent variable here, where t takes on values in the bounded range [tmin,tmax]
         while (t0<tmax):
@@ -1133,7 +1143,7 @@ class PDSimCore(object):
         x0 : arraym
             The starting values for the solver that modifies the discharge temperature and lump temperatures
         reset_initial_state : boolean
-            If ``True``, use the stored initial state from the previous call to ``solve``
+            If ``True``, use the stored initial state from the previous call to ``solve`` as the starting value for the thermodynamic values for the control volumes
         LS_start : int
             Number of conventional steps to be taken when not using newton-raphson prior to entering into a line search
         """
@@ -1212,6 +1222,7 @@ class PDSimCore(object):
                 x_state: arraym instance
                     Contains the state variables for all the control volumes in existence, as well as the valve values
                 """
+                x_state = arraym(x_state)
                 
                 # (1). First, run all the tubes
                 for tube in self.Tubes:
@@ -1221,7 +1232,7 @@ class PDSimCore(object):
                 self.update_existence()
                 
                 #The first time this function is run, save the initial state
-                # and the existence of the CV
+                # and the existence of the CV, as well as the valve positions
                 if self.xstate_init is None:
                     self.xstate_init = x_state
                     self.exists_CV_init = self.CVs.exists_keys
@@ -1308,10 +1319,10 @@ class PDSimCore(object):
                 ##################################
             
             if UseNR:
-                self.x_state = Broyden(OBJECTIVE_CYCLE, 
+                self.x_state = Broyden(OBJECTIVE_CYCLE,
                                        self.x_state, 
                                        Nfd = 1, 
-                                       dx = 0.01*np.array(self.x_state), 
+                                       dx = 0.01*arraym(self.x_state), 
                                        itermax = 50, 
                                        ytol = 1e-4)
                 if self.x_state[0] is None:
@@ -1481,7 +1492,8 @@ class PDSimCore(object):
         """
         
         # Updates the state, calculates the volumes, prepares all the things needed for derivatives
-        self.core.properties_and_volumes(self.CVs.exists_CV, theta, STATE_VARS_TM, x)
+        self.core.properties_and_volumes(self.CVs.exists_CV, theta, STATE_VARS_TM, x)           
+            
         
         #Join the enthalpies of the CV in existence and the tubes
         harray = self.core.h.copy()
@@ -1503,11 +1515,19 @@ class PDSimCore(object):
         
         #Liquid not yet supported
         if self.__hasLiquid__:
-            return NotImplementedError()
+            raise NotImplementedError()
         
-        #Valves not yet supported
+        #Add the derivatives for the valves
         if self.__hasValves__:
-            return NotImplementedError()
+            # 
+            offset = len(self.stateVariables)*self.CVs.Nexist
+            for i,valve in enumerate(self.Valves):
+                #Get the values from the input array for this valve
+                xvalve = x[offset+i*2:offset+2+i*2]
+                #Set the values in the valve class
+                valve.set_xv(xvalve)
+                # Get the derivatives of position and derivative of velocity
+                self.core.property_derivs.extend(valve.derivs(self))
         
         return self.core.property_derivs
         

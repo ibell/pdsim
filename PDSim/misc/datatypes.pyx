@@ -44,7 +44,13 @@ cdef class arraym(object):
         cdef np.ndarray[np.float_t, ndim = 1] npdata
         
         if data is not None:
-            self.N = len(data)
+            if isinstance(data,(float,int)):
+                #It is a single value, wrap it in a list
+                self.N = 1
+                data = [data]
+            else:
+                #Its an item with a length
+                self.N = len(data)
             #Allocate the memory for the array that will be used internally
             self.data = <double *> calloc(self.N, sizeof(double))
             
@@ -322,7 +328,7 @@ cdef class arraym(object):
         if j == i:
             raise IndexError('Length of slice must be greater than 1')
         if j > self.N:
-            raise IndexError('End of slice out of bounds. Length of arraym is '+str(self.N)+' requested end is '+str(j))
+            raise IndexError('End of slice out of bounds. Length of arraym is '+str(self.N)+' and requested end is '+str(j))
         
         arr.set_size(j-i)
         memcpy(arr.data,self.data+i,(j-i)*sizeof(double))

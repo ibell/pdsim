@@ -24,15 +24,15 @@ import os, sys
 # If the following line is uncommented, python will try to use a local version
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
-#sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('..'))
 
 #Here we import the things from PDSim we need
 from PDSim.flow.flow import FlowPath
 from PDSim.flow import flow_models
+from PDSim.misc.datatypes import arraym
 from PDSim.core.containers import ControlVolume
 from PDSim.core.core import Tube,PDSimCore
 from PDSim.plot.plots import debug_plots
-from PDSim.misc._listmath import listm
 
 #Imports from CoolProp (fluid property database)
 from CoolProp import State
@@ -103,12 +103,12 @@ class PURecip(PDSimCore):
         A callback used by PDSimCore.derivs to calculate the heat transfer
         to the gas in the working chamber.
         
-        We return a listm instance as long as the number of CV in existence
+        We return an arraym instance the same length as the number of CV in existence
         
         More code (a proper heat transfer model) could be included here, like 
         in PDSim.recip.core
         """
-        return listm([0.0]*self.CVs.N)
+        return arraym([0.0]*self.CVs.N)
         
     def mechanical_losses(self):
         """

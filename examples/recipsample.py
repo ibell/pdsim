@@ -13,7 +13,7 @@ from PDSim.flow import flow_models
 from PDSim.core.containers import ControlVolume
 from PDSim.core.core import Tube,PDSimCore
 from PDSim.plot.plots import debug_plots
-from PDSim.misc._listmath import listm
+from PDSim.misc.datatypes import arraym
 from CoolProp import State
 from CoolProp import CoolProp as CP
 from PDSim.flow.flow_models import ValveModel
@@ -50,7 +50,7 @@ def Compressor():
     Ref='R410A'
     inletState=State.State(Ref,dict(T=289.15, D=33.1))
     p_outlet = inletState.p*2.5
-    T2s = recip.isentropic_outlet_temp(inletState,p_outlet)
+    T2s = recip.guess_outlet_temp(inletState,p_outlet)
     outletState=State.State(Ref,{'T':T2s,'P':p_outlet})
     mdot_guess = inletState.rho*recip.Vdisp()*recip.omega/(2*pi)
     

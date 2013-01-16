@@ -103,7 +103,7 @@ cdef class CVArrays(object):
         theta : double
             Crank angle [radians]
         state_vars : int
-            Flag for the set of input variables - one of STATE_VARS_TM or STATE_VARS_TD
+            Flag for the set of input variables - one of STATE_VARS_TM or STATE_VARS_TD defined in this module
         x : arraym
             List of state variables corresponding to the state_vars flag
         """
