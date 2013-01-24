@@ -10,7 +10,6 @@ or heat transfer to chamber
 For illustrative purposes only!
 """
 
-
 ##########################################
 ###          Part 1. Imports           ###
 ##########################################
@@ -24,7 +23,7 @@ import os, sys
 # If the following line is uncommented, python will try to use a local version
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
-sys.path.insert(0, os.path.abspath('..'))
+#sys.path.insert(0, os.path.abspath('..'))
 
 #Here we import the things from PDSim we need
 from PDSim.flow.flow import FlowPath
@@ -188,13 +187,14 @@ def Compressor():
     
     t1=clock()
     recip.EulerN = 4000
+    recip.RK45_eps = 1e-10
     recip.solve(key_inlet='inlet.1',
                 key_outlet='outlet.2',
                 endcycle_callback=recip.endcycle_callback, # Provided by PDSimCore
                 heat_transfer_callback=recip.heat_transfer_callback,
                 lump_energy_balance_callback = recip.lump_energy_balance_callback,
                 valves_callback =recip.valves_callback,
-                solver_method = 'Euler',
+                solver_method = 'RK45',
                 OneCycle = False,
                 UseNR = True
                 )

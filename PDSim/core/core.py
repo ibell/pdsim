@@ -15,7 +15,7 @@ from containers import ControlVolumeCollection,Tube,TubeCollection
 from PDSim.plot.plots import debug_plots
 from PDSim.misc.solvers import Broyden,MultiDimNewtRaph
 from PDSim.misc.datatypes import arraym, empty_arraym
-from _core import delimit_vector, setcol, getcol
+from _core import delimit_vector, setcol, getcol, _PDSimCore
 
 ##-- Non-package imports  --
 import numpy as np
@@ -55,7 +55,7 @@ copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 class struct(object):
     pass    
 
-class PDSimCore(object):
+class PDSimCore(_PDSimCore):
     """
     This is the main driver class for the model
     
@@ -693,7 +693,7 @@ class PDSimCore(object):
         self.post_cycle()
         return
         
-    def cycle_RK45(self,x_state,hmin=1e-4,tmin=0,tmax=2.0*pi,eps_allowed=1e-10,step_relax=0.9,
+    def cycle_RK45(self,x_state,tmin=0,tmax=2.0*pi,hmin=1e-4,eps_allowed=1e-10,step_relax=0.9,
               step_callback=None,heat_transfer_callback=None,valves_callback = None,
               UseCashKarp=True,**kwargs):
         """
@@ -768,16 +768,20 @@ class PDSimCore(object):
         t0=tmin
         h=hmin
         
+        # Get the beginning of the cycle configured
+        # Put a copy of the values into the matrices
+        xold = x_state.copy()
+        #Add zeros for the valves as they are assumed to start closed and at rest
+        if self.__hasValves__:
+            xold.extend(empty_arraym(len(self.Valves)*2))
+        self.__put_to_matrices(xold, 0)
+        
         gamma1=16.0/135.0
         gamma2=0.0
         gamma3=6656.0/12825.0
         gamma4=28561.0/56430.0
         gamma5=-9.0/50.0
         gamma6=2.0/55.0
-        
-        # Get the beginning of the cycle configured
-        # Put a copy of the values into the matrices
-        self.__put_to_matrices(x_state.copy(), 0)
         
         #t is the independent variable here, where t takes on values in the bounded range [tmin,tmax]
         while (t0<tmax):

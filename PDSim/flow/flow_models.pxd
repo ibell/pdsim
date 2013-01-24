@@ -12,7 +12,7 @@ from PDSim.flow._flow import FlowPath
 from PDSim.flow._flow cimport FlowPath
 
 from PDSim.misc.datatypes import arraym, empty_arraym
-from PDSim.misc.datatypes cimport arraym
+from PDSim.misc.datatypes cimport arraym, empty_arraym
     
 from libc.math cimport exp, log, M_PI as pi, M_E as e, sqrt
 
@@ -36,7 +36,7 @@ mdot=cython.double,
 T_down=cython.double,
 rho_down=cython.double,
 otherparameters=cython.dict,)
-cpdef double IsentropicNozzle(double A, State State_up, State State_down, bytes other_output=*)
+cpdef double IsentropicNozzle(double A, State State_up, State State_down, int other_output=*)
 
 cdef class FlowFunctionWrapper(object):
     
@@ -66,11 +66,9 @@ cdef class ValveModel(object):
     @cython.locals(exists_keys = cython.list, key = cython.bytes)
     cpdef get_States(self, Core)
     
-    cpdef tuple _pressure_dominant(self,double x, double xdot, double rho, double V, double deltap)
-    cpdef tuple _flux_dominant(self,double x, double xdot, double rho, double V)
+    cdef _pressure_dominant(self,arraym f, double x, double xdot, double rho, double V, double deltap)
+    cdef _flux_dominant(self,arraym f, double x, double xdot, double rho, double V)
     cpdef double flow_velocity(self,State State_up, State State_down)
-    
-    @cython.locals(V=cython.double,x=cython.double,xdot=cython.double,x_tr=cython.double)
     cpdef arraym derivs(self, Core)
     cpdef dict __cdict__(self)
 

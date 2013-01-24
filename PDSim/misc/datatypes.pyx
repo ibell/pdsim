@@ -24,8 +24,8 @@ class Collector(object):
     def __repr__(self):
         return str(self.vec)
     
-    def v(self):
-        return np.array(self.vec, ndmin = 2)
+    def v(self,ndmin = 2):
+        return np.array(self.vec, ndmin = ndmin)
     
 @cython.final
 cdef class arraym(object):
@@ -319,6 +319,12 @@ cdef class arraym(object):
     @cython.returns(double)
     def __getitem__(self, int i):
         return self.data[i]
+    
+    cpdef double get_index(self, int i):
+        return self.data[i]
+    
+    cpdef double set_index(self, int i, double val):
+        self.data[i] = val
     
     cdef arraym slice(self, int i, int j):
         cdef int k

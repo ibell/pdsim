@@ -3,11 +3,6 @@ from math import pi
 from time import clock
 import sys, os
 
-# If the following line is uncommented, python will try to use a local version
-# of PDSim.  This is handy for debugging purposes.  Generally you want this line 
-# commented out
-sys.path.insert(0, os.path.abspath('..'))
-
 from PDSim.flow.flow import FlowPath
 from PDSim.flow import flow_models
 from PDSim.core.containers import ControlVolume
@@ -118,7 +113,7 @@ def Compressor():
 
     recip.EulerN = 5000
     recip.HeunN = 3000
-    recip.RK45_eps = 1e-10
+    recip.RK45_eps = 1e-9
     t1=clock()
     
     recip.precond_solve(key_inlet='inlet.1',key_outlet='outlet.2',
@@ -126,7 +121,7 @@ def Compressor():
                 heat_transfer_callback=recip.heat_transfer_callback,
                 lump_energy_balance_callback = recip.lump_energy_balance_callback,
                 valves_callback =recip.valves_callback,
-                solver_method = 'Euler',
+                solver_method = 'RK45',
                 OneCycle = False,
                 UseNR = True,
                 )

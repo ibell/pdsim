@@ -6,7 +6,7 @@ from __future__ import division
 import cython
 cimport cython
 
-from PDSim.misc.datatypes import arraym, empty_arraym
+
 
 #Uncomment this line to use the python math functions
 #from math import log,pi,e,pow,sqrt
@@ -18,6 +18,10 @@ This is the module that contains all the flow models
 cdef public enum:
     TYPE_RADIAL
     TYPE_FLANK
+    
+cdef public enum:
+    OUTPUT_VELOCITY
+    OUTPUT_MA
 
 cdef double ar_0 = 25932.1070099
 cdef double ar_1 = 0.914825434095
@@ -395,31 +399,33 @@ cdef class ValveModel(object):
             if key in exists_keys:
                 setattr(self,Statevar,Core.CVs[key].State)
             elif key in Tubes_Nodes:
-                setattr(self,Statevar,Tubes_Nodes[key])                  
+                setattr(self,Statevar,Tubes_Nodes[key])              
     
-    cpdef tuple _pressure_dominant(self,double x, double xdot, double rho, double V, double deltap):
-        dxdt = xdot
-        dxdot_dt = (0.5*self.C_D*rho*(V-xdot)**2*self.A_valve+deltap*self.A_valve-self.k_valve*x)/(self.m_eff)
-        return (dxdt,dxdot_dt)
+    @cython.cdivision(True)
+    cdef _pressure_dominant(self, arraym f, double x, double xdot, double rho, double V, double deltap):
+        f.set_index(0, xdot) #dxdt
+        f.set_index(1, (0.5*self.C_D*rho*(V-xdot)**2*self.A_valve+deltap*self.A_valve-self.k_valve*x)/(self.m_eff)) #dxdotdt
+        return
         
-    cpdef tuple _flux_dominant(self,double x, double xdot, double rho, double V):
-        dxdt = xdot
-        dxdot_dt = (0.5*self.C_D*rho*(V-xdot)**2*self.A_valve+rho*(V-xdot)**2*self.A_port-self.k_valve*x)/(self.m_eff)
-        return (dxdt,dxdot_dt)
+    @cython.cdivision(True)
+    cdef _flux_dominant(self, arraym f, double x, double xdot, double rho, double V):
+        f.set_index(0, xdot) #dxdt
+        f.set_index(1, (0.5*self.C_D*rho*(V-xdot)**2*self.A_valve+rho*(V-xdot)**2*self.A_port-self.k_valve*x)/(self.m_eff)) #dxdotdt
+        return
     
     cpdef set_xv(self, arraym xv):
         #If xv[0] is less than zero, just use zero
-        if xv[0]<0.0:
-            xv[0]=0.0
-            xv[1]=0.0
+        if xv.get_index(0)<0.0:
+            xv.set_index(0,0.0)
+            xv.set_index(1,0.0)
         #If it predicts a valve opening greater than max opening, just use the max opening
-        elif xv[0]>self.x_stopper:
-            xv[0]=self.x_stopper
-            xv[1]=0.0
+        elif xv.get_index(0)>self.x_stopper:
+            xv.set_index(0,self.x_stopper)
+            xv.set_index(1,0.0)
         self.xv=xv
         
     cpdef double A(self):
-        return pi*self.xv[0]*self.d_valve
+        return pi*self.xv.get_index(0)*self.d_valve
     
     cpdef double flow_velocity(self,State State_up, State State_down):
         """
@@ -427,14 +433,12 @@ cdef class ValveModel(object):
         check whether it is within the valve lift range, and then
         calculate the flow velocity
         """
+        cdef double v
         if State_up.get_p()<State_down.get_p():
             return 0.0
-        try:
             #Need a dummy value for the area to get a flow velocity even when the valve is closed
-            A_dummy=0.001 
-            return IsentropicNozzle(A_dummy,State_up,State_down,other_output=bytes('v'))
-        except ZeroDivisionError:
-            return 0.0
+        A_dummy=0.001 
+        return IsentropicNozzle(A_dummy,State_up,State_down,OUTPUT_VELOCITY)
         
     @cython.cdivision(True)
     cpdef arraym derivs(self, Core):
@@ -450,9 +454,11 @@ cdef class ValveModel(object):
         out_array: arraym instance
         
         """ 
+        cdef double omega
+        cdef arraym f = empty_arraym(2)
         cdef arraym out_array = empty_arraym(2)
-        x=self.xv[0]
-        xdot=self.xv[1]
+        x=self.xv.get_index(0)
+        xdot=self.xv.get_index(1)
         
         self.get_States(Core)
         
@@ -470,12 +476,13 @@ cdef class ValveModel(object):
         x_tr = 0.25*(self.d_port**2/self.d_valve)
         
         if x>=x_tr:
-            f=self._pressure_dominant(x,xdot,rho,V,deltap)
+            self._pressure_dominant(f,x,xdot,rho,V,deltap)
         else:
-            f=self._flux_dominant(x,xdot,rho,V)
+            self._flux_dominant(f,x,xdot,rho,V)
             
-        out_array[0] = f[0]/Core.omega
-        out_array[1] = f[1]/Core.omega
+        omega = Core.omega
+        out_array.set_index(0, f.get_index(0)/omega)
+        out_array.set_index(1, f.get_index(1)/omega)
         
         return out_array #[dxdtheta, dxdot_dtheta]
     
@@ -498,7 +505,7 @@ cdef class ValveModel(object):
         return rebuildValveModel,(self.__cdict__(),)
 
 @cython.cdivision(True)        
-cpdef double IsentropicNozzle(double A, State State_up, State State_down, bytes other_output = None):
+cpdef double IsentropicNozzle(double A, State State_up, State State_down, int other_output = -1):
     """
     The mass flow rate is calculated by using isentropic flow model
     
@@ -559,11 +566,11 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, bytes 
         Ma=1.0
     
 
-    if other_output is None:
+    if other_output < 0:
         return mdot
-    elif other_output == 'v':
+    elif other_output == OUTPUT_VELOCITY:
         return v
-    elif other_output == 'Ma':
+    elif other_output == OUTPUT_MA:
         return Ma
      
 @cython.cdivision(True)

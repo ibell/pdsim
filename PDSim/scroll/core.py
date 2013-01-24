@@ -1132,7 +1132,7 @@ class Scroll(PDSimCore, _Scroll):
         else:
             return 'd1' if inner_outer == 'i' else 'd2'
         
-    def Injection_to_Comp(self,FlowPath,phi,inner_outer,check_valve = False, **kwargs):
+    def Injection_to_Comp(self,FlowPath,phi,inner_outer,check_valve = False, A = 0.001, **kwargs):
         """
         Function to calculate flow rate between injection line and chamber
         
@@ -1152,7 +1152,7 @@ class Scroll(PDSimCore, _Scroll):
         #1. Figure out what CV is connected to the port
         partner_key = self._get_injection_CVkey(phi, self.theta, inner_outer)
 
-        FlowPath.A = 3*pi*(0.001)**2/4.0
+        FlowPath.A = A
         #2. Based on what CV is connected to the port, maybe quit
         if partner_key in ['d1', 'd2'] and 'ddd' in [FlowPath.key_up, 
                                                      FlowPath.key_down]:

@@ -6,8 +6,12 @@ cimport cython
 import numpy as np
 cimport numpy as np
 
-from PDSim.misc.datatypes import arraym
-from PDSim.misc.datatypes cimport arraym
+from libc.math cimport M_PI as pi
+
+from PDSim.misc.datatypes import arraym, empty_arraym
+from PDSim.misc.datatypes cimport arraym, empty_arraym
+
+from libcpp cimport bool
 
 cpdef list getcol(np.ndarray[np.float_t, ndim=2] mat, int colIndex, list indices):
     cdef int i,j

@@ -212,7 +212,7 @@ def coords_norm(phi_vec,geo,theta,flag="fi"):
         (nx,ny) : tuple of unit normal coordinates pointing towards scroll wrap
     """
     
-    phi_i0=geo.phi_i0
+    phi_i0=geo.phi_i0   
     phi_o0=geo.phi_o0
     phi_ie=geo.phi_ie
     rb=geo.rb
