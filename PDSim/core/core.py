@@ -9,7 +9,7 @@ from cPickle import loads, dumps
 
 ##--  Package imports  --
 from PDSim.flow import _flow,flow_models
-from PDSim.core._containers import STATE_VARS_TM, CVArrays
+from _containers import STATE_VARS_TM, CVArrays
 from PDSim.flow.flow import FlowPathCollection, FlowPath
 from containers import ControlVolumeCollection,Tube,TubeCollection
 from PDSim.plot.plots import debug_plots
@@ -1665,7 +1665,6 @@ class PDSimCore(_PDSimCore):
         new_T_list = [newT[key] for key in self.CVs.keys() if key in newT]
         new_rho_list = [new_rho[key] for key in self.CVs.keys() if key in new_rho]
         
-        
         #Reset the exist flags for the CV - this should handle all the possibilities
         #Turn off the LHS CV
         for key in LHS:
@@ -1689,7 +1688,9 @@ class PDSimCore(_PDSimCore):
             else:
                 raise KeyError
             
-        V, dV=self.CVs.volumes(0.0, as_dict = True)
+        # Calculate the volumes at the beginning of the next rotation
+        self.core.just_volumes(self.CVs.exists_CV, 0)
+        V = {key:V for key,V in zip(self.CVs.exists_keys,self.core.V)}
         new_mass_list = [new_rho[key]*V[key] for key in self.CVs.exists_keys]
         
         new_list = []

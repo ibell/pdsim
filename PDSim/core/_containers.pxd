@@ -41,6 +41,8 @@ cdef class CVArrays(object):
     cdef build_all(self, int N)
     cdef free_all(self)
     
+    cpdef just_volumes(self, CVs, double theta)
+    
     cpdef properties_and_volumes(self, CVs, double theta, int state_vars, arraym x)
     #
     cpdef calculate_flows(self, Flows, harray, Core)

@@ -92,6 +92,29 @@ cdef class CVArrays(object):
         self.build_all(N)
         
     @cython.cdivision(True)    
+    cpdef just_volumes(self, CVs, double theta):
+        """
+        Just calculate the volumes
+        for each control volume.
+        
+        Parameters
+        ----------
+        CVs : list of control volumes
+        theta : double
+            Crank angle [radians]
+        """
+        cdef int N = len(CVs)
+        
+        for iCV in range(N):
+            # Early-bind the control volume for speed
+            CV = CVs[iCV]
+            
+            # Calculate the volume and derivative of volume - does not depend on
+            # any of the other state variables
+            self.V.data[iCV], self.dV.data[iCV] = CV.V_dV(theta, **CV.V_dV_kwargs)
+        
+    
+    @cython.cdivision(True)    
     cpdef properties_and_volumes(self, CVs, double theta, int state_vars, arraym x):
         """
         Calculate all the required thermodynamic properties as well as the volumes
@@ -108,7 +131,6 @@ cdef class CVArrays(object):
             List of state variables corresponding to the state_vars flag
         """
         cdef StateClass State
-        cdef tuple V_dV
         cdef int N = len(CVs)
         cdef int iCV, iVar
         cdef arraym T,rho,m
