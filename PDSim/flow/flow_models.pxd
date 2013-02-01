@@ -38,17 +38,17 @@ rho_down=cython.double,
 otherparameters=cython.dict,)
 cpdef double IsentropicNozzle(double A, State State_up, State State_down, int other_output=*)
 
-cdef class FlowFunctionWrapper(object):
+cdef class FlowFunction(object):
     
     cpdef double call(self, FlowPath FP)
     
-cdef class PyFlowFunctionWrapper(FlowFunctionWrapper):
+cdef class PyFlowFunctionWrapper(FlowFunction):
     cdef dict kwargs
     cdef public object Function
     
     cpdef double call(self, FlowPath FP)
     
-cdef class IsentropicNozzleWrapper(FlowFunctionWrapper):
+cdef class IsentropicNozzleWrapper(FlowFunction):
     cpdef double call(self, FlowPath FP)
     
 @cython.locals(Re = cython.double, v = cython.double)

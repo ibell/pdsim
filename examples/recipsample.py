@@ -111,7 +111,7 @@ def Compressor():
           )
     recip.add_valve(recip.discharge_valve)
 
-    recip.EulerN = 5000
+    recip.EulerN = 4000
     recip.HeunN = 3000
     recip.RK45_eps = 1e-9
     t1=clock()
@@ -121,7 +121,7 @@ def Compressor():
                 heat_transfer_callback=recip.heat_transfer_callback,
                 lump_energy_balance_callback = recip.lump_energy_balance_callback,
                 valves_callback =recip.valves_callback,
-                solver_method = 'RK45',
+                solver_method = 'Euler',
                 OneCycle = False,
                 UseNR = True,
                 )

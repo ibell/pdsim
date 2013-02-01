@@ -8,8 +8,8 @@ from libcpp.pair cimport pair
 from libcpp.map cimport map
 from cython.operator cimport dereference as deref, preincrement as inc
     
-from PDSim.flow.flow_models import FlowFunctionWrapper
-from PDSim.flow.flow_models cimport FlowFunctionWrapper
+from PDSim.flow.flow_models import FlowFunction
+from PDSim.flow.flow_models cimport FlowFunction
 
 from PDSim.misc.datatypes import arraym
 from PDSim.misc.datatypes cimport arraym
@@ -31,7 +31,7 @@ cdef class FlowPath(object):
     cdef public bytes key_up, key_down, key1, key2, Gas
     cdef int ikey1, ikey2, ikey_up, ikey_down
     cdef public double mdot, h_up, T_up, p_up, p_down, A
-    cdef public FlowFunctionWrapper MdotFcn
+    cdef public FlowFunction MdotFcn
     cdef public State State1,State2,State_up,State_down
     
     cpdef dict __cdict__(self, AddStates = *)

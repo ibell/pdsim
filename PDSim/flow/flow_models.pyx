@@ -49,18 +49,21 @@ cdef double af_9 = 0.689497785772
 cdef double af_10 = 1.09607735134
 cdef double Re_star_flank = 826.167177885
     
-cdef class PyFlowFunctionWrapper(FlowFunctionWrapper):
+cdef class PyFlowFunctionWrapper(FlowFunction):
     """
-    This function is defined at the in order to do high-level 
-    mass flow functions that are slower but can still be accessed by the 
-    Cython code. 
+    This class is defined in order to wrap python functions for ease-of-use.
     """
     def __init__(self,Function,kwargs):
         self.Function = Function
         self.kwargs = kwargs
         
     cpdef double call(self,FlowPath FP):
-        return self.Function(FP,**self.kwargs)
+        cdef double val
+        try:
+            val = self.Function(FP, **self.kwargs)
+        except ValueError:
+            raise ValueError("Wrapped function in PyFlowFunctionWrapper did not return a floating point value")
+        return val
     
     def __reduce__(self):
         if not isinstance(self.Function,str):
@@ -73,7 +76,7 @@ def makePyFlowFunctionWrapper(kwds):
     # A stub function to rebuild for pickling
     return PyFlowFunctionWrapper(**kwds)
         
-cdef class IsentropicNozzleWrapper(FlowFunctionWrapper):
+cdef class IsentropicNozzleWrapper(FlowFunction):
     """
     A wrapper that can be added to call the isentropic nozzle model
     if the flow area is constant
@@ -94,15 +97,15 @@ def makeIsentropicNozzleWrapper(kwds):
     # A stub function to rebuild for pickling
     return IsentropicNozzleWrapper()
 
-cdef class FlowFunctionWrapper(object):
+cdef class FlowFunction(object):
     """
     A wrapper to contain the function that will be called
     
     Two methods are provided, call(FP) and __call__(FP).  The special method
-     __call__(FP) allows an instance of FlowFunctionWrapper to be called 
+     __call__(FP) allows an instance of FlowFunction to be called 
      directly like:: 
      
-         FFW = FlowFunctionWrapper()
+         FFW = FlowFunction()
          FFW(FP)
          
      or you can call the call() method like::

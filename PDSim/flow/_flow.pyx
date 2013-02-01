@@ -240,7 +240,7 @@ cdef class FlowPath(object):
         
         # You are passing in a pre-wrapped function - will be nice and fast since
         # all the calls will stay at the C++ layer
-        if isinstance(MdotFcn, FlowFunctionWrapper):
+        if isinstance(MdotFcn, FlowFunction):
             self.MdotFcn = MdotFcn
         else:
             # Add the bound method in a wrapper - this will keep the calls at
@@ -291,7 +291,7 @@ cdef class FlowPath(object):
         calculate
         """
         cdef double p1, p2
-        cdef FlowFunctionWrapper FW
+        cdef FlowFunction FF
         #The states of the chambers
         p1=self.State1.get_p()
         p2=self.State2.get_p()
@@ -327,8 +327,8 @@ cdef class FlowPath(object):
             self.ikey_down = self.ikey1
             self.Gas=self.State2.Fluid
             
-        FW = self.MdotFcn
-        self.mdot = FW.call(self)
+        FF = self.MdotFcn
+        self.mdot = FF.call(self)
         
     def __reduce__(self):
         return rebuildFlowPath,(self.__getstate__(),)

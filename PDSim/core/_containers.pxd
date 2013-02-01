@@ -3,6 +3,9 @@ from CoolProp.State cimport State as StateClass
 
 from libcpp cimport bool
 
+from PDSim.flow._flow import FlowPathCollection
+from PDSim.flow._flow cimport FlowPathCollection
+
 from PDSim.misc.datatypes cimport arraym
 from PDSim.misc.datatypes import arraym
     
@@ -45,7 +48,7 @@ cdef class CVArrays(object):
     
     cpdef properties_and_volumes(self, CVs, double theta, int state_vars, arraym x)
     #
-    cpdef calculate_flows(self, Flows, harray, Core)
+    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, Core)
     
     cpdef calculate_derivs(self, double omega, bint has_liquid)
     

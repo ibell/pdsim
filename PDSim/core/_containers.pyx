@@ -174,7 +174,7 @@ cdef class CVArrays(object):
         self.N = N
         self.state_vars = state_vars
     
-    cpdef calculate_flows(self, Flows, harray, Core):
+    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, Core):
         """
         Calculate the flows between tubes and control volumes and sum up the flow-related terms 
         """

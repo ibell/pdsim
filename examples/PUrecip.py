@@ -194,7 +194,7 @@ def Compressor():
                 heat_transfer_callback=recip.heat_transfer_callback,
                 lump_energy_balance_callback = recip.lump_energy_balance_callback,
                 valves_callback =recip.valves_callback,
-                solver_method = 'RK45',
+                solver_method = 'Euler',
                 OneCycle = False,
                 UseNR = True
                 )
