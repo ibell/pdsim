@@ -1,4 +1,4 @@
-
+from __future__ import division
 cimport cython
     
 cdef public enum STATE_VARS:
@@ -90,8 +90,7 @@ cdef class CVArrays(object):
     cpdef update_size(self, int N):
         self.free_all()
         self.build_all(N)
-        
-    @cython.cdivision(True)    
+         
     cpdef just_volumes(self, CVs, double theta):
         """
         Just calculate the volumes
@@ -103,6 +102,7 @@ cdef class CVArrays(object):
         theta : double
             Crank angle [radians]
         """
+        
         cdef int N = len(CVs)
         
         for iCV in range(N):
@@ -112,7 +112,6 @@ cdef class CVArrays(object):
             # Calculate the volume and derivative of volume - does not depend on
             # any of the other state variables
             self.V.data[iCV], self.dV.data[iCV] = CV.V_dV(theta, **CV.V_dV_kwargs)
-        
     
     @cython.cdivision(True)    
     cpdef properties_and_volumes(self, CVs, double theta, int state_vars, arraym x):
@@ -136,47 +135,53 @@ cdef class CVArrays(object):
         cdef arraym T,rho,m
         cdef arraym var1, var2 #Arrays to hold the state values for T,rho for instance
         
+        #Calculate the volumes
+        self.just_volumes(CVs,theta)
+        
         # Split the state variable array into chunks
-        T = x.slice(0,N)
+        self.T = x.slice(0,N)
         if state_vars == STATE_VARS_TM:
             m = x.slice(N, 2*N)
+            self.m.set_data(m.data,N)
+            for iCV in range(N):
+                self.rho.data[iCV] = self.m.data[iCV]/self.V.data[iCV]
         elif state_vars == STATE_VARS_TD:
             rho = x.slice(N, 2*N)
+            self.rho.set_data(rho.data, N)
+            for iCV in range(N):
+                self.m.data[iCV] = self.rho.data[iCV]*self.V.data[iCV]
+        
+        for iCV in range(N):
+            self.v.data[iCV] = 1/self.rho.data[iCV]
         
         for iCV in range(N):
             # Early-bind the control volume and State for speed
             CV = CVs[iCV]
             State = CV.State
+
+            # Update the CV state variables using temperature and density
+            State.update_Trho(self.T.data[iCV], self.rho.data[iCV])
             
-            # Calculate the volume and derivative of volume - does not depend on
-            # any of the other state variables
-            self.V.data[iCV], self.dV.data[iCV] = CV.V_dV(theta, **CV.V_dV_kwargs)
-            
-            # Update the state variables
-            if state_vars == STATE_VARS_TM:
-                # Update the CV state variables using temperature and mass
-                State.update_Trho(T.data[iCV], m.data[iCV] / self.V.data[iCV])
-            elif state_vars == STATE_VARS_TD:
-                # Update the CV state variables using temperature and density
-                State.update_Trho(T.data[iCV], rho.data[iCV])
-            
-            self.T.data[iCV] = State.get_T()
             self.p.data[iCV] = State.get_p()
-            self.rho.data[iCV] = State.get_rho()
             self.h.data[iCV] = State.get_h()
             self.cp.data[iCV] = State.get_cp()
             self.cv.data[iCV] = State.get_cv()
             self.dpdT_constV.data[iCV] = State.get_dpdT()
-            
-            self.m.data[iCV] = self.rho.data[iCV] * self.V.data[iCV]
-            self.v.data[iCV] = 1 / self.rho.data[iCV]
         
         self.N = N
         self.state_vars = state_vars
     
     cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, Core):
         """
-        Calculate the flows between tubes and control volumes and sum up the flow-related terms 
+        Calculate the flows between tubes and control volumes and sum up the 
+        flow-related terms
+        
+        Parameters
+        ----------
+        Flows: :class:`PDSim.core.flow._flow.FlowPathCollection` instance
+        harray: :class:`PDSim.misc.datatypes.arraym` instance
+            An array,
+        
         """
         cdef int i
         cdef arraym summerdm, summerdT

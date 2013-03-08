@@ -20,4 +20,6 @@ Subpackages
     PDSim.plot
     PDSim.recip
     PDSim.scroll
+    PDSim.callbacks
+    PDSim.cycleintegrators
 

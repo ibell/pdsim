@@ -1,11 +1,11 @@
-
 from __future__ import division
-import gc
+
 from math import pi
 import textwrap
 import copy
 from time import clock
 from cPickle import loads, dumps
+import inspect
 
 ##--  Package imports  --
 from PDSim.flow import _flow,flow_models
@@ -13,9 +13,10 @@ from _containers import STATE_VARS_TM, CVArrays
 from PDSim.flow.flow import FlowPathCollection, FlowPath
 from containers import ControlVolumeCollection,Tube,TubeCollection
 from PDSim.plot.plots import debug_plots
-from PDSim.misc.solvers import Broyden,MultiDimNewtRaph
+from PDSim.misc.solvers import Broyden, MultiDimNewtRaph
 from PDSim.misc.datatypes import arraym, empty_arraym
 from _core import delimit_vector, setcol, getcol, _PDSimCore
+import PDSim.core.callbacks
 
 ##-- Non-package imports  --
 import numpy as np
@@ -60,10 +61,20 @@ class PDSimCore(_PDSimCore):
     This is the main driver class for the model
     
     This class is not intended to be run on its own.  It must be subclassed and extended to provide functions for mass flow, etc. 
+    
+    The basic order of steps that should be followed can be summarized as
+    #. Instantiate the subclass of PDSimCore
+    #. Add each of the control volumes
+    #. Add each of the tubes
+    #. Add all the flow models between CV and tubes
+    #. Add valves (if applicable)
+    #. Connect the callbacks for heat transfer, step, etc.
+    #. Run the model
+    
     """
     def __init__(self,stateVariables=None):
         """
-        Initialization of the PD Core
+        Initialization of the PDSimCore
         
         Parameters
         ----------
@@ -94,15 +105,16 @@ class PDSimCore(_PDSimCore):
         self.xstate_init = None
         
         #: A storage of the initial valves vector
-        
-        
         if isinstance(stateVariables,(list,tuple)):
             self.stateVariables=list(stateVariables)
         else:
             self.stateVariables=['T','M']
         self._want_abort = False
+        
+        #Build a structure to hold all the callbacks
+        self.callbacks = PDSim.core.callbacks.CallbackContainer()
     
-    def __get_from_matrices(self,i):
+    def _get_from_matrices(self,i):
         """
         Get values back from the matrices and reconstruct the state variable list
         """
@@ -127,7 +139,7 @@ class PDSimCore(_PDSimCore):
                 
             return arraym(VarList)
         
-    def __statevars_to_dict(self,x):
+    def _statevars_to_dict(self,x):
         d={}
         for iS,s in enumerate(self.stateVariables):
             x_=(x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)])
@@ -139,7 +151,7 @@ class PDSimCore(_PDSimCore):
                 d['M']=x_
         return d
         
-    def __put_to_matrices(self,x,i):
+    def _put_to_matrices(self,x,i):
         """
         Take a state variable list and put back in numpy matrices
         """
@@ -180,7 +192,7 @@ class PDSimCore(_PDSimCore):
             setcol(self.h, i, exists_indices, self.core.h)    
             setcol(self.Q, i, exists_indices, self.core.Q)
     
-    def __postprocess_flows(self):
+    def _postprocess_flows(self):
         """
         In this private method, the flows from each of the flow nodes are summed for 
         each step of the revolution, and then averaged flow rates are calculated.
@@ -274,7 +286,7 @@ class PDSimCore(_PDSimCore):
             
         self.mdot = self.FlowsProcessed.mean_mdot[self.key_inlet]
             
-    def __postprocess_HT(self):    
+    def _postprocess_HT(self):    
         self.HTProcessed=struct()
         r = range(self.Ntheta)
         
@@ -341,7 +353,7 @@ class PDSimCore(_PDSimCore):
         #Add the values from the valves
         if self.__hasValves__:
             x.extend(empty_arraym(2*len(self.Valves)))
-        self.__put_to_matrices(x, 0)
+        self._put_to_matrices(x, 0)
         #Reset the temporary variables
         self.xstate_init = None
         self.exists_CV_init = None
@@ -385,11 +397,10 @@ class PDSimCore(_PDSimCore):
         
         Parameters
         ----------
-        CV : Control Volume instance
-            An initialized control volume.  See :class:`PDSim.core.containers.ControlVolume`
-            
+        CV : :class:`ControlVolume <PDSim.core.containers.ControlVolume>` instance
+            An initialized control volume
         """
-
+        
         if CV.key in self.CVs:
             raise KeyError('Sorry but the key for your Control Volume ['+CV.key+'] is already in use')
         
@@ -402,8 +413,8 @@ class PDSimCore(_PDSimCore):
         
         Parameters
         ----------
-        Tube : Tube instance
-            An initialized Tube.  See :class:`PDSim.core.core.Tube`
+        Tube : :class:`Tube <PDSim.core.core.Tube>` instance
+            An initialized tube.
         """
         #Add it to the list
         self.Tubes.append(Tube)
@@ -411,19 +422,19 @@ class PDSimCore(_PDSimCore):
         
     def add_valve(self,Valve):
         """
-        Add a valve to the model.  Alternatively call PDSimCore.Valves.append(Tube)
+        Add a valve to the model.
         
         Parameters
         ----------
-        Valve : ValveModel instance
-            An initialized Tube.  See :class:`PDSim.flow.flow_models.ValveModel`
+        Valve : :class:`ValveModel <PDSim.flow.flow_models.ValveModel>` instance
+            An initialized valve.
         """
         #Add it to the list
         self.Valves.append(Valve)
         self.__hasValves__=True
         
     def pre_run(self, N = 40000):
-        #Build the full numpy arrays for temperature, volume, etc.
+        # Build the full numpy arrays for temperature, volume, etc.
         self.t=np.zeros((N,))
         self.T=np.zeros((self.CVs.N,N))
         self.T.fill(np.nan)
@@ -437,20 +448,20 @@ class PDSimCore(_PDSimCore):
         self.xL=self.T.copy()
         self.xValves=np.zeros((2*len(self.Valves),N))
         
-        #Initialize the core class that contains the arrays and the derivs
+        # Initialize the core class that contains the arrays and the derivs
         self.core = CVArrays(0)
         
-        self.update_existence()        
+        # Update the existence of all the control volumes
+        self.update_existence()
         
-        #Initialize the control volumes
-        self.__hasLiquid__=False
+        # Set a flag about liquid flooding
+        self.__hasLiquid__ = False
         
         # If it has a motor model, try to use that to get a guess for the motor
         # losses and then also figure out whether these motor losses should be
         # added to the suction gas 
         if hasattr(self,'motor'):
             pass
-            
         
     def pre_cycle(self, x0 = None):
         """
@@ -495,7 +506,7 @@ class PDSimCore(_PDSimCore):
             if self.__hasValves__ and len(x0) == self.CVs.Nexist*len(self.stateVariables):
                 #Load up the rest of the array with zeros since the valves start closed and at rest
                 x0_.extend(empty_arraym(len(self.Valves)*2))
-            self.__put_to_matrices(x0_, 0)
+            self._put_to_matrices(x0_, 0)
         
         # Assume all the valves to be fully closed and stationary at the beginning of cycle
         self.xValves[:,0]=0
@@ -505,7 +516,7 @@ class PDSimCore(_PDSimCore):
             self.Tubes_hdict[Tube.key1]=Tube.State1.get_h()
             self.Tubes_hdict[Tube.key2]=Tube.State2.get_h()
         
-    def cycle_SimpleEuler(self,N,x_state,tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
+    def cycle_SimpleEuler(self,N,x_state,tmin=0,tmax=2*pi):
         """
         The simple Euler PDSim ODE integrator
         
@@ -519,19 +530,6 @@ class PDSimCore(_PDSimCore):
             Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
         tmax : float, optional
             Ending value for the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``] 
-        step_callback : function, optional 
-            A pointer to a function that is called at the beginning of the step.  This function must be of the form:: 
-            
-                step_callback(t,h,Itheta)
-                
-            where ``h`` is the step size that the solver wants to use, ``t`` is the current value of the independent variable, and ``Itheta`` is the index in the container variables.  The return values are ignored, so the same callback can be used as for the ``cycle_RK45`` solver 
-                
-        heat_transfer_callback : function, optional
-            If provided, the heat_transfer_callback function should have a format like::
-            
-                Q_=heat_transfer_callback(t)
-            
-            It should return a ``arraym`` instance with the same length as the number of CV in existence.  The entry in the ``arraym`` is positive if the heat transfer is TO the fluid in the CV in order to maintain the sign convention that energy (or mass) input is positive.  Will raise an error otherwise
         
         """
         #Do some initialization - create arrays, etc.
@@ -547,7 +545,7 @@ class PDSimCore(_PDSimCore):
         #Add zeros for the valves as they are assumed to start closed and at rest
         if self.__hasValves__:
             xold.extend(empty_arraym(len(self.Valves)*2))
-        self.__put_to_matrices(xold, 0)
+        self._put_to_matrices(xold, 0)
         
         for Itheta in range(N):
             #Once every 100 steps check if you are supposed to abort
@@ -555,19 +553,19 @@ class PDSimCore(_PDSimCore):
                 return 'abort'
                   
             #Call the step callback if provided
-            if step_callback is not None:
-                disable, h = step_callback(t0, h, Itheta)
+            if self.callbacks.step_callback is not None:
+                disable, h = self.callbacks.step_callback(t0, h, Itheta)
                 if disable:
                     print 'CV have changed'
-                    xold = self.__get_from_matrices(Itheta)
+                    xold = self._get_from_matrices(Itheta)
             
             # Step 1: derivatives evaluated at old values of t = t0
-            f1 = self.derivs(t0, xold, heat_transfer_callback, valves_callback)
+            f1 = self.derivs(t0, xold)
             xnew = xold+h*f1
             
             #Store at the current index (first run at index 0)
             self.t[Itheta] = t0
-            self.__put_to_matrices(xold, Itheta)
+            self._put_to_matrices(xold, Itheta)
             self.FlowStorage.append(self.Flows.get_deepcopy())
             
             # Everything from this step is finished, now update for the next
@@ -581,12 +579,12 @@ class PDSimCore(_PDSimCore):
         #Stored at the old value
         self.t[N]=t0
         
-        self.__put_to_matrices(xnew, N)
+        self._put_to_matrices(xnew, N)
         
         #ensure you end up at the right place
         assert abs(t0-tmax)<1e-10
         
-        self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+        self.derivs(t0,xold)
         self.FlowStorage.append(self.Flows.get_deepcopy())
         
         if sorted(self.stateVariables) == ['D','T']:
@@ -602,7 +600,7 @@ class PDSimCore(_PDSimCore):
         self.Ntheta = N+1
         self.post_cycle()
         
-    def cycle_Heun(self,N,x_state, tmin=0,tmax=2*pi,step_callback=None,heat_transfer_callback=None,valves_callback=None):
+    def cycle_Heun(self,N,x_state, tmin=0,tmax=2*pi):
         """
         Use the Heun method (modified Euler method)
         
@@ -616,19 +614,6 @@ class PDSimCore(_PDSimCore):
             Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
         tmax : float
             Ending value for the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``] 
-        step_callback : function, optional 
-            A pointer to a function that is called at the beginning of the step.  This function must be of the form:: 
-            
-                step_callback(t,h,Itheta)
-                
-            where ``h`` is the step size that the solver wants to use, ``t`` is the current value of the independent variable, and ``Itheta`` is the index in the container variables.  The return values are ignored, so the same callback can be used as for the ``cycle_RK45`` solver 
-                
-        heat_transfer_callback : function, optional
-            If provided, the heat_transfer_callback function should have a format like::
-            
-                Q_=heat_transfer_callback(t)
-            
-            It should return a ```` instance with the same length as the number of CV in existence.  The entry in the ```` is positive if the heat transfer is TO the fluid in the CV in order to maintain the sign convention that energy (or mass) input is positive.  Will raise an error otherwise
         
         """
         #Do some initialization - create arrays, etc.
@@ -641,7 +626,7 @@ class PDSimCore(_PDSimCore):
         
         # Get the beginning of the cycle configured
         # Put a copy of the values into the matrices
-        self.__put_to_matrices(x_state.copy(), 0)
+        self._put_to_matrices(x_state.copy(), 0)
     
         for Itheta in range(N):
             
@@ -649,22 +634,22 @@ class PDSimCore(_PDSimCore):
             if self._check_cycle_abort(Itheta):
                 return 'abort'
             
-            if step_callback!=None:
-                step_callback(t0,h,Itheta)
+            if self.callbacks.step_callback!=None:
+                self.callbacks.step_callback(t0,h,Itheta)
                 
-            xold=self.__get_from_matrices(Itheta)
+            xold=self._get_from_matrices(Itheta)
                         
             # Step 1: derivatives evaluated at old values
-            f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+            f1=self.derivs(t0,xold)
             xtemp=xold+h*f1
             
             #Stored at the starting value of the step
             self.t[Itheta]=t0+h
-            self.__put_to_matrices(xold,Itheta)
+            self._put_to_matrices(xold,Itheta)
             self.FlowStorage.append(self.Flows.get_deepcopy())
             
             #Step 2: Evaluated at predicted step
-            f2=self.derivs(t0+h,xtemp,heat_transfer_callback,valves_callback)
+            f2=self.derivs(t0+h,xtemp)
             xnew = xold + h/2.0*(f1 + f2)
             
             t0+=h
@@ -677,8 +662,8 @@ class PDSimCore(_PDSimCore):
         V,dV=self.CVs.volumes(t0)
         #Stored at the old value
         self.t[N]=t0
-        self.derivs(t0,xold,heat_transfer_callback,valves_callback)
-        self.__put_to_matrices(xnew,N)
+        self.derivs(t0,xold)
+        self._put_to_matrices(xnew,N)
         self.FlowStorage.append(self.Flows.get_deepcopy())
         if sorted(self.stateVariables) == ['D','T']:
             self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
@@ -694,7 +679,7 @@ class PDSimCore(_PDSimCore):
         return
         
     def cycle_RK45(self,x_state,tmin=0,tmax=2.0*pi,hmin=1e-4,eps_allowed=1e-10,step_relax=0.9,
-              step_callback=None,heat_transfer_callback=None,valves_callback = None,
+              valves_callback = None,
               UseCashKarp=True,**kwargs):
         """
         
@@ -715,22 +700,6 @@ class PDSimCore(_PDSimCore):
             Maximum absolute error of any CV per step allowed.  Don't make this parameter too big or you may not be able to get a stable solution.  Also don't make it too small because then you are going to run into truncation error.
         step_relax : float, optional
             The relaxation factor that is used in the step resizing algorithm.  Should be less than 1.0; you can play with this parameter to improve the adaptive resizing, but should not be necessary.
-        step_callback : function, optional 
-            A pointer to a function that is called at the beginning of the step.  This function must be of the form:: 
-            
-                disableAdaptive,h=step_callback(t,h,Itheta)
-                
-            where ``h`` is the step size that the adaptive solver wants to use, ``t`` is the current value of the independent variable, and ``Itheta`` is the index in the container variables.  The return value ``disableAdaptive`` is a boolean value that describes whether the adaptive method should be turned off for this step ( ``False`` : use the adaptive method), and ``h`` is the step size you want to use.  If you don't want to disable the adaptive method and use the given step size, just::
-                
-                return False,h
-            
-            in your code.
-        heat_transfer_callback : function, optional
-            If provided, the heat_transfer_callback function should have a format like::
-            
-                Q_=heat_transfer_callback(t)
-            
-            It should return a ``arraym`` instance with the same length as the number of CV in existence.  The entry in the ``arraym`` is positive if the heat transfer is TO the fluid in the CV in order to maintain the sign convention that energy (or mass) input is positive.  Will raise an error otherwise
         
         Notes
         -----
@@ -764,9 +733,9 @@ class PDSimCore(_PDSimCore):
         self.pre_cycle()
         
         #Start at an index of 0
-        Itheta=0
-        t0=tmin
-        h=hmin
+        Itheta = 0
+        t0 = tmin
+        h = hmin
         
         # Get the beginning of the cycle configured
         # Put a copy of the values into the matrices
@@ -774,7 +743,7 @@ class PDSimCore(_PDSimCore):
         #Add zeros for the valves as they are assumed to start closed and at rest
         if self.__hasValves__:
             xold.extend(empty_arraym(len(self.Valves)*2))
-        self.__put_to_matrices(xold, 0)
+        self._put_to_matrices(xold, 0)
         
         gamma1=16.0/135.0
         gamma2=0.0
@@ -797,19 +766,20 @@ class PDSimCore(_PDSimCore):
                 disableAdaptive=False
                 
                 if t0 + h > tmax:
-                    disableAdaptive=True
-                    h=tmax - t0
+                    disableAdaptive = True
+                    h = tmax - t0
             
-                if step_callback is not None and not disableAdaptive:
+                if self.callbacks.step_callback is not None and not disableAdaptive:
                     #The user has provided a disabling function for the adaptive method
                     #Call it to figure out whether to use the adaptive method or not
                     #Pass it a copy of the compressor class and the current step size
                     #The function can modify anything in the class to change flags, existence, merge, etc.
-                    disableAdaptive, h=step_callback(t0, h, Itheta)
-                    x = self.__get_from_matrices(Itheta)
+                    h = self.callbacks.step_callback(t0, h, Itheta)
+                    disableAdaptive = self.callbacks.step_callback.disable_adaptive
+                    x = self._get_from_matrices(Itheta)
                     
                     if disableAdaptive and np.all(np.isfinite(x)):
-                        xold = self.__get_from_matrices(Itheta)
+                        xold = self._get_from_matrices(Itheta)
                 else:
                     disableAdaptive=False
                     
@@ -822,53 +792,53 @@ class PDSimCore(_PDSimCore):
                     ## Using RKF constants ##
                     
                     # Step 1: derivatives evaluated at old values
-                    f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+                    f1=self.derivs(t0,xold)
                     xnew1=xold+h*(+1.0/4.0*f1)
                     
                     #Store a copy of the flows for future use as well as a buffered set of state variables
                     Flows_temporary = self.Flows.get_deepcopy()
                     core_temporary = self.core.copy()
                     
-                    f2=self.derivs(t0+1.0/4.0*h,xnew1,heat_transfer_callback,valves_callback)
+                    f2=self.derivs(t0+1.0/4.0*h,xnew1)
                     xnew2=xold+h*(+3.0/32.0*f1+9.0/32.0*f2)
     
-                    f3=self.derivs(t0+3.0/8.0*h,xnew2,heat_transfer_callback,valves_callback)
+                    f3=self.derivs(t0+3.0/8.0*h,xnew2)
                     xnew3=xold+h*(+1932.0/2197.0*f1-7200.0/2197.0*f2+7296.0/2197.0*f3)
     
-                    f4=self.derivs(t0+12.0/13.0*h,xnew3,heat_transfer_callback,valves_callback)
+                    f4=self.derivs(t0+12.0/13.0*h,xnew3)
                     xnew4=xold+h*(+439.0/216.0*f1-8.0*f2+3680.0/513.0*f3-845.0/4104.0*f4)
                     
-                    f5=self.derivs(t0+h,xnew4,heat_transfer_callback,valves_callback)
+                    f5=self.derivs(t0+h,xnew4)
                     xnew5=xold+h*(-8.0/27.0*f1+2.0*f2-3544.0/2565.0*f3+1859.0/4104.0*f4-11.0/40.0*f5)
                     
                     #Updated values at the next step
-                    f6=self.derivs(t0+h/2.0,xnew5,heat_transfer_callback,valves_callback)
+                    f6=self.derivs(t0+h/2.0,xnew5)
                     
                     xnew=xold+h*(gamma1*f1 + gamma2*f2 + gamma3*f3 + gamma4*f4 + gamma5*f5 + gamma6*f6)
                         
                     error=h*(1.0/360.0*f1-128.0/4275.0*f3-2197.0/75240.0*f4+1.0/50.0*f5+2.0/55.0*f6)
                 else:
                     # Step 1: derivatives evaluated at old values
-                    f1=self.derivs(t0,xold,heat_transfer_callback,valves_callback)
+                    f1=self.derivs(t0,xold)
                     xnew1=xold+h*(+1.0/5.0*f1)
                     
                     #Store a copy of the flows for future use as well as a buffered set of state variables
                     Flows_temporary = self.Flows.get_deepcopy()
                     core_temporary = self.core.copy()
                     
-                    f2=self.derivs(t0+1.0/5.0*h,xnew1,heat_transfer_callback,valves_callback)
+                    f2=self.derivs(t0+1.0/5.0*h,xnew1)
                     xnew2=xold+h*(+3.0/40.0*f1+9.0/40.0*f2)
     
-                    f3=self.derivs(t0+3.0/10.0*h,xnew2,heat_transfer_callback,valves_callback)
+                    f3=self.derivs(t0+3.0/10.0*h,xnew2)
                     xnew3=xold+h*(3.0/10.0*f1-9.0/10.0*f2+6.0/5.0*f3)
     
-                    f4=self.derivs(t0+3.0/5.0*h,xnew3,heat_transfer_callback,valves_callback)
+                    f4=self.derivs(t0+3.0/5.0*h,xnew3)
                     xnew4=xold+h*(-11.0/54.0*f1+5.0/2.0*f2-70/27.0*f3+35.0/27.0*f4)
                     
-                    f5=self.derivs(t0+h,xnew4,heat_transfer_callback,valves_callback)
+                    f5=self.derivs(t0+h,xnew4)
                     xnew5=xold+h*(1631.0/55296*f1+175.0/512.0*f2+575.0/13824.0*f3+44275.0/110592.0*f4+253.0/4096.0*f5)
                     
-                    f6=self.derivs(t0+7/8*h,xnew5,heat_transfer_callback,valves_callback)
+                    f6=self.derivs(t0+7/8*h,xnew5)
                     
                     #Updated values at the next step using 5-th order
                     xnew=xold+h*(37/378*f1 + 250/621*f3 + 125/594*f4 + 512/1771*f6)
@@ -904,7 +874,7 @@ class PDSimCore(_PDSimCore):
             
             # Store the values for volumes and state vars in the matrices
             # In the first step this will over-write the values in the matrices 
-            self.__put_to_matrices(xold, Itheta)
+            self._put_to_matrices(xold, Itheta)
             
             # Store the flows for the beginning of the step
             self.FlowStorage.append(Flows_temporary)
@@ -928,9 +898,9 @@ class PDSimCore(_PDSimCore):
         self.t[Itheta] = t0
         # Re-evaluate derivs at the starting value for the step in order 
         # to use the correct values in the storage containers
-        self.derivs(t0, xold, heat_transfer_callback, valves_callback)
+        self.derivs(t0, xold)
         # Store the values for volumes and state vars in the matrices
-        self.__put_to_matrices(xold, Itheta)
+        self._put_to_matrices(xold, Itheta)
         # Store the flows for the end
         self.FlowStorage.append(self.Flows.get_deepcopy())
 
@@ -947,7 +917,20 @@ class PDSimCore(_PDSimCore):
         self.Ntheta = Itheta+1
         self.post_cycle()
         
-    def __calc_boundary_work(self):
+    def calc_boundary_work(self):
+        """
+        This method calculates the boundary work rate using a trapezoidal 
+        integration of
+        
+        .. math::
+        
+            \\dot W_{pv} = -\int p\\frac{dV}{d\\theta}\\frac{\\omega}{2\\pi} d\\theta
+            
+        for all the control volumes and sets the parameter ``self.Wdot_pv`` with 
+        the result.
+        
+        The units of the boundary work are kW.
+        """
         
         def Wdot_one_CV(CVindex):
             """ calculate the p-v work for one CV """
@@ -969,13 +952,24 @@ class PDSimCore(_PDSimCore):
         
     def post_cycle(self):
         """
-        This stuff all happens at the end of the cycle.  It is a private method not meant to be called externally
+        This stuff all happens at the end of the cycle.  It is a private method 
+        not meant to be called externally
+        
+        The following things are done:
+        #. The boundary work is calculated
+        #. The flows are post-processed
+        #. The heat transfer is post-processed
+        #. The mass flow rate is calculated
+        #. The volumetric efficiency is calculated
+        #. The adiabatic efficiency is calculated
+        #. The isentropic power is calculated
+        #. The power input is calculated
         """
             
-        self.__calc_boundary_work()
+        self.calc_boundary_work()
             
-        self.__postprocess_flows()
-        self.__postprocess_HT()
+        self._postprocess_flows()
+        self._postprocess_HT()
         
         if not hasattr(self,'Qamb'):
             self.Qamb = 0
@@ -1016,6 +1010,9 @@ class PDSimCore(_PDSimCore):
         
         Meant for calling by cycle_RK45, cycle_SimpleEuler, cycle_Heun, etc.
         
+        Primarily this is useful for use with the GUI, where the GUI can pass
+        an abort command to the model
+        
         Parameters
         ----------
         index : int
@@ -1052,47 +1049,177 @@ class PDSimCore(_PDSimCore):
         """
         A preconditioned solve
         
+        What happens in this function is that one cycle is run using the very 
+        rough first estimate of outlet state.  This cycle is then used to update
+        the guess value for the outlet state
+        
         All keyword arguments are passed on to the PDSimCore.solve
         function
         """
         
-        #We are going to over-write OldCycle in the preconditioner
+        # We are going to over-write OldCycle in the preconditioner
+        # so we cache its current value.  If not provided, use False
         OneCycle_oldval = kwargs.get('OneCycle', False)
         
-        #Run it with OneCycle turned on
+        #Run solve with OneCycle turned on
         kwargs['OneCycle'] = True
         solve_output = self.solve(**kwargs)
         
+        #If abort has already been called, stop and don't keep going
         if not self._want_abort:
             
+            #Iterate over the tubes in order to find the inlet and outlet states
             for key, State in self.Tubes.Nodes.iteritems():
                 if key == self.key_inlet:
                      IS = State
                 if key == self.key_outlet:
                      OS = State
                      
-            #Using Wdot_pv (boundary work), calculate a good guess for the outlet enthalpy
+            # Using Wdot_pv (boundary work), calculate a good guess for the 
+            # outlet enthalpy by assuming the compressor is adiabatic
             h2 = IS.h + self.Wdot_pv/self.mdot
             
-            #Find temperature as a function of enthalpy
+            # Find temperature as a function of enthalpy
             T2 = Props('T','H',h2,'P',OS.p,OS.Fluid)
             
-            #Now run using the old value 
+            # Now run using the old value of OldCycle if OneCycle was 
+            # not equal to True originally
             if not OneCycle_oldval:
                 kwargs['OneCycle'] = OneCycle_oldval
-                kwargs['x0']  = [T2, 0.5*T2+0.5*self.Tamb]
+                kwargs['x0']  = [T2, 0.5*T2+0.5*self.Tamb] #guesses for temperatures of discharge and lump
                 kwargs['reset_initial_state'] = True
-                #kwargs['state0'] = self.xstate_init
                 self.solve(**kwargs)
+       
+    def connect_callbacks(self,
+                          step_callback = None,
+                          heat_transfer_callback = None,
+                          lumps_energy_balance_callback = None,
+                          endcycle_callback = None
+                          ):
+        """ 
+        Connect up the callbacks for the simulation
+        
+        The callbacks must either be unbound methods or methods of a class derived from PDSimCore
+        
+        No keyword arguments are supported.  The callback is probably a bound 
+        method of a PDSimCore instance, in which case you have access to all the 
+        data in the class anyway
+        
+        Parameters
+        ----------
+        step_callback : function, or :class:`StepCallback <PDSim.core.callbacks.StepCallback>` subclass
+            
+            If a function is provided, it must have the call signature::
+            
+                disable_adaptive,h = step_callback(double t, double h, int i)
+                
+            where ``h`` is the step size that the adaptive solver wants to use, ``t`` is the current value of the independent variable, and ``i`` is the index in the container variables.  The return value ``disableAdaptive`` is a boolean value that describes whether the adaptive method should be turned off for this step ( ``False`` : use the adaptive method), and ``h`` is the step size you want to use.  If you don't want to disable the adaptive method and use the given step size, just::
+                
+                return False,h
+            
+            in your code.
+        
+        heat_transfer_callback : function, or :class:`HeatTransferCallback <PDSim.core.callbacks.HeatTransferCallback>` subclass
+            
+            If a function is provided, the heat_transfer_callback function must have the call signature::
+            
+                Q = heat_transfer_callback(double t)
+            
+            It should return an :class:`arraym <PDSim.misc.datatypes.arraym>` instance 
+            with the same length as the number of CV in existence.  
+            The entry in the :class:`arraym <PDSim.misc.datatypes.arraym>` is 
+            positive if the heat transfer is TO the fluid in the CV in order 
+            to maintain the sign convention that energy (or mass) input is 
+            positive.
+            
+        lumps_energy_balance_callback : function, or :class:`LumpsEnergyBalanceCallback <PDSim.core.callbacks.LumpsEnergyBalanceCallback>` subclass
+            
+            If a function is provided, the lumps_energy_balance_callback 
+            function must have the call signature::
+            
+                r = lumps_energy_balance_callback()
+            
+            It should return an :class:`arraym <PDSim.misc.datatypes.arraym>` 
+            instance with the same length as the number of lumps.  The entry in 
+            ``r`` is the value of the energy balance.  It will be driven to zero 
+            by the solver
+            
+        """
+        
+        
+        if step_callback is None:
+            #No callback is provided, don't do anything
+            pass
+        elif isinstance(step_callback, PDSim.core.callbacks.StepCallback):
+            #If the cythonized step callback is provided, hold onto it
+            self.callbacks.step_callback = step_callback
+        #Otherwise, wrap the desired callback if it has the right signature
+        else:
+            #Check the functional call
+            callargs = inspect.getcallargs(step_callback, 0.0, 1e-10, 0)
+            
+            # Either a non-bound method is provided, or bound method is provided, in which case you get self,t,h,i as the values
+            # t is a subclass of float, h is a subclass of float, is a subclass of int, and self is subclass of PDSimCore
+            if not all([isinstance(arg,(float,int,PDSimCore)) for arg in callargs.values()]):
+                sig_ok = False
+            else:
+                if len(callargs) in [3,4]:
+                    sig_ok = True
+                else:
+                    sig_ok = False
+            
+            if step_callback is not None and sig_ok:
+                self.callbacks.step_callback = PDSim.core.callbacks.WrappedStepCallback(self, step_callback)
+            else:
+                raise ValueError("step_callback is not possible to be wrapped - neither a subclass of StepCallback nor acceptable function signature")
+        
+        if heat_transfer_callback is None:
+            #No callback is provided, don't do anything
+            pass
+        elif isinstance(heat_transfer_callback, PDSim.core.callbacks.HeatTransferCallback):
+            #If the cythonized heat transfer callback is provided, hold a pointer to it
+            self.callbacks.heat_transfer_callback = heat_transfer_callback
+        else:
+            callargs = inspect.getcallargs(heat_transfer_callback, 0.0)
+            # Either a non-bound method is provided, or bound method is provided, in which case you get self,t as the values
+            # t is a subclass of float, and self is subclass of PDSimCore
+            if not all([isinstance(arg,(float,int,PDSimCore)) for arg in callargs.values()]):
+                sig_ok = False
+            else:
+                if len(callargs) in [1,2]:
+                    sig_ok = True
+                else:
+                    sig_ok = False
+            
+            #Otherwise, wrap the desired callback if it has the right signature
+            if heat_transfer_callback is not None and sig_ok:
+                self.callbacks.heat_transfer_callback = PDSim.core.callbacks.WrappedHeatTransferCallback(self, heat_transfer_callback)
+            else:
+                raise ValueError("heat_transfer_callback is not possible to be wrapped - neither a subclass of HeatTransferCallback nor an acceptable function")
+        
+        if lumps_energy_balance_callback is None:
+            #No callback is provided, don't do anything
+            pass
+        elif isinstance(lumps_energy_balance_callback, PDSim.core.callbacks.LumpsEnergyBalanceCallback):
+            #If the cythonized lump energy balance callback is provided, hold onto it
+            self.callbacks.lumps_energy_balance_callback = lumps_energy_balance_callback
+        #Otherwise, wrap the desired callback if it has the right signature
+        else:
+            callargs = inspect.getcallargs(lumps_energy_balance_callback)
+            # Either a non-bound method is provided, or bound method is provided, in which case you get self,t as the values
+            # t is a subclass of float, and self is subclass of PDSimCore
+            sig_ok = len(callargs) == 0 or (len(callargs) == 1 and isinstance(callargs.values()[0],PDSimCore))
+            
+            if lumps_energy_balance_callback is not None and sig_ok:  #Do functional introspection here where the ``True`` is
+                self.callbacks.lumps_energy_balance_callback = PDSim.core.callbacks.WrappedLumpsEnergyBalanceCallback(self, lumps_energy_balance_callback)
+            else:
+                raise ValueError("lump_energy_balance_callback is not possible to be wrapped - neither a subclass of LumpsEnergyBalanceCallback nor an acceptable function")
+        
+        self.callbacks.endcycle_callback = endcycle_callback
         
     def solve(self,
               key_inlet = None,
               key_outlet = None,
-              step_callback = None,
-              endcycle_callback = None,
-              heat_transfer_callback = None,
-              lump_energy_balance_callback = None,
-              valves_callback = None,
               solver_method = 'Euler',
               OneCycle = False,
               Abort = None,
@@ -1119,17 +1246,6 @@ class PDSimCore(_PDSimCore):
             The key for the flow node that represents the upstream quasi-steady point
         key_outlet : string
             The key for the flow node that represents the upstream quasi-steady point
-        step_callback : function
-            This callback is passed on to the cycle() function. 
-            See :func:`PDSim.core.Core.PDSimCore.cycle` for a description of the callback
-        endcycle_callback : function
-            This callback gets called at the end of the cycle to determine whether the cycle 
-            should be run again.  It returns a flag(``redo`` that is ``True`` if the cycle 
-            should be run again, or ``False`` if the cycle iterations have reached convergence.).  
-            This callback does not take any inputs
-        heat_transfer_callback : function
-        lump_energy_balance_callback : function
-        valves_callback : function
         solver_method : string
         OneCycle : boolean
             If ``True``, stop after just one rotation.  Useful primarily for 
@@ -1139,7 +1255,7 @@ class PDSimCore(_PDSimCore):
             If calling Abort() returns ``True``, stop running 
         pipe_abort : 
         UseNR : boolean
-            If ``True``, use a multi-dimensional solver to determine the initial state of
+            If ``True``, use a multi-dimensional solver to determine the initial state of the state variables for each control volume
         alpha : float
             Use a range of ``(1-alpha)*dx, (1+alpha)*dx`` for line search if needed
         plot_every_cycle : boolean
@@ -1150,6 +1266,17 @@ class PDSimCore(_PDSimCore):
             If ``True``, use the stored initial state from the previous call to ``solve`` as the starting value for the thermodynamic values for the control volumes
         LS_start : int
             Number of conventional steps to be taken when not using newton-raphson prior to entering into a line search
+            
+        step_callback : function
+            DEPRECATED! Should be passed to the connect_callbacks() function before running precond_solve() or solve()
+        endcycle_callback : function
+            DEPRECATED! Should be passed to the connect_callbacks() function before running precond_solve() or solve()
+        heat_transfer_callback : function
+            DEPRECATED! Should be passed to the connect_callbacks() function before running precond_solve() or solve()
+        lump_energy_balance_callback : function
+            DEPRECATED! Should be passed to the connect_callbacks() function before running precond_solve() or solve()
+        valves_callback : function
+            DEPRECATED! Should be passed to the connect_callbacks() function before running precond_solve() or solve()
         """
         
         #Connect functions that have been serialized by saving the function name as a string
@@ -1172,13 +1299,14 @@ class PDSimCore(_PDSimCore):
         # Used from the GUI to kill process from the top-level thread
         self.pipe_abort = pipe_abort
         
-        #If a function called pre_solve is provided, call it with no input arguments
+        # If a function called pre_solve is provided, call it with no input arguments
         if hasattr(self,'pre_solve'):
             self.pre_solve()
             
-        #This runs before the model starts at all
+        # This runs before the model starts at all
         self.pre_run()
         
+        # Check which method is used to do aborting
         if Abort is None and pipe_abort is not None:
             # Use the pipe_abort pipe to look at the abort pipe to see whether 
             # to quit 
@@ -1191,6 +1319,8 @@ class PDSimCore(_PDSimCore):
         else:
             raise ValueError('Only one of Abort and pipe_abort may be provided')
         
+        # If you want to reset the initial state, use the values that were
+        # cached in the xstate_init array
         if reset_initial_state is not None and reset_initial_state:
             self.reset_initial_state()
             self.pre_cycle(self.xstate_init)
@@ -1199,7 +1329,7 @@ class PDSimCore(_PDSimCore):
             self.pre_cycle()
             #x_state only includes the values for the chambers, the valves start closed
             #Since indexed, yields a copy
-            self.x_state = self.__get_from_matrices(0)[0:len(self.stateVariables)*self.CVs.Nexist]
+            self.x_state = self._get_from_matrices(0)[0:len(self.stateVariables)*self.CVs.Nexist]
         
         if x0 is None:
             x0 = [self.Tubes.Nodes[key_outlet].T, self.Tubes.Nodes[key_outlet].T]
@@ -1210,7 +1340,7 @@ class PDSimCore(_PDSimCore):
                 Contains the discharge temperature followed by the temperatures of each lumped mass
             """
             print Td_Tlumps,'Td,Tlumps inputs'
-            # Td_Tlumps is a list (or  or np.ndarray)
+            # Td_Tlumps is a list (or or np.ndarray)
             Td_Tlumps = list(Td_Tlumps)
             # Consume the first element as the discharge temp 
             self.Td = float(Td_Tlumps.pop(0))
@@ -1240,32 +1370,20 @@ class PDSimCore(_PDSimCore):
                 if self.xstate_init is None:
                     self.xstate_init = x_state
                     self.exists_CV_init = self.CVs.exists_keys
-                    
                 try:
                     t1 = clock()
                     if solver_method == 'Euler':
-                        
                         #Default to 7000 steps if not provided
                         N = getattr(self,'EulerN', 7000)
-                        aborted = self.cycle_SimpleEuler(N,x_state,step_callback=step_callback,
-                                        heat_transfer_callback=heat_transfer_callback,
-                                        valves_callback=valves_callback)
+                        aborted = self.cycle_SimpleEuler(N,x_state)
                     elif solver_method == 'Heun':
                         #Default to 7000 steps if not provided
                         N = getattr(self,'HeunN', 7000)
-                        aborted = self.cycle_Heun(N,x_state,step_callback=step_callback,
-                                               heat_transfer_callback=heat_transfer_callback,
-                                               valves_callback=valves_callback)
+                        aborted = self.cycle_Heun(N,x_state)
                     elif solver_method == 'RK45':
                         #Default to tolerance of 1e-8 if not provided
                         eps_allowed = getattr(self,'RK45_eps', 1e-8)
-                        
-                        aborted = self.cycle_RK45(x_state,
-                                        eps_allowed = eps_allowed,
-                                        step_callback=step_callback,
-                                        heat_transfer_callback=heat_transfer_callback,
-                                        valves_callback=valves_callback,
-                                        **kwargs)
+                        aborted = self.cycle_RK45(x_state,eps_allowed = eps_allowed)
                     else:
                         raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
                 except ValueError:
@@ -1310,11 +1428,11 @@ class PDSimCore(_PDSimCore):
                     print 'Quitting OBJECTIVE_CYCLE loop in core.solve'
                     return None #Stop
                         
-                if endcycle_callback is None:
+                if self.callbacks.endcycle_callback is None:
                     return None #Stop
                 else:
                     #endcycle_callback returns the errors and new initial state for the solver
-                    errors, x_state_new = endcycle_callback()
+                    errors, x_state_new = self.callbacks.endcycle_callback()
                     self.x_state = x_state_new.copy() #Make a copy
                     return errors
                 
@@ -1410,13 +1528,13 @@ class PDSimCore(_PDSimCore):
                 print 'Quitting OBJECTIVE function in core.solve'
                 if hasattr(self,'mechanical_losses'):
                     self.mechanical_losses('low')
-                if hasattr(self,'lump_energy_balance_callback'):
-                    self.lump_energy_balance_callback()
+                if self.callbacks.lumps_energy_balance_callback is not None:
+                    self.callbacks.lumps_energy_balance_callback()
                 return None
                     
             # (3) After convergence of the inner loop, check the energy balance on the lumps
-            if lump_energy_balance_callback is not None:
-                resid_HT = lump_energy_balance_callback()
+            if self.callbacks.lumps_energy_balance_callback is not None:
+                resid_HT = self.callbacks.lumps_energy_balance_callback()
                 if not isinstance(resid_HT,arraym):
                     resid_HT = arraym(resid_HT)
                 
@@ -1463,7 +1581,7 @@ class PDSimCore(_PDSimCore):
         print 'Volumetric efficiency is',self.eta_v*100,'%'
         print 'Adiabatic efficiency is',self.eta_a*100,'%'
         
-    def derivs(self,theta,x,heat_transfer_callback=None,valves_callback=None):
+    def derivs(self,theta,x):
         """
         Evaluate the derivatives of the state variables
         
@@ -1475,19 +1593,7 @@ class PDSimCore(_PDSimCore):
         theta : float
             The value of the independent variable
         x : ``arraym`` instance
-            The array of the state variables (plus valve parameters) 
-        heat_transfer_callback : ``None`` or function
-            A function that has the form::
-            
-                Q=heat_transfer_callback(theta)
-            
-            where ``Q`` is the ``arraym`` instance of heat transfer rates to the control 
-            volume.  If an entry of ``Q`` is positive, heat is being transferred 
-            TO the fluid contained in the control volume
-            
-            If ``None``, no heat transfer is used
-                
-        valves_callback: ``None`` or function
+            The array of the state variables (plus valve parameters)
         
         Returns
         -------
@@ -1496,8 +1602,7 @@ class PDSimCore(_PDSimCore):
         """
         
         # Updates the state, calculates the volumes, prepares all the things needed for derivatives
-        self.core.properties_and_volumes(self.CVs.exists_CV, theta, STATE_VARS_TM, x)           
-            
+        self.core.properties_and_volumes(self.CVs.exists_CV, theta, STATE_VARS_TM, x)
         
         #Join the enthalpies of the CV in existence and the tubes
         harray = self.core.h.copy()
@@ -1506,13 +1611,13 @@ class PDSimCore(_PDSimCore):
         # Calculate the flows and sum up all the terms
         self.core.calculate_flows(self.Flows, harray, self)
         
-        # Calculate the heat transfer terms
-        if heat_transfer_callback is not None:
-            self.core.Q=arraym(heat_transfer_callback(theta))
+        # Calculate the heat transfer terms if provided
+        if self.callbacks.heat_transfer_callback is not None:
+            self.core.Q = arraym(self.callbacks.heat_transfer_callback(theta))
             if not len(self.core.Q) == self.CVs.Nexist:
-                raise ValueError('Length of Q is not equal to length of number of CV')
+                raise ValueError('Length of Q is not equal to length of number of CV in existence')
         else:
-            self.core.Q=0.0
+            self.core.Q = empty_arraym(self.CVs.Nexist)
             
         # Calculate the derivative terms and set the derivative of the state vector
         self.core.calculate_derivs(self.omega, False)

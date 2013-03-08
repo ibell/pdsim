@@ -19,6 +19,7 @@ cdef class arraym(object):
     cpdef extend(self, arraym array2)
     cpdef double get_index(self, int i)
     cpdef double set_index(self, int i, double val)
+    cpdef reciprocal(self)
     
 cpdef arraym empty_arraym(int N)
     

@@ -23,6 +23,7 @@ import os, sys
 # If the following line is uncommented, python will try to use a local version
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
+# PDSim should also be built using a command like python build_ext --inplace to keep all the extension modules next to the .pyx files
 #sys.path.insert(0, os.path.abspath('..'))
 
 #Here we import the things from PDSim we need
@@ -188,12 +189,14 @@ def Compressor():
     t1=clock()
     recip.EulerN = 4000
     recip.RK45_eps = 1e-10
+    
+    recip.connect_callbacks(endcycle_callback=recip.endcycle_callback, # Provided by PDSimCore
+                            heat_transfer_callback=recip.heat_transfer_callback,
+                            lumps_energy_balance_callback = recip.lump_energy_balance_callback
+                            )
+    
     recip.solve(key_inlet='inlet.1',
                 key_outlet='outlet.2',
-                endcycle_callback=recip.endcycle_callback, # Provided by PDSimCore
-                heat_transfer_callback=recip.heat_transfer_callback,
-                lump_energy_balance_callback = recip.lump_energy_balance_callback,
-                valves_callback =recip.valves_callback,
                 solver_method = 'Euler',
                 OneCycle = False,
                 UseNR = True

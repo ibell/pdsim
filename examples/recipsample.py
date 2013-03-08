@@ -15,7 +15,6 @@ from PDSim.flow.flow_models import ValveModel
 from PDSim.recip.core import Recip
     
 def Compressor():
-
     recip=Recip()
     
     recip.piston_stroke = 0.02   #Piston stroke, m
@@ -111,20 +110,18 @@ def Compressor():
           )
     recip.add_valve(recip.discharge_valve)
 
-    recip.EulerN = 4000
-    recip.HeunN = 3000
-    recip.RK45_eps = 1e-9
-    t1=clock()
+    recip.connect_callbacks(endcycle_callback=recip.endcycle_callback,
+                            heat_transfer_callback=recip.heat_transfer_callback,
+                            lumps_energy_balance_callback = recip.lump_energy_balance_callback
+                            )
     
-    recip.precond_solve(key_inlet='inlet.1',key_outlet='outlet.2',
-                endcycle_callback=recip.endcycle_callback,
-                heat_transfer_callback=recip.heat_transfer_callback,
-                lump_energy_balance_callback = recip.lump_energy_balance_callback,
-                valves_callback =recip.valves_callback,
-                solver_method = 'Euler',
-                OneCycle = False,
-                UseNR = True,
-                )
+    t1=clock()
+    recip.precond_solve(key_inlet='inlet.1',
+                        key_outlet='outlet.2',
+                        solver_method = 'Euler',
+                        OneCycle = False,
+                        UseNR = True,
+                        )
     print 'time taken', clock()-t1
     
     debug_plots(recip)

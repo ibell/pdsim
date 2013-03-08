@@ -3,7 +3,7 @@ import subprocess, os, glob
 print 'Rebuilding pdsim locally i.e. in the PDSim folder rather than to site-packages'
 this_location = os.path.abspath('.')
 os.chdir('..')
-subprocess.call(['python','setup.py','build_ext','--inplace'])
+#subprocess.call(['python','setup.py','build_ext','--inplace'])
 os.chdir(this_location)
 
 #When this module is imported, run sphinx-apidoc for GUI and PDSim.  It is fast.

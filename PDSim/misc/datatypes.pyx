@@ -307,6 +307,11 @@ cdef class arraym(object):
                         z[i] = x[i] - y[i]
             
         return z
+
+    cpdef reciprocal(self):
+        cdef int i
+        for i in range(self.N):
+            self.data[i] = 1/self.data[i]
     
     cpdef arraym copy(self):
         cdef arraym arr = arraym.__new__(arraym)

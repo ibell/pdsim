@@ -19,7 +19,7 @@ core Package
 
 
 :mod:`motor` Module
-------------------
+------------------- 
 
 .. automodule:: PDSim.core.motor
     :members:
@@ -28,7 +28,7 @@ core Package
     
 
 :mod:`bearings` Module
-------------------
+----------------------
 
 .. automodule:: PDSim.core.bearings
     :members:

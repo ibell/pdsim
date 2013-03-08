@@ -52,7 +52,9 @@ pyx_list = [
             "PDSim/core/_core.pyx",
             "PDSim/core/_containers.pyx",
             "PDSim/recip/_recip.pyx",
-            "PDSim/scroll/_scroll.pyx"
+            "PDSim/scroll/_scroll.pyx",
+            "PDSim/core/callbacks.pyx",
+            "PDSim/core/cycleintegrators.pyx"
             ]
 
 def clean():

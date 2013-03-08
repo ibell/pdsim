@@ -13,7 +13,7 @@ from _scroll import _Scroll
 ##--- non-package imports
 import warnings
 from scipy.optimize import fsolve, newton
-from CoolProp.CoolProp import UseSinglePhaseLUT, Props
+from CoolProp.CoolProp import Props
 from CoolProp import State
 from math import pi,cos
 import numpy as np
@@ -516,7 +516,7 @@ class Scroll(PDSimCore, _Scroll):
         #Use the compiled version from the cython code
         return _Scroll.involute_heat_transfer(self,**kwargs)
     
-    def heat_transfer_callback(self, theta, **kwargs):
+    def heat_transfer_callback(self, theta):
         """
         The scroll simulation heat transfer callback for HT to the fluid in the 
         chambers
@@ -524,7 +524,7 @@ class Scroll(PDSimCore, _Scroll):
         ``heat_transfer_callback`` for ``PDSimCore.derivs`` must be of the 
         form::
         
-            heat_transfer_callback(theta, **kwargs)
+            heat_transfer_callback(theta)
             
         but we need to get the inlet and outlet states to get the linear 
         temperature profile in the scroll wrap. Thus we wrap the callback 
@@ -533,9 +533,9 @@ class Scroll(PDSimCore, _Scroll):
         """
         State_inlet = self.Tubes.Nodes[self.key_inlet]
         State_outlet = self.Tubes.Nodes[self.key_outlet]
-        return self._heat_transfer_callback(theta, State_inlet, State_outlet, **kwargs)
+        return self._heat_transfer_callback(theta, State_inlet, State_outlet)
     
-    def _heat_transfer_callback(self, theta, State_inlet, State_outlet, HTC_tune = 1.0, **kwargs):
+    def _heat_transfer_callback(self, theta, State_inlet, State_outlet, HTC_tune = 1.0):
         """
         A private function to actually do the heat transfer analysis
         """
@@ -553,7 +553,7 @@ class Scroll(PDSimCore, _Scroll):
             Q.append(self.calcHT(theta,key,HTC_tune,dT_dphi,phim))
         return arraym(Q)
         
-    def step_callback(self,t,h,Itheta,**kwargs):
+    def step_callback(self,t,h,Itheta):
         """
         Here we test whether the control volumes need to be
         a) Merged

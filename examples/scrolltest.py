@@ -12,7 +12,7 @@ from math import pi
 # If the following line is uncommented, python will try to use a local version
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
-# PDSim should also be build using a command like python build_ext --inplace to keep all the extension modules next to the .pyx files
+# PDSim should also be built using a command like python build_ext --inplace to keep all the extension modules next to the .pyx files
 #sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
@@ -36,12 +36,12 @@ import time
 Injection = False
 check_valve = False
 
-def Compressor(f = None):
+def Compressor(Te = 273, Tc = 300, f = None):
     global Injection
     ScrollComp=Scroll()
     #This runs if the module code is run directly
     
-    ScrollComp.set_scroll_geo(100e-6, 2.4, 0.005, 0.006) #Set the scroll wrap geometry
+    ScrollComp.set_scroll_geo(100e-6, 2.3, 0.005, 0.006) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2=0)
     ScrollComp.geo.delta_flank = 15e-6
     ScrollComp.geo.delta_radial = 15e-6
@@ -140,7 +140,7 @@ def Compressor(f = None):
     if f is None:
         Injection = False
         
-    Ref='R410A'
+    Ref='Propane'
     
     Te = -10 + 273.15
     Tc = 40 + 273.15
@@ -156,7 +156,7 @@ def Compressor(f = None):
 #    inletState = State.State(Ref,{'T':300.0,'P':300.0})
 #    p_outlet = inletState.p*3.0
 #    T2s = ScrollComp.guess_outlet_temp(inletState,p_outlet)
-#    outletState = State.State(Ref,{'T':T2s,'P':p_outlet})    
+#    outletState = State.State(Ref,{'T':T2s,'P':p_outlet})
     
     mdot_guess = inletState.rho*ScrollComp.Vdisp*ScrollComp.omega/(2*pi)
     
@@ -192,8 +192,6 @@ def Compressor(f = None):
                                         initialState = injState1
                                         )
                           )
-     
-    
     
     ScrollComp.auto_add_CVs(inletState, outletState)
     
@@ -240,27 +238,27 @@ def Compressor(f = None):
     ScrollComp.add_flow(FlowPath(key1='d2',
                                  key2='dd',
                                  MdotFcn=ScrollComp.D_to_DD))
-
+    
+    #Connect the callbacks for the step, endcycle, heat transfer and lump energy balance
+    ScrollComp.connect_callbacks(step_callback = ScrollComp.step_callback,
+                                 endcycle_callback = ScrollComp.endcycle_callback,
+                                 heat_transfer_callback = ScrollComp.heat_transfer_callback,
+                                 lumps_energy_balance_callback = ScrollComp.lump_energy_balance_callback
+                                 )
+    
     from time import clock
     t1=clock()
-    ScrollComp.RK45_eps = 1e-9
-    ScrollComp.EulerN = 20000
-    ScrollComp.HeunN = 6000
     ScrollComp.eps_cycle = 0.003
     try:
-        ScrollComp.precond_solve(key_inlet='inlet.1',key_outlet='outlet.2',
-                     step_callback=ScrollComp.step_callback, 
-                     endcycle_callback=ScrollComp.endcycle_callback,
-                     heat_transfer_callback=ScrollComp.heat_transfer_callback,
-                     lump_energy_balance_callback=ScrollComp.lump_energy_balance_callback,
-                     solver_method='RK45',
-                     UseNR = False, #Use Newton-Raphson ND solver to determine the initial state
-                     OneCycle = False,
-                     plot_every_cycle= False,
-                     hmin = 1e-8
-                     )
+        ScrollComp.precond_solve(key_inlet='inlet.1',
+                                 key_outlet='outlet.2',
+                                 solver_method='RK45',
+                                 UseNR = False, #If True, use Newton-Raphson ND solver to determine the initial state
+                                 OneCycle = False,
+                                 plot_every_cycle= False,
+                                 hmin = 1e-8
+                                 )
     except:
-        
         #debug_plots(ScrollComp)
         raise
 
@@ -275,7 +273,7 @@ def Compressor(f = None):
         ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
     
-    debug_plots(ScrollComp)
+#    debug_plots(ScrollComp)
     
     del ScrollComp.FlowStorage
     from PDSim.misc.hdf5 import HDF5Writer
@@ -285,7 +283,8 @@ def Compressor(f = None):
     return ScrollComp
     
 if __name__=='__main__':
-    
+    #CP.enable_TTSE_LUT('R410A')
+    #CP.enable_TTSE_LUT('R404A')
     profile=False
     if profile==True:
         import line_profiler as LP

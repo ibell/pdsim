@@ -52,6 +52,8 @@ cdef double Re_star_flank = 826.167177885
 cdef class PyFlowFunctionWrapper(FlowFunction):
     """
     This class is defined in order to wrap python functions for ease-of-use.
+    
+    In this way, functions defined at the python level can still be used by the Cython code
     """
     def __init__(self,Function,kwargs):
         self.Function = Function
@@ -115,6 +117,8 @@ cdef class FlowFunction(object):
      Having both methods allows cython functions to stay at the C++ layer since they
      can call the .call() function with defined argument types and not
      need to come back to python layer for speed 
+     
+     See also PyFlowFunctionWrapper
      
     """
     cpdef double call(self, FlowPath FP):
@@ -417,7 +421,7 @@ cdef class ValveModel(object):
         return
     
     cpdef set_xv(self, arraym xv):
-        #If xv[0] is less than zero, just use zero
+        #If valve opening is less than zero, just use zero (the valve is closed)
         if xv.get_index(0)<0.0:
             xv.set_index(0,0.0)
             xv.set_index(1,0.0)
@@ -521,8 +525,8 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, int ot
         Upstream ``State`` instance
     State_down : :class:`State <CoolProp.State.State>` instance
         Downstream ``State`` instance
-    other_output : string
-        If 'v', returns the velocity
+    other_output : int
+        Default is to return the mass flow rate, can over-ride by passing OUTPUT_VELOCITY or OUTPUT_MA instead
         
     Returns
     -------
@@ -536,7 +540,6 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, int ot
     R = 8.314472/State_up.get_MM()*1000 #[J/kg/K]
     cv = cp-R/1000.0 #[kJ/kg/K]
     k = cp / cv
-    
     
     p_up=State_up.get_p()
     T_up=State_up.get_T()

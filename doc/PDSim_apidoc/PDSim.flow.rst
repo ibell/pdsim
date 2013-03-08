@@ -19,7 +19,7 @@ flow Package
     :show-inheritance:
 
 :mod:`flow_models` Module
-------------------
+-------------------------
 
 .. automodule:: PDSim.flow.flow_models
     :members:
@@ -27,7 +27,7 @@ flow Package
     :show-inheritance:
     
 :mod:`_sumterms` Module
-------------------
+-----------------------
 
 .. automodule:: PDSim.flow._sumterms
     :members:

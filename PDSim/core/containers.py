@@ -212,8 +212,7 @@ class ControlVolumeCollection(collections.OrderedDict):
         else:
             V_dict = {key:_V for key,_V in zip(self.exists_keys,V)}
             dV_dict = {key:_dV for key,_dV in zip(self.exists_keys,dV)}
-            return V_dict, dV_dict
-            
+            return V_dict, dV_dict
 
 def rebuildCV(d):
     CV = ControlVolume(d.pop('key'),d.pop('V_dV'),d.pop('State'))
@@ -235,10 +234,9 @@ class ControlVolume(object):
         self.exists=exists
         self.key=key
         
-        self.V_dV=VdVFcn
-        
-        self.V_dV_kwargs=VdVFcn_kwargs #Keyword-arguments that can get passed to volume function
-        self.discharge_becomes=discharge_becomes if discharge_becomes is not None else key
+        self.V_dV = VdVFcn
+        self.V_dV_kwargs = VdVFcn_kwargs #Keyword-arguments that can get passed to volume function
+        self.discharge_becomes = discharge_becomes if discharge_becomes is not None else key
         self.becomes=becomes if becomes is not None else key
     
     def __reduce__(self):

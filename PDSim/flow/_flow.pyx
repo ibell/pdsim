@@ -26,10 +26,12 @@ cpdef tuple sumterms_given_CV(bytes key, list Flows):
     key: string
     Flows: FlowPathCollection instance 
     """
+    cdef int i
     cdef FlowPath Flow
     cdef double summer_mdot = 0.0, summer_mdoth = 0.0
     
-    for Flow in Flows:
+    for i in range(len(Flows)):
+        Flow = <FlowPath>Flows[i]
 
         if not Flow.exists or abs(Flow.mdot)<1e-12:
             continue

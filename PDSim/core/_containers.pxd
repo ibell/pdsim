@@ -47,7 +47,7 @@ cdef class CVArrays(object):
     cpdef just_volumes(self, CVs, double theta)
     
     cpdef properties_and_volumes(self, CVs, double theta, int state_vars, arraym x)
-    #
+
     cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, Core)
     
     cpdef calculate_derivs(self, double omega, bint has_liquid)
