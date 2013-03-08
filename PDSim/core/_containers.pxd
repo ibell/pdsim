@@ -35,6 +35,16 @@ cdef class ControlVolume(object):
     cdef public bint exists
     cdef public StateClass State
     
+cdef class ControlVolumeCollection(object):
+    cdef readonly list keys, CVs, indices, exists_keys, exists_indices, exists_CV
+    cdef readonly dict Nodes
+    cdef readonly int N, Nexist 
+    
+    cpdef add(self, ControlVolume CV)
+    cpdef rebuild_exists(self)
+    cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2)
+    cpdef volumes(self, double theta, bint as_dict = *)
+    
 cdef class CVArrays(object):
     cdef list array_list
     

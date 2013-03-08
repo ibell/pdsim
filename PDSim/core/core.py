@@ -337,7 +337,7 @@ class PDSimCore(_PDSimCore):
         preconditioning run
         """
         
-        for k,CV in self.CVs.iteritems():
+        for k,CV in zip(self.CVs.keys,self.CVs.CVs):
             if k in self.exists_CV_init:
                 CV.exists = True
             else:
@@ -401,11 +401,12 @@ class PDSimCore(_PDSimCore):
             An initialized control volume
         """
         
-        if CV.key in self.CVs:
+        if CV.key in self.CVs.keys:
             raise KeyError('Sorry but the key for your Control Volume ['+CV.key+'] is already in use')
         
         #Add the CV to the collection
-        self.CVs[CV.key]=CV
+        self.CVs.add(CV)
+        self.CVs.rebuild_exists()
         
     def add_tube(self,Tube):
         """
@@ -1764,11 +1765,11 @@ class PDSimCore(_PDSimCore):
                 LHS.append(key)
                 RHS.append(newkey)
         
-        error_T_list = [errorT[key] for key in self.CVs.keys() if key in newT]
-        error_rho_list = [error_rho[key] for key in self.CVs.keys() if key in new_rho]
+        error_T_list = [errorT[key] for key in self.CVs.keys if key in newT]
+        error_rho_list = [error_rho[key] for key in self.CVs.keys if key in new_rho]
         
-        new_T_list = [newT[key] for key in self.CVs.keys() if key in newT]
-        new_rho_list = [new_rho[key] for key in self.CVs.keys() if key in new_rho]
+        new_T_list = [newT[key] for key in self.CVs.keys if key in newT]
+        new_rho_list = [new_rho[key] for key in self.CVs.keys if key in new_rho]
         
         #Reset the exist flags for the CV - this should handle all the possibilities
         #Turn off the LHS CV

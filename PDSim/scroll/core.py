@@ -603,7 +603,7 @@ class Scroll(PDSimCore, _Scroll):
             ########################
             #Find chambers with a discharge_becomes flag
             for key in self.CVs.exists_keys:
-                if self.CVs[key].discharge_becomes in self.CVs.keys():
+                if self.CVs[key].discharge_becomes in self.CVs.keys:
                     #Set the state of the "new" chamber to be the old chamber
                     oldCV=self.CVs[key]
                     if oldCV.exists==True:
@@ -1267,7 +1267,7 @@ class Scroll(PDSimCore, _Scroll):
                         dd = scroll_geo.DD_forces,
                         ddd = scroll_geo.DDD_forces
                         )
-        for CVkey in self.CVs.keys():
+        for CVkey in self.CVs.keys:
             if CVkey in func_map:
                 #Calculate the force components for each crank angle
                 #Early bind the function

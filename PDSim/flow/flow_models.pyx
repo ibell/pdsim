@@ -6,8 +6,6 @@ from __future__ import division
 import cython
 cimport cython
 
-
-
 #Uncomment this line to use the python math functions
 #from math import log,pi,e,pow,sqrt
 
@@ -454,11 +452,11 @@ cdef class ValveModel(object):
         
         Parameters
         ----------
-        Core: PDSimCore instance
+        Core : :class:`PDSimCore <PSSim.core.core.PDSimCore>` instance
         
         Returns
         -------
-        out_array: arraym instance
+        out_array : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
         
         """ 
         cdef double omega
@@ -597,7 +595,7 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
     delta : float
         Gap width in meters
     Type : int
-        One of flow_models.TYPE_RADIAL or flow_models.TYPE_FLANK
+        One of ``flow_models.TYPE_RADIAL`` or ``flow_models.TYPE_FLANK``
     t : float
         Scroll wrap thickness in m
     ro : float

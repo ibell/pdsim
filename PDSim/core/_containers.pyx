@@ -320,11 +320,182 @@ cdef class ControlVolume(object):
         import copy
         return copy.deepcopy(self)
     
-def rebuildCV(d):
+def rebuildCV(dict d):
     CV = ControlVolume(d.pop('key'),d.pop('V_dV'),d.pop('State'))
     for item in d:
         setattr(CV,item,d[item])
     return CV
+        
+cdef class ControlVolumeCollection(object):
+    """
+    ControlVolumeCollection is class to hold all the control volumes
+    """
+    def __init__(self):
+        self.keys = []
+        self.CVs = []
+        
+    def __reduce__(self):
+        #TODO: rewrite me
+        return rebuildCVCollection,(self.__getstate__(),)
+    
+    def __getstate__(self):
+        #TODO: rewrite me
+        import copy
+        CVs = [copy.copy(item) for k,item in self.iteritems()]
+        return CVs
+
+    def __setstate__(self, CVs):
+        #TODO: rewrite me
+        for CV in CVs:
+            self[CV.key]=CV
+            
+    def __getitem__(self, k):
+        """
+        Can index based on integer index or string key
+        """
+        if k in self.keys:
+            return self.CVs[self.keys.index(k)]
+        elif k in range(self.N):
+            return self.CVs[k]
+        else:
+            raise KeyError('Your key [{key:s}] is invalid'.format(key = k))
+            
+    cpdef add(self, ControlVolume CV):
+        """
+        Add a control volume to the list of control volumes
+        
+        Parameters
+        ----------
+        CV : :class:`ControlVolume <PDSim.core.containers.ControlVolume>' instance
+        
+        """
+        if CV.key in self.keys:
+            raise ValueError('Your CV key [{key:s}] is already in use'.format(CV.key))
+        else:
+            self.CVs.append(CV)
+            self.keys.append(CV.key)
+    
+    cpdef rebuild_exists(self):
+        
+        # For all CV - whether they exist or not
+        # both indices and keys are in the same order
+        self.indices = range(0,len(self.keys))
+        
+        self.exists_indices = [i for i in self.indices if self.CVs[i].exists]
+        self.exists_keys = [self.keys[i] for i in self.exists_indices]
+        self.exists_CV = [self.CVs[i] for i in self.exists_indices]
+        if len(self.exists_keys) == 0:
+            return
+        
+        self.Nodes = dict([(CV.key, CV.State) for CV in self.exists_CV])
+        self.N = len(self.CVs)
+        self.Nexist = len(self.exists_CV)
+    
+    def index(self,key):
+        return self.keys.index(key)
+    
+    @property
+    def T(self):
+        """
+        Temperature for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.State.get_T() for CV in self.exists_CV]
+    
+    @property
+    def p(self):
+        """
+        Pressure for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.State.get_p() for CV in self.exists_CV]
+    
+    @property
+    def rho(self):
+        """
+        Density for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.State.get_rho() for CV in self.exists_CV]
+    
+    @property
+    def h(self):
+        """
+        Enthalpy for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.State.get_h() for CV in self.exists_CV]
+    
+    @property
+    def cp(self):
+        """
+        Specific heat at constant volume for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.State.get_cp() for CV in self.exists_CV]
+    
+    @property
+    def cv(self):
+        """
+        Specific heat at constant volume for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.State.get_cv() for CV in self.exists_CV]
+    
+    @property
+    def dpdT(self):
+        """
+        Derivative of pressure with respect to temperature at constant volume for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.State.get_dpdT() for CV in self.exists_CV]
+    
+    cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2):
+#        if not len(array1) == len(array2) or not len(array2)==len(self.exists_CV):
+#            raise AttributeError('length of arrays must be the same and equal number of CV in existence')
+        keys = self.exists_keys
+        # Update each of the states of the control volume
+        for CV,v1,v2 in zip(self.exists_CV, array1, array2):
+            CV.State.update({name1:v1,name2:v2})
+     
+    cpdef volumes(self, double theta, bint as_dict = False):
+        """
+        Each control volume class must define a function V_dV (through a pointer) 
+        that defines the volume and derivative of volume with respect to the 
+        independent variable.  The function that V_dV points to MUST be of the form
+        
+        V,dV=V_dV(theta,**kwargs)
+        
+        If the parameter V_dV_kwargs is passed to the class constructor, these keyword 
+        arguments will be unpacked into the volume function call.  Useful for passing 
+        a flag to a given function
+        
+        Parameters
+        ----------
+        as_dict : boolean, optional
+            If ``True``, return the volumes and derivatives of volumes as a dictionary
+            
+        Returns
+        -------
+        A tuple of volumes and derivatives of volumes as arraym instances
+        
+        """
+            
+        #Loop over the control volumes that exist 
+        V_dV=[CV.V_dV(theta, **CV.V_dV_kwargs) for CV in self.exists_CV] #See below for Vfunc
+        V,dV=zip(*V_dV)
+        if not as_dict:
+            return arraym(V),arraym(dV)
+        else:
+            V_dict = {key:_V for key,_V in zip(self.exists_keys,V)}
+            dV_dict = {key:_dV for key,_dV in zip(self.exists_keys,dV)}
+            return V_dict, dV_dict
+
+def rebuildCVCollection(CVs):
+    CVC = ControlVolumeCollection()
+    for CV in CVs:
+        CVC[CV.key]=CV
+    return CVC
 
 cdef class _Tube:
     pass
