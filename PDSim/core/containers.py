@@ -212,44 +212,6 @@ class ControlVolumeCollection(collections.OrderedDict):
         else:
             V_dict = {key:_V for key,_V in zip(self.exists_keys,V)}
             dV_dict = {key:_dV for key,_dV in zip(self.exists_keys,dV)}
-            return V_dict, dV_dict
+            return V_dict, dV_dict
 
-def rebuildCV(d):
-    CV = ControlVolume(d.pop('key'),d.pop('V_dV'),d.pop('State'))
-    for item in d:
-        setattr(CV,item,d[item])
-    return CV
-
-class ControlVolume(object):
-    """
-    This is a class that contains all the code for a given control volume.  
-    
-    It includes the code for calculation of volumes and others.
-    """
-    
-    def __init__(self, key, VdVFcn, initialState, exists=True,
-                 VdVFcn_kwargs={}, discharge_becomes=None, becomes=None):
-        #_ControlVolume.__init__(self)
-        self.State=initialState
-        self.exists=exists
-        self.key=key
-        
-        self.V_dV = VdVFcn
-        self.V_dV_kwargs = VdVFcn_kwargs #Keyword-arguments that can get passed to volume function
-        self.discharge_becomes = discharge_becomes if discharge_becomes is not None else key
-        self.becomes=becomes if becomes is not None else key
-    
-    def __reduce__(self):
-        return rebuildCV,(self.__getstate__().copy(),)  
-    
-    def __getstate__(self):
-        d=self.__dict__
-        d['State']=self.State
-        return d.copy()
-    
-    def __setstate__(self, d):
-        for item in d:
-            setattr(self,item,d[item])
-        
-    def __deepcopy__(self):
-        return copy.deepcopy(self)
+from _containers import ControlVolume

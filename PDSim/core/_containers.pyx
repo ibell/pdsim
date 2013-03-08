@@ -258,9 +258,73 @@ cdef class CVArrays(object):
         
         return CVA
         
+cdef class ControlVolume(object):
+    """
+    This is a class that contains all the code for a given control volume.  
     
-cdef class _ControlVolume:
-    pass
+    It includes the code for calculation of volumes and others.
+    
+    Parameters
+    ----------
+    key : str
+        The string of the key for this control volume
+    VdVFcn : function, (future: VolumeFunction class)
+    initialState : :class:`State <CoolProp.State.State>` instance
+    exists : bool
+        ``True`` if control volume exists, ``False`` otherwise
+    VdVFcn_kwargs : dict
+        Keyword arguments that can be passed to the VdVFcn 
+    discharge_becomes : str
+        The key of the chamber that this control volume becomes at the 
+        discharge angle (scroll compressor only)
+    becomes : str or list
+        The key of the control volume that this CV becomes in the next revolution,
+        or a list of keys of control volumes that take on the values of this
+        CV
+    """
+    
+    def __init__(self, 
+                 str key, 
+                 object VdVFcn, 
+                 StateClass initialState, 
+                 bint exists=True,
+                 dict VdVFcn_kwargs={}, 
+                 str discharge_becomes=None, 
+                 object becomes = None):
+
+        self.key = key.encode('ascii')
+        self.V_dV = VdVFcn
+        self.State = initialState
+        self.exists = exists
+        self.V_dV_kwargs = VdVFcn_kwargs #Keyword-arguments that can get passed to volume function
+        self.discharge_becomes = discharge_becomes.encode('ascii') if discharge_becomes is not None else key.encode('ascii')
+        self.becomes = becomes if becomes is not None else key.encode('ascii')
+    
+    def __reduce__(self):
+        #TODO: fix me
+        return rebuildCV,(self.__getstate__().copy(),)
+    
+    def __getstate__(self):
+        #TODO: fix me
+        d=self.__dict__
+        d['State']=self.State
+        return d.copy()
+    
+    def __setstate__(self, d):
+        #TODO: fix me
+        for item in d:
+            setattr(self,item,d[item])
+        
+    def __deepcopy__(self):
+        #TODO: fix me
+        import copy
+        return copy.deepcopy(self)
+    
+def rebuildCV(d):
+    CV = ControlVolume(d.pop('key'),d.pop('V_dV'),d.pop('State'))
+    for item in d:
+        setattr(CV,item,d[item])
+    return CV
 
 cdef class _Tube:
     pass

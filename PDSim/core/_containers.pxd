@@ -27,6 +27,14 @@ cdef class _Tube(object):
     cdef public double Q_add,alpha,L,ID,OD,mdot
     cdef public bool exists
     
+cdef class ControlVolume(object):
+    cdef public bytes key, discharge_becomes
+    cdef public object becomes
+    cdef public object V_dV
+    cdef public dict V_dV_kwargs
+    cdef public bint exists
+    cdef public StateClass State
+    
 cdef class CVArrays(object):
     cdef list array_list
     

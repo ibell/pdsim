@@ -186,15 +186,12 @@ def Compressor():
     recip.add_flow(FlowPath(key1='inlet.2',key2='A',MdotFcn=recip.Suction))
     recip.add_flow(FlowPath(key1='outlet.1',key2='A',MdotFcn=recip.Discharge))
     
-    t1=clock()
-    recip.EulerN = 4000
-    recip.RK45_eps = 1e-10
-    
     recip.connect_callbacks(endcycle_callback=recip.endcycle_callback, # Provided by PDSimCore
                             heat_transfer_callback=recip.heat_transfer_callback,
                             lumps_energy_balance_callback = recip.lump_energy_balance_callback
                             )
     
+    t1=clock()
     recip.solve(key_inlet='inlet.1',
                 key_outlet='outlet.2',
                 solver_method = 'Euler',
