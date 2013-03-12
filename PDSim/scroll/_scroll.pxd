@@ -1,5 +1,5 @@
-from PDSim.flow._flow import FlowPath
-from PDSim.flow._flow cimport FlowPath
+from PDSim.flow.flow import FlowPath
+from PDSim.flow.flow cimport FlowPath
 
 from PDSim.scroll import scroll_geo
 from PDSim.scroll cimport scroll_geo

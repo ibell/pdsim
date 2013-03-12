@@ -309,6 +309,9 @@ cdef class arraym(object):
         return z
 
     cpdef reciprocal(self):
+        """
+        In-place get the reciprocal of each element
+        """
         cdef int i
         for i in range(self.N):
             self.data[i] = 1/self.data[i]
@@ -330,6 +333,10 @@ cdef class arraym(object):
     
     cpdef double set_index(self, int i, double val):
         self.data[i] = val
+        
+    cpdef fill(self, double fillval):
+        for i in range(self.N):
+            self.data[i] = fillval
     
     cdef arraym slice(self, int i, int j):
         cdef int k

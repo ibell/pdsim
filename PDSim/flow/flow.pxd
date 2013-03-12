@@ -20,7 +20,7 @@ cdef class FlowPathCollection(list):
     cpdef update_existence(self, Core)
     cpdef calculate(self, arraym harray)
     cpdef get_deepcopy(self)
-    cpdef tuple sumterms(self,Core)
+    cpdef sumterms(self, arraym summerdT, arraym summerdm)
     cpdef list flow_paths
     #cpdef FlowPath get_index(self, int i)
     #cpdef set_index(self, int i, FlowPath FP)

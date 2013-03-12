@@ -36,7 +36,10 @@ import time
 Injection = False
 check_valve = False
 
-def Compressor(Te = 273, Tc = 300, f = None):
+def Compressor(Te = 273, Tc = 300, f = None,TTSE = False):
+    if TTSE:
+        CP.set_TTSESinglePhase_LUT_size("Propane", 500, 500)
+        CP.enable_TTSE_LUT('Propane')
     global Injection
     ScrollComp=Scroll()
     #This runs if the module code is run directly
@@ -283,8 +286,6 @@ def Compressor(Te = 273, Tc = 300, f = None):
     return ScrollComp
     
 if __name__=='__main__':
-    #CP.enable_TTSE_LUT('R410A')
-    #CP.enable_TTSE_LUT('R404A')
     profile=False
     if profile==True:
         import line_profiler as LP

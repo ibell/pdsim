@@ -29,8 +29,8 @@ fp.close()
 if len(sys.argv) == 1:
     #sys.argv+=['build_ext','--force','--inplace']
     #sys.argv+=['build_ext','--inplace']
-    #sys.argv+=['build','--force','install']
-    sys.argv+=['build','install']
+    sys.argv+=['build','--force','install']
+    #sys.argv+=['build','install']
 
 import Cython
 
@@ -44,13 +44,13 @@ import numpy
 pyx_list = [
             "PDSim/misc/scipylike.pyx",
             "PDSim/flow/flow_models.pyx",
-            "PDSim/flow/_flow.pyx",
+            "PDSim/flow/flow.pyx",
             "PDSim/scroll/scroll_geo.pyx",
             "PDSim/misc/polymath.pyx",
             "PDSim/misc/stl_utilities.pyx",
             "PDSim/misc/datatypes.pyx",
             "PDSim/core/_core.pyx",
-            "PDSim/core/_containers.pyx",
+            "PDSim/core/containers.pyx",
             "PDSim/recip/_recip.pyx",
             "PDSim/scroll/_scroll.pyx",
             "PDSim/core/callbacks.pyx",

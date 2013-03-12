@@ -200,9 +200,7 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
             T2=State2.T
             
         #Q_add needs to be in W
-        Q_add *= 1000
-        
-        
+        Q_add *= 1000       
         
         S=State(Fluid,{'T':Tmean,'P':p})
             

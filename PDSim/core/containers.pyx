@@ -1,10 +1,78 @@
 from __future__ import division
 cimport cython
-    
+
 cdef public enum STATE_VARS:
     STATE_VARS_TD
     STATE_VARS_TM
     
+cdef class Tube(object):
+    """
+    A tube is a component of the model that allows for heat transfer and pressure drop.
+    
+    With this class, the state of at least one of the points is fixed.  For instance, at the inlet of the compressor, the state well upstream is quasi-steady.
+    """
+    def __init__(self,key1,key2,L,ID,State1=None,State2=None,OD=-1,fixed=-1,TubeFcn=None,mdot=-1,exists=True):
+        """
+        
+        Parameters
+        ----------
+        key1 : str
+            Key for the upstream flow node
+        key2 : str
+            Key for the downstream flow node
+        L : float
+            Length of the tube [m] 
+        ID : float
+            Internal diameter of the tube [m]
+        State1 : :class:`State <CoolProp.State.State>` instance
+            Upstream state
+        State2 : :class:`State <CoolProp.State.State>` instance
+            Downstream state
+        OD : float
+            Outer diameter of the tube [m]
+        fixed : int
+            Which one of the node is fixed, one of ``1`` or ``2``
+        TubeFun : function
+            A function that will be called for the tube
+        mdot : float
+            The mass flow rate [kg/s]
+        exists : boolean
+            ``True`` if the tube exists
+        """
+        self.key1 = key1
+        self.key2 = key2
+        self.fixed = fixed
+        
+        #: Additional heat to be added to the tube
+        self.Q_add = 0.0
+        
+        #: Fixed heat transfer coefficient if desired (if less than zero will use correlation - default)
+        self.alpha = -1.0
+        
+        self.exists = exists
+        if fixed<0:
+            raise AttributeError("You must provide an integer value for fixed, either 1 for Node 1 fixed, or 2 for Node 2 fixed.")
+        if fixed==1 and isinstance(State1,StateClass) and State2==None:
+            #Everything good
+            self.State1=State1
+            self.State2=State1.copy()
+        elif fixed==2 and isinstance(State2,StateClass) and State1==None:
+            #Everything good
+            self.State2=State2
+            self.State1=State2.copy()
+        else:
+            raise AttributeError('Incompatibility between the value for fixed and the states provided')
+            
+        self.TubeFcn=TubeFcn
+        if mdot<0:
+            self.mdot=0.010
+            print('Warning: mdot not provided to Tube class constructor, guess value of '+str(self.mdot)+' kg/s used')
+        else:
+            self.mdot=mdot
+        self.L=L
+        self.ID=ID
+        self.OD=OD
+        
 cdef class TubeCollection(list):
     
     def __init__(self):
@@ -91,7 +159,7 @@ cdef class CVArrays(object):
         self.free_all()
         self.build_all(N)
          
-    cpdef just_volumes(self, CVs, double theta):
+    cpdef just_volumes(self, list CVs, double theta):
         """
         Just calculate the volumes
         for each control volume.
@@ -107,14 +175,14 @@ cdef class CVArrays(object):
         
         for iCV in range(N):
             # Early-bind the control volume for speed
-            CV = CVs[iCV]
+            CV = <ControlVolume>(CVs[iCV])
             
             # Calculate the volume and derivative of volume - does not depend on
             # any of the other state variables
             self.V.data[iCV], self.dV.data[iCV] = CV.V_dV(theta, **CV.V_dV_kwargs)
     
     @cython.cdivision(True)    
-    cpdef properties_and_volumes(self, CVs, double theta, int state_vars, arraym x):
+    cpdef properties_and_volumes(self, list CVs, double theta, int state_vars, arraym x):
         """
         Calculate all the required thermodynamic properties as well as the volumes
         for each control volume.
@@ -131,23 +199,26 @@ cdef class CVArrays(object):
         """
         cdef StateClass State
         cdef int N = len(CVs)
-        cdef int iCV, iVar
-        cdef arraym T,rho,m
-        cdef arraym var1, var2 #Arrays to hold the state values for T,rho for instance
+        cdef int iCV, iVar, i
         
         #Calculate the volumes
         self.just_volumes(CVs,theta)
         
         # Split the state variable array into chunks
-        self.T = x.slice(0,N)
+        for i in range(N):
+            self.T.data[i] = x.data[i]
         if state_vars == STATE_VARS_TM:
-            m = x.slice(N, 2*N)
-            self.m.set_data(m.data,N)
+            i = 0
+            for j in xrange(N, 2*N):
+                self.m.data[i] = x.data[j]
+                i += 1
             for iCV in range(N):
                 self.rho.data[iCV] = self.m.data[iCV]/self.V.data[iCV]
         elif state_vars == STATE_VARS_TD:
-            rho = x.slice(N, 2*N)
-            self.rho.set_data(rho.data, N)
+            i = 0
+            for j in xrange(N, 2*N):
+                self.rho.data[i] = x.data[j]
+                i += 1
             for iCV in range(N):
                 self.m.data[iCV] = self.rho.data[iCV]*self.V.data[iCV]
         
@@ -155,9 +226,8 @@ cdef class CVArrays(object):
             self.v.data[iCV] = 1/self.rho.data[iCV]
         
         for iCV in range(N):
-            # Early-bind the control volume and State for speed
-            CV = CVs[iCV]
-            State = CV.State
+            # Early-bind the State for speed
+            State = (<ControlVolume>(CVs[iCV])).State
 
             # Update the CV state variables using temperature and density
             State.update_Trho(self.T.data[iCV], self.rho.data[iCV])
@@ -171,23 +241,22 @@ cdef class CVArrays(object):
         self.N = N
         self.state_vars = state_vars
     
-    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, Core):
+    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray):
         """
         Calculate the flows between tubes and control volumes and sum up the 
         flow-related terms
         
+        Loads the arraym instances ``summerdT`` and ``summerdT``
+        
         Parameters
         ----------
-        Flows: :class:`PDSim.core.flow._flow.FlowPathCollection` instance
-        harray: :class:`PDSim.misc.datatypes.arraym` instance
-            An array,
+        Flows : :class:`PDSim.core.flow.flow.FlowPathCollection` instance
+        harray : :class:`PDSim.misc.datatypes.arraym` instance
         
         """
-        cdef int i
-        cdef arraym summerdm, summerdT
         
         Flows.calculate(harray)
-        self.summerdT, self.summerdm = Flows.sumterms(Core)
+        Flows.sumterms(self.summerdT, self.summerdm)
     
     @cython.cdivision(True)
     cpdef calculate_derivs(self, double omega, bint has_liquid):
@@ -349,6 +418,12 @@ cdef class ControlVolumeCollection(object):
         for CV in CVs:
             self[CV.key]=CV
             
+    cpdef at(self, int i):
+        """
+        Return the control volume at the given index
+        """
+        return self.CVs[i]
+    
     def __getitem__(self, k):
         """
         Can index based on integer index or string key
@@ -358,7 +433,7 @@ cdef class ControlVolumeCollection(object):
         elif k in range(self.N):
             return self.CVs[k]
         else:
-            raise KeyError('Your key [{key:s}] is invalid'.format(key = k))
+            raise KeyError('Your key [{key:s}] of type [{_type:s}] is invalid'.format(key = k,_type = str(type(k))))
             
     cpdef add(self, ControlVolume CV):
         """
@@ -376,6 +451,9 @@ cdef class ControlVolumeCollection(object):
             self.keys.append(CV.key)
     
     cpdef rebuild_exists(self):
+        """
+        Rebuild all the internal lists that hold the indices, keys, and control volumes
+        """
         
         # For all CV - whether they exist or not
         # both indices and keys are in the same order
@@ -496,9 +574,6 @@ def rebuildCVCollection(CVs):
     for CV in CVs:
         CVC[CV.key]=CV
     return CVC
-
-cdef class _Tube:
-    pass
 
 cpdef list collect_State_h(list CVList):
     cdef _ControlVolume CV

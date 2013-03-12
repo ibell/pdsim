@@ -7,8 +7,8 @@ from flow_models import PyFlowFunctionWrapper
 from CoolProp.State import State as StateClass
 from CoolProp.State cimport State as StateClass
 
-from PDSim.core._containers import TubeCollection
-from PDSim.core._containers cimport TubeCollection
+from PDSim.core.containers import TubeCollection
+from PDSim.core.containers cimport TubeCollection
 
 from libc.stdlib cimport malloc, free, calloc
 
@@ -55,21 +55,6 @@ class struct(object):
  
 @cython.final
 cdef class FlowPathCollection(list):
-
-#    def __init__(self):
-#        self.flow_paths = list()
-#    
-#    cpdef FlowPath get_index(self, int i):
-#        """
-#        Get the FlowPath at index i
-#        """ 
-#        return self.flow_paths[i]
-#    
-#    cpdef set_index(self, int i, FlowPath FP):
-#        """
-#        Set the FlowPath at index i
-#        """ 
-#        self.flow_paths[i] = FP
     
     cpdef update_existence(self, Core):
         """
@@ -143,8 +128,8 @@ cdef class FlowPathCollection(list):
         
         Parameters
         ----------
-        harray : arraym, optional
-            Arraym that maps index to enthalpy - CVs+Tubes
+        harray : arraym
+            arraym that maps index to enthalpy - CVs+Tubes
         """
         cdef FlowPath FP
         cdef int i
@@ -155,7 +140,7 @@ cdef class FlowPathCollection(list):
                 FP.calculate(harray)
         
     @cython.cdivision(True)
-    cpdef tuple sumterms(self, Core):
+    cpdef sumterms(self, arraym summerdT, arraym summerdm):
         """
         Sum all the mass flow and mdot*h for each CV in existence at a given 
         step for the derivatives in the ODE solver
@@ -164,18 +149,17 @@ cdef class FlowPathCollection(list):
         
         Parameters
         ----------
-        Core: PDSimCore instance
+        summerdT : :class:`arraym <PDSim.misc.datatypes.arraym>' instance
+        summerdm : :class:`arraym <PDSim.misc.datatypes.arraym>' instance
             
         """
-        cdef arraym summerdm_array, summerdT_array
         cdef double mdot, h_up
         cdef int I_up,I_down
         cdef FlowPath Flow
         cdef int i
         
-        # calloc initializes the values to zero
-        cdef double *summerdm = <double*> calloc(self.Nexists, sizeof(double))
-        cdef double *summerdT = <double*> calloc(self.Nexists, sizeof(double))
+        summerdm.fill(0.0)
+        summerdT.fill(0.0)
         
         #Loop over the flowpaths
         for i in range(self.N):
@@ -195,26 +179,14 @@ cdef class FlowPathCollection(list):
             #If the upstream node is a control volume 
             if Flow.key_up_exists:
                 #Flow is leaving the upstream control volume
-                summerdm[Flow.ikey_up] -= mdot/self.omega
-                summerdT[Flow.ikey_up] -= mdot/self.omega*h_up
+                summerdm.data[Flow.ikey_up] -= mdot/self.omega
+                summerdT.data[Flow.ikey_up] -= mdot/self.omega*h_up
                 
             #If the downstream node is a control volume
             if Flow.key_down_exists:
                 #Flow is entering the downstream control volume
-                summerdm[Flow.ikey_down] += mdot/self.omega
-                summerdT[Flow.ikey_down] += mdot/self.omega*h_up
-    
-        # Create the arraym instances and copy the data over to them
-        summerdT_array = arraym()
-        summerdT_array.set_data(summerdT,self.Nexists)
-        summerdm_array = arraym()
-        summerdm_array.set_data(summerdm,self.Nexists)
-        
-        #Free the memory that was allocated
-        free(summerdm)
-        free(summerdT)
-        
-        return summerdT_array, summerdm_array
+                summerdm.data[Flow.ikey_down] += mdot/self.omega
+                summerdT.data[Flow.ikey_down] += mdot/self.omega*h_up
     
     def __reduce__(self):
         return rebuildFPC,(self[:],)

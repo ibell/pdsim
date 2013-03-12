@@ -8,7 +8,7 @@ from cPickle import loads, dumps
 import inspect
 
 ##--  Package imports  --
-from PDSim.flow import _flow,flow_models
+from PDSim.flow import flow,flow_models
 from _containers import STATE_VARS_TM, CVArrays
 from PDSim.flow.flow import FlowPathCollection, FlowPath
 from containers import ControlVolumeCollection,Tube,TubeCollection
@@ -85,7 +85,7 @@ class PDSimCore(_PDSimCore):
         
         #: The Valves container class
         self.Valves=[]
-        #: A :class:`ControlVolumeCollection <PDSim.core.containers.ControlVolumeCollection>` instance
+        #: The :class:`ControlVolumeCollection <PDSim.core.containers.ControlVolumeCollection>` instance
         #: that contains all the control volumes in the machine
         self.CVs=ControlVolumeCollection()
         #: The :class:`FlowPathCollection <PDSim.flow.flow.FlowPathCollection>` 
@@ -207,7 +207,7 @@ class PDSimCore(_PDSimCore):
             
             Use the code in the Cython module
             """
-            return _flow.sumterms_given_CV(key, Flows)
+            return flow.sumterms_given_CV(key, Flows)
             
         def collect_keys(Tubes,Flows):
             """
@@ -286,7 +286,13 @@ class PDSimCore(_PDSimCore):
             
         self.mdot = self.FlowsProcessed.mean_mdot[self.key_inlet]
             
-    def _postprocess_HT(self):    
+    def _postprocess_HT(self):
+        """
+        Postprocess the heat transfer terms
+        
+        Here we
+        calculate the mean heat transfer rate over the course of the cycle 
+        """
         self.HTProcessed=struct()
         r = range(self.Ntheta)
         
@@ -435,19 +441,23 @@ class PDSimCore(_PDSimCore):
         self.__hasValves__=True
         
     def pre_run(self, N = 40000):
+        """
+        This function gets called before the run begins.  It builds large matrices
+        to store values, and does other initialization. 
+        """
         # Build the full numpy arrays for temperature, volume, etc.
         self.t=np.zeros((N,))
         self.T=np.zeros((self.CVs.N,N))
         self.T.fill(np.nan)
         self.p=self.T.copy()
         self.h = self.T.copy()
-        self.m=self.T.copy()
-        self.V=self.T.copy()
-        self.dV=self.T.copy()
-        self.rho=self.T.copy()
-        self.Q=self.T.copy()
-        self.xL=self.T.copy()
-        self.xValves=np.zeros((2*len(self.Valves),N))
+        self.m = self.T.copy()
+        self.V = self.T.copy()
+        self.dV = self.T.copy()
+        self.rho = self.T.copy()
+        self.Q = self.T.copy()
+        self.xL = self.T.copy()
+        self.xValves = np.zeros((2*len(self.Valves),N))
         
         # Initialize the core class that contains the arrays and the derivs
         self.core = CVArrays(0)
@@ -458,17 +468,10 @@ class PDSimCore(_PDSimCore):
         # Set a flag about liquid flooding
         self.__hasLiquid__ = False
         
-        # If it has a motor model, try to use that to get a guess for the motor
-        # losses and then also figure out whether these motor losses should be
-        # added to the suction gas 
-        if hasattr(self,'motor'):
-            pass
-        
     def pre_cycle(self, x0 = None):
         """
         This runs before the cycle is run but after pre_run has been called
         """        
-        
         self.t.fill(np.nan)
         self.T.fill(np.nan)
         self.p.fill(np.nan)
@@ -496,7 +499,6 @@ class PDSimCore(_PDSimCore):
             self.p[self.CVs.exists_indices, 0] = self.CVs.p
             self.rho[self.CVs.exists_indices, 0] = self.CVs.rho
             self.m[self.CVs.exists_indices, 0] = self.CVs.rho*arraym(V)
-
         else:
             #x0 is provided, but need to pad it out to include valve values
             x0_ = x0.copy()
@@ -1007,7 +1009,7 @@ class PDSimCore(_PDSimCore):
     def _check_cycle_abort(self, index, I = 100):
         """
         This function will check whether an abort has been requested every 
-        I steps of the solver throughout the rotation
+        ``I`` steps of the solver throughout the rotation
         
         Meant for calling by cycle_RK45, cycle_SimpleEuler, cycle_Heun, etc.
         
@@ -1018,7 +1020,6 @@ class PDSimCore(_PDSimCore):
         ----------
         index : int
             The index of the step
-        
         I : int, optional
             Check abort at this interval
         
@@ -1037,7 +1038,7 @@ class PDSimCore(_PDSimCore):
         will be read by the main execution thread
         
         Once self._want_abort is ``True``, it will stay latched True until the 
-        run is over
+        run is terminated
         """
         #If you received an abort request, set a flag in the simulation
         if self.pipe_abort.poll() and self.pipe_abort.recv():
@@ -1052,7 +1053,7 @@ class PDSimCore(_PDSimCore):
         
         What happens in this function is that one cycle is run using the very 
         rough first estimate of outlet state.  This cycle is then used to update
-        the guess value for the outlet state
+        the guess value for the outlet state.
         
         All keyword arguments are passed on to the PDSimCore.solve
         function
@@ -1102,9 +1103,9 @@ class PDSimCore(_PDSimCore):
         
         The callbacks must either be unbound methods or methods of a class derived from PDSimCore
         
-        No keyword arguments are supported.  The callback is probably a bound 
-        method of a PDSimCore instance, in which case you have access to all the 
-        data in the class anyway
+        No keyword arguments are supported to be passed to the callbacks.  The 
+        callback is probably a bound method of a PDSimCore instance, in which 
+        case you have access to all the data in the class anyway
         
         Parameters
         ----------
@@ -1146,7 +1147,6 @@ class PDSimCore(_PDSimCore):
             by the solver
             
         """
-        
         
         if step_callback is None:
             #No callback is provided, don't do anything
@@ -1601,7 +1601,7 @@ class PDSimCore(_PDSimCore):
         dfdt : ``arraym`` instance
         
         """
-        
+
         # Updates the state, calculates the volumes, prepares all the things needed for derivatives
         self.core.properties_and_volumes(self.CVs.exists_CV, theta, STATE_VARS_TM, x)
         
@@ -1610,7 +1610,7 @@ class PDSimCore(_PDSimCore):
         harray.extend(self.Tubes.get_h())
         
         # Calculate the flows and sum up all the terms
-        self.core.calculate_flows(self.Flows, harray, self)
+        self.core.calculate_flows(self.Flows, harray)
         
         # Calculate the heat transfer terms if provided
         if self.callbacks.heat_transfer_callback is not None:

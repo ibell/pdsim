@@ -8,8 +8,8 @@ from libcpp.vector cimport vector
 
 from CoolProp.State cimport State
 
-from PDSim.flow._flow import FlowPath
-from PDSim.flow._flow cimport FlowPath
+from PDSim.flow.flow import FlowPath
+from PDSim.flow.flow cimport FlowPath
 
 from PDSim.misc.datatypes import arraym, empty_arraym
 from PDSim.misc.datatypes cimport arraym, empty_arraym
