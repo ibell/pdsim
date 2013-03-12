@@ -24,11 +24,14 @@ class Motor(object):
     def set_coeffs(self, tau_coeffs, eta_coeffs, omega_coeffs):
         """
         Set the coefficients
-        tau_coeffs: iterable
+        
+        Parameters
+        ----------
+        tau_coeffs: iterable (list or similar)
             Values for the torque [N-m]
-        eta_coeffs: iterable
+        eta_coeffs: iterable (list or similar)
             Values for the efficiency [-] (in the range 0 to 1)
-        omega_coeffs: iterable
+        omega_coeffs: iterable (list or similar)
             Values for the rotational speed [rad/s]
         """
         #Only accept coefficients if they are all the same length

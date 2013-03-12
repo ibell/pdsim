@@ -1,6 +1,11 @@
 import cython
 cimport cython
         
+cdef class Collector(object):
+    cdef public list vec
+    
+    cpdef v(self, int ndmin = *)
+    
 cdef class listm(list):
     """
     See http://docs.cython.org/src/userguide/special_methods.html
@@ -19,7 +24,6 @@ cdef class arraym(object):
     cpdef extend(self, arraym array2)
     cpdef double get_index(self, int i)
     cpdef double set_index(self, int i, double val)
-    cpdef reciprocal(self)
     cpdef fill(self, double fillval)
     
 cpdef arraym empty_arraym(int N)

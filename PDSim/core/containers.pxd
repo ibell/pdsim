@@ -9,9 +9,6 @@ from PDSim.flow.flow cimport FlowPathCollection
 from PDSim.misc.datatypes cimport arraym
 from PDSim.misc.datatypes import arraym
     
-cdef class _ControlVolume:
-    cdef public StateClass State
-    
 cdef class TubeCollection(list):
     cdef dict _Nodes
     cdef arraym harray

@@ -605,14 +605,13 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
         
     Notes
     -----
-    If Type is 'radial', t must be provided
+    If Type is ``radial``, t must be provided
     
-    If Type is 'flank', ro must be provided
+    If Type is ``flank``, ro must be provided
         
     Implements the frictionally-corrected method of 
-    Bell et al., *A Computationally Efficient Hybrid Leakage Model for Modeling Leakage in Positive Displacement Compressors*, "2012 International Compressor Engineering Conference at Purdue University
+    Bell, I, Groll, E, Braun, J. E, & W. Travis, H. (in press, 2013). A computationally efficient hybrid leakage model for positive displacement compressors and expanders. International Journal of Refrigeration. 
     
-    Journal publication to follow
     """
     
     cdef double mdot,Re,v,mdot_ratio

@@ -246,13 +246,27 @@ cdef class CVArrays(object):
         Calculate the flows between tubes and control volumes and sum up the 
         flow-related terms
         
-        Loads the arraym instances ``summerdT`` and ``summerdT``
+        Loads the arraym instances ``summerdT`` and ``summerdm`` of this class
+        
+        These terms are defined by
+        
+        .. math::
+        
+            \\mathrm{summerdm} = \\sum  \\frac{\\dot m}{\\omega}
+            
+        and 
+        
+        .. math::
+        
+            \\mathrm{summerdT} = \\sum  \\frac{\\dot m h}{\\omega}
+        
+        where the signs are dependent on whether the flow is into or out of the 
+        given control volume
         
         Parameters
         ----------
-        Flows : :class:`PDSim.core.flow.flow.FlowPathCollection` instance
-        harray : :class:`PDSim.misc.datatypes.arraym` instance
-        
+        Flows : :class:`FlowPathCollection <PDSim.flow.flow.FlowPathCollection>` instance
+        harray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
         """
         
         Flows.calculate(harray)
@@ -332,24 +346,6 @@ cdef class ControlVolume(object):
     This is a class that contains all the code for a given control volume.  
     
     It includes the code for calculation of volumes and others.
-    
-    Parameters
-    ----------
-    key : str
-        The string of the key for this control volume
-    VdVFcn : function, (future: VolumeFunction class)
-    initialState : :class:`State <CoolProp.State.State>` instance
-    exists : bool
-        ``True`` if control volume exists, ``False`` otherwise
-    VdVFcn_kwargs : dict
-        Keyword arguments that can be passed to the VdVFcn 
-    discharge_becomes : str
-        The key of the chamber that this control volume becomes at the 
-        discharge angle (scroll compressor only)
-    becomes : str or list
-        The key of the control volume that this CV becomes in the next revolution,
-        or a list of keys of control volumes that take on the values of this
-        CV
     """
     
     def __init__(self, 
@@ -360,6 +356,25 @@ cdef class ControlVolume(object):
                  dict VdVFcn_kwargs={}, 
                  str discharge_becomes=None, 
                  object becomes = None):
+        """
+        Parameters
+        ----------
+        key : str
+            The string of the key for this control volume
+        VdVFcn : function, (future: VolumeFunction class)
+        initialState : :class:`State <CoolProp.State.State>` instance
+        exists : bool
+            ``True`` if control volume exists, ``False`` otherwise
+        VdVFcn_kwargs : dict
+            Keyword arguments that can be passed to the VdVFcn 
+        discharge_becomes : str
+            The key of the chamber that this control volume becomes at the 
+            discharge angle (scroll compressor only)
+        becomes : str or list
+            The key of the control volume that this CV becomes in the next revolution,
+            or a list of keys of control volumes that take on the values of this
+            CV
+        """
 
         self.key = key.encode('ascii')
         self.V_dV = VdVFcn
@@ -375,12 +390,12 @@ cdef class ControlVolume(object):
     
     def __getstate__(self):
         #TODO: fix me
-        d=self.__dict__
-        d['State']=self.State
+        d= dict(key = self.key, discharge_becomes = self.discharge_becomes,
+                becomes = self.becomes, V_dV = self.V_dV, V_dV_kwargs = self.V_dV_kwargs,
+                exists = self.exists, State = self.State)
         return d.copy()
     
     def __setstate__(self, d):
-        #TODO: fix me
         for item in d:
             setattr(self,item,d[item])
         
@@ -408,9 +423,8 @@ cdef class ControlVolumeCollection(object):
         return rebuildCVCollection,(self.__getstate__(),)
     
     def __getstate__(self):
-        #TODO: rewrite me
         import copy
-        CVs = [copy.copy(item) for k,item in self.iteritems()]
+        CVs = [copy.copy(CV) for CV in self.CVs]
         return CVs
 
     def __setstate__(self, CVs):
@@ -572,9 +586,10 @@ cdef class ControlVolumeCollection(object):
 def rebuildCVCollection(CVs):
     CVC = ControlVolumeCollection()
     for CV in CVs:
-        CVC[CV.key]=CV
+        CVC.add(CV)
+    CVC.rebuild_exists()
     return CVC
 
 cpdef list collect_State_h(list CVList):
-    cdef _ControlVolume CV
+    cdef ControlVolume CV
     return [CV.State.get_h() for CV in CVList]

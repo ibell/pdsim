@@ -23,7 +23,6 @@ def thrust_bearing(**kwargs):
     N : float
         Thrust force [N]
     
-    
     Notes
     -----
     To derive the speed of contact of the orbiting scroll
@@ -256,7 +255,7 @@ def journal_bearing(**kwargs):
 #    print 'log10_f_rb_c_list',log10_f_rb_c_list
 #    print 'rb*f/c',rb_c_f
 #    print 'f',f
-    print 'hmin =',hm_over_c*(r_b/rb_c)
+#    print 'hmin =',hm_over_c*(r_b/rb_c)
     return dict(
                 S = S,
                 f = f,

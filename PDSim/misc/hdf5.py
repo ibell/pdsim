@@ -28,8 +28,13 @@ class HDF5Writer(object):
                 f.create_dataset(thing, data = value)
                 continue
             elif isinstance(value, np.ndarray):
-                #Save it with compression, go to next thing
-                f.create_dataset(thing, data = value, compression = 'gzip')
+                
+                if not value.shape: # value.shape is an empty tuple
+                    # It's a one-element numpy array
+                    f.create_dataset(thing, data = value)
+                else:
+                    #Save it with compression, go to next thing
+                    f.create_dataset(thing, data = value, compression = 'gzip')
                 continue
             elif isinstance(value, basestring):
                 str_type = h5py.new_vlen(str)

@@ -26,7 +26,7 @@ scroll Package
     :show-inheritance:
     
 :mod:`_scroll` Module
-------------------
+---------------------
 
 .. automodule:: PDSim.scroll._scroll
     :members:

@@ -8,6 +8,16 @@ try:
 except ImportError:
     raise ImportError('The required python package CoolProp was not found.  Please go to coolprop.sf.net to obtain a copy')
     
+try:
+    import psutil
+    for proc in psutil.get_process_list():
+        cmdline = proc.cmdline
+        if cmdline and ''.join(cmdline).find('pycompletionserver.py') > 0:
+            proc.terminate()
+            break
+except ImportError:
+    print 'psutil was not found, it is used to kill the python completion server in Eclipse which keeps PDSim from building. psutils can be easy_install-ed or installed using pip'
+    
 from distutils.core import setup, Extension
 from Cython.Build import cythonize
 from Cython.Distutils import build_ext
@@ -27,10 +37,10 @@ for line in lines:
 fp.close()
 
 if len(sys.argv) == 1:
-    #sys.argv+=['build_ext','--force','--inplace']
-    #sys.argv+=['build_ext','--inplace']
-    sys.argv+=['build','--force','install']
-    #sys.argv+=['build','install']
+    #sys.argv += ['build_ext','--force','--inplace']
+    #sys.argv += ['build_ext','--inplace']
+    #sys.argv += ['build','--force','install']
+    sys.argv += ['build','install']
 
 import Cython
 
@@ -42,6 +52,10 @@ import numpy
 
 #Each of the Pure-Python or PYX files in this list will be compiled to a python module       
 pyx_list = [
+            "PDSim/core/_core.pyx",
+            "PDSim/core/containers.pyx",
+            "PDSim/core/callbacks.pyx",
+            "PDSim/core/cycleintegrators.pyx",
             "PDSim/misc/scipylike.pyx",
             "PDSim/flow/flow_models.pyx",
             "PDSim/flow/flow.pyx",
@@ -49,12 +63,8 @@ pyx_list = [
             "PDSim/misc/polymath.pyx",
             "PDSim/misc/stl_utilities.pyx",
             "PDSim/misc/datatypes.pyx",
-            "PDSim/core/_core.pyx",
-            "PDSim/core/containers.pyx",
             "PDSim/recip/_recip.pyx",
-            "PDSim/scroll/_scroll.pyx",
-            "PDSim/core/callbacks.pyx",
-            "PDSim/core/cycleintegrators.pyx"
+            "PDSim/scroll/_scroll.pyx"
             ]
 
 def clean():
@@ -90,7 +100,6 @@ for pyx_file in pyx_list:
     ext_name = pyx_file.rsplit('.',1)[0].replace('/','.')
 
     ext_module_list.append(CyExtension(ext_name,sources,language='c++'))
-       
 
 setup(
   name = 'PDSim',

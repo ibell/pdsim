@@ -925,17 +925,19 @@ class Scroll(PDSimCore, _Scroll):
         
     def lump_energy_balance_callback(self):
         """
+        Derivation for electrical power of motor:
+        
         .. math ::
             
-            \\eta _{motor}} = \\frac{{{{\dot W}_{shaft}}}}{{{{\dot W}_{shaft}} + {{\dot W}_{motor}}}}
+            \\eta _{motor} = \\frac{\\dot W_{shaft}}{\\dot W_{shaft} + \\dot W_{motor}}
             
         .. math ::
             
-            {\eta _{motor}}\left( {{{\dot W}_{shaft}} + {{\dot W}_{motor}}} \\right) = {{\dot W}_{shaft}}
+            {\\eta _{motor}}\\left( \\dot W_{shaft} + \\dot W_{motor} \\right) = \\dot W_{shaft}
             
         .. math::
         
-            {{\dot W}_{motor}} = \frac{{{{\dot W}_{shaft}}}}{{{\eta _{motor}}}} - {{\dot W}_{shaft}}
+            \\dot W_{motor} = \\frac{\\dot W_{shaft}}{\\eta _{motor}} - \\dot W_{shaft}
         """
         
         #For the single lump

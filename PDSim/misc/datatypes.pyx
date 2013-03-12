@@ -11,7 +11,23 @@ from cpython cimport bool
 
 cimport cython
 
-class Collector(object):
+cdef class Collector(object):
+    """
+    The collector class is a thin wrapper around a list with compact semantics for adding values::
+    
+        C  = Collector()
+        C << 1
+        C << 3
+        
+    And the values can be obtained as a numpy array by::
+    
+        C.v()
+        
+    Or as a list from the attribute:: 
+    
+        C.vec
+        
+    """
     def __init__(self):
         self.vec = []
         
@@ -24,11 +40,30 @@ class Collector(object):
     def __repr__(self):
         return str(self.vec)
     
-    def v(self,ndmin = 2):
+    cpdef v(self, int ndmin = 2):
+        """
+        Get a numpy array of the Collector values
+        
+        Internally, the call looks like::
+        
+            return np.array(self.vec, ndmin = ndmin)
+            
+        Parameters
+        ----------
+        ndmin, int
+            Minimum number of axes
+        """
         return np.array(self.vec, ndmin = ndmin)
     
 @cython.final
 cdef class arraym(object):
+    """
+    A thin wrapper around a low-level c-array with pythonic semantics
+    
+    Implements the element-wise operators +,-,/,* between arraym instances and other iterables and constants
+    
+    Note: The only divide operator implemented is the truediv operator of python 3.x .  To get the ``/`` operator to work in python 2.x, you need to do ``from __future__ import division`` in your header
+    """
     
     def __init__(self, data = None):
         """
@@ -91,6 +126,14 @@ cdef class arraym(object):
             self.N = N
             
     cdef void set_data(self, double *data, int N):
+        """
+        Parameters
+        ----------
+        data : double *
+            The data to be set in this array
+        N : int
+            The size of the passed data
+        """
         if self.data == NULL:
             #Allocate the memory for the array that will be used internally
             self.data = <double *> calloc(N, sizeof(double))
@@ -100,7 +143,7 @@ cdef class arraym(object):
         memcpy(self.data,data,N*sizeof(double))
     
     cpdef dealloc(self):
-        #Clean up the memory we allocated
+        """ Clean up the memory we allocated. Not generally needed to be called, python will do the cleanup automatically """
         if not self.data == NULL:
             free(self.data)
             self.data = NULL
@@ -307,16 +350,11 @@ cdef class arraym(object):
                         z[i] = x[i] - y[i]
             
         return z
-
-    cpdef reciprocal(self):
-        """
-        In-place get the reciprocal of each element
-        """
-        cdef int i
-        for i in range(self.N):
-            self.data[i] = 1/self.data[i]
     
     cpdef arraym copy(self):
+        """
+        Return a copy of the instance
+        """
         cdef arraym arr = arraym.__new__(arraym)
         arr.set_data(self.data, self.N)
         return arr
@@ -328,13 +366,36 @@ cdef class arraym(object):
     def __getitem__(self, int i):
         return self.data[i]
     
-    cpdef double get_index(self, int i):
-        return self.data[i]
+    cpdef double get_index(self, int i) except *:
+        """
+        Get the value at the given index
+        
+        Parameters
+        ----------
+        i : int
+            The index in the array
+        """
+        if i < self.N:
+            return self.data[i]
+        else:
+            raise ValueError('Your index [{i:d}] is out of range [{N:d}]'.format(i=i,N=self.N))
     
-    cpdef double set_index(self, int i, double val):
-        self.data[i] = val
+    cpdef double set_index(self, int i, double val) except *:
+        """
+        Set the value at the given index
+        
+        Parameters
+        ----------
+        i : int
+            The index in the array
+        """
+        if i < self.N:
+            self.data[i] = val
+        else:
+            raise ValueError('Your index [{i:d}] is out of range [{N:d}]'.format(i=i,N=self.N))
         
     cpdef fill(self, double fillval):
+        """ Fill the array with the given value """
         for i in range(self.N):
             self.data[i] = fillval
     
@@ -353,6 +414,14 @@ cdef class arraym(object):
         return arr
     
     cpdef extend(self, arraym array2):
+        """
+        Extend this arraym instance with another arraym instance
+        
+        Parameters
+        ----------
+        array2 : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
+            The arraym to be appended to this arraym instance 
+        """
         cdef double* new_data
         cdef int N = array2.N + self.N
         
@@ -394,9 +463,6 @@ cpdef arraym empty_arraym(int N):
     cdef arraym arr = arraym()
     arr.set_size(N)
     return arr
-
-
-
 
 
 ###############################################################################

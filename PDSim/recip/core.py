@@ -9,7 +9,7 @@ from _recip import _Recip
 
 class Recip(PDSimCore,_Recip):
     """
-    Recip is derived from :class:`PDSimCore`.
+    Recip is derived from :class:`PDSimCore <PDSim.core.core.PDSimCore>`.
     
     functions V_dV and heat_transfer_callback are provided in _Recip Cython class 
     """
@@ -128,19 +128,19 @@ class Recip(PDSimCore,_Recip):
         
         .. math::
         
-            x = {L_c}\cos \\theta  + \sqrt {L_1^2 - L_c^2{{\left( {\sin \\theta } \right)}^2}}
+            x = {L_c}\cos \\theta  + \sqrt {L_1^2 - L_c^2{{\\left( {\\sin \\theta } \\right)}^2}}
             
         .. math::
         
-            \dot x =  - {L_c}\sin \theta \dot \theta  + \frac{{ - L_c^2\sin 2\theta }}{{2\sqrt {L_1^2 - L_c^2{{\left( {\sin \theta } \right)}^2}} }}\dot \theta
+            \\dot x =  - {L_c}\\sin \\theta \\dot \\theta  + \\frac{{ - L_c^2\\sin 2\\theta }}{{2\\sqrt {L_1^2 - L_c^2{{\\left( {\\sin \\theta } \\right)}^2}} }}\\dot \\theta
         
         .. math::
             
-            \bar \dot x =  - \frac{{\dot \theta }}{\pi }\int_0^\pi  {\left[ { - {L_c}\sin \theta  + \frac{{ - L_c^2\sin 2\theta }}{{2\sqrt {L_1^2 - L_c^2{{\left( {\sin \theta } \right)}^2}} }}} \right]d\theta }
+            \\bar \\dot x =  - \\frac{{\\dot \\theta }}{\\pi }\\int_0^\pi  {\\left[ { - {L_c}\\sin \\theta  + \\frac{{ - L_c^2\\sin 2\\theta }}{{2\\sqrt {L_1^2 - L_c^2{{\\left( {\\sin \\theta } \\right)}^2}} }}} \\right]d\\theta }
         
         .. math::
             
-            \bar \dot x =  - \frac{{\dot \theta }}{\pi }\left[ {{L_c}\cos \theta } \right]_0^\pi  =  - \frac{{{L_c}\dot \theta }}{\pi }( - 1 - 1) = \frac{{2{L_c}\dot \theta }}{\pi }
+            \\bar \\dot x =  - \\frac{{\\dot \\theta }}{\\pi }\\left[ {{L_c}\\cos \\theta } \\right]_0^\pi  =  - \\frac{{{L_c}\\dot \\theta }}{\\pi }( - 1 - 1) = \\frac{{2{L_c}\\dot \\theta }}{\\pi }
         
         """
         #Oil with viscosity of 10 cSt (=10e-6 m^2/s) and density of 860 kg/m^3

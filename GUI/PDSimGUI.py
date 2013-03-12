@@ -592,12 +592,13 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
             """
             sim.RK45_eps = {RK_eps:s}
             t1=time.clock()
+            sim.connect_callbacks(step_callback = sim.step_callback, 
+                                  endcycle_callback = sim.endcycle_callback,
+                                  heat_transfer_callback = sim.heat_transfer_callback,
+                                  lumps_energy_balance_callback = sim.lump_energy_balance_callback
+                                  )
             sim.precond_solve(key_inlet='inlet.1',
                               key_outlet='outlet.2',
-                              step_callback = sim.step_callback, 
-                              endcycle_callback = sim.endcycle_callback,
-                              heat_transfer_callback = sim.heat_transfer_callback,
-                              lump_energy_balance_callback = sim.lump_energy_balance_callback,
                               pipe_abort = pipe_abort,
                               solver_method = 'RK45',
                               UseNR = False, #Don't use Newton-Raphson ND solver to determine the initial state

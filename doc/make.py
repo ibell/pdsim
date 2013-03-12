@@ -23,3 +23,4 @@ if 0: #raw_input(r'run sphinx-apidoc (y/[n])? ') == 'y':
 
 fp = open('log.txt','w')
 subprocess.call(['make','html'],stdout = fp,stderr = fp, shell=True)
+subprocess.call(['make','latex'],stdout = fp,stderr = fp, shell=True)

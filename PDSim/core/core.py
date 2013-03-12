@@ -420,7 +420,7 @@ class PDSimCore(_PDSimCore):
         
         Parameters
         ----------
-        Tube : :class:`Tube <PDSim.core.core.Tube>` instance
+        Tube : :class:`Tube <PDSim.core.containers.Tube>` instance
             An initialized tube.
         """
         #Add it to the list
@@ -1279,6 +1279,8 @@ class PDSimCore(_PDSimCore):
         valves_callback : function
             DEPRECATED! Should be passed to the connect_callbacks() function before running precond_solve() or solve()
         """
+        if any(cb in kwargs for cb in ['step_callback','endcycle_callback','heat_transfer_callback','lump_energy_balance_callback','valves_callback']):
+            raise NotImplementedError('callback functions are no longer passed to solve() function, rather they are passed to connect_callbacks() function prior to calling solve()')
         
         #Connect functions that have been serialized by saving the function name as a string
         self.connect_flow_functions()
