@@ -128,7 +128,7 @@ cdef class FlowPathCollection(list):
         
         Parameters
         ----------
-        harray : arraym
+        harray : :class:`arraym <PDSim.misc.datatypes.arraym>' instance
             arraym that maps index to enthalpy - CVs+Tubes
         """
         cdef FlowPath FP

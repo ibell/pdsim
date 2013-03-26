@@ -9,7 +9,7 @@ import inspect
 
 ##--  Package imports  --
 from PDSim.flow import flow,flow_models
-from _containers import STATE_VARS_TM, CVArrays
+from containers import STATE_VARS_TM, CVArrays
 from PDSim.flow.flow import FlowPathCollection, FlowPath
 from containers import ControlVolumeCollection,Tube,TubeCollection
 from PDSim.plot.plots import debug_plots
