@@ -686,8 +686,6 @@ class MotorCoeffsTable(wx.ListCtrl, TextEditMixin):
         Get the list of lists of values that are used in the table
         """
         return self.values
-    
-
         
 class MotorChoices(wx.Choicebook):
     def __init__(self, parent):

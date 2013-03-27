@@ -13,7 +13,7 @@ from math import pi
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
 # PDSim should also be built using a command like python build_ext --inplace to keep all the extension modules next to the .pyx files
-#sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
@@ -66,6 +66,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False):
     ScrollComp.D_lower_bearing = 0.025
     ScrollComp.L_lower_bearing = 0.025
     ScrollComp.c_lower_bearing = 20e-6
+    ScrollComp.thrust_ID = 0.05
     ScrollComp.thrust_friction_coefficient = 0.028 #From Chen thesis
     ScrollComp.orbiting_scroll_mass = 2.5
     ScrollComp.L_ratio_bearings = 3

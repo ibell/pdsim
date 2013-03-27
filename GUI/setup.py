@@ -17,11 +17,11 @@ if len(sys.argv)==1:
 # Process the includes, excludes and packages first
 
 include_files = []
-includes = ['numpy',]
+includes = ['numpy','scipy.sparse.csgraph._validation']
 excludes = ['_gtkagg', '_tkagg', 'bsddb', 'curses', 'email', 'PyQt4',
             'pywin.debugger', 'pywin.debugger.dbgcon', 'pywin.dialogs',
             'tcl', 'Tkconstants', 'Tkinter']
-packages = ['h5py']
+packages = ['h5py','CoolProp','scipy']
 path = []
 
 # This is a place where the user custom code may go. You can do almost
@@ -91,19 +91,19 @@ setup(
 # to clean up your folders or to do some particular post-compilation
 # actions.
 
-if sys.platform.startswith('win'):
-    #Further windows packaging things
-    import subprocess
-    #Compress the files if UPX is found on the system path
-    subprocess.call(['upx','PDSimGUI/*.*'])
-    #Make an installer using InnoSetup
-    subprocess.call(['C:\Program Files (x86)\Inno Setup 5\Compil32.exe','/cc','package_gui.iss'])
-    #Rename the installer to include the PDSim version
-    old_name = os.path.join('Output','SetupPDSimGUI.exe')
-    import PDSim
-    new_name = os.path.join('Output','SetupPDSimGUI_version-'+PDSim.__version__+'.exe')
-    if os.path.exists(new_name):
-        os.remove(new_name)
-    os.rename(old_name, new_name)
+#if sys.platform.startswith('win'):
+#    #Further windows packaging things
+#    import subprocess
+#    #Compress the files if UPX is found on the system path
+#    subprocess.call(['upx','PDSimGUI/*.*'])
+#    #Make an installer using InnoSetup
+#    subprocess.call(['C:\Program Files (x86)\Inno Setup 5\Compil32.exe','/cc','package_gui.iss'])
+#    #Rename the installer to include the PDSim version
+#    old_name = os.path.join('Output','SetupPDSimGUI.exe')
+#    import PDSim
+#    new_name = os.path.join('Output','SetupPDSimGUI_version-'+PDSim.__version__+'.exe')
+#    if os.path.exists(new_name):
+#        os.remove(new_name)
+#    os.rename(old_name, new_name)
 # And we are done. That's a setup script :-D
 

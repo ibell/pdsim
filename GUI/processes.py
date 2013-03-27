@@ -3,6 +3,7 @@ from multiprocessing import Process, Pipe, freeze_support, cpu_count, allow_conn
 from threading import Thread
 from datatypes import InfiniteList
 from PDSimGUI import pdsim_home_folder
+import wx.lib.agw.pybusyinfo as PBI
 
 class RedirectText2Pipe(object):
     """
@@ -202,10 +203,11 @@ class RedirectedWorkerThread(Thread):
         Thread.__init__(self)
         self.script_name = script_name
         self.stdout_target = stdout_target
-        self._want_abort = False
         self.done_callback = done_callback
         self.add_results = add_results
         self.main_stdout = main_stdout
+        
+        self._want_abort = False
         
     def run(self):
         """

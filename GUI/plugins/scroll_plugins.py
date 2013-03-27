@@ -2,7 +2,7 @@ import sys
 sys.path.append('..')
 
 import pdsim_plugins
-import pdsim_panels
+from panels import pdsim_panels
 from PDSim.flow.flow import FlowPath
 from PDSim.core.core import Tube
 from PDSim.core.containers import ControlVolume

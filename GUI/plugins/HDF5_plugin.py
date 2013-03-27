@@ -2,7 +2,6 @@ import sys
 sys.path.append('..')
 
 import pdsim_plugins
-import pdsim_panels
 import wx
 import numpy as np
 import types

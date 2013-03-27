@@ -4,9 +4,8 @@
 import wx
 from wx.lib.mixins.listctrl import CheckListCtrlMixin, ColumnSorterMixin, ListCtrlAutoWidthMixin
 from wx.lib.embeddedimage import PyEmbeddedImage
-import wx.lib.agw.pybusyinfo as PBI
 from wx.lib.wordwrap import wordwrap
-wx.SetDefaultPyEncoding('latin-1') 
+wx.SetDefaultPyEncoding('latin-1')
 
 #Provided by python
 import os, sys
@@ -14,7 +13,7 @@ import codecs
 from operator import itemgetter
 from math import pi
 from Queue import Queue, Empty
-from multiprocessing import Process, Pipe, freeze_support, cpu_count, allow_connection_pickling
+from multiprocessing import freeze_support
 
 import time
 import textwrap
@@ -37,12 +36,11 @@ import PDSim
 
 #PDSim GUI imports
 import processes
-import datatypes
-import pdsim_panels
 import pdsim_plugins
-import recip_panels
-import scroll_panels
 import default_configs 
+import panels.pdsim_panels as pdsim_panels
+import panels.recip_panels as recip_panels
+import panels.scroll_panels as scroll_panels
 
 # The path to the home folder that will hold everything
 home = os.getenv('USERPROFILE') or os.getenv('HOME')
@@ -83,7 +81,6 @@ class InputsToolBook(wx.Toolbook):
                          recip_panels.MechanicalLossesPanel(self,
                                                             configfile,
                                                             name='MechanicalLossesPanel'),
-                         
                          )
             
         elif Main.SimType == 'scroll':
