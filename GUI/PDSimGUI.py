@@ -13,7 +13,7 @@ import codecs
 from operator import itemgetter
 from math import pi
 from Queue import Queue, Empty
-from multiprocessing import freeze_support
+from multiprocessing import freeze_support, cpu_count
 
 import time
 import textwrap
@@ -26,6 +26,8 @@ import random
 #Other packages that are required
 import numpy as np
 import CoolProp.State as CPState
+import yaml
+import h5py
 
 #PDSim imports
 from PDSim.recip.core import Recip
@@ -41,6 +43,7 @@ import default_configs
 import panels.pdsim_panels as pdsim_panels
 import panels.recip_panels as recip_panels
 import panels.scroll_panels as scroll_panels
+import datatypes
 
 # The path to the home folder that will hold everything
 home = os.getenv('USERPROFILE') or os.getenv('HOME')
@@ -50,7 +53,13 @@ class InputsToolBook(wx.Toolbook):
     """
     The toolbook that contains the pages with input values
     """
-    def __init__(self,parent,configfile,id=-1):
+    def __init__(self,parent,config,id=-1):
+        """
+        Parameters
+        ----------
+        config : yaml config file
+            The top-level configuration file
+        """
         wx.Toolbook.__init__(self, parent, -1, style=wx.BK_LEFT)
         il = wx.ImageList(32, 32)
         indices=[]
@@ -62,15 +71,11 @@ class InputsToolBook(wx.Toolbook):
             indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
         self.AssignImageList(il)
         
-        parser = SafeConfigParser()
-        parser.optionxform = unicode
-        
         Main = wx.GetTopLevelParent(self)
-        if Main.SimType == 'recip':
-            # Make the recip panels.  Name should be consistent with configuration 
-            # file section heading
+        if config['family'] == 'recip':
+            # Make the recip panels.  
             self.panels=(recip_panels.GeometryPanel(self, 
-                                                    configfile,
+                                                    config = self.config['GeometryPanel'],
                                                     name='GeometryPanel'),
                          pdsim_panels.StateInputsPanel(self,
                                                        configfile,
@@ -83,32 +88,26 @@ class InputsToolBook(wx.Toolbook):
                                                             name='MechanicalLossesPanel'),
                          )
             
-        elif Main.SimType == 'scroll':
-            # Make the scroll panels.  Name should be consistent with configuration 
-            # file section heading
-            self.panels=(scroll_panels.GeometryPanel(self, 
-                                                    configfile,
-                                                    name='GeometryPanel'),
-                         pdsim_panels.StateInputsPanel(self,
-                                                   configfile,
-                                                   name='StatePanel'),
-                         scroll_panels.MassFlowPanel(self,
-                                                    configfile,
-                                                    name='MassFlowPanel'),
-                         scroll_panels.MechanicalLossesPanel(self,
-                                                    configfile,
-                                                    name='MechanicalLossesPanel'),
+        elif config['family'] == 'scroll':
+            # Make the scroll panels.  
+            self.panels=(scroll_panels.GeometryPanel(self, config['GeometryPanel'],name='GeometryPanel'),
+                         pdsim_panels.StateInputsPanel(self, config['StatePanel'], name='StatePanel'),
+                         wx.Panel(self,-1),
+#                         scroll_panels.MassFlowPanel(self, config['StatePanel'], name='MassFlowPanel'),
+                         scroll_panels.MechanicalLossesPanel(self, config['MechanicalLossesPanel'], name='MechanicalLossesPanel'),
                          )
+        else:
+            raise ValueError
         
         for Name, index, panel in zip(['Geometry','State Points','Mass Flow - Valves','Mechanical'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
             
         #: A dictionary that maps name to panel 
         self.panels_dict = {panel.Name:panel for panel in self.panels}
-        
-        #Update the discharge geometry
-        if Main.SimType == 'scroll':
-            self.panels_dict['MassFlowPanel'].OnChangeDdisc()
+#        
+#        #Update the discharge geometry
+#        if Main.SimType == 'scroll':
+#            self.panels_dict['MassFlowPanel'].OnChangeDdisc()
     
     def get_script_chunks(self):
         """
@@ -502,47 +501,89 @@ class RunToolBook(wx.Panel):
     def __init__(self,parent):
         wx.Panel.__init__(self, parent)
         
-        # The running page of the main toolbook
-        self.log_ctrl = wx.TextCtrl(self, wx.ID_ANY,
-                                    style = wx.TE_MULTILINE|wx.TE_READONLY)
-        
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        
+        # The action buttons
+        self.cmdRunOne = wx.Button(self,-1,'\nRun!\n')
+        self.cmdRunOne.Bind(wx.EVT_BUTTON, self.GetTopLevelParent().OnStart)
+        self.cmdRunParametric = wx.Button(self,-1,'Run\nParametric\nTable')
+        self.cmdRunParametric.Bind(wx.EVT_BUTTON, self.GetTopLevelParent().OnStart)
         self.cmdAbort = wx.Button(self,-1,'Stop\nAll\nRuns')
-        self.cmdAbort.Bind(wx.EVT_BUTTON, self.GetGrandParent().OnStop)
+        self.cmdAbort.Bind(wx.EVT_BUTTON, self.GetTopLevelParent().OnStop)
+        
+        # Layout the buttons
         hsizer = wx.BoxSizer(wx.HORIZONTAL)
+        hsizer.Add(self.cmdRunOne,0)
+        hsizer.Add(self.cmdRunParametric,0)
         hsizer.Add(self.cmdAbort,0)
-        sizer.Add(hsizer)
-        sizer.Add(wx.StaticText(self,-1,"Output Log:"))
-        sizer.Add(self.log_ctrl,1,wx.EXPAND)
         
-        nb = wx.Notebook(self)
-        self.log_ctrl_thread1 = wx.TextCtrl(nb, wx.ID_ANY,
-                                            style = wx.TE_MULTILINE|wx.TE_READONLY)
-        self.log_ctrl_thread2 = wx.TextCtrl(nb, wx.ID_ANY,
-                                            style = wx.TE_MULTILINE|wx.TE_READONLY)
-        self.log_ctrl_thread3 = wx.TextCtrl(nb, wx.ID_ANY,
-                                            style = wx.TE_MULTILINE|wx.TE_READONLY)
+        # Define the containers
+        splitter = wx.SplitterWindow(self)
+        top_pane = wx.Panel(splitter)
+        bottom_pane = wx.Panel(splitter)
         
-        nb.AddPage(self.log_ctrl_thread1,"Thread #1")
-        nb.AddPage(self.log_ctrl_thread2,"Thread #2")
-        nb.AddPage(self.log_ctrl_thread3,"Thread #3")
-        sizer.Add(nb,1,wx.EXPAND)
-        self.write_log_button = wx.Button(self,-1,"Write Log to File")
+        # The main running log
+        self.main_log_ctrl = wx.TextCtrl(top_pane, style = wx.TE_MULTILINE|wx.TE_READONLY)
+        
+        #The log controls
+        nb = wx.Notebook(bottom_pane)
+        self.log_ctrls = []
+        
+        # Make one log box for each thread possible on this machine 
+        for thread in range(cpu_count()-1):
+            # Make the textbox
+            log_ctrl = wx.TextCtrl(nb, style = wx.TE_MULTILINE|wx.TE_READONLY)
+            # Add the page to the notebook
+            nb.AddPage(log_ctrl,"Thread #"+str(thread+1))
+            #Add the log textbox to the list
+            self.log_ctrls.append(log_ctrl)
         
         def WriteLog(event=None):
             FD = wx.FileDialog(None,"Log File Name",defaultDir=os.curdir,
                                style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
-            if wx.ID_OK==FD.ShowModal():
-                fp=open(FD.GetPath(),'w')
-                fp.write(self.log_ctrl.GetValue())
+            if wx.ID_OK == FD.ShowModal():
+                fp = open(FD.GetPath(),'w')
+                
+                # The main log
+                fp.write('Main Log\n---------')
+                fp.write(self.main_log_ctrl.GetValue())
+                fp.write('\n\n')
+                
+                # Print out the logs from each thread
+                for i,log in enumerate(self.log_ctrls):
+                    fp.write('Log from thread #'+str(i+1)+'\n-------------------')
+                    fp.write(log.GetValue())
+                    fp.write('\n\n')
                 fp.close()
             FD.Destroy()
             
+        self.write_log_button = wx.Button(bottom_pane, -1, "Write All Logs to a File")
         self.write_log_button.Bind(wx.EVT_BUTTON,WriteLog)
-        sizer.Add(self.write_log_button,0)
-        self.SetSizer(sizer)
-        sizer.Layout()
+        
+        # Layout the top pane
+        top_pane_sizer = wx.BoxSizer(wx.VERTICAL)
+        top_pane_sizer.Add(wx.StaticText(top_pane,-1,"Main Output Log:"))
+        top_pane_sizer.Add(self.main_log_ctrl,1,wx.EXPAND)
+        top_pane.SetSizer(top_pane_sizer)
+        
+        # Layout the bottom pane
+        bottom_pane_sizer = wx.BoxSizer(wx.VERTICAL)
+        bottom_pane_sizer.Add(nb, 1, wx.EXPAND)
+        bottom_pane_sizer.Add(self.write_log_button, 0)
+        bottom_pane.SetSizer(bottom_pane_sizer)
+        
+        # Configure the splitter
+        splitter.SetMinimumPaneSize(100)
+        splitter.SplitHorizontally(top_pane, bottom_pane, -100)
+        
+        # Main layout
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        main_sizer.Add(hsizer) # The buttons
+        main_sizer.Add(splitter,1, wx.EXPAND)
+        self.SetSizer(main_sizer)
+        
+        top_pane_sizer.Layout()
+        bottom_pane_sizer.Layout()
+        
+        main_sizer.Layout()
         
 class AutoWidthListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
     def __init__(self, parent, ID = wx.ID_ANY, pos=wx.DefaultPosition,
@@ -1407,15 +1448,20 @@ class OutputsToolBook(wx.Toolbook):
             indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
         self.AssignImageList(il)
         
-        variables = self.Parent.InputsTB.collect_parametric_terms()
-        self.PlotsPanel = wx.Panel(self)
-        self.DataPanel = OutputDataPanel(self,
-                                         variables = variables, 
-                                         name = 'OutputDataPanel',
-                                         configfile = configfile)
+#        variables = self.Parent.InputsTB.collect_parametric_terms()
+#        self.PlotsPanel = wx.Panel(self)
+#        self.DataPanel = OutputDataPanel(self,
+#                                         variables = variables, 
+#                                         name = 'OutputDataPanel',
+#                                         configfile = configfile)
         
-        #Make a Recip instance
-        self.panels=(self.DataPanel,self.PlotsPanel)
+    
+        # Load the runs into memory
+        runa = h5py.File('runa.h5', driver = 'core', backing_store = False)
+        runb = h5py.File('runb.h5', driver = 'core', backing_store = False)
+    
+        #Make a  instance
+        self.panels = (pdsim_panels.OutputTreePanel(self,[runa, runb]), wx.Panel(self))#self.PlotsPanel)
         for Name,index,panel in zip(['Data','Plots'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
             
@@ -1450,7 +1496,7 @@ class MainToolBook(wx.Toolbook):
         self.AssignImageList(il)
         
         self.InputsTB = InputsToolBook(self, configfile)
-        self.SolverTB = SolverToolBook(self, configfile)
+        self.SolverTB = wx.Toolbook(self,-1)#  SolverToolBook(self, configfile)
         self.RunTB = RunToolBook(self)
         self.OutputsTB = OutputsToolBook(self, configfile)
         
@@ -1462,64 +1508,47 @@ class MainFrame(wx.Frame):
     def __init__(self, configfile=None, position=None, size=None):
         wx.Frame.__init__(self, None, title = "PDSim GUI", size=(700, 700))
         
+        self.GUI_object_library = {}
+        
         if configfile is None: #No file name or object passed in
             
             configfile = os.path.join('configs','default.cfg')
             
             #First see if a command line option provided
             if '--config' in sys.argv:
+                raise NotImplementedError('Not currently accepting command line --config argument')
                 i = sys.argv.index('--config')
                 _configfile = sys.argv[i+1]
                 if os.path.exists(_configfile):
-                    configbuffer = open(_configfile, 'rb')
+                    self.config = yaml.load(open(_configfile, 'rb'))
                 else:
-                    warnings.warn('Sorry but your --config file "'+_configfile+'" is not found')
-                    configbuffer = open(configfile, 'rb')
+                    warnings.warn('Sorry but your --config file "'+_configfile+'" is not found, loading the default configuration')
+                    self.config = yaml.load(open(configfile, 'rb'))
                 
-            #Then see if there is a file at configs/default.cfg
-            elif os.path.exists(configfile):
-                configbuffer = open(configfile,'rb')
+#            #Then see if there is a file at configs/default.cfg
+#            elif os.path.exists(configfile):
+#                configbuffer = open(configfile,'rb')
                 
             #Then use the internal default recip
             else:
-                configbuffer = default_configs.get_recip_defaults()
+                self.config = default_configs.get_defaults('scroll')
         
-        #A string has been passed in for the 
-        elif isinstance(configfile, basestring):
-            if os.path.exists(configfile):
-                configbuffer = open(configfile, 'rb')
-                        
-        elif isinstance(configfile, StringIO.StringIO):
-            configbuffer = configfile
+#        #A string has been passed in for the configuration file name
+#        elif isinstance(configfile, basestring):
+#            if os.path.exists(configfile):
+#                configbuffer = open(configfile, 'rb')
+#                        
+#        elif isinstance(configfile, StringIO.StringIO):
+#            configbuffer = configfile
                 
         else:
             raise ValueError
         
-        #Get a unicode-wrapped version of the selected file-like object
-        enc, dec, reader, writer = codecs.lookup('latin-1')
-        uConfigParser = reader(configbuffer)
-                
-        #The file-like object for the configuration
-        self.config_parser = SafeConfigParser()
-        self.config_parser.optionxform = unicode 
-        self.config_parser.readfp(uConfigParser)
-        
-        #The file-like object for the default scroll configuration
-        parser = SafeConfigParser()
-        parser.optionxform = unicode
-        uConfigParser = reader(default_configs.get_scroll_defaults())
-        parser.readfp(uConfigParser)
-        self.config_parser_default_scroll = parser
-        
-        #The file-like object for the default recip configuration
-        parser = SafeConfigParser()
-        parser.optionxform = unicode
-        uConfigParser = reader(default_configs.get_recip_defaults())
-        parser.readfp(uConfigParser)
-        self.config_parser_default_recip = parser
-        
         #Get the simulation type (recip, scroll, ...)
-        self.SimType = self.config_parser.get('Globals', 'Type')
+        try:
+            self.machinefamily = self.config['family']
+        except IndexError:
+            raise ValueError('configuration file does not have the top-level key "family"')
             
         #The position and size are needed when the frame is rebuilt, but not otherwise
         if position is None:
@@ -1540,9 +1569,9 @@ class MainFrame(wx.Frame):
 #            def flush(self):
 #                return None
                 
-        redir=RedirectText(self.MTB.RunTB.log_ctrl)
-        sys.stdout=redir
-        sys.stderr=redir
+#        redir=RedirectText(self.MTB.RunTB.log_ctrl)
+#        sys.stdout=redir
+#        sys.stderr=redir
         
         self.SetPosition(position)
         self.SetSize(size)
@@ -1570,10 +1599,94 @@ class MainFrame(wx.Frame):
         else:
             raise AttributeError
     
+    def register_GUI_objects(self, annotated_GUI_objects):
+        """
+        Register the GUI objects in the top-level database
+        
+        Parameters
+        ----------
+        annotated_GUI_objects : list of `AnnotatedGUIObject` instances
+        """
+        for o in annotated_GUI_objects:
+            if not isinstance(o, datatypes.AnnotatedGUIObject):
+                raise TypeError('You can only register lists of AnnotatedGUIObjects')
+            if o.key in self.GUI_object_library:
+                raise KeyError('Your key [{k:s}] is already in the parameter library'.format(k = o.key))
+            self.GUI_object_library[o.key] = o
+        
+    def get_GUI_object(self, key):
+        """
+        Return an annotated GUI object
+        
+        Returns
+        -------
+        o : :class:`AnnotatedGUIObject` instance
+        """
+        return self.GUI_object_library[key]
+    
+    def get_GUI_object_value(self, key):
+        """
+        Return an annotated GUI object's value, converted to a floating point if possible, otherwise as integer or string
+        
+        Returns
+        -------
+        val : int,float,string
+            value of the GUI object, converted away from string if possible
+        """
+        val = self.GUI_object_library[key].GetValue()
+        try:
+            return int(val) #Convert to integer
+        except (ValueError,TypeError):
+            try:
+                return float(val) #Convert to floating point
+            except (TypeError,ValueError):
+                return val
+    
+    def set_GUI_object_value(self, key, val):
+        """
+        Set the value of an annotated GUI object's value, converted to the same 
+        type as the value of the item is currently
+        
+        Parameters
+        ----------
+        val : varied
+            Value of the object, can be a class instance to set more complicated
+            data types like :class:`CoolProp.State.State` classes
+        """
+        
+        # Get the value of the current target
+        current_val = self.GUI_object_library[key].GetValue()
+        
+        # Get the type of the input to these units 
+        type_val = type(current_val)
+        
+        try:
+            # Convert the type of the input to these units
+            converted_val = type_val(val)
+            
+            # Set the item
+            self.GUI_object_library[key].SetValue(converted_val)
+        
+        except TypeError:
+            #Try to set the value without converting the value
+            self.GUI_object_library[key].SetValue(val)
+            
+    def get_GUI_object_dict(self, key):
+        """
+        Return the dictionary of all the annotated GUI objects
+        
+        Returns
+        -------
+        val : dict
+            key is the term, value is the AnnotatedGUIObject instance 
+        """
+        return self.GUI_object_library
+    
     def get_logctrls(self):
-        return [self.MTB.RunTB.log_ctrl_thread1,
-                self.MTB.RunTB.log_ctrl_thread2,
-                self.MTB.RunTB.log_ctrl_thread3]
+        """
+        Return a list of the wx.TextCtrl targets for the logs for each thread
+        """
+        return self.MTB.RunTB.log_ctrls
     
     def update_parametric_terms(self):
         """
@@ -1617,10 +1730,9 @@ class MainFrame(wx.Frame):
         self.Destroy()
         
     def script_header(self):
+        import CoolProp, PDSim
         time_generation = time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime())
-        import PDSim
         pdsim_version = PDSim.__version__
-        import CoolProp
         coolprop_version = CoolProp.__version__+ ' svn revision: '+str(CoolProp.__svnrevision__)
         
         return textwrap.dedent(
@@ -1637,7 +1749,7 @@ class MainFrame(wx.Frame):
             # where this_file_name.py is the name of this file
             #
             # In python 2.7 make a/b always give the double division even 
-            # if both a and b are integers - thus 2/3 gives 0.666666666... 
+            # if both a and b are integers - thus 2/3 now yields 0.666666666... 
             # rather than 0
             from __future__ import division
             
@@ -1666,20 +1778,22 @@ class MainFrame(wx.Frame):
             )
         
     def build(self):
+        """ Build the entire GUI """
+        
         self.make_menu_bar()
         
         sizer = wx.BoxSizer(wx.VERTICAL)
-        self.MTB=MainToolBook(self, self.get_config_objects())
+        self.MTB = MainToolBook(self, self.config)
         sizer.Add(self.MTB, 1, wx.EXPAND)
         self.SetSizer(sizer)
         sizer.Layout()
         
         self.worker=None
         
-        self.load_plugins(self.PluginsMenu)
-        #After loading plugins, try to set the parameters in the parametric table
-        self.MTB.SolverTB.flush_parametric_terms()
-        self.MTB.SolverTB.set_parametric_terms()
+#        self.load_plugins(self.PluginsMenu)
+#        #After loading plugins, try to set the parameters in the parametric table
+#        self.MTB.SolverTB.flush_parametric_terms()
+#        self.MTB.SolverTB.set_parametric_terms()
             
     def build_recip(self, post_set = True):
         #Instantiate the recip class
@@ -1895,8 +2009,7 @@ class MainFrame(wx.Frame):
         #self.load_plugins(self.PluginsMenu)
         self.MenuBar.Append(self.PluginsMenu, "Plugins")
         
-        
-        if self.config_parser.get('Globals', 'Type') == 'recip':
+        if self.config['family'] == 'recip':
             self.TypeRecip.Check(True)
         else:
             self.TypeScroll.Check(True)
@@ -2020,6 +2133,7 @@ class MainFrame(wx.Frame):
         """
         Runs the primary inputs without applying the parametric table inputs
         """
+        
         self.MTB.SetSelection(2)
         if self.SimType == 'recip':
             raise NotImplementedError
@@ -2048,7 +2162,7 @@ class MainFrame(wx.Frame):
         
         #Add results from the pipe to the GUI
         if not self.results_list.empty():
-            print 'readying to get simulation',
+            print 'readying to get simulation; ',
             sim = self.results_list.get()
             print 'got a simulation'
             
@@ -2120,21 +2234,18 @@ class MainFrame(wx.Frame):
         Checks to see if temp folder exists, if so, removes it
         """
         import shutil, glob
-        home = os.getenv('USERPROFILE') or os.getenv('HOME')
-        temp_folder = os.path.join(home,'.pdsim-temp')
         
-        if os.path.exists(temp_folder):
-            N = len(glob.glob(os.path.join(temp_folder,'*.*')))
+        if os.path.exists(pdsim_home_folder):
+            N = len(glob.glob(os.path.join(pdsim_home_folder,'*.*')))
             dlg = wx.MessageDialog(None,'There are '+str(N)+' files in the temporary folder.\n\nPress Ok to remove all the temporary files',style = wx.OK|wx.CANCEL)
             if dlg.ShowModal() == wx.ID_OK:    
-                shutil.rmtree(temp_folder)
-                print 'removed the folder',temp_folder 
+                shutil.rmtree(pdsim_home_folder)
+                print 'removed the folder',pdsim_home_folder 
             dlg.Destroy()
         else:
             dlg = wx.MessageDialog(None,'Temporary folder does not exist', style = wx.OK)
             dlg.ShowModal()
             dlg.Destroy()
-    
 
 class MySplashScreen(wx.SplashScreen):
     """
@@ -2169,7 +2280,6 @@ if __name__ == '__main__':
     freeze_support()
     
     app = wx.App(False)
-    
     
     if '--nosplash' not in sys.argv:
         Splash=MySplashScreen()

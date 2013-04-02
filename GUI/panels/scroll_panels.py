@@ -15,217 +15,274 @@ from PDSim.scroll.plots import plotScrollSet, ScrollAnimForm
 from PDSim.flow.flow import FlowPath
 from PDSim.core.core import Tube
 from PDSim.core.motor import Motor
+from PDSim.misc.datatypes import AnnotatedValue
 from CoolProp import State as CPState
+from pdsim_panels import LaTeXImageMaker, MotorChoices, PlotPanel
+from datatypes import HeaderStaticText
 
 LabeledItem = pdsim_panels.LabeledItem
-
-class PlotPanel(wx.Panel):
-    def __init__(self, parent, **kwargs):
-        size = kwargs.get('size',(200,200))
-        wx.Panel.__init__(self, parent, size = size, **kwargs)
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        self.figure = mpl.figure.Figure(dpi=100, figsize=(size[0]/100, size[1]/100))
-        self.canvas = WXCanvas(self, -1, self.figure)
-#        self.canvas.resize(200,200)
-        #self.toolbar = WXToolbar(self.canvas)
-        #self.toolbar.Realize()
-        sizer.Add(self.canvas)
-        #sizer.Add(self.toolbar)
+        
+class ReadOnlyLaTeXLabel(wx.Panel):
+    """
+    A stub panel to allow for a LaTeX image with an additional caption for units
+    """
+    def __init__(self, LaTeX, parent, remaining_label = ''):
+        wx.Panel.__init__(self, parent = parent)
+        
+        # Sizer
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
+        
+        # The objects
+        img = LaTeXImageMaker(LaTeX, parent = self)
+        lab = wx.StaticText(self, label = remaining_label)
+        
+        # Layout
+        sizer.AddMany([img,lab])
         self.SetSizer(sizer)
         sizer.Layout()
         
-
+    def GetValue(self):
+        return self.textbox.GetValue()
+    
+    def SetValue(self, value):
+        self.textbox.SetValue(value)
+        
+class ScrollWrapAnglesFrame(wx.Frame):
+    def __init__(self, geo):
+        wx.Frame.__init__(self, None)
+        
+        panel = wx.Panel(self)
+        
+        # The sizer for all the outputs
+        sizer_for_outputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+        
+        label1 = ReadOnlyLaTeXLabel('$\phi_{i0}$', parent = panel, remaining_label='[rad]')
+        self.phi_i0 = wx.TextCtrl(panel)
+        self.phi_i0.SetEditable(False)
+        label2 = ReadOnlyLaTeXLabel('$\phi_{is}$', parent = panel, remaining_label='[rad]')
+        self.phi_is = wx.TextCtrl(panel)
+        self.phi_is.SetEditable(False)
+        label3 = ReadOnlyLaTeXLabel('$\phi_{ie}$', parent = panel, remaining_label='[rad]')
+        self.phi_ie = wx.TextCtrl(panel)
+        self.phi_ie.SetEditable(False)
+        label4 = ReadOnlyLaTeXLabel('$\phi_{o0}$', parent = panel, remaining_label='[rad]')
+        self.phi_o0 = wx.TextCtrl(panel)
+        self.phi_o0.SetEditable(False)
+        label5 = ReadOnlyLaTeXLabel('$\phi_{os}$', parent = panel, remaining_label='[rad]')
+        self.phi_os = wx.TextCtrl(panel)
+        self.phi_os.SetEditable(False)
+        label6 = ReadOnlyLaTeXLabel('$\phi_{oe}$', parent = panel, remaining_label='[rad]')
+        self.phi_oe = wx.TextCtrl(panel)
+        self.phi_oe.SetEditable(False)
+        label7 = ReadOnlyLaTeXLabel('$r_b$', parent = panel, remaining_label='[m]')
+        self.rb = wx.TextCtrl(panel)
+        self.rb.SetEditable(False)
+        label8 = ReadOnlyLaTeXLabel('$h_s$', parent = panel, remaining_label='[m]')
+        self.hs = wx.TextCtrl(panel)
+        self.hs.SetEditable(False)
+        
+        #Set the values of each of the boxes
+        self.phi_i0.SetValue(str(geo.phi_i0))
+        self.phi_is.SetValue(str(geo.phi_is))
+        self.phi_ie.SetValue(str(geo.phi_ie))
+        self.phi_o0.SetValue(str(geo.phi_o0))
+        self.phi_os.SetValue(str(geo.phi_os))
+        self.phi_oe.SetValue(str(geo.phi_oe))
+        self.rb.SetValue(str(geo.rb))
+        self.hs.SetValue(str(geo.h))
+        
+        # Add all the output objects to the sizer for the outputs
+        sizer_for_outputs.AddMany([label1, self.phi_i0,
+                                   label2, self.phi_is,
+                                   label3, self.phi_ie,
+                                   label4, self.phi_o0,
+                                   label5, self.phi_os,
+                                   label6, self.phi_oe,
+                                   label7, self.rb,
+                                   label8, self.hs])
+        
+        #Do the layout
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(sizer_for_outputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(wx.Button(panel, label='Close'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        
+        panel.SetSizer(sizer)
+        sizer.Layout()
+        
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        main_sizer.Add(panel)
+        self.SetSizer(main_sizer)
+        main_sizer.Layout()
+        self.SetClientSize(main_sizer.GetMinSize())
+    
 class GeometryPanel(pdsim_panels.PDPanel):
     """
     The geometry panel of the scroll compressor
     Loads all parameters from the configuration file
     """
-    def __init__(self,parent,configfile,**kwargs):
-        pdsim_panels.PDPanel.__init__(self,parent,**kwargs)
+    
+    # Maps from key in config file to description of the term  
+    desc_map = dict(Vdisp = ('Displacement of the machine [m\xb3/rev]','m^3'),
+                    Vratio = ('Built-in volume ratio [-]','-'),
+                    t = ('Thickness of the scroll wrap [m]','m'),
+                    ro = ('Orbiting radius [m]','m'),
+                    phi_fi0 = ('Initial involute angle of the inner involute of the fixed scroll [rad]','rad'),
+                    phi_fis = ('Starting involute angle of the inner involute of the fixed scroll [rad]','rad'),
+                    phi_fos = ('Starting involute angle of the outer involute of the fixed scroll [rad]','rad'),
+                    use_offset = ('Use offset geometry',''),
+                    delta_offset = ('Offset gap width [m]','m'),
+                    delta_flank = ('Flank gap width [m]','m'),
+                    delta_radial = ('Radial gap width [m]' ,'m'),
+                    d_discharge = ('Discharge port diameter [m]','m'),
+                    inlet_tube_length = ('Inlet tube length [m]','m'),
+                    inlet_tube_ID = ('Inlet tube inner diameter [m]','m'),
+                    outlet_tube_length = ('Outlet tube length [m]','m'),
+                    outlet_tube_ID = ('Outlet tube inner diameter [m]','m')
+                    )
+    
+    def __init__(self, parent, config, **kwargs):
+        """
+        Parameters
+        ----------
+        parent : wx.Panel
+            The parent of this panel
+        config : dict
+            The section of the configuration file pertaining to the geometry panel
+        """
+        # Instantiate the base class
+        pdsim_panels.PDPanel.__init__(self, parent, **kwargs)
         
-        #Now we are going to put everything into a scrolled window
+        # Now we are going to put everything into a scrolled window
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         
-        scrolled_panel = ScrolledPanel(self, size=(-1,-1),
-                                 style = wx.TAB_TRAVERSAL, name="panel1")
-        scrolled_panel.SetScrollbars(1,1,1,1)
+        # The scrolled panel
+        scrolled_panel = ScrolledPanel(self, size = (-1,-1), style = wx.TAB_TRAVERSAL, name="panel1")
+        scrolled_panel.SetScrollbars(1, 1, 1, 1)
         
-        #Loads all the parameters from the config file
-        configdict, descdict = self.get_from_configfile('GeometryPanel')
+        # The list for all the annotated objects
+        self.annotated_values = []
         
-        # Things in self.items are linked through to the module code where 
-        # it attempts to set the attribute.  They are also automatically
-        # written to configuration file
-        self.items = [
-        dict(attr='Vdisp'),
-        dict(attr='Vratio'),
-        dict(attr='t'),
-        dict(attr='ro'),
-        dict(attr='phi_fi0'),
-        dict(attr='phi_fis'),
-        dict(attr='phi_fos'),
-        dict(attr='delta_flank'),
-        dict(attr='delta_radial'),
-        ]
+        # The sizer for all the objects
+        sizer_for_wrap_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
         
-        sizerInputs = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
+        annotated_values = []
+        # Loop over the first group of inputs
+        for key in ['Vdisp','Vratio','t','ro','phi_fi0','phi_fis','phi_fos',
+                    'use_offset','delta_offset','delta_flank','delta_radial']:
+            # Get the annotation and the units for the term 
+            annotation, units = self.desc_map[key]
+            # Add the annotated object to the list of objects
+            annotated_values.append(AnnotatedValue(key, config[key], annotation, units))
+            
+        self.ScrollWrapAnglesButton = wx.Button(scrolled_panel,label='View Scroll Wrap Angles')
+        self.ScrollWrapAnglesButton.Bind(wx.EVT_BUTTON,self.OnShowWrapGeo)
         
-        self.ConstructItems(self.items, sizerInputs, configdict, descdict, parent = scrolled_panel)
+        # Build the items and return the list of annotated GUI objects
+        annotated_GUI_objects = self.construct_items(annotated_values, 
+                                                     sizer = sizer_for_wrap_inputs, 
+                                                     parent = scrolled_panel)
         
-        self.UseOffsetLabel = wx.StaticText(scrolled_panel, label = 'Use Offset scrolls')
-        self.UseOffset = wx.CheckBox(scrolled_panel)
-        self.UseOffset.SetValue(self._use_offset)
-        del self._use_offset
-        self.UseOffset.Bind(wx.EVT_CHECKBOX, self.OnChangeOffset)
-        sizerInputs.AddMany([self.UseOffsetLabel,self.UseOffset])
+        # The sizer for all the tube objects
+        sizer_for_tube_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
         
-        items2 = [dict(attr = 'delta_offset')]
-        self.ConstructItems(items2, sizerInputs, configdict, descdict, parent = scrolled_panel)
-        self.items += items2
+        # Loop over the tube inputs
+        annotated_values = []
+        for key in ['inlet_tube_length', 'inlet_tube_ID', 'outlet_tube_length', 'outlet_tube_ID']:
+            # Get the annotation and the units for the term 
+            annotation, units = self.desc_map[key]
+            # Add the annotated object to the list of objects
+            annotated_values.append(AnnotatedValue(key, config[key], annotation, units))
+            
+        # Build the items and return the list of annotated GUI objects, add to existing list
+        annotated_GUI_objects += self.construct_items(annotated_values,
+                                                     sizer = sizer_for_tube_inputs,
+                                                     parent = scrolled_panel)
         
-        for item in self.items:
-            setattr(self,item['attr'],item['textbox'])
         
-        kwargs = dict(label = u"\u03D5_i0 [radian]",
-                      tooltip = 'Initial involute angle for inner involute'
-                      )
-        self.phi_i0_label, self.phi_i0 = LabeledItem(scrolled_panel, **kwargs)
+        # ---------------------------------------------------------------------
+        # Register terms in the GUI database
+        self.main.register_GUI_objects(annotated_GUI_objects)
         
-        self.phi_is_label, self.phi_is= LabeledItem(scrolled_panel,
-                                                       label=u"\u03D5_is [radian]")
-
-        width = max([item['label'].GetEffectiveMinSize()[0] for item in self.items])
-        self.phi_is_label.SetMinSize((width,-1))
-        self.phi_ie_label, self.phi_ie= LabeledItem(scrolled_panel,
-                                                       label=u"\u03D5_ie [radian]")
-        self.phi_o0_label, self.phi_o0= LabeledItem(scrolled_panel,
-                                                       label=u"\u03D5_o0 [radian]")
-        self.phi_os_label, self.phi_os= LabeledItem(scrolled_panel,
-                                                       label=u"\u03D5_os [radian]")
-        self.phi_oe_label, self.phi_oe= LabeledItem(scrolled_panel,
-                                                       label=u"\u03D5_oe [radian]")
-        self.rb_label, self.rb = LabeledItem(scrolled_panel,
-                                             label="rb [m]")
-        self.hs_label, self.hs= LabeledItem(scrolled_panel,
-                                            label="hs [m]")
+        # Link callback for refreshing of this panel with changing any input
+        # parameter 
+        for o in annotated_GUI_objects:
+            o.GUI_location.Bind(wx.EVT_KILL_FOCUS, self.OnRefresh)
         
-        self.phi_i0.Enable(False)
-        self.phi_is.Enable(False)
-        self.phi_ie.Enable(False)
-        self.phi_o0.Enable(False)
-        self.phi_os.Enable(False)
-        self.phi_oe.Enable(False)
-        self.rb.Enable(False)
-        self.hs.Enable(False)
-        
+        # The plot of the scroll wraps
         self.PP = PlotPanel(scrolled_panel)
-        hsizer = wx.BoxSizer(wx.HORIZONTAL)
-        hsizer.Add(self.PP,0,wx.EXPAND)
+        self.ax = self.PP.figure.add_axes((0, 0, 1, 1))
         anibutton = wx.Button(scrolled_panel, label = 'Animate')
-        anibutton.Bind(wx.EVT_BUTTON,self.OnAnimate)
-        hsizer.Add(anibutton,1,wx.EXPAND)
-        
+        anibutton.Bind(wx.EVT_BUTTON, self.OnAnimate)
+        plotwrapssizer = wx.BoxSizer(wx.HORIZONTAL)
+        plotwrapssizer.Add(self.PP, 1, wx.EXPAND)
+        plotwrapssizer.Add(anibutton, 0, wx.EXPAND)
+
+        # Layout the sizers
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(sizerInputs)
-        sizer.AddSpacer(10)
-        sizer.Add(hsizer)
-        sizer.AddSpacer(10)
+        sizer.Add(HeaderStaticText(scrolled_panel, 'Scroll Wrap Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(plotwrapssizer, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(self.ScrollWrapAnglesButton, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_wrap_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(HeaderStaticText(scrolled_panel, 'Discharge Port Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(HeaderStaticText(scrolled_panel, 'Tube Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_tube_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(20)
         
-        self.ax = self.PP.figure.add_axes((0,0,1,1))
-
-        fgsGeoAnglesInputs = wx.FlexGridSizer(cols = 2)
-        fgsGeoAnglesInputs.AddMany([
-                     self.phi_i0_label,self.phi_i0, 
-                     self.phi_is_label,self.phi_is,
-                     self.phi_ie_label,self.phi_ie,
-                     self.phi_o0_label,self.phi_o0, 
-                     self.phi_os_label,self.phi_os,
-                     self.phi_oe_label,self.phi_oe,
-                     self.rb_label,self.rb,
-                     self.hs_label,self.hs
-                     ])
-        sizer.Add(fgsGeoAnglesInputs)
-
-        
-        for item in self.items:
-            item['textbox'].Bind(wx.EVT_KILL_FOCUS, self.OnChangeParam)
-        self.UseOffset.Bind(wx.EVT_CHECKBOX,self.OnChangeParam)
-        delta_offset_item = self._get_item_by_attr('delta_offset')['textbox']
-        delta_offset_item.Bind(wx.EVT_KILL_FOCUS, self.OnChangeParam)
-        
-        self.items += items2
-        # Keep a local copy of the scroll in order to be able to use the 
-        # set_scroll_geo and set_disc_geo functions
-        self.Scroll=Scroll()
-        
-        #Do the layout of all the panels
+        # Do the layout of the scrolled panel
         scrolled_panel.SetSizer(sizer)
         main_sizer.Add(scrolled_panel, 1, wx.EXPAND)
         self.SetSizer(main_sizer)
+
+        # Create a scroll model instance to hold the geometry 
+        self.Scroll = Scroll()
         
-        self.OnChangeOffset()
-        self.OnChangeParam()
-          
-    def post_prep_for_configfile(self):
-        return 'use_offset = bool, ' + str(self.UseOffset.IsChecked()) + '\n'
-    
-    def post_get_from_configfile(self,k,v):
+        # Refresh the panel
+        self.OnRefresh()
         
-        if k == 'use_offset':
-            self._use_offset = (v.split(',')[1].strip().lower() == 'true')
-    
-    def skip_list(self):
-        """
-        Returns a list of atttributes to skip setting in set_params() function
-        from the base class PDPanel
-        """
-        return ['Vdisp','Vratio','t','ro']
+    def OnShowWrapGeo(self, event = None):
+        if event is not None: event.Skip()
         
-    def OnChangeOffset(self, event = None):
-        delta_offset_item = self._get_item_by_attr('delta_offset')['textbox']
-        if self.UseOffset.IsChecked():
-            delta_offset_item.Enable(True)
-        else:
-            delta_offset_item.Enable(False)
+        frm = ScrollWrapAnglesFrame(self.Scroll.geo)
+        frm.Show()
         
     def OnAnimate(self, event = None):
         SAF = ScrollAnimForm(self.Scroll.geo, size=(400,400))
         SAF.Show()
         
-    def OnChangeParam(self, event = None):
-        if event is not None:
-            event.Skip()
-        Vdisp=float(self.Vdisp.GetValue())
-        Vratio=float(self.Vratio.GetValue())
-        t=float(self.t.GetValue())
-        ro=float(self.ro.GetValue())
-        phi_i0 = float(self.phi_fi0.GetValue())
-        phi_is = float(self.phi_fis.GetValue())
-        phi_os = float(self.phi_fos.GetValue())
+    def OnRefresh(self, event = None):
+        if event is not None: event.Skip()
         
-        #Set the scroll wrap geometry
-        self.Scroll.set_scroll_geo(Vdisp,Vratio,t,ro,
-                                   phi_i0 = phi_i0, 
-                                   phi_os = phi_os,
-                                   phi_is = phi_is,) 
-        self.Scroll.set_disc_geo('2Arc', r2=0)
+        def get(key):
+            # Compact code to get a parameter from the main database
+            return self.main.get_GUI_object_value(key)
         
-        if self.UseOffset.IsChecked():
+        # Set the scroll wrap geometry
+        self.Scroll.set_scroll_geo(get('Vdisp'),
+                                   get('Vratio'),
+                                   get('t'),
+                                   get('ro'),
+                                   phi_i0 = get('phi_fi0'),
+                                   phi_os = get('phi_fos'),
+                                   phi_is = get('phi_fis')
+                                   )
+        self.Scroll.set_disc_geo('2Arc', r2 = 0)
+        
+        if get('use_offset'):
             self.Scroll.geo.phi_ie_offset = pi
-            delta_offset_item = self._get_item_by_attr('delta_offset')['textbox']
-            self.Scroll.geo.delta_suction_offset = float(delta_offset_item.GetValue())
+            self.Scroll.geo.delta_suction_offset = get('delta_offset')
+            self.main.get_GUI_object('delta_offset').GUI_location.Enable(True)
         else:
             self.Scroll.geo.phi_ie_offset = 0
             self.Scroll.geo.delta_suction_offset = 0.0
+            self.main.get_GUI_object('delta_offset').GUI_location.Enable(False)
         
-        self.phi_i0.SetValue(str(self.Scroll.geo.phi_i0))
-        self.phi_is.SetValue(str(self.Scroll.geo.phi_is))
-        self.phi_ie.SetValue(str(self.Scroll.geo.phi_ie))
-        self.phi_o0.SetValue(str(self.Scroll.geo.phi_o0))
-        self.phi_os.SetValue(str(self.Scroll.geo.phi_os))
-        self.phi_oe.SetValue(str(self.Scroll.geo.phi_oe))
-        self.rb.SetValue(str(self.Scroll.geo.rb))
-        self.hs.SetValue(str(self.Scroll.geo.h))
+        
         
         self.ax.cla()
 
@@ -235,35 +292,42 @@ class GeometryPanel(pdsim_panels.PDPanel):
                       offsetScroll = self.Scroll.geo.phi_ie_offset > 0)
         
         # Plot the discharge port if the variable _d_discharge has been set
-        if hasattr(self,'_d_discharge'):
-            t = np.linspace(0,2*np.pi)
-            x = self.Scroll.geo.xa_arc1 + self._d_discharge/2*np.cos(t)
-            y = self.Scroll.geo.ya_arc1 + self._d_discharge/2*np.sin(t)
+        try:
+            d_discharge = get('d_discharge')
+            t = np.linspace(0, 2*np.pi)
+            x = self.Scroll.geo.xa_arc1 + d_discharge/2*np.cos(t)
+            y = self.Scroll.geo.ya_arc1 + d_discharge/2*np.sin(t)
             self.ax.plot(x,y,'--')
+        except KeyError:
+            pass
             
         self.PP.canvas.draw()
         
     def get_script_chunks(self):
+        
+        def get(key):
+            # Compact code to get a parameter from the main database
+            return self.main.get_GUI_object(key).GetValue()
     
-        if self.UseOffset.IsChecked():
+        if get('use_offset'):
             phi_ie_offset = str(pi)
         else:
             phi_ie_offset = str(0)
             
         #Parameters to be set in the string:
-        str_params = dict(Vdisp = self.Vdisp.GetValue(),
-                          Vratio = self.Vratio.GetValue(),
-                          t = self.t.GetValue(),
-                          ro = self.ro.GetValue(),
-                          phi_i0 = self.phi_fi0.GetValue(),
-                          phi_is = self.phi_fis.GetValue(),
-                          phi_os = self.phi_fos.GetValue(),
+        str_params = dict(Vdisp = get('Vdisp'),
+                          Vratio = get('Vratio'),
+                          t = get('t'),
+                          ro = get('ro'),
+                          phi_i0 = get('phi_i0'),
+                          phi_os = get('phi_os'),
+                          phi_is = get('phi_is'),
                           phi_ie_offset = phi_ie_offset)
 
         return textwrap.dedent(
             """
             #Parameters from the GUI
-            Vdisp = {Vdisp:s} #[m]
+            Vdisp = {Vdisp:s} #[m^3/rev]
             Vratio = {Vratio:s} #[-] 
             t = {t:s} #[m]
             ro = {ro:s} #[m]
@@ -272,10 +336,13 @@ class GeometryPanel(pdsim_panels.PDPanel):
             phi_os = {phi_os:s} #[rad]
             
             #Set the scroll wrap geometry
-            sim.set_scroll_geo(Vdisp, Vratio, t, ro,
-                               phi_i0 = phi_i0,
-                               phi_os = phi_os,
-                               phi_is = phi_is)
+            sim.set_scroll_geo(Vdisp, # Vdisp [m^3/rev]
+                               Vratio, # Vratio [-]
+                               t, # Thickness [m]
+                               ro, # Orbiting radius [m]
+                               phi_i0 = phi_i0, # [rad]
+                               phi_os = phi_os, # [rad]
+                               phi_is = phi_is) # [rad]
             sim.set_disc_geo('2Arc', r2 = 0) #hard-coded
             
             # self.delta_flank and self.delta_radial are set in the conventional way
@@ -552,173 +619,45 @@ class MassFlowPanel(pdsim_panels.PDPanel):
 #                            )
 #                       ])
 #        return _T
-     
-class MotorCoeffsTable(wx.ListCtrl, TextEditMixin):
-    
-    def __init__(self, parent, values = None):
-        """
-        Parameters
-        ----------
-        parent : wx.window
-            The parent of this checklist
-        values : A 3-element list of lists for all the coeff
-        """
-        wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT)
-        TextEditMixin.__init__(self)
-        
-        #Build the headers
-        self.InsertColumn(0,'Motor Torque [N-m]')
-        self.InsertColumn(1,'Efficiency [-]')
-        self.InsertColumn(2,'Slip speed [rad/s]')
-        
-        #: The values stored as a list of lists in floating form
-        self.values = values
-        
-        #Reset the values
-        self.refresh_table()
-        
-        #Set the column widths    
-        for i in range(3):
-            self.SetColumnWidth(i,wx.LIST_AUTOSIZE_USEHEADER)
-        
-        # Turn on callback to write values back into internal data structure when
-        # a cell is edited
-        self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.OnCellEdited)
-        
-        #Required width for the table
-        min_width = sum([self.GetColumnWidth(i) for i in range(self.GetColumnCount())])
-        
-        #No required height (+30 for buffer to account for vertical scroll bar)
-        self.SetMinSize((min_width + 30,-1))
-
-    def OnCellEdited(self, event):
-        """
-        Once the cell is edited, write its value back into the data matrix
-        """
-        row_index = event.m_itemIndex
-        col_index = event.Column
-        val = float(event.Text)
-        self.data[row_index][col_index-1] = val
-    
-    def GetStringCell(self,Irow,Icol):
-        """ Returns a string representation of the cell """
-        return self.data[Irow][Icol]
-    
-    def GetFloatCell(self,Irow,Icol):
-        """ Returns a float representation of the cell """
-        return float(self.data[Irow][Icol])
-    
-    def AddRow(self):
-        
-        row = [0]*self.GetColumnCount()
-        
-        i = len(self.data)-1
-        self.InsertStringItem(i,'')
-        for j,val in enumerate(row):
-            self.SetStringItem(i,j+1,str(val))
-        self.CheckItem(i)
-        
-        self.data.append(row)
-        
-    def RemoveRow(self, i = 0):
-        self.data.pop(i)
-        self.DeleteItem(i)
-        
-    def RemoveLastRow(self):
-        i = len(self.data)-1
-        self.data.pop(i)
-        self.DeleteItem(i)
-    
-    def update_from_configfile(self, values):
-        """
-        
-        Parameters
-        ----------
-        values : list of lists, with entries as floating point values
-            The first entry is a list (or other iterable) of torque values
-            
-            The second entry is a list (or other iterable) of efficiency values
-            
-            The third entry is a list (or other iterable) of slip speed values
-        """
-        self.values = values
-        self.refresh_table()
-        
-    def string_for_configfile(self):
-        """
-        Build and return a string for writing to the config file
-        """
-            
-        tau_list = self.values[0]
-        tau_string = 'tau_motor_coeffs = coeffs, '+'; '.join([str(tau) for tau in tau_list])
-        
-        eta_list = self.values[1]
-        eta_string = 'eta_motor_coeffs = coeffs, '+'; '.join([str(eta) for eta in eta_list])
-        
-        omega_list = self.values[2]
-        omega_string = 'omega_motor_coeffs = coeffs, '+'; '.join([str(omega) for omega in omega_list])
-            
-        return tau_string + '\n' + eta_string + '\n' + omega_string + '\n'
-        
-        
-    def refresh_table(self):
-        """
-        Take the values from self.values and write them to the table
-        """
-        #Remove all the values in the table
-        for i in reversed(range(self.GetItemCount())):
-            self.DeleteItem(i)
-            
-        if self.values is None:
-            #Add a few rows
-            for i in range(10):
-                self.InsertStringItem(i,str(i))
-        else:
-            #They all need to be the same length
-            assert len(self.values[0]) == len(self.values[1]) == len(self.values[2])
-            for i in range(len(self.values[0])):
-                self.InsertStringItem(i,str(self.values[0][i]))
-                self.SetStringItem(i,1,str(self.values[1][i]))
-                self.SetStringItem(i,2,str(self.values[2][i]))
-                
-    def get_coeffs(self):
-        """
-        Get the list of lists of values that are used in the table
-        """
-        return self.values
-        
-class MotorChoices(wx.Choicebook):
-    def __init__(self, parent):
-        wx.Choicebook.__init__(self, parent, -1)
-        
-        self.pageconsteta=wx.Panel(self)
-        self.AddPage(self.pageconsteta,'Constant efficiency')
-        self.eta_motor_label, self.eta_motor = LabeledItem(self.pageconsteta, 
-                                                           label="Motor Efficiency [-]",
-                                                           value='0.9')
-        sizer=wx.FlexGridSizer(cols = 2, hgap = 3, vgap = 3)
-        sizer.AddMany([self.eta_motor_label, self.eta_motor])
-        self.pageconsteta.SetSizer(sizer)
-        
-        self.pagemotormap=wx.Panel(self)
-        self.AddPage(self.pagemotormap,'Motor map')
-        self.MCT = MotorCoeffsTable(self.pagemotormap,values = [[1,2,3],[0.9,0.9,0.9],[307,307,307]])
-        sizer=wx.FlexGridSizer(cols = 2, hgap = 3, vgap = 3)
-        sizer.Add(self.MCT, 1, wx.EXPAND)
-        self.pagemotormap.SetSizer(sizer)
-        sizer.Layout()
     
 class MechanicalLossesPanel(pdsim_panels.PDPanel):
     
-    def __init__(self, parent, configfile,**kwargs):
+    desc_map = dict(h_shell = ('Shell-ambient mean HTC','W/m^2/K'),
+                    A_shell = ('Shell outer area [m\xb2]','m^2'),
+                    Tamb = ('Ambient temperature [K]','K'),
+                    
+                    mu_oil = ('Viscosity of the oil [Pa-s]','Pa-s'),
+                    D_upper_bearing = ('Upper bearing journal diameter [m]','m'),
+                    L_upper_bearing = ('Upper bearing length [m]','m'),
+                    c_upper_bearing = ('Upper bearing clearance [m]','m'),
+                    D_crank_bearing = ('Crank bearing journal diameter [m]','m'),
+                    L_crank_bearing = ('Crank bearing length [m]','m'),
+                    c_crank_bearing = ('Upper bearing clearance [m]','m'),
+                    D_lower_bearing = ('Lower bearing journal diameter [m]','m'),
+                    L_lower_bearing = ('Lower bearing length [m]','m'),
+                    c_lower_bearing = ('Upper bearing clearance [m]','m'),
+                    journal_tune_factor = ('Tuning factor on journal bearing losses [-]','-'),
+                    thrust_friction_coefficient = ('Thrust bearing friction coefficient [-]','-'),
+                    thrust_ID = ('Thrust bearing inner diameter [m]','m'),
+                    thrust_OD = ('Thrust bearing outer diameter [m]','m'), 
+                    orbiting_scroll_mass = ('Orbiting scroll mass [kg]','kg'), 
+                    L_ratio_bearings = ('Ratio of lengths to the bearings [-]','-'),
+                    
+                    HTC = ('Heat transfer coefficient in the scrolls [W/m\xb2/K]','W/m^2/K'),
+                    )
     
+    def __init__(self, parent, config, **kwargs):
         pdsim_panels.PDPanel.__init__(self, parent, **kwargs)
         
-        #Loads all the parameters from the config file (case-sensitive)
-        self.configdict, self.descdict = self.get_from_configfile('MechanicalLossesPanel')
+        # Now we are going to put everything into a scrolled window
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
         
-        #: The box sizer that contains all the sizers
-        box_sizer = wx.BoxSizer(wx.VERTICAL)
+        # The scrolled panel
+        scrolled_panel = ScrolledPanel(self, size = (-1,-1), style = wx.TAB_TRAVERSAL, name="panel1")
+        scrolled_panel.SetScrollbars(1, 1, 1, 1)
+        
+        # The sizer for all the objects
+        sizer_for_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
         
         """
         There are 2 possibilities for the types of motor models supported.
@@ -731,72 +670,69 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         it rejects its heat to the suction volume
         """
         
-        box_sizer.Add(wx.StaticText(self, -1, "Motor Model"))
-        box_sizer.Add(wx.StaticLine(self, -1, (25, 50), (300,1)))
+        self.motor_choices = MotorChoices(scrolled_panel)
         
-        self.motor_choices = MotorChoices(self)
-        box_sizer.Add(self.motor_choices)
-        
-        if ('eta_motor' in self.configdict 
-            and 'eta_motor_coeffs' not in self.configdict
-            and 'tau_motor_coeffs' not in self.configdict
-            and 'omega_motor_coeffs' not in self.configdict):
+        if ('eta_motor' in config
+            and 'eta_motor_coeffs' not in config
+            and 'tau_motor_coeffs' not in config
+            and 'omega_motor_coeffs' not in config):
             #Only eta_motor is provided, use it in the motor panel
             self.motor_choices.SetSelection(0)
             #Set the value in the panel
-            self.motor_choices.eta_motor.SetValue(str(self.configdict['eta_motor']))
+            self.motor_choices.eta_motor.SetValue(str(config['eta_motor']))
             
-        elif ('eta_motor' not in self.configdict 
-            and 'eta_motor_coeffs' in self.configdict
-            and 'tau_motor_coeffs' in self.configdict
-            and 'omega_motor_coeffs' in self.configdict):
+        elif ('eta_motor' not in config
+            and 'eta_motor_coeffs' in config
+            and 'tau_motor_coeffs' in config
+            and 'omega_motor_coeffs' in config):
             #Coefficients are provided, use them in the motor panel
             self.motor_choices.SetSelection(1)
-            values = [self.configdict['tau_motor_coeffs'],
-                      self.configdict['eta_motor_coeffs'],
-                      self.configdict['omega_motor_coeffs']
+            values = [config['tau_motor_coeffs'],
+                      config['eta_motor_coeffs'],
+                      config['omega_motor_coeffs']
                       ]
             self.motor_choices.MCT.update_from_configfile(values)
-        elif False:
-            #If neither of the above are matched, fall back to the default configuration
-            pass
         else:
             raise ValueError('Your combination of motor terms is not valid')
         
-        self.items = [
-      
-                    dict(attr='h_shell'),
-                    dict(attr='A_shell'),
-                    dict(attr='Tamb'),
-                    dict(attr='mu_oil'),
-                    dict(attr='D_upper_bearing'),
-                    dict(attr='L_upper_bearing'),
-                    dict(attr='c_upper_bearing'),
-                    dict(attr='D_crank_bearing'),
-                    dict(attr='L_crank_bearing'),
-                    dict(attr='c_crank_bearing'),
-                    dict(attr='D_lower_bearing'),
-                    dict(attr='L_lower_bearing'),
-                    dict(attr='c_lower_bearing'),
-                    dict(attr='journal_tune_factor'),
-                    
-                    dict(attr = 'thrust_friction_coefficient'),
-                    dict(attr = 'thrust_ID'),
-                    dict(attr = 'thrust_OD'),
-                    dict(attr = 'orbiting_scroll_mass'),
-                    dict(attr = 'L_ratio_bearings'),
-                    dict(attr = 'HTC')
-        ]
+        keys = ['h_shell','A_shell','Tamb','mu_oil',
+                'D_upper_bearing','L_upper_bearing','c_upper_bearing',
+                'D_crank_bearing','L_crank_bearing','c_crank_bearing',
+                'D_lower_bearing','L_lower_bearing','c_lower_bearing',
+                'journal_tune_factor',
+                'thrust_friction_coefficient', 'thrust_ID', 'thrust_OD', 
+                'orbiting_scroll_mass', 'L_ratio_bearings', 'HTC'
+                ]
         
+        # The list for all the annotated objects
+        self.annotated_values = []
         
-        sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
-#        self.ConstructItems([self.items[0]],sizer,self.configdict,self.descdict)
-#        
-#        box_sizer.AddSpacer(20)
-        self.ConstructItems(self.items,sizer,self.configdict,self.descdict)
+        # Loop over the first group of inputs
+        for key in keys:
+            # Get the annotation and the units for the term 
+            annotation, units = self.desc_map[key]
+            # Add the annotated object to the list of objects
+            self.annotated_values.append(AnnotatedValue(key, config[key], annotation, units))
+            
+        # Build the items and return the list of annotated GUI objects
+        annotated_GUI_objects = self.construct_items(self.annotated_values, 
+                                                     sizer_for_inputs, 
+                                                     parent = scrolled_panel)
         
-        box_sizer.Add(sizer)
-        self.SetSizer(box_sizer)
+        # Register terms in the GUI database
+        self.main.register_GUI_objects(annotated_GUI_objects)
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(wx.StaticText(scrolled_panel, -1, "Motor Model"))
+        sizer.Add(wx.StaticLine(scrolled_panel, -1, (25, 50), (300,1)))
+        sizer.Add(self.motor_choices)
+        sizer.AddSpacer(20)
+        sizer.Add(sizer_for_inputs)
+        
+        scrolled_panel.SetSizer(sizer)
+        main_sizer.Add(scrolled_panel, 1, wx.EXPAND)
+        self.SetSizer(main_sizer)
+        
         sizer.Layout()
         
     def get_script_chunks(self):
@@ -882,6 +818,14 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
             return 'eta_motor = float, '+eta+', Motor Efficiency [-]'
         else:
             return self.motor_choices.MCT.string_for_configfile()
-            
-        
+#            
+#        
+#if __name__=='__main__':
+#    app = wx.App(False)
+#    
+#    frame = wx.Frame()
+#    frame.geo = GeometryPanel(frame,) 
+#    frame.Show(True) 
+#    
+#    app.MainLoop()
         

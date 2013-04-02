@@ -11,6 +11,13 @@ from cpython cimport bool
 
 cimport cython
 
+cdef class AnnotatedValue(object):
+    def __init__(self, str key, object value, str annotation, str units):
+        self.key = key
+        self.value = value
+        self.annotation = annotation
+        self.units = units
+
 cdef class Collector(object):
     """
     The collector class is a thin wrapper around a list with compact semantics for adding values::

@@ -1051,6 +1051,10 @@ class ScrollAnimForm(wx.Frame):
         
         self.ax = self.pltpanel.axes
         
+        sizer.Layout()
+        
+        self.SetSize(sizer.GetMinSize())
+        
         if start:
             self.start()
         

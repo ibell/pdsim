@@ -1,6 +1,11 @@
 import cython
 cimport cython
         
+cdef class AnnotatedValue(object):
+    cdef public object value
+    cdef public str annotation, units, key
+    
+    
 cdef class Collector(object):
     cdef public list vec
     

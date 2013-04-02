@@ -1,28 +1,35 @@
 # -*- coding: latin-1 -*-
 
+# Python imports
+import warnings, codecs, textwrap,os, itertools
+from multiprocessing import Process
+
+# wxPython imports
 import wx
 from wx.lib.mixins.listctrl import CheckListCtrlMixin,TextEditMixin,ListCtrlAutoWidthMixin
+
 import CoolProp
 from CoolProp.State import State
 from CoolProp import CoolProp as CP
+
 from ConfigParser import SafeConfigParser
-import codecs
-import textwrap
 import numpy as np
-import os
-import itertools
+
 import matplotlib as mpl
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as WXCanvas
 from matplotlib.backends.backend_wxagg import NavigationToolbar2Wx as WXToolbar
-from multiprocessing import Process
+
 from PDSim.scroll import scroll_geo
-from PDSimLoader import RecipBuilder, ScrollBuilder
-import quantities as pq
-import warnings
 from PDSim.scroll.plots import plotScrollSet, ScrollAnimForm
+from PDSim.misc.datatypes import AnnotatedValue
+from datatypes import AnnotatedGUIObject, HeaderStaticText
+
+import h5py
+import quantities as pq
 
 length_units = {
                 'Meter': pq.length.m,
+                'Millimeter': pq.length.mm,
                 'Micrometer' : pq.length.um,
                 'Centimeter' : pq.length.cm,
                 'Inch' : pq.length.inch,
@@ -171,20 +178,45 @@ class UnitConvertor(wx.Dialog):
         elif new == 'Rankine':
             return (celsius_val+273.15)*9.0/5.0
         
+def mathtext_to_wxbitmap(s):
+    #The magic from http://matplotlib.org/examples/user_interfaces/mathtext_wx.html?highlight=button
+    from matplotlib.mathtext import MathTextParser
+    
+    mathtext_parser = MathTextParser("Bitmap")
+    ftimage, depth = mathtext_parser.parse(s, 100)
+    return wx.BitmapFromBufferRGBA(ftimage.get_width(), 
+                                   ftimage.get_height(),
+                                   ftimage.as_rgba_str()
+                                   )
+        
+def EquationButtonMaker(LaTeX, parent, **kwargs):
+    """
+    A Convenience function to generate a button with LaTeX as its image
+    
+    LaTeX : string
+    parent : wx.Window
+    
+    kwargs passed to BitmapButton constructor 
+    """
+    return wx.BitmapButton(parent, bitmap = mathtext_to_wxbitmap(LaTeX), **kwargs)
+    
+def LaTeXImageMaker(LaTeX,parent,**kwargs):
+    return wx.StaticBitmap(parent, bitmap = mathtext_to_wxbitmap(LaTeX), **kwargs)        
         
 class PlotPanel(wx.Panel):
-    def __init__(self, parent, **kwargs):
-        wx.Panel.__init__(self, parent, size = (300,200), **kwargs)
+    def __init__(self, parent, toolbar = False, **kwargs):
+        wx.Panel.__init__(self, parent, **kwargs)
         sizer = wx.BoxSizer(wx.VERTICAL)
         self.figure = mpl.figure.Figure(dpi=100, figsize=(2, 2))
-#        self.figure.set_figwidth(2.0)
-#        self.figure.set_figheight(2.0)
         self.canvas = WXCanvas(self, -1, self.figure)
-#        self.canvas.resize(200,200)
-        self.toolbar = WXToolbar(self.canvas)
-        self.toolbar.Realize()
+        
         sizer.Add(self.canvas)
-        sizer.Add(self.toolbar)
+        
+        if toolbar:
+            self.toolbar = WXToolbar(self.canvas)
+            self.toolbar.Realize()
+            sizer.Add(self.toolbar)
+            
         self.SetSizer(sizer)
         sizer.Layout()
 
@@ -228,6 +260,9 @@ class PDPanel(wx.Panel):
     def __init__(self,*args,**kwargs):
         wx.Panel.__init__(self,*args,**kwargs)
         self.name=kwargs.get('name','')
+        
+        # Get the main frame
+        self.main = self.GetTopLevelParent()
         
     def _get_item_by_attr(self, attr):
         if hasattr(self,'items'):
@@ -324,7 +359,92 @@ class PDPanel(wx.Panel):
                     textbox.default_units = 'Cubic Meter'
                 elif units == 'rad/s':
                     textbox.default_units = 'Radians per second'
-                self.Bind(wx.EVT_CONTEXT_MENU,self.OnChangeUnits,textbox)      
+                self.Bind(wx.EVT_CONTEXT_MENU,self.OnChangeUnits,textbox)     
+                
+    def construct_items(self, annotated_objects, sizer = None, parent = None):
+        
+        """
+        Parameters
+        ----------
+        annotated_objects : a list of `AnnotatedValue <PDSim.misc.datatypes.AnnotatedValue>`
+        sizer : wx.Sizer
+            The sizer to add the wx elements to
+        parent : wx.Window
+            The parent of the items, default is this panel
+            
+        Returns
+        -------
+        annotated_GUI_objects : a list of `GUIAnnotatedObject` derived from the input ``annotated_objects`` 
+        """
+        
+        # Default to parent it to this panel
+        if parent is None:
+            parent = self
+            
+        # Output list of annotated GUI objects
+        annotated_GUI_objects = []
+        
+        # Loop over the objects
+        for o in annotated_objects:
+            
+            # Type-check
+            if not isinstance(o, AnnotatedValue):
+                raise TypeError('object of type [{t:s}] is not an AnnotatedValue'.format(t = type(o)))
+                
+            # Build the GUI objects
+            label=wx.StaticText(parent, -1, o.annotation)
+            
+            if sizer is not None:
+                # Add the label to the sizer
+                sizer.Add(label, 1, wx.EXPAND)
+
+            # If the input is a boolean value, make a check box
+            if isinstance(o.value,bool):
+                # Build the checkbox
+                checkbox = wx.CheckBox(parent)
+                # Set its value
+                checkbox.SetValue(o.value)
+                
+                if sizer is not None:
+                    # Add to the sizer
+                    sizer.Add(checkbox, 1, wx.EXPAND)
+                
+                # Add to the annotated objects
+                annotated_GUI_objects.append(AnnotatedGUIObject(o,checkbox))
+            
+            # Otherwise make a TextCtrl 
+            else:
+                # Create the textbox
+                textbox=wx.TextCtrl(parent, value = str(o.value))
+                
+                if sizer is not None:
+                    # Add it to the sizer
+                    sizer.Add(textbox, 1, wx.EXPAND)
+                
+                # Units are defined for the item
+                if o.units:
+                    unicode_units = unicode(o.units)
+                    textbox.default_units = ''
+                    if unicode_units == u'm':
+                        textbox.default_units = 'Meter'
+                    elif unicode_units == u'm^2':
+                        textbox.default_units = 'Square Meter'
+                    elif unicode_units == u'm^3':
+                        textbox.default_units = 'Cubic Meter'
+                    elif unicode_units == u'rad/s':
+                        textbox.default_units = 'Radians per second'
+                    
+                    #If it has units bind the unit changing callback on right-click
+                    if textbox.default_units:
+                        self.Bind(wx.EVT_CONTEXT_MENU,self.OnChangeUnits,textbox)  
+                
+                annotated_GUI_objects.append(AnnotatedGUIObject(o,textbox))
+            
+        if len(annotated_GUI_objects) == 1:
+            return annotated_GUI_objects[0]
+        else:
+            return annotated_GUI_objects
+              
         
     def prep_for_configfile(self):
         """
@@ -524,6 +644,135 @@ class PDPanel(wx.Panel):
         dlg.ShowModal()
         TextCtrl.SetValue(dlg.get_value())
         dlg.Destroy()
+        
+class OutputTreePanel(wx.Panel):
+    
+    def __init__(self, parent, runs):
+        import wx, textwrap
+        
+        wx.Panel.__init__(self, parent, -1)
+        self.Bind(wx.EVT_SIZE, self.OnSize)
+
+        import wx.gizmos
+        self.tree = wx.gizmos.TreeListCtrl(self, -1, style =
+                                           wx.TR_DEFAULT_STYLE
+                                           #| wx.TR_HAS_BUTTONS
+                                           #| wx.TR_TWIST_BUTTONS
+                                           #| wx.TR_ROW_LINES
+                                           #| wx.TR_COLUMN_LINES
+                                           #| wx.TR_NO_LINES 
+                                           | wx.TR_FULL_ROW_HIGHLIGHT
+                                           )
+
+        isz = (16, 16)
+        il = wx.ImageList(*isz)
+        fldridx     = il.Add(wx.ArtProvider_GetBitmap(wx.ART_FOLDER,      wx.ART_OTHER, isz))
+        fldropenidx = il.Add(wx.ArtProvider_GetBitmap(wx.ART_FILE_OPEN,   wx.ART_OTHER, isz))
+        fileidx     = il.Add(wx.ArtProvider_GetBitmap(wx.ART_NORMAL_FILE, wx.ART_OTHER, isz))
+
+        self.tree.SetImageList(il)
+        self.il = il
+        self.tree.AddColumn("Main column")
+        self.tree.SetMainColumn(0) # the one with the tree in it...
+        self.tree.SetColumnWidth(0, 175)
+        
+        # Flush everything
+        
+        # Build the columns
+        for i, run in enumerate(runs):
+            self.tree.AddColumn("Run {i:d}".format(i = i))  
+
+        # Create some columns
+        self.root = self.tree.AddRoot("The Root Item")
+        self.tree.SetItemImage(self.root, fldridx, which = wx.TreeItemIcon_Normal)
+        self.tree.SetItemImage(self.root, fldropenidx, which = wx.TreeItemIcon_Expanded)
+        
+        self.runs = runs
+        
+        def _recursive_add(root, objects):
+            
+            assert len(objects)>=1
+            
+            if isinstance(objects[0], dict):
+                # Iterate over the keys (all objects MUST have the same structure, this is enforced by recursive fill
+                for key in sorted(objects[0].keys()):
+                    
+                    #Ensure that all runs have this key at this level
+                    assert all([key in o for o in objects])
+                    
+                    #Create a node for this key
+                    child = self.tree.AppendItem(root, key)
+                    self.tree.SetItemImage(child, fldridx, which = wx.TreeItemIcon_Normal)
+                    self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
+                    
+                    # If a value, stop the recursion and output the value
+                    if any([isinstance(o[key],(float,int,str)) for o in objects]):
+                        for i,o in enumerate(objects):
+                            self.tree.SetItemText(child, str(o[key]),i+1)
+                    
+                    # Otherwise keep going
+                    else:
+                        _recursive_add(child,[o[key] for o in objects])
+            
+            elif isinstance(objects[0],list):
+                # Iterate over the items:
+                for j in range(len(objects[0])):
+                    
+                    #Create a node for this index
+                    child = self.tree.AppendItem(root, str(j))
+                    self.tree.SetItemImage(child, fldridx, which = wx.TreeItemIcon_Normal)
+                    self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
+                    
+                    # If a value, stop the recursion and output the value
+                    if any([isinstance(o[j],(float,int,str)) for o in objects]):
+                        for i,o in enumerate(objects):
+                            self.tree.SetItemText(child, str(o[j]),i+1)
+                    
+                    # Otherwise keep going
+                    else:
+                        _recursive_add(child,[o[j] for o in objects])
+                    
+            else:
+                raise TypeError('Can\'t handle this type yet: '+str(type(objects[0])))
+            
+        #_recursive_add(self.root, runs)
+        
+        def _recursive_hdf5_add(root, objects):
+            for thing in objects[0]:
+                #Always make this level
+                child = self.tree.AppendItem(root, str(thing))
+                
+                if isinstance(objects[0][thing], h5py.Dataset):    
+                    for i, o in enumerate(objects):
+                        if not o[thing].shape: # It's a single - element, perhaps a number or a string
+                            self.tree.SetItemText(child, str(o[thing].value), i+1)
+                        else:
+                            self.tree.SetItemText(child, str(o[thing]), i+1)
+                    
+                elif isinstance(objects[0][thing], h5py.Group):
+                    _recursive_hdf5_add(child,[o[thing] for o in objects])
+        
+        _recursive_hdf5_add(self.root, runs)
+        
+        self.tree.Expand(self.root)
+
+        self.tree.GetMainWindow().Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
+        self.tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.OnActivate)
+
+    def OnActivate(self, evt):
+        print('OnActivate: %s' % self.tree.GetItemText(evt.GetItem()))
+
+    def OnRightUp(self, evt):
+        pos = evt.GetPosition()
+        item, flags, col = self.tree.HitTest(pos)
+        if item:
+            print('Flags: %s, Col:%s, Text: %s' %
+                           (flags, col, self.tree.GetItemText(item, col)))
+
+    def OnSize(self, evt):
+        self.tree.SetSize(self.GetSize())
+        
+        
         
 class ChangeParamsDialog(wx.Dialog):
     def __init__(self, params, **kwargs):
@@ -1524,27 +1773,28 @@ class StateChooser(wx.Dialog):
         except ValueError:
             return
         
-
-    
 class StatePanel(wx.Panel):
     """
     This is a generic Panel that has the ability to select a state given by 
     Fluid, temperature and density by selecting the desired set of inputs in a
     dialog which can be Tsat and DTsh or T & p.
     """
-    def __init__(self,parent,id=-1,Fluid='R404A',T=283.15,rho=5.74, Fluid_fixed = False):
-        wx.Panel.__init__(self,parent,id)
+    def __init__(self, parent, id=-1, CPState = None, Fluid_fixed = False):
+        wx.Panel.__init__(self, parent, id)
         
+        # If the fluid is not allowed to be changed Fluid_fixed is true
         self._Fluid_fixed = Fluid_fixed
-        p = CP.Props('P','T',T,'D',rho,str(Fluid))
-        sizer=wx.FlexGridSizer(cols=2,hgap=4,vgap=4)
-        self.Fluidlabel, self.Fluid = LabeledItem(self,label="Fluid",value=str(Fluid))
         
-        self.Tlabel, self.T = LabeledItem(self,label="Temperature [K]",value=str(T))
-        self.plabel, self.p = LabeledItem(self,label="Pressure [kPa]",value=str(p))
-        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/m³]",value=str(rho))
-        sizer.AddMany([self.Fluidlabel, self.Fluid,self.Tlabel,self.T,self.plabel,self.p,self.rholabel,self.rho])
+        sizer = wx.FlexGridSizer(cols=2,hgap=4,vgap=4)
+        self.Fluidlabel, self.Fluid = LabeledItem(self,label="Fluid",value=str(CPState.Fluid))
         
+        self.Tlabel, self.T = LabeledItem(self,label="Temperature [K]",value=str(CPState.T))
+        self.plabel, self.p = LabeledItem(self,label="Pressure [kPa]",value=str(CPState.p))
+        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/m³]",value=str(CPState.rho))
+        sizer.AddMany([self.Fluidlabel, self.Fluid,
+                       self.Tlabel, self.T,
+                       self.plabel, self.p,
+                       self.rholabel, self.rho])
         
         for box in [self.T,self.p,self.rho,self.Fluid]:
             #Make the box not editable
@@ -1568,7 +1818,13 @@ class StatePanel(wx.Panel):
         Fluid = str(self.Fluid.GetValue())
         T = float(self.T.GetValue())
         rho = float(self.rho.GetValue())
-        return State(Fluid,dict(T=T,D=rho))
+        return State(Fluid,dict(T = T, D = rho))
+    
+    def GetValue(self):
+        return self.GetState()
+    
+    def SetValue(self, State_val):
+        self.set_state(State_val.Fluid, dict(T= State_val.T, D = State_val.rho))
     
     def set_state(self, Fluid, **kwargs):
         """
@@ -1613,66 +1869,81 @@ class StatePanel(wx.Panel):
         
         # post the update event, with arbitrary data attached
         wx.PostEvent(self, self.StateUpdateEvent())
-        
-        
 
 class StateInputsPanel(PDPanel):
     
-    def __init__(self, parent, configfile, **kwargs):
+    desc_map = dict(omega = ('Rotational speed [rad/s]','rad/s'),
+                    inletState = ('The inlet state to the machine','-')
+                    )
+    
+    def __init__(self, parent, config, **kwargs):
     
         PDPanel.__init__(self, parent, **kwargs)
         
-        #Loads all the parameters from the config file (case-sensitive)
-        self.configdict, self.descdict = self.get_from_configfile('StatePanel')
+        # The CoolProp State instance
+        inletState = State(config['inletState']['Fluid'], dict(T = config['inletState']['T'], D = config['inletState']['rho']))
         
-        self.items = [
-                      dict(attr='omega')
-                      ]
+        # Create the sizers
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer_for_omega = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_for_inletState = wx.BoxSizer(wx.HORIZONTAL)
         
-        box_sizer = wx.BoxSizer(wx.VERTICAL)
+        # The list for all the annotated objects
+        self.annotated_values = []
         
-        sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
-        self.ConstructItems([self.items[0]],sizer,self.configdict,self.descdict)
-        box_sizer.Add(sizer)
+        # Add the annotated omega to the list of objects
+        self.annotated_values.append(AnnotatedValue('omega', config['omega'], *self.desc_map['omega'])) #*self.desc_map[key] unpacks into annotation, units
         
-        box_sizer.Add(wx.StaticText(self,-1,"Suction State"))
-        box_sizer.Add(wx.StaticLine(self, -1, (25, 50), (300,1)))    
-            
-        Fluid = self.configdict['inletState']['Fluid']
-        T = self.configdict['inletState']['T']
-        rho = self.configdict['inletState']['rho']
-        self.SuctionState = StatePanel(self,Fluid=Fluid,T=T,rho=rho)
-        box_sizer.Add(self.SuctionState)
+        # Construct annotated omega GUI entry
+        AGO_omega = self.construct_items(self.annotated_values, sizer_for_omega)
+        AGO_omega.GUI_location.SetToolTipString('If a motor curve is provided, this value will not be used')
         
-        box_sizer.Add((20,20))
-        box_sizer.Add(wx.StaticText(self,-1,"Discharge State"))
-        box_sizer.Add(wx.StaticLine(self,-1,(25, 50), (300,1)))
+        # Construct StatePanel
+        SP = StatePanel(self, CPState = inletState)
+        AGO_inletState = AnnotatedGUIObject(AnnotatedValue('inletState', inletState, *self.desc_map['inletState']), SP)
         
-        self.cmbDischarge = wx.ComboBox(self)
-        self.cmbDischarge.AppendItems(['Discharge pressure [kPa]', 
-                                       'Pressure ratio [-]', 
-                                       'Saturated Temperature [K]'
-                                       ])
-        self.cmbDischarge.SetStringSelection(self.Discharge_key)
-        self.DischargeValue = wx.TextCtrl(self, value = self.Discharge_value)
-        self.cmbDischarge.Bind(wx.EVT_COMBOBOX, self.OnChangeDischargeVariable)
-        self.DischargeValue.Bind(wx.EVT_KILL_FOCUS,self.OnChangeDischargeValue)
-        self.DischargeValue.Bind(wx.EVT_TEXT,self.OnChangeDischargeValue)
+        self.main.register_GUI_objects([AGO_omega, AGO_inletState])
         
-        sizer = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
-        sizer.AddMany([self.cmbDischarge, self.DischargeValue])
-        box_sizer.Add(sizer)
+        sizer.Add(HeaderStaticText(self,'Rotational Speed'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_omega, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(HeaderStaticText(self,'Inlet State'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(SP, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(HeaderStaticText(self, 'Discharge State'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+
+#        sizer.Add(sizer_for_outputs, 1, wx.ALIGN_CENTER_HORIZONTAL)
+#        box_sizer.Add((20,20))
+#        box_sizer.Add(wx.StaticText(self,-1,"Discharge State"))
+#        box_sizer.Add(wx.StaticLine(self,-1,(25, 50), (300,1)))
+#        
+#        self.cmbDischarge = wx.ComboBox(self)
+#        self.cmbDischarge.AppendItems(['Discharge pressure [kPa]', 
+#                                       'Pressure ratio [-]', 
+#                                       'Saturated Temperature [K]'
+#                                       ])
+#        self.cmbDischarge.SetStringSelection(self.Discharge_key)
+#        self.DischargeValue = wx.TextCtrl(self, value = self.Discharge_value)
+#        self.cmbDischarge.Bind(wx.EVT_COMBOBOX, self.OnChangeDischargeVariable)
+#        self.DischargeValue.Bind(wx.EVT_KILL_FOCUS,self.OnChangeDischargeValue)
+#        self.DischargeValue.Bind(wx.EVT_TEXT,self.OnChangeDischargeValue)
+#        
+#        sizer = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+#        sizer.AddMany([self.cmbDischarge, self.DischargeValue])
+#        box_sizer.Add(sizer)
         
-        self.SetSizer(box_sizer)
-        sizer.Layout()  
+        self.SetSizer(sizer)
+        sizer.Layout()
         
-        #Set the value self._discharge_pressure variable
-        self.OnChangeDischargeValue()
-        #Bind the selection of discharge value event
-        self.OnChangeDischargeVariable()
-        
-        # bind it as usual
-        self.SuctionState.Bind(self.SuctionState.EVT_STATE_UPDATE_EVENT, self.OnChangeDischargeVariable)
+#        #Set the value self._discharge_pressure variable
+#        self.OnChangeDischargeValue()
+#        #Bind the selection of discharge value event
+#        self.OnChangeDischargeVariable()
+#        
+#        # bind it as usual
+#        self.SuctionState.Bind(self.SuctionState.EVT_STATE_UPDATE_EVENT, self.OnChangeDischargeVariable)
         
     def OnChangeDischargeValue(self, event = None):
         """ 
@@ -1911,6 +2182,162 @@ class StateInputsPanel(PDPanel):
             raise ValueError ('Only one discharge pressure parameter can be provided in parametric table')
             
         return attrs, vals
+    
+class MotorCoeffsTable(wx.ListCtrl, TextEditMixin):
+    
+    def __init__(self, parent, values = None):
+        """
+        Parameters
+        ----------
+        parent : wx.window
+            The parent of this checklist
+        values : A 3-element list of lists for all the coeff
+        """
+        wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT)
+        TextEditMixin.__init__(self)
         
-if __name__=='__main__':
+        #Build the headers
+        self.InsertColumn(0,'Motor Torque [N-m]')
+        self.InsertColumn(1,'Efficiency [-]')
+        self.InsertColumn(2,'Slip speed [rad/s]')
+        
+        #: The values stored as a list of lists in floating form
+        self.values = values
+        
+        #Reset the values
+        self.refresh_table()
+        
+        #Set the column widths    
+        for i in range(3):
+            self.SetColumnWidth(i,wx.LIST_AUTOSIZE_USEHEADER)
+        
+        # Turn on callback to write values back into internal data structure when
+        # a cell is edited
+        self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.OnCellEdited)
+        
+        #Required width for the table
+        min_width = sum([self.GetColumnWidth(i) for i in range(self.GetColumnCount())])
+        
+        #No required height (+30 for buffer to account for vertical scroll bar)
+        self.SetMinSize((min_width + 30,-1))
+
+    def OnCellEdited(self, event):
+        """
+        Once the cell is edited, write its value back into the data matrix
+        """
+        row_index = event.m_itemIndex
+        col_index = event.Column
+        val = float(event.Text)
+        self.data[row_index][col_index-1] = val
+    
+    def GetStringCell(self,Irow,Icol):
+        """ Returns a string representation of the cell """
+        return self.data[Irow][Icol]
+    
+    def GetFloatCell(self,Irow,Icol):
+        """ Returns a float representation of the cell """
+        return float(self.data[Irow][Icol])
+    
+    def AddRow(self):
+        
+        row = [0]*self.GetColumnCount()
+        
+        i = len(self.data)-1
+        self.InsertStringItem(i,'')
+        for j,val in enumerate(row):
+            self.SetStringItem(i,j+1,str(val))
+        self.CheckItem(i)
+        
+        self.data.append(row)
+        
+    def RemoveRow(self, i = 0):
+        self.data.pop(i)
+        self.DeleteItem(i)
+        
+    def RemoveLastRow(self):
+        i = len(self.data)-1
+        self.data.pop(i)
+        self.DeleteItem(i)
+    
+    def update_from_configfile(self, values):
+        """
+        
+        Parameters
+        ----------
+        values : list of lists, with entries as floating point values
+            The first entry is a list (or other iterable) of torque values
+            
+            The second entry is a list (or other iterable) of efficiency values
+            
+            The third entry is a list (or other iterable) of slip speed values
+        """
+        self.values = values
+        self.refresh_table()
+        
+    def string_for_configfile(self):
+        """
+        Build and return a string for writing to the config file
+        """
+            
+        tau_list = self.values[0]
+        tau_string = 'tau_motor_coeffs = coeffs, '+'; '.join([str(tau) for tau in tau_list])
+        
+        eta_list = self.values[1]
+        eta_string = 'eta_motor_coeffs = coeffs, '+'; '.join([str(eta) for eta in eta_list])
+        
+        omega_list = self.values[2]
+        omega_string = 'omega_motor_coeffs = coeffs, '+'; '.join([str(omega) for omega in omega_list])
+            
+        return tau_string + '\n' + eta_string + '\n' + omega_string + '\n'
+        
+        
+    def refresh_table(self):
+        """
+        Take the values from self.values and write them to the table
+        """
+        #Remove all the values in the table
+        for i in reversed(range(self.GetItemCount())):
+            self.DeleteItem(i)
+            
+        if self.values is None:
+            #Add a few rows
+            for i in range(10):
+                self.InsertStringItem(i,str(i))
+        else:
+            #They all need to be the same length
+            assert len(self.values[0]) == len(self.values[1]) == len(self.values[2])
+            for i in range(len(self.values[0])):
+                self.InsertStringItem(i,str(self.values[0][i]))
+                self.SetStringItem(i,1,str(self.values[1][i]))
+                self.SetStringItem(i,2,str(self.values[2][i]))
+                
+    def get_coeffs(self):
+        """
+        Get the list of lists of values that are used in the table
+        """
+        return self.values
+        
+class MotorChoices(wx.Choicebook):
+    def __init__(self, parent):
+        wx.Choicebook.__init__(self, parent, -1)
+        
+        self.pageconsteta=wx.Panel(self)
+        self.AddPage(self.pageconsteta,'Constant efficiency')
+        self.eta_motor_label, self.eta_motor = LabeledItem(self.pageconsteta, 
+                                                           label="Motor Efficiency [-]",
+                                                           value='0.9')
+        sizer=wx.FlexGridSizer(cols = 2, hgap = 3, vgap = 3)
+        sizer.AddMany([self.eta_motor_label, self.eta_motor])
+        self.pageconsteta.SetSizer(sizer)
+        
+        self.pagemotormap=wx.Panel(self)
+        self.AddPage(self.pagemotormap,'Motor map')
+        self.MCT = MotorCoeffsTable(self.pagemotormap,values = [[1,2,3],[0.9,0.9,0.9],[307,307,307]])
+        sizer=wx.FlexGridSizer(cols = 2, hgap = 3, vgap = 3)
+        sizer.Add(self.MCT, 1, wx.EXPAND)
+        self.pagemotormap.SetSizer(sizer)
+        sizer.Layout()
+        
+if __name__=='__main__':    
+    
     execfile('PDSimGUI.py')
