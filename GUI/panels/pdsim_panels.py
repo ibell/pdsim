@@ -689,70 +689,34 @@ class OutputTreePanel(wx.Panel):
         
         self.runs = runs
         
-        def _recursive_add(root, objects):
-            
-            assert len(objects)>=1
-            
-            if isinstance(objects[0], dict):
-                # Iterate over the keys (all objects MUST have the same structure, this is enforced by recursive fill
-                for key in sorted(objects[0].keys()):
-                    
-                    #Ensure that all runs have this key at this level
-                    assert all([key in o for o in objects])
-                    
-                    #Create a node for this key
-                    child = self.tree.AppendItem(root, key)
-                    self.tree.SetItemImage(child, fldridx, which = wx.TreeItemIcon_Normal)
-                    self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
-                    
-                    # If a value, stop the recursion and output the value
-                    if any([isinstance(o[key],(float,int,str)) for o in objects]):
-                        for i,o in enumerate(objects):
-                            self.tree.SetItemText(child, str(o[key]),i+1)
-                    
-                    # Otherwise keep going
-                    else:
-                        _recursive_add(child,[o[key] for o in objects])
-            
-            elif isinstance(objects[0],list):
-                # Iterate over the items:
-                for j in range(len(objects[0])):
-                    
-                    #Create a node for this index
-                    child = self.tree.AppendItem(root, str(j))
-                    self.tree.SetItemImage(child, fldridx, which = wx.TreeItemIcon_Normal)
-                    self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
-                    
-                    # If a value, stop the recursion and output the value
-                    if any([isinstance(o[j],(float,int,str)) for o in objects]):
-                        for i,o in enumerate(objects):
-                            self.tree.SetItemText(child, str(o[j]),i+1)
-                    
-                    # Otherwise keep going
-                    else:
-                        _recursive_add(child,[o[j] for o in objects])
-                    
-            else:
-                raise TypeError('Can\'t handle this type yet: '+str(type(objects[0])))
-            
-        #_recursive_add(self.root, runs)
-        
         def _recursive_hdf5_add(root, objects):
             for thing in objects[0]:
-                #Always make this level
+                # Always make this level
                 child = self.tree.AppendItem(root, str(thing))
                 
-                if isinstance(objects[0][thing], h5py.Dataset):    
+                # If it is a dataset, write the dataset contents to the tree
+                if isinstance(objects[0][thing], h5py.Dataset):
                     for i, o in enumerate(objects):
-                        if not o[thing].shape: # It's a single - element, perhaps a number or a string
+                        if not o[thing].shape: # It's a single element, perhaps a number or a string.  
+                                               # shape will be an empty tuple, hence not () is True
                             self.tree.SetItemText(child, str(o[thing].value), i+1)
                         else:
+                            # A place holder for now - will develop a frame to display the matrix
                             self.tree.SetItemText(child, str(o[thing]), i+1)
-                    
+                
+                # Otherwise if it is a group, change the icon and recurse into the group
                 elif isinstance(objects[0][thing], h5py.Group):
-                    _recursive_hdf5_add(child,[o[thing] for o in objects])
+                    
+                    self.tree.SetItemImage(child, fldridx, which = wx.TreeItemIcon_Normal)
+                    self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
+                    _recursive_hdf5_add(child, [o[thing] for o in objects])
         
+        from time import clock
+        t1 = clock()
         _recursive_hdf5_add(self.root, runs)
+        t2 = clock()
+        
+        print t2-t1,'secs elapsed'
         
         self.tree.Expand(self.root)
 

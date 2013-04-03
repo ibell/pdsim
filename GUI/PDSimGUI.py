@@ -502,7 +502,7 @@ class RunToolBook(wx.Panel):
         wx.Panel.__init__(self, parent)
         
         # The action buttons
-        self.cmdRunOne = wx.Button(self,-1,'\nRun!\n')
+        self.cmdRunOne = wx.Button(self,-1,'  \nRun!\n  ')
         self.cmdRunOne.Bind(wx.EVT_BUTTON, self.GetTopLevelParent().OnStart)
         self.cmdRunParametric = wx.Button(self,-1,'Run\nParametric\nTable')
         self.cmdRunParametric.Bind(wx.EVT_BUTTON, self.GetTopLevelParent().OnStart)
@@ -1457,11 +1457,12 @@ class OutputsToolBook(wx.Toolbook):
         
     
         # Load the runs into memory
-        runa = h5py.File('runa.h5', driver = 'core', backing_store = False)
-        runb = h5py.File('runb.h5', driver = 'core', backing_store = False)
+        runa = h5py.File('runa.h5')#, driver = 'core', backing_store = False)
+        runb = h5py.File('runb.h5')#, driver = 'core', backing_store = False)
     
         #Make a  instance
         self.panels = (pdsim_panels.OutputTreePanel(self,[runa, runb]), wx.Panel(self))#self.PlotsPanel)
+        #self.panels = (wx.Panel(self), wx.Panel(self))#self.PlotsPanel)
         for Name,index,panel in zip(['Data','Plots'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
             
