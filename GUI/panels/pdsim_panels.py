@@ -69,6 +69,26 @@ temperature_units = {
                      'Rankine': np.nan
                      }
 
+
+class InputsToolBook(wx.Toolbook):
+    
+    def get_script_chunks(self):
+        """
+        Pull all the values out of the child panels, using the values in 
+        self.items and the function get_script_chunks if the panel implements
+        it
+        
+        The values are written into the script file that will be execfile-d
+        """
+        chunks = []
+        for panel in self.panels:
+            chunks.append('#############\n# From '+panel.Name+'\n############\n')
+            if hasattr(panel,'get_script_params'):
+                chunks.append(panel.get_script_params())
+            if hasattr(panel,'get_script_chunks'):
+                chunks.append(panel.get_script_chunks())
+        return chunks
+
 class UnitConvertor(wx.Dialog):
     def __init__(self, value, default_units, type = None, TextCtrl = None):
         wx.Dialog.__init__(self, None, title='Convert units')
@@ -648,12 +668,14 @@ class PDPanel(wx.Panel):
 class OutputTreePanel(wx.Panel):
     
     def __init__(self, parent, runs):
+        
         import wx, textwrap
+        import wx.gizmos
+        from operator import mul
         
         wx.Panel.__init__(self, parent, -1)
         self.Bind(wx.EVT_SIZE, self.OnSize)
-
-        import wx.gizmos
+        
         self.tree = wx.gizmos.TreeListCtrl(self, -1, style =
                                            wx.TR_DEFAULT_STYLE
                                            #| wx.TR_HAS_BUTTONS
@@ -687,6 +709,43 @@ class OutputTreePanel(wx.Panel):
         self.tree.SetItemImage(self.root, fldridx, which = wx.TreeItemIcon_Normal)
         self.tree.SetItemImage(self.root, fldropenidx, which = wx.TreeItemIcon_Expanded)
         
+        # Make a list of list of keys for each HDF5 file
+        lists_of_keys = []
+        for run in runs:
+            keys = []
+            run.visit(keys.append) #For each thing in HDF5 file, append its name to the keys list
+            lists_of_keys.append(keys)
+        
+        from time import clock
+        t1 = clock()
+        
+        mylist = []
+        def func(name, obj):
+            if isinstance(obj, h5py.Dataset):
+                try:
+                    mylist.append((name, obj.value))
+                except ValueError:
+                    pass
+            elif isinstance(obj, h5py.Group):
+                mylist.append((name, None))
+            else:
+                return
+                
+        run.visititems(func)
+        
+        
+        for el in mylist:
+            r,v = el
+            
+            # Always make this level
+            child = self.tree.AppendItem(self.root, r)
+            self.tree.SetItemImage(child, fldridx, which = wx.TreeItemIcon_Normal)
+            self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
+            self.tree.SetItemText(child, str(v), 1)
+            
+        t2 = clock()
+        print t2 - t1, 'to get all the items'
+            
         self.runs = runs
         
         def _recursive_hdf5_add(root, objects):
@@ -711,12 +770,12 @@ class OutputTreePanel(wx.Panel):
                     self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
                     _recursive_hdf5_add(child, [o[thing] for o in objects])
         
-        from time import clock
-        t1 = clock()
-        _recursive_hdf5_add(self.root, runs)
-        t2 = clock()
         
-        print t2-t1,'secs elapsed'
+#        t1 = clock()
+#        _recursive_hdf5_add(self.root, runs)
+#        t2 = clock()
+        
+#        print t2-t1,'secs elapsed to load output tree'
         
         self.tree.Expand(self.root)
 
@@ -1837,7 +1896,10 @@ class StatePanel(wx.Panel):
 class StateInputsPanel(PDPanel):
     
     desc_map = dict(omega = ('Rotational speed [rad/s]','rad/s'),
-                    inletState = ('The inlet state to the machine','-')
+                    inletState = ('The inlet state to the machine','-'),
+                    discPratio = ('Pressure ratio (disc/suction)','-'),
+                    discPressure = ('Discharge pressure [kPa]','kPa'),
+                    discTsat = ('Discharge saturation temperature [K]','K'),
                     )
     
     def __init__(self, parent, config, **kwargs):
@@ -1851,6 +1913,7 @@ class StateInputsPanel(PDPanel):
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_for_omega = wx.BoxSizer(wx.HORIZONTAL)
         sizer_for_inletState = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_for_discState = wx.FlexGridSizer(cols = 2)
         
         # The list for all the annotated objects
         self.annotated_values = []
@@ -1863,10 +1926,28 @@ class StateInputsPanel(PDPanel):
         AGO_omega.GUI_location.SetToolTipString('If a motor curve is provided, this value will not be used')
         
         # Construct StatePanel
-        SP = StatePanel(self, CPState = inletState)
-        AGO_inletState = AnnotatedGUIObject(AnnotatedValue('inletState', inletState, *self.desc_map['inletState']), SP)
+        self.SuctionStatePanel = StatePanel(self, CPState = inletState)
+        AGO_inletState = AnnotatedGUIObject(AnnotatedValue('inletState', inletState, *self.desc_map['inletState']), self.SuctionStatePanel)
         
-        self.main.register_GUI_objects([AGO_omega, AGO_inletState])
+        #Construct the discharge state
+        if 'pratio' in config['discharge']:
+            pratio = config['discharge']['pratio']
+            pressure = pratio * inletState.p
+            Tsat = CP.Props('T','P',pressure,'Q',1,inletState.Fluid)
+             
+        disc_annotated_values = [
+            AnnotatedValue('discPressure', pressure, *self.desc_map['discPressure']),
+            AnnotatedValue('discPratio', pratio, *self.desc_map['discPratio']),
+            AnnotatedValue('discTsat', Tsat, *self.desc_map['discTsat'])
+            ]
+        
+        AGO_disc = self.construct_items(disc_annotated_values, sizer_for_discState)
+        
+        AGO_disc[0].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'pressure'))
+        AGO_disc[1].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'pratio'))
+        AGO_disc[2].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'Tsat'))
+        
+        self.main.register_GUI_objects([AGO_omega, AGO_inletState] + AGO_disc)
         
         sizer.Add(HeaderStaticText(self,'Rotational Speed'), 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
@@ -1874,112 +1955,51 @@ class StateInputsPanel(PDPanel):
         sizer.AddSpacer(5)
         sizer.Add(HeaderStaticText(self,'Inlet State'), 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
-        sizer.Add(SP, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(self.SuctionStatePanel, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
         sizer.Add(HeaderStaticText(self, 'Discharge State'), 0, wx.ALIGN_CENTER_HORIZONTAL)
-
-#        sizer.Add(sizer_for_outputs, 1, wx.ALIGN_CENTER_HORIZONTAL)
-#        box_sizer.Add((20,20))
-#        box_sizer.Add(wx.StaticText(self,-1,"Discharge State"))
-#        box_sizer.Add(wx.StaticLine(self,-1,(25, 50), (300,1)))
-#        
-#        self.cmbDischarge = wx.ComboBox(self)
-#        self.cmbDischarge.AppendItems(['Discharge pressure [kPa]', 
-#                                       'Pressure ratio [-]', 
-#                                       'Saturated Temperature [K]'
-#                                       ])
-#        self.cmbDischarge.SetStringSelection(self.Discharge_key)
-#        self.DischargeValue = wx.TextCtrl(self, value = self.Discharge_value)
-#        self.cmbDischarge.Bind(wx.EVT_COMBOBOX, self.OnChangeDischargeVariable)
-#        self.DischargeValue.Bind(wx.EVT_KILL_FOCUS,self.OnChangeDischargeValue)
-#        self.DischargeValue.Bind(wx.EVT_TEXT,self.OnChangeDischargeValue)
-#        
-#        sizer = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
-#        sizer.AddMany([self.cmbDischarge, self.DischargeValue])
-#        box_sizer.Add(sizer)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_discState, 0, wx.ALIGN_CENTER_HORIZONTAL)
         
         self.SetSizer(sizer)
         sizer.Layout()
         
-#        #Set the value self._discharge_pressure variable
-#        self.OnChangeDischargeValue()
-#        #Bind the selection of discharge value event
-#        self.OnChangeDischargeVariable()
-#        
-#        # bind it as usual
-#        self.SuctionState.Bind(self.SuctionState.EVT_STATE_UPDATE_EVENT, self.OnChangeDischargeVariable)
-        
-    def OnChangeDischargeValue(self, event = None):
+    def OnChangeDischargeValue(self, event = None, changed_parameter = ''):
         """ 
         Set the internal pressure variable when the value is changed in the TextCtrl
         """
-        p_suction = self.SuctionState.GetState().p
-        Fluid = self.SuctionState.GetState().Fluid
-        try:
-            
-            if self.cmbDischarge.GetStringSelection() == 'Discharge pressure [kPa]':
-                p_disc = float(self.DischargeValue.GetValue())
-                self._discharge_pressure = p_disc
-                
-            elif self.cmbDischarge.GetStringSelection() == 'Pressure ratio [-]':
-                p_ratio = float(self.DischargeValue.GetValue())
-                self._discharge_pressure = p_ratio*p_suction
-            
-            elif self.cmbDischarge.GetStringSelection() == 'Saturated Temperature [K]':
-                Tsat = float(self.DischargeValue.GetValue())
-                self._discharge_pressure = CP.Props('P','T',Tsat,'Q',1.0,Fluid)
-    
-            else:
-                raise KeyError
-            
-        except ValueError:
-            # Silently allow CoolProp to raise ValueError if intermediate value is not within 
-            # saturation range
-            pass
-            
-    def OnChangeDischargeVariable(self, event = None):
-        """
-        Fires when the combobox is selected
-        """
-        p_suction = self.SuctionState.GetState().p
-        Fluid = self.SuctionState.GetState().Fluid
-
-        #Remove the handler for units selection
-        self.DischargeValue.Unbind(wx.EVT_CONTEXT_MENU)
+        suction_state = self.SuctionStatePanel.GetState() 
+        psuction = suction_state.p
+        Fluid = suction_state.Fluid
         
-        if self.cmbDischarge.GetStringSelection() == 'Discharge pressure [kPa]':
-            self.DischargeValue.SetValue(str(self._discharge_pressure))
-            #Set the handler for unit selection
-            self.DischargeValue.default_units = 'kPa'
-            self.DischargeValue.Bind(wx.EVT_CONTEXT_MENU, self.OnChangeUnits)
+        if changed_parameter == 'pressure':
+            pdisc = self.main.get_GUI_object_value('discPressure')
+            pratio = pdisc / psuction
+            Tsat = CP.Props('T', 'P', pdisc, 'Q', 1.0, Fluid)
             
-        elif self.cmbDischarge.GetStringSelection() == 'Pressure ratio [-]':
-            p_disc = self._discharge_pressure
-            pratio = p_disc/p_suction
-            self.DischargeValue.SetValue(str(pratio))
-        
-        elif self.cmbDischarge.GetStringSelection() == 'Saturated Temperature [K]':
-            p_disc = self._discharge_pressure
-            Tsat = CP.Props('T', 'P', p_disc, 'Q', 1.0, Fluid)
-            self.DischargeValue.SetValue(str(Tsat))
-            #Set the handler for unit selection
-            self.DischargeValue.default_units = 'Kelvin'
-            self.DischargeValue.Bind(wx.EVT_CONTEXT_MENU, self.OnChangeUnits)
-        
-        else:
-            raise KeyError
-        
-    def post_get_from_configfile(self, key, value):
-        Dummy, value, key = value.split(',')
-        self.Discharge_key = key
-        self.Discharge_value = str(value)
+        elif changed_parameter == 'pratio':
+            pratio = self.main.get_GUI_object_value('discPratio')
+            pdisc = psuction * pratio
+            Tsat = CP.Props('T', 'P', pdisc, 'Q', 1.0, Fluid)
+            
+        elif changed_parameter == 'Tsat':
+            Tsat = self.main.get_GUI_object_value('discTsat')
+            pdisc = CP.Props('P', 'T', Tsat, 'Q', 1.0, Fluid)
+            pratio = pdisc / psuction
+            
+        # Set all the values again
+        self.main.set_GUI_object_value('discPressure',pdisc)
+        self.main.set_GUI_object_value('discPratio',pratio)
+        self.main.set_GUI_object_value('discTsat',Tsat)
         
     def get_script_chunks(self):
         """
         Get a string for the script file that will be run
         """
-        inletState = self.SuctionState.GetState()
-        
+        inletState = self.SuctionStatePanel.GetState()
+        discPressure = self.main.get_GUI_object_value('discPressure')
+        omega = self.main.get_GUI_object_value('omega')
+    
         return textwrap.dedent(
             """
             inletState = State.State("{Ref:s}", {{'T': {Ti:s}, 'P' : {pi:s} }})
@@ -1987,13 +2007,16 @@ class StateInputsPanel(PDPanel):
             T2s = sim.guess_outlet_temp(inletState,{po:s})
             outletState = State.State("{Ref:s}", {{'T':T2s,'P':{po:s} }})
             
-            #Add all the control volumes
-            sim.auto_add_CVs(inletState, outletState)
+            # The rotational speed (over-written if motor map provided)
+            sim.omega = {omega:s}
             """.format(Ref = inletState.Fluid,
                        Ti = str(inletState.T),
-                       pi= str(inletState.p),
-                       po= str(self._discharge_pressure))
+                       pi = str(inletState.p),
+                       po = str(discPressure),
+                       omega = str(omega)
+                       )
             )
+    
     def post_set_params(self, simulation):
         Fluid = self.SuctionState.GetState().Fluid
         

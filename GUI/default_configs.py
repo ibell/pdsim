@@ -195,9 +195,15 @@ GeometryPanel:
   outlet_tube_ID : 0.02 # Outlet tube inner diameter [m]
 
 MassFlowPanel:
-  Xd_sa_s1 : 0.8 # Discharge coefficient for sa-s1 flow
-  Xd_sa_s2 : 0.8 # Discharge coefficient for sa-s2 flow
-  Xd_inlet.2_sa : 0.8 # Discharge coefficient for sa-s1 flow
+  sa-s1:
+      model : IsentropicNozzle
+      options : {Xd : 0.8}
+  sa-s2:
+      model : IsentropicNozzle
+      options : {Xd : 0.8}
+  inlet.2-sa:
+      model : IsentropicNozzle
+      options : {Xd : 0.8}
 
 MechanicalLossesPanel:
   eta_motor : 0.95 # Motor efficiency [-]
@@ -229,7 +235,7 @@ StatePanel:
       T : 283.15 #[K]
       rho : 5.75 #[kg/m^3]
   discharge:
-      pratio = 2.0
+      pratio : 2.0
 
 ParametricPanel:
   Term1 : 

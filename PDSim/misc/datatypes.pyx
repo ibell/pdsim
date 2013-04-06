@@ -1,3 +1,5 @@
+#cython: embedsignature=True 
+
 import cython
 cimport cython
 
@@ -12,6 +14,10 @@ from cpython cimport bool
 cimport cython
 
 cdef class AnnotatedValue(object):
+    """
+    An annotated value is a structured datatype that is used to hold a python 
+    object and provide information about the item in a strongly structured way
+    """
     def __init__(self, str key, object value, str annotation, str units):
         self.key = key
         self.value = value

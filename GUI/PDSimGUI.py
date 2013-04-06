@@ -48,127 +48,6 @@ import datatypes
 # The path to the home folder that will hold everything
 home = os.getenv('USERPROFILE') or os.getenv('HOME')
 pdsim_home_folder = os.path.join(home,'.pdsim-temp')
-
-class InputsToolBook(wx.Toolbook):
-    """
-    The toolbook that contains the pages with input values
-    """
-    def __init__(self,parent,config,id=-1):
-        """
-        Parameters
-        ----------
-        config : yaml config file
-            The top-level configuration file
-        """
-        wx.Toolbook.__init__(self, parent, -1, style=wx.BK_LEFT)
-        il = wx.ImageList(32, 32)
-        indices=[]
-        for imgfile in ['Geometry.png',
-                        'StatePoint.png',
-                        'MassFlow.png',
-                        'MechanicalLosses.png']:
-            ico_path = os.path.join('ico',imgfile)
-            indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
-        self.AssignImageList(il)
-        
-        Main = wx.GetTopLevelParent(self)
-        if config['family'] == 'recip':
-            # Make the recip panels.  
-            self.panels=(recip_panels.GeometryPanel(self, 
-                                                    config = self.config['GeometryPanel'],
-                                                    name='GeometryPanel'),
-                         pdsim_panels.StateInputsPanel(self,
-                                                       configfile,
-                                                       name='StatePanel'),
-                         recip_panels.MassFlowPanel(self,
-                                                    configfile,
-                                                    name='MassFlowPanel'),
-                         recip_panels.MechanicalLossesPanel(self,
-                                                            configfile,
-                                                            name='MechanicalLossesPanel'),
-                         )
-            
-        elif config['family'] == 'scroll':
-            # Make the scroll panels.  
-            self.panels=(scroll_panels.GeometryPanel(self, config['GeometryPanel'],name='GeometryPanel'),
-                         pdsim_panels.StateInputsPanel(self, config['StatePanel'], name='StatePanel'),
-                         wx.Panel(self,-1),
-#                         scroll_panels.MassFlowPanel(self, config['StatePanel'], name='MassFlowPanel'),
-                         scroll_panels.MechanicalLossesPanel(self, config['MechanicalLossesPanel'], name='MechanicalLossesPanel'),
-                         )
-        else:
-            raise ValueError
-        
-        for Name, index, panel in zip(['Geometry','State Points','Mass Flow - Valves','Mechanical'],indices,self.panels):
-            self.AddPage(panel,Name,imageId=index)
-            
-        #: A dictionary that maps name to panel 
-        self.panels_dict = {panel.Name:panel for panel in self.panels}
-#        
-#        #Update the discharge geometry
-#        if Main.SimType == 'scroll':
-#            self.panels_dict['MassFlowPanel'].OnChangeDdisc()
-    
-    def get_script_chunks(self):
-        """
-        Pull all the values out of the child panels, using the values in 
-        self.items and the function get_script_chunks if the panel implements
-        it
-        
-        The values are written into the script file that will be execfile-d
-        """
-        chunks = []
-        for panel in self.panels:
-            chunks.append('#############\n# From '+panel.Name+'\n############\n')
-            if hasattr(panel,'get_script_params'):
-                chunks.append(panel.get_script_params())
-            if hasattr(panel,'get_script_chunks'):
-                chunks.append(panel.get_script_chunks())
-        return chunks
-                
-    def collect_parametric_terms(self):
-        """
-        Collect all the terms to be added to parametric table
-        """
-        items = [] 
-        #get a list of the panels that subclass PDPanel
-        panels = [panel for panel in self.Children if isinstance(panel,pdsim_panels.PDPanel)]
-        for panel in panels:
-            if hasattr(panel,'items'):
-                items += panel.items
-            more_items = panel.get_additional_parametric_terms()
-            if more_items is not None:
-                items += more_items
-        return items
-    
-    def apply_additional_parametric_terms(self, attrs, vals, items):
-        """
-        Apply parametric terms for each panel
-        
-        Parameters
-        ----------
-        attrs : list of strings
-            Attributes that are included in the parametric table
-        vals : the values corresponding to each attr in attrs
-        items : the list of dictionaries of item data in para table
-        
-        """
-        #get a list of the panels that subclass PDPanel
-        panels = [panel for panel in self.Children if isinstance(panel,pdsim_panels.PDPanel)]
-        for panel in panels:
-            #Collect all the additional terms that apply to the panel
-            panel_items = [item for item in items if 'parent' in item and item['parent'] == panel]
-            # Returns the remaining attrs, vals
-            attrs, vals = panel.apply_additional_parametric_terms(attrs, vals, panel_items)
-        
-        return attrs, vals
-    
-    def collect_output_terms(self):
-        terms = []
-        for panel in self.panels:
-            if hasattr(panel,'collect_output_terms'):
-                terms += panel.collect_output_terms()
-        return terms
     
 class IntegratorChoices(wx.Choicebook):
     def __init__(self, parent, **kwargs):
@@ -247,41 +126,60 @@ class IntegratorChoices(wx.Choicebook):
             return 'Cycle = Cycle,RK45,'+self.RK45_eps.GetValue()
         
 class SolverInputsPanel(pdsim_panels.PDPanel):
-    def __init__(self, parent, configfile,**kwargs):
+    
+    desc_map = {'eps_cycle' : ('Cycle-cycle convergence criterion','-')}
+    
+    def __init__(self, parent, configdict,**kwargs):
         pdsim_panels.PDPanel.__init__(self, parent, **kwargs)
     
         self.IC = IntegratorChoices(self)
-        sizer = wx.BoxSizer(wx.VERTICAL)
         
-        #Loads all the parameters from the config file (case-sensitive)
-        self.configdict, self.descdict = self.get_from_configfile('SolverInputsPanel')
+        sizer_for_solver_inputs = wx.BoxSizer(wx.HORIZONTAL)
         
-        self.items = [dict(attr = 'eps_cycle')]
+        annotated_values = []
+        # Loop over the first group of inputs
+        for key in ['eps_cycle']:
+            # Get the annotation and the units for the term 
+            annotation, units = self.desc_map[key]
+            # Add the annotated object to the list of objects
+            annotated_values.append(datatypes.AnnotatedValue(key, configdict[key], annotation, units))
         
-        sizer.Insert(0, self.IC)
-        sizer.AddSpacer(10)
+        # Build the items and return the list of annotated GUI objects
+        annotated_GUI_objects = self.construct_items(annotated_values, 
+                                                     sizer = sizer_for_solver_inputs
+                                                     )
         
-        sizer_tols = wx.FlexGridSizer(cols = 2)        
-        self.ConstructItems(self.items, sizer_tols, self.configdict, self.descdict)
-        sizer.Add(sizer_tols)
-        
-        sizer_advanced = wx.FlexGridSizer(cols = 1)
-        
-        sizer.Add(wx.StaticText(self,label='Advanced/Debug options'))
-        sizer.Add(wx.StaticLine(self, -1, (25, 50), (300,1)))
-        self.OneCycle = wx.CheckBox(self,
-                                    label = "Just run one cycle - not the full solution")
-        self.plot_every_cycle = wx.CheckBox(self,
-                                            label = "Open the plots after each cycle (warning - very annoying but good for debug)")
+        # ---------------------------------------------------------------------
+        # Register terms in the GUI database
+        self.main.register_GUI_objects([annotated_GUI_objects])
+
+        sizer_advanced = wx.BoxSizer(wx.VERTICAL)
+        self.OneCycle = wx.CheckBox(self, label = "Just run one cycle - not the full solution")
+        self.plot_every_cycle = wx.CheckBox(self, label = "Open the plots after each cycle (warning - very annoying but good for debug)")
         sizer_advanced.AddMany([self.OneCycle,
                                 self.plot_every_cycle])
-        sizer.Add(sizer_advanced)
+        
+        # Layout the sizers
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(pdsim_panels.HeaderStaticText(self, 'Cycle Integrator Selection'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(self.IC,0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(20)
+        sizer.Add(pdsim_panels.HeaderStaticText(self, 'Solver Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_solver_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(20)
+        sizer.Add(pdsim_panels.HeaderStaticText(self, 'Advanced & Debug options'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_advanced, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(20)
+        
+        self.SetSizer(sizer)
         sizer.Layout()
     
     def get_script_chunks(self):
         
-        item = self._get_item_by_attr('eps_cycle')
-        eps_cycle = item['textbox']
+        eps_cycle = self.main.get_GUI_object('eps_cycle').GetValue()
         
         return textwrap.dedent(
             """
@@ -299,11 +197,11 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
                               UseNR = False, #Don't use Newton-Raphson ND solver to determine the initial state
                               OneCycle = {OneCycle:s},
                               plot_every_cycle = {plot_every_cycle:s},
-                              hmin = 1e-8
+                              hmin = 1e-8 # hard-coded
                               )
             print 'time taken',time.clock()-t1
             """.format(RK_eps = self.IC.RK45_eps.GetValue(),
-                       eps_cycle = str(eps_cycle.GetValue()),
+                       eps_cycle = str(eps_cycle),
                        OneCycle = str(self.OneCycle.GetValue()),
                        plot_every_cycle = str(self.plot_every_cycle.GetValue())
                        )
@@ -325,7 +223,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         pass
         
 class SolverToolBook(wx.Toolbook):
-    def __init__(self,parent,configfile,id=-1):
+    def __init__(self, parent, configdict, id=-1):
         wx.Toolbook.__init__(self, parent, -1, style=wx.BK_LEFT)
         il = wx.ImageList(32, 32)
         indices=[]
@@ -334,11 +232,11 @@ class SolverToolBook(wx.Toolbook):
             indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
         self.AssignImageList(il)
         
-        items = self.Parent.InputsTB.collect_parametric_terms()
         #Make the panels.  Name should be consistent with configuration file
-        pane1=SolverInputsPanel(self, configfile, name = 'SolverInputsPanel')
-        pane2=pdsim_panels.ParametricPanel(self, configfile, items, name='ParametricPanel')
-        self.panels=(pane1,pane2)
+        pane1=SolverInputsPanel(self, configdict['SolverInputsPanel'], name = 'SolverInputsPanel')
+        pane2 = wx.Panel(self)
+        #pane2=pdsim_panels.ParametricPanel(self, configdict, items, name='ParametricPanel')
+        self.panels=(pane1, pane2)
         
         for Name,index,panel in zip(['Params','Parametric'],indices,self.panels):
             self.AddPage(panel, Name, imageId=index)
@@ -543,13 +441,13 @@ class RunToolBook(wx.Panel):
                 fp = open(FD.GetPath(),'w')
                 
                 # The main log
-                fp.write('Main Log\n---------')
+                fp.write('Main Log\n---------\n')
                 fp.write(self.main_log_ctrl.GetValue())
                 fp.write('\n\n')
                 
                 # Print out the logs from each thread
                 for i,log in enumerate(self.log_ctrls):
-                    fp.write('Log from thread #'+str(i+1)+'\n-------------------')
+                    fp.write('Log from thread #'+str(i+1)+'\n-------------------\n')
                     fp.write(log.GetValue())
                     fp.write('\n\n')
                 fp.close()
@@ -1487,7 +1385,7 @@ class OutputsToolBook(wx.Toolbook):
         self.DataPanel.change_output_terms(key_dict)
             
 class MainToolBook(wx.Toolbook):
-    def __init__(self,parent,configfile):
+    def __init__(self, parent, configdict):
         wx.Toolbook.__init__(self, parent, -1, style=wx.BK_TOP)
         il = wx.ImageList(32, 32)
         indices=[]
@@ -1496,18 +1394,22 @@ class MainToolBook(wx.Toolbook):
             indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
         self.AssignImageList(il)
         
-        self.InputsTB = InputsToolBook(self, configfile)
-        self.SolverTB = wx.Toolbook(self,-1)#  SolverToolBook(self, configfile)
+        # Get the family module to be used
+        config_family = configdict['family']
+        family = parent.families_dict[config_family]
+        
+        self.InputsTB = family.InputsToolBook(self, configdict)
+        self.SolverTB = SolverToolBook(self, configdict)
         self.RunTB = RunToolBook(self)
-        self.OutputsTB = OutputsToolBook(self, configfile)
+        self.OutputsTB = OutputsToolBook(self, configdict)
         
         self.panels=(self.InputsTB,self.SolverTB,self.RunTB,self.OutputsTB)
         for Name,index,panel in zip(['Inputs','Solver','Run','Output'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
 
 class MainFrame(wx.Frame):
-    def __init__(self, configfile=None, position=None, size=None):
-        wx.Frame.__init__(self, None, title = "PDSim GUI", size=(700, 700))
+    def __init__(self, configfile = None, position = None, size = None):
+        wx.Frame.__init__(self, None, title = "PDSim GUI", size = (700, 700))
         
         self.GUI_object_library = {}
         
@@ -1530,20 +1432,13 @@ class MainFrame(wx.Frame):
 #            elif os.path.exists(configfile):
 #                configbuffer = open(configfile,'rb')
                 
-            #Then use the internal default recip
+            # Then use the internal default scroll
             else:
                 self.config = default_configs.get_defaults('scroll')
-        
-#        #A string has been passed in for the configuration file name
-#        elif isinstance(configfile, basestring):
-#            if os.path.exists(configfile):
-#                configbuffer = open(configfile, 'rb')
-#                        
-#        elif isinstance(configfile, StringIO.StringIO):
-#            configbuffer = configfile
                 
         else:
-            raise ValueError
+            # Use the config dictionary passed in
+            self.config = configfile
         
         #Get the simulation type (recip, scroll, ...)
         try:
@@ -1608,6 +1503,10 @@ class MainFrame(wx.Frame):
         ----------
         annotated_GUI_objects : list of `AnnotatedGUIObject` instances
         """
+        # If a single value, convert into a list
+        if not isinstance(annotated_GUI_objects,list):
+            annotated_GUI_objects = [annotated_GUI_objects]
+            
         for o in annotated_GUI_objects:
             if not isinstance(o, datatypes.AnnotatedGUIObject):
                 raise TypeError('You can only register lists of AnnotatedGUIObjects')
@@ -1672,14 +1571,9 @@ class MainFrame(wx.Frame):
             #Try to set the value without converting the value
             self.GUI_object_library[key].SetValue(val)
             
-    def get_GUI_object_dict(self, key):
+    def get_GUI_object_dict(self):
         """
         Return the dictionary of all the annotated GUI objects
-        
-        Returns
-        -------
-        val : dict
-            key is the term, value is the AnnotatedGUIObject instance 
         """
         return self.GUI_object_library
     
@@ -1762,7 +1656,7 @@ class MainFrame(wx.Frame):
             import numpy as np
             from matplotlib import pyplot as plt
             
-            # Imports from PDSim that are needed for all types of compressors
+            # Imports from PDSim that are needed for all families of machines
             from PDSim.flow.flow import FlowPath
             from PDSim.flow.flow_models import IsentropicNozzleWrapper
             from PDSim.core.containers import ControlVolume
@@ -1773,6 +1667,8 @@ class MainFrame(wx.Frame):
             # Imports from CoolProp
             from CoolProp import State
             from CoolProp import CoolProp as CP
+            
+            
             """.format(coolprop_version = coolprop_version,
                        pdsim_version = pdsim_version,
                        time_generation = time_generation)
@@ -1782,6 +1678,7 @@ class MainFrame(wx.Frame):
         """ Build the entire GUI """
         
         self.make_menu_bar()
+        self.load_families(self.FamiliesMenu)
         
         sizer = wx.BoxSizer(wx.VERTICAL)
         self.MTB = MainToolBook(self, self.config)
@@ -1809,9 +1706,9 @@ class MainFrame(wx.Frame):
             RecipBuilder(recip)
         return recip
     
-    def build_scroll(self, run_index = 1):
+    def build_simulation_script(self, run_index = 1):
         """
-        Build the scroll simulation
+        Build the simulation script file
         
         Parameters
         ----------
@@ -1832,12 +1729,12 @@ class MainFrame(wx.Frame):
                 new_lines.append('    '*N+line)
             return '\n'.join(new_lines)+'\n'
         
-        #Apply any plugins in use - this is the last step in the building process
-        if hasattr(self,'plugins_list'):
-            for plugin in self.plugins_list:
-                if plugin.is_activated():
-                    raise NotImplementedError
-                    plugin.get_script_chunks()
+#        #Apply any plugins in use - this is the last step in the building process
+#        if hasattr(self,'plugins_list'):
+#            for plugin in self.plugins_list:
+#                if plugin.is_activated():
+#                    raise NotImplementedError
+#                    plugin.get_script_chunks()
             
         self.script_chunks.extend(['def build():\n'])
         self.script_chunks.extend(['    from PDSim.scroll.core import Scroll\n    sim = Scroll()\n'])
@@ -1852,28 +1749,25 @@ class MainFrame(wx.Frame):
         
         self.script_chunks.extend(["if __name__ == '__main__':\n    sim = build()\n    run(sim)"])
         
-        #Write to file
+        # Write to file
         
-        #Create a string in the form xxxxxxxx where each x is in '0123456789abcdef'
-        random_string = ''.join([random.choice('0123456789abcdef') for i in range(8)])
+        # Create a string in the form xxxxxxxx where each x is in '0123456789abcdef'
+        # This is a simple way to ensure that the file name is unique.  
+        random_string = ''.join([random.choice('0123456789abcdef') for i in range(12)])
         
-        #Make the full file name
+        # Make the full file name
         fName = 'script_' + random_string + '.py'
         
-        f = open(fName,'w')
+        # Add the PDSim temp folder to the python path
+        if pdsim_home_folder not in sys.path:
+            sys.path.append(pdsim_home_folder) 
+        
+        f = open(os.path.join(pdsim_home_folder,fName),'w')
         for chunk in self.script_chunks:
             f.write(chunk)
         f.close()
 
         return fName
-    
-    def run_simulation(self, script_name):
-        """
-        Run a single simulation
-        """
-            
-        #Make single-run into a list in order to use the code for the batch
-        self.run_batch([script_name])
     
     def run_batch(self, sims):
         """
@@ -1884,7 +1778,7 @@ class MainFrame(wx.Frame):
             self.WTM = processes.WorkerThreadManager(sims, 
                                                      self.get_logctrls(),
                                                      done_callback = self.deliver_result,
-                                                     main_stdout = self.MTB.RunTB.log_ctrl)
+                                                     main_stdout = self.MTB.RunTB.main_log_ctrl)
             self.WTM.setDaemon(True)
             self.WTM.start()
         else:
@@ -1894,9 +1788,8 @@ class MainFrame(wx.Frame):
             
     def deliver_result(self, sim = None):
         if sim is not None:
-#            print 'Queueing a result for further processing'
             self.results_list.put(sim)
-            wx.CallAfter(self.MTB.RunTB.log_ctrl.WriteText,'Result queued\n') 
+            wx.CallAfter(self.MTB.RunTB.main_log_ctrl.WriteText,'Result queued\n')
      
     def load_plugins(self, PluginsMenu):
         """
@@ -1962,7 +1855,47 @@ class MainFrame(wx.Frame):
         # plugins might have added terms if they are activated from the config
         # file
         self.update_parametric_terms()
-        
+   
+    def load_families(self, FamiliesMenu):
+        """
+        Load any machine families into the GUI that are found in families folder
+        """
+        import glob
+        self.plugins_list = []
+        #Look at each .py file in plugins folder
+        for py_file in glob.glob(os.path.join('families','*.py')):
+            #Get the root filename (/path/to/AAA.py --> AAA)
+            fname = py_file.split(os.path.sep,1)[1].split('.')[0]
+            
+            # Skip __init__.py file
+            if fname == '__init__': continue
+            
+            # Load the families package
+            mods = __import__('families.'+fname)
+            # Try to import the file as a module
+            mod = getattr(mods,fname)
+            
+            # Get the name of the family
+            if hasattr(mod,'family_menu_name'):
+                family_menu_name = mod.family_menu_name 
+            else:
+                raise AttributeError('Family InputToolBook must provide the attribute family_menu_name with the name of the menu item')
+            
+            # Create a menu item for the plugin
+            menuItem = wx.MenuItem(FamiliesMenu, -1, family_menu_name, "", wx.ITEM_CHECK)
+            
+            # Add the menu item
+            FamiliesMenu.AppendItem(menuItem)
+            
+            # Attach a pointer to the module for this family
+            if not hasattr(self,'families_dict'): self.families_dict = {}
+            # Add both the menu label and module names to the dictionary 
+            self.families_dict[fname] = mod
+            self.families_dict[family_menu_name] = mod
+            
+            # Bind the event to activate the plugin
+            self.Bind(wx.EVT_MENU, self.OnChangeSimFamily, menuItem)
+                    
     def make_menu_bar(self):
         #################################
         ####       Menu Bar         #####
@@ -1991,32 +1924,15 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU,self.OnFlushTemporaryFolder,self.menuFileFlush)
         self.Bind(wx.EVT_MENU,self.OnQuit,self.menuFileQuit)
         
-        self.Type = wx.Menu()
-        self.TypeRecip = wx.MenuItem(self.Type, -1, "Recip", "", wx.ITEM_RADIO)
-        self.TypeScroll = wx.MenuItem(self.Type, -1, "Scroll", "", wx.ITEM_RADIO)
-        self.TypeCompressor = wx.MenuItem(self.Type, -1, "Compressor mode", "", wx.ITEM_RADIO)
-        self.TypeExpander = wx.MenuItem(self.Type, -1, "Expander mode", "", wx.ITEM_RADIO)
-        self.TypeCompressor.Enable(False)
-        self.TypeExpander.Enable(False)
-        self.Type.AppendItem(self.TypeRecip)
-        self.Type.AppendItem(self.TypeScroll)
-        self.Type.AppendSeparator()
-        self.Type.AppendItem(self.TypeCompressor)
-        self.Type.AppendItem(self.TypeExpander)
-        self.MenuBar.Append(self.Type, "Type")
-        
+        self.FamiliesMenu = wx.Menu()
+        self.MenuBar.Append(self.FamiliesMenu, "Families")
         
         self.PluginsMenu = wx.Menu()
         #self.load_plugins(self.PluginsMenu)
         self.MenuBar.Append(self.PluginsMenu, "Plugins")
         
-        if self.config['family'] == 'recip':
-            self.TypeRecip.Check(True)
-        else:
-            self.TypeScroll.Check(True)
-            
-        self.Bind(wx.EVT_MENU,self.OnChangeSimType,self.TypeScroll)
-        self.Bind(wx.EVT_MENU,self.OnChangeSimType,self.TypeRecip)
+#        self.Bind(wx.EVT_MENU,self.OnChangeSimType,self.TypeScroll)
+#        self.Bind(wx.EVT_MENU,self.OnChangeSimType,self.TypeRecip)
         
         self.Solve = wx.Menu()
         self.SolveSolve = wx.MenuItem(self.Solve, -1, "Solve\tF5", "", wx.ITEM_NORMAL)
@@ -2134,20 +2050,16 @@ class MainFrame(wx.Frame):
         """
         Runs the primary inputs without applying the parametric table inputs
         """
-        
         self.MTB.SetSelection(2)
-        if self.SimType == 'recip':
-            raise NotImplementedError
-            self.recip = self.build_recip()
-            self.recip.run_index = 1
-            self.run_simulation(self.recip)
-        
-        elif self.SimType == 'scroll':
-            script_name = self.build_scroll()
-            self.run_simulation(script_name)
+        script_name = self.build_simulation_script()
+        self.run_batch([script_name])
             
     def OnStop(self, event):
-        """Stop Computation."""
+        """
+        Stop Computation.
+        
+        Send the abort request to the WorkerThreadManager
+        """
         if self.WTM is not None:
             self.WTM.abort()
         
@@ -2166,29 +2078,14 @@ class MainFrame(wx.Frame):
             print 'readying to get simulation; ',
             sim = self.results_list.get()
             print 'got a simulation'
-            
-            more_terms = []
-            
-            #Collect terms from the panels if any have them
-            for TB in [self.MTB.InputsTB, self.MTB.SolverTB]:
-                more_terms += TB.collect_output_terms()
-                
-            #Allow the plugins to post-process the results
-            for plugin in self.plugins_list:
-                if plugin.is_activated():
-                    plugin.post_process(sim)
-                    more_terms += plugin.collect_output_terms()
-            
-            #Add all the terms to the output table        
-            self.MTB.OutputsTB.add_output_terms(more_terms)
                 
 #            from plugins.HDF5_plugin import HDF5Writer
 #            HDF5 = HDF5Writer()
 #            HDF5.write_to_file(sim,'sim.hd5')
             
-            self.MTB.OutputsTB.plot_outputs(sim)
-            self.MTB.OutputsTB.DataPanel.add_runs([sim])
-            self.MTB.OutputsTB.DataPanel.rebuild()
+#            self.MTB.OutputsTB.plot_outputs(sim)
+#            self.MTB.OutputsTB.DataPanel.add_runs([sim])
+#            self.MTB.OutputsTB.DataPanel.rebuild()
             
             #Check whether there are no more results to be processed and threads list is empty
             #This means the manager has completed its work - reset it
@@ -2220,13 +2117,21 @@ class MainFrame(wx.Frame):
         # Then we call wx.AboutBox giving it that info object
         wx.AboutBox(info)
         
-    def OnChangeSimType(self, event):  
-        if self.TypeScroll.IsChecked():
-            print 'Scroll-type compressor'
-            self.rebuild(default_configs.get_scroll_defaults())
-        elif self.TypeRecip.IsChecked():
-            print 'Recip-type compressor'
-            self.rebuild(default_configs.get_recip_defaults())
+    def OnChangeSimFamily(self, event):
+        """
+        Change the machine family of the GUI
+        """
+        
+        for menuItem in self.FamiliesMenu.GetMenuItems():
+            # Determine which menu item was clicked
+            if event.Id == menuItem.Id: break
+        
+        # Look up the module based on the name on the GUI menu item
+        module = self.families_dict[menuItem.ItemLabel]
+        
+        # Get its defaut config from the family file and rebuild the GUI using 
+        # the default values for this family
+        self.rebuild(module.get_defaults())
         
     def OnFlushTemporaryFolder(self, events):
         """

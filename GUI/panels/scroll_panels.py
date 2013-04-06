@@ -182,6 +182,24 @@ class GeometryPanel(pdsim_panels.PDPanel):
                                                      sizer = sizer_for_wrap_inputs, 
                                                      parent = scrolled_panel)
         
+        #----------------------------------------------------------------------
+        # The sizer for all the discharge objects
+        sizer_for_discharge_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+        
+        # Loop over the tube inputs
+        annotated_values = []
+        for key in ['d_discharge']:
+            # Get the annotation and the units for the term 
+            annotation, units = self.desc_map[key]
+            # Add the annotated object to the list of objects
+            annotated_values.append(AnnotatedValue(key, config[key], annotation, units))
+            
+        # Build the items and return the list of annotated GUI objects, add to existing list
+        annotated_GUI_objects += [self.construct_items(annotated_values,
+                                                      sizer = sizer_for_discharge_inputs,
+                                                      parent = scrolled_panel)]
+        
+        #----------------------------------------------------------------------
         # The sizer for all the tube objects
         sizer_for_tube_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
         
@@ -203,7 +221,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         # Register terms in the GUI database
         self.main.register_GUI_objects(annotated_GUI_objects)
         
-        # Link callback for refreshing of this panel with changing any input
+        # Link callback for refresh of this panel with changing any input
         # parameter 
         for o in annotated_GUI_objects:
             o.GUI_location.Bind(wx.EVT_KILL_FOCUS, self.OnRefresh)
@@ -227,7 +245,9 @@ class GeometryPanel(pdsim_panels.PDPanel):
         sizer.AddSpacer(5)
         sizer.Add(sizer_for_wrap_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
-        sizer.Add(HeaderStaticText(scrolled_panel, 'Discharge Port Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(HeaderStaticText(scrolled_panel, 'Discharge Region Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_discharge_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
         sizer.Add(HeaderStaticText(scrolled_panel, 'Tube Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
@@ -282,8 +302,6 @@ class GeometryPanel(pdsim_panels.PDPanel):
             self.Scroll.geo.delta_suction_offset = 0.0
             self.main.get_GUI_object('delta_offset').GUI_location.Enable(False)
         
-        
-        
         self.ax.cla()
 
         plotScrollSet(pi/4.0, 
@@ -319,9 +337,12 @@ class GeometryPanel(pdsim_panels.PDPanel):
                           Vratio = get('Vratio'),
                           t = get('t'),
                           ro = get('ro'),
-                          phi_i0 = get('phi_i0'),
-                          phi_os = get('phi_os'),
-                          phi_is = get('phi_is'),
+                          phi_i0 = get('phi_fi0'),
+                          phi_os = get('phi_fos'),
+                          phi_is = get('phi_fis'),
+                          delta_flank = get('delta_flank'),
+                          delta_radial = get('delta_radial'),
+                          d_discharge = get('d_discharge'),
                           phi_ie_offset = phi_ie_offset)
 
         return textwrap.dedent(
@@ -344,13 +365,14 @@ class GeometryPanel(pdsim_panels.PDPanel):
                                phi_os = phi_os, # [rad]
                                phi_is = phi_is) # [rad]
             sim.set_disc_geo('2Arc', r2 = 0) #hard-coded
+            sim.d_discharge = {d_discharge:s}
             
             # self.delta_flank and self.delta_radial are set in the conventional way
             # using the parametric table
-            sim.geo.delta_flank = sim.delta_flank
-            sim.geo.delta_radial = sim.delta_radial
+            sim.geo.delta_flank = {delta_flank:s}
+            sim.geo.delta_radial = {delta_radial:s}
             
-            sim.geo.phi_ie_offset = {phi_ie_offset:s}        
+            sim.geo.phi_ie_offset = {phi_ie_offset:s}  
             """.format(**str_params))
     
     def collect_output_terms(self):
@@ -364,124 +386,79 @@ class GeometryPanel(pdsim_panels.PDPanel):
                                                               ro = 'geo.ro',))
         return []
         
-class FlankLeakageFlowChoice(pdsim_panels.MassFlowOptionPanel):
+class FlowOptions(pdsim_panels.PDPanel):
+    """
+    Takes a list of dictionaries in and creates a panel with a dropdown to select
+    the model and a set of objects to change the parameters
     
-    def __init__(self,parent,**kwargs):
-        pdsim_panels.MassFlowOptionPanel.__init__(self,parent,**kwargs)
-    
-    def model_options(self):
-        return [
-                dict(desc = 'Hybrid leakage model',
-                     function_name = 'FlankLeakage',)
-                ]
+    Returns
+    -------
+    A list of annotated GUI objects for each item that is created
+    """
+    def __init__(self, parent, pathname, choices_list, register_objects = True):
+        wx.Panel.__init__(self, parent)
         
-class RadialLeakageFlowChoice(pdsim_panels.MassFlowOptionPanel):
-    
-    def __init__(self,parent,**kwargs):
-        pdsim_panels.MassFlowOptionPanel.__init__(self,parent,**kwargs)
-    
-    def model_options(self):
-        return [
-                dict(desc = 'Hybrid leakage model',function_name = 'RadialLeakage')
-                ]
-
-class SuctionFlowChoice(pdsim_panels.MassFlowOptionPanel):
-    
-    def __init__(self,parent,**kwargs):
-        pdsim_panels.MassFlowOptionPanel.__init__(self,parent,**kwargs)
-    
-    def model_options(self):
-        return [
-                dict(desc = 'Isentropic nozzle',
-                     function_name = 'SA_S',
-                     params = [dict(attr = 'X_d',
-                                    value = 1.0,
-                                    desc = 'Tuning factor')]
-                     )
-                ]
+        annotated_objects = []
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        self.choice_book = wx.Choicebook(self, -1)
+        
+        for choice in choices_list:
+            panel = wx.Panel(self.choice_book)
+            self.choice_book.AddPage(panel, text = choice['model'])
+            
+            panel_sizer = wx.FlexGridSizer(cols = 2)
+            panel_annotated_objects = []
+            
+            for option in choice['options']:
+                term_name = 'flow path' + pathname + '|' + option
+                value = choice['options'][option]
+                panel_annotated_objects.append(AnnotatedValue(term_name, value, term_name, ''))
+            
+            #Annotated GUI objects
+            panel_AGO = self.construct_items(panel_annotated_objects,
+                                             sizer = panel_sizer,
+                                             parent = panel)
+            
+            if register_objects:
+                self.GetTopLevelParent().register_GUI_objects(panel_AGO)
                 
-class InletFlowChoice(pdsim_panels.MassFlowOptionPanel):
-    
-    def __init__(self,parent,**kwargs):
-        pdsim_panels.MassFlowOptionPanel.__init__(self,parent,**kwargs)
-        self.parent = parent
-        
-    def model_options(self):
-        return [dict(desc = 'Isentropic nozzle',
-                     function_name = 'IsentropicNozzleFM',
-                     params = [dict(attr = 'X_d',
-                                    value = 1.0,
-                                    desc = 'Tuning factor')
-                               ]
-                     )
-                ]
+            panel.SetSizer(panel_sizer)
+            panel_sizer.Layout()
+            
+        sizer.Add(self.choice_book, 0)
+        self.SetSizer(sizer)
+        sizer.Layout()
                 
 class MassFlowPanel(pdsim_panels.PDPanel):
     
-    def __init__(self, parent, configfile,**kwargs):
+    def __init__(self, parent, configdict, **kwargs):
     
-        pdsim_panels.PDPanel.__init__(self, parent,**kwargs)
+        pdsim_panels.PDPanel.__init__(self, parent, **kwargs)
         
-        #Loads all the parameters from the config file
-        self.configdict,self.descdict = self.get_from_configfile('MassFlowPanel')
+        for flow in ['sa-s1', 'sa-s2', 'inlet.2-sa']:
+            model = configdict[flow]['model']
+            options = configdict[flow]['options']
+            
+        no_flow_dict = dict(model = 'No Flow',options = {})
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        self.flow1 = FlowOptions(self, 'sa-s1', [configdict['sa-s1'],no_flow_dict])
+        self.flow2 = FlowOptions(self, 'sa-s2', [configdict['sa-s2'],no_flow_dict])
+        self.flow3 = FlowOptions(self, 'inlet.2-sa', [configdict['inlet.2-sa'],no_flow_dict])
         
-        self.items1 = [
-        dict(attr='d_discharge'),
-        dict(attr='inlet_tube_length'),
-        dict(attr='inlet_tube_ID'),
-        dict(attr='outlet_tube_length'),
-        dict(attr='outlet_tube_ID')
-        ]
-        box_sizer = wx.BoxSizer(wx.VERTICAL)
-        box_sizer.Add(wx.StaticText(self,-1,"Required Inputs"))
-        box_sizer.Add(wx.StaticLine(self,-1,(25, 50), (300,1)))
+        sizer.Add(pdsim_panels.HeaderStaticText(self,'Flow model parameters') , 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(10)
+        sizer.Add(wx.StaticText(self,label='sa-s1'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(self.flow1, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(wx.StaticText(self,label='sa-s2'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(self.flow2, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(wx.StaticText(self,label='inlet.2-sa'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(self.flow3, 0, wx.ALIGN_CENTER_HORIZONTAL)
         
-        sizer = wx.FlexGridSizer(cols=2, vgap=4, hgap=4)
-        self.ConstructItems(self.items1,sizer,self.configdict,self.descdict)
-
-        box_sizer.Add(sizer)  
-        
-        box_sizer.AddSpacer(10)
-        box_sizer.Add(wx.StaticText(self,-1,"Flow Models"))
-        box_sizer.Add(wx.StaticLine(self,-1,(25, 50), (300,1)))
-
-        self.suctionflow1 = SuctionFlowChoice(parent = self,
-                                              key1 = 'sa',
-                                              key2 = 's1',
-                                              label = 'Flow to suction chamber #1')
-        Xd_sa_s1,Xd_sa_s1_desc = self.get_from_configfile('MassFlowPanel','Xd_sa_s1')
-        self.suctionflow1.set_attr('X_d', float(Xd_sa_s1))
-        
-        self.suctionflow2 = SuctionFlowChoice(parent = self,
-                                              key1 = 'sa',
-                                              key2 = 's2',
-                                              label = 'Flow to suction chamber #2')    
-        Xd_sa_s2,Xd_sa_s2_desc = self.get_from_configfile('MassFlowPanel','Xd_sa_s2')
-        self.suctionflow2.set_attr('X_d', float(Xd_sa_s2))
-        
-        self.inletflow = InletFlowChoice(parent = self,
-                                         key1 = 'inlet.2',
-                                         key2 = 'sa',
-                                         label = 'Flow into shell',
-                                         )
-        Xd_shell_sa,Xd_shell_sa_desc = self.get_from_configfile('MassFlowPanel','Xd_inlet.2_sa')
-        self.inletflow.set_attr('X_d', float(Xd_shell_sa))
-        
-        self.flows = [self.suctionflow1, self.suctionflow2, self.inletflow]
-        
-        box_sizer.AddMany(self.flows)
-        
-        self.resize_flows(self.flows)
-        
-        self.SetSizer(box_sizer)
-        box_sizer.Layout()
-        
-        self.items=self.items1
-        
-        # When discharge port diameter changes, update the value for the plot 
-        # in the geometry panel
-        self.d_discharge = self._get_item_by_attr('d_discharge')['textbox']
-        self.d_discharge.Bind(wx.EVT_KILL_FOCUS, self.OnChangeDdisc) 
+        self.SetSizer(sizer)
+        sizer.Layout()
     
     def OnChangeDdisc(self, event = None):
         """
@@ -492,7 +469,6 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         GeoPanel._d_discharge = float(self.d_discharge.GetValue())
         # Re-plot
         GeoPanel.OnChangeParam()
-        
         
     def resize_flows(self, flows):
         """
@@ -516,29 +492,36 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         
     def get_script_chunks(self):
         
-        Xd_dict = {}
-        for flow in self.flows:
-            param_dict = {p['attr']:p['value'] for p in flow.params_dict}
-            Xd_dict[flow.key1+'-'+flow.key2] = str(param_dict.pop('X_d'))
-          
+        Xd_dict = dict(Xd_sa_s1 = str(self.main.get_GUI_object_value('flow pathsa-s1|Xd')),
+                       Xd_sa_s2 = str(self.main.get_GUI_object_value('flow pathsa-s2|Xd')),
+                       Xd_inlet = str(self.main.get_GUI_object_value('flow pathinlet.2-sa|Xd')),
+                       inlet_tube_length = str(self.main.get_GUI_object_value('inlet_tube_length')),
+                       outlet_tube_length = str(self.main.get_GUI_object_value('outlet_tube_length')),
+                       inlet_tube_ID = str(self.main.get_GUI_object_value('inlet_tube_ID')),
+                       outlet_tube_ID = str(self.main.get_GUI_object_value('outlet_tube_ID')),
+                       )
           
         return textwrap.dedent(
             """
-            # Add both the inlet and outlet tubes
+            # Add all the control volumes
+            sim.auto_add_CVs(inletState, outletState)
+            
+            # Get the guess for the mass flow rate
             mdot_guess = inletState.rho*sim.Vdisp*sim.omega/(2*pi)
     
+            # Add both the inlet and outlet tubes
             sim.add_tube(Tube(key1 = 'inlet.1',
                               key2 = 'inlet.2',
-                              L = sim.inlet_tube_length,
-                              ID = sim.inlet_tube_ID,
+                              L = {inlet_tube_length:s},
+                              ID = {inlet_tube_ID:s},
                               mdot = mdot_guess, 
                               State1 = inletState.copy(),
                               fixed = 1,
                               TubeFcn = sim.TubeCode))
             sim.add_tube(Tube(key1 = 'outlet.1',
                               key2 = 'outlet.2',
-                              L = sim.outlet_tube_length,
-                              ID = sim.outlet_tube_ID,
+                              L = {outlet_tube_length:s},
+                              ID = {outlet_tube_ID:s},
                               mdot = mdot_guess, 
                               State2 = outletState.copy(),
                               fixed = 2,
@@ -553,7 +536,7 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                   key2='sa', 
                   MdotFcn=IsentropicNozzleWrapper(),
                   )
-            FP.A = pi*sim.inlet_tube_ID**2/4*{Xd_inlet:s}
+            FP.A = pi*{inlet_tube_ID:s}**2/4*{Xd_inlet:s}
             sim.add_flow(FP)
             
             # Add the suction-area to suction chambers flows
@@ -590,10 +573,7 @@ class MassFlowPanel(pdsim_panels.PDPanel):
             sim.add_flow(FlowPath(key1='d2',
                                   key2='dd',
                                   MdotFcn=sim.D_to_DD))
-            """.format(Xd_sa_s1 = Xd_dict['sa-s1'],
-                       Xd_sa_s2 = Xd_dict['sa-s2'],
-                       Xd_inlet = Xd_dict['inlet.2-sa'],
-                       )
+            """.format(**Xd_dict)
             )
         
        
@@ -741,7 +721,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         """
         if self.motor_choices.GetSelection() == 0:
             #Use the value for the motor efficiency
-            return textwrap.dedent(
+            motor_chunk = textwrap.dedent(
                """
                sim.motor = Motor()
                sim.motor.set_eta({eta_motor:s})
@@ -752,7 +732,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
             # back into the call to set the coefficients
             c = self.motor_choices.MCT.get_coeffs()
             #Will set the type flag itself
-            return textwrap.dedent(
+            motor_chunk = textwrap.dedent(
                """
                sim.motor = Motor()
                sim.motor.set_coeffs(tau_coeffs = {tau_coeffs:s},
@@ -765,6 +745,21 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                           )        )
         else:
             raise NotImplementedError
+        
+        for term in ['h_shell','A_shell','Tamb','mu_oil',
+                'D_upper_bearing','L_upper_bearing','c_upper_bearing',
+                'D_crank_bearing','L_crank_bearing','c_crank_bearing',
+                'D_lower_bearing','L_lower_bearing','c_lower_bearing',
+                'journal_tune_factor',
+                'thrust_friction_coefficient', 'thrust_ID', 'thrust_OD', 
+                'orbiting_scroll_mass', 'L_ratio_bearings', 'HTC'
+                ]:
+            val = self.main.get_GUI_object_value(term)
+            motor_chunk += 'sim.{name:s} = {value:s}\n'.format(name = term,
+                                                             value = str(val)) 
+        return motor_chunk
+        
+        
         
     def post_get_from_configfile(self,key,value):
         """
