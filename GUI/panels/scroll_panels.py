@@ -23,7 +23,7 @@ from PDSim.core.motor import Motor
 from PDSim.misc.datatypes import AnnotatedValue
 import pdsim_panels
 from pdsim_panels import LaTeXImageMaker, MotorChoices, PlotPanel
-from datatypes import HeaderStaticText
+from datatypes import HeaderStaticText, AnnotatedGUIObject
 
 LabeledItem = pdsim_panels.LabeledItem
         
@@ -671,14 +671,19 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
             and 'eta_motor_coeffs' not in config
             and 'tau_motor_coeffs' not in config
             and 'omega_motor_coeffs' not in config):
+            eta_motor = config['eta_motor']
             #Only eta_motor is provided, use it in the motor panel
             self.motor_choices.SetSelection(0)
             #Set the value in the panel
-            self.motor_choices.eta_motor.SetValue(str(config['eta_motor']))
+            self.motor_choices.eta_motor.SetValue(str(eta_motor))
             # When the motor efficiency is changed by something else, it means
             # we want to use the motor efficiency rather than the motor curves,
             # so set it back to using constant efficiency
             self.motor_choices.eta_motor.Bind(wx.EVT_TEXT,lambda event: self.motor_choices.SetSelection(0))
+            
+            AGO_motor = AnnotatedGUIObject(AnnotatedValue('eta_motor', eta_motor, 'Motor Efficiency [-]','-'),self.motor_choices.eta_motor)
+            
+            self.main.register_GUI_objects(AGO_motor)
             
         elif ('eta_motor' not in config
             and 'eta_motor_coeffs' in config

@@ -2052,6 +2052,9 @@ class StateInputsPanel(PDPanel):
         AGO_disc[0].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'pressure'))
         AGO_disc[1].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'pratio'))
         AGO_disc[2].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'Tsat'))
+        AGO_disc[0].GUI_location.Bind(wx.EVT_TEXT,lambda event: self.OnChangeDischargeValue(event, 'pressure'))
+        AGO_disc[1].GUI_location.Bind(wx.EVT_TEXT,lambda event: self.OnChangeDischargeValue(event, 'pratio'))
+        AGO_disc[2].GUI_location.Bind(wx.EVT_TEXT,lambda event: self.OnChangeDischargeValue(event, 'Tsat'))
         
         self.main.register_GUI_objects([AGO_omega, AGO_inletState] + AGO_disc)
         
@@ -2074,6 +2077,7 @@ class StateInputsPanel(PDPanel):
         """ 
         Set the internal pressure variable when the value is changed in the TextCtrl
         """
+        
         suction_state = self.SuctionStatePanel.GetState() 
         psuction = suction_state.p
         Fluid = suction_state.Fluid
@@ -2093,10 +2097,11 @@ class StateInputsPanel(PDPanel):
             pdisc = CP.Props('P', 'T', Tsat, 'Q', 1.0, Fluid)
             pratio = pdisc / psuction
             
-        # Set all the values again
-        self.main.set_GUI_object_value('discPressure',pdisc)
-        self.main.set_GUI_object_value('discPratio',pratio)
-        self.main.set_GUI_object_value('discTsat',Tsat)
+        # Set all the values again - we use ChangeValue manually to ensure that they 
+        # don't emit change events which would result in infinite recursion
+        self.main.get_GUI_object('discPressure').GUI_location.ChangeValue(str(pdisc))
+        self.main.get_GUI_object('discPratio').GUI_location.ChangeValue(str(pratio))
+        self.main.get_GUI_object('discTsat').GUI_location.ChangeValue(str(Tsat))
         
     def get_config_chunk(self):
         
