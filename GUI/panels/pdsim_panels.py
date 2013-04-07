@@ -1,7 +1,7 @@
 # -*- coding: latin-1 -*-
 
 # Python imports
-import warnings, codecs, textwrap,os, itertools
+import warnings, codecs, textwrap,os, itertools, difflib, zipfile
 from multiprocessing import Process
 
 # wxPython imports
@@ -12,7 +12,6 @@ import CoolProp
 from CoolProp.State import State
 from CoolProp import CoolProp as CP
 
-from ConfigParser import SafeConfigParser
 import numpy as np
 
 import matplotlib as mpl
@@ -23,6 +22,8 @@ from PDSim.scroll import scroll_geo
 from PDSim.scroll.plots import plotScrollSet, ScrollAnimForm
 from PDSim.misc.datatypes import AnnotatedValue
 from datatypes import AnnotatedGUIObject, HeaderStaticText
+
+import PDSimGUI
 
 import h5py
 import quantities as pq
@@ -1019,18 +1020,27 @@ class ParaSelectDialog(wx.Dialog):
     def CancelValues(self, event = None):
         self.EndModal(wx.ID_CANCEL)
 
+
 class ParametricOption(wx.Panel):
-    def __init__(self, parent, items):
+    def __init__(self, parent, GUI_objects):
         wx.Panel.__init__(self, parent)
         
-        attrs = [item['attr'] for item in items]
-        labels = [item['text'] for item in items]
+        labels = [o.annotation for o in GUI_objects.itervalues()]
+        
+        # Check that there is no duplication between annotations
+        if not len(labels) == len(set(labels)): # Sets do not allow duplication
+            raise ValueError('You have duplicated annotations which is not allowed')
+        
+        # Make a reverse map from annotation to GUI object key
+        self.GUI_map = {o.annotation:o.key for o in GUI_objects.itervalues()} 
+        
         self.Terms = wx.ComboBox(self)
         self.Terms.AppendItems(labels)
         self.Terms.SetSelection(0)
         self.Terms.SetEditable(False)
         self.RemoveButton = wx.Button(self, label = '-', style = wx.ID_REMOVE)
-        self.Values = wx.TextCtrl(self, value = '1,2,3,4,5,6,7,8,9')
+        
+        self.Values = wx.TextCtrl(self, value = '')
         self.Select = wx.Button(self, label = 'Select...')
         
         sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -1039,8 +1049,28 @@ class ParametricOption(wx.Panel):
         sizer.Add(self.Values)
         sizer.Add(self.Select)
         self.SetSizer(sizer)
+        
         self.Select.Bind(wx.EVT_BUTTON,self.OnSelectValues)
         self.RemoveButton.Bind(wx.EVT_BUTTON, lambda event: self.Parent.RemoveTerm(self))
+        self.Terms.Bind(wx.EVT_COMBOBOX, self.OnChangeTerm)
+        
+        self.OnChangeTerm()
+        
+    def OnChangeTerm(self, event = None):
+        """
+        Update the values when the term is changed if a structured table
+        """
+        if self.GetParent().Structured.GetValue():
+            annotation = self.Terms.GetStringSelection()
+            
+            # Get the key of the registered object
+            key = self.GUI_map[annotation]
+            
+            # Get the value of the item in the GUI
+            val = self.GetTopLevelParent().get_GUI_object_value(key)
+            
+            # Set the textctrl with this value
+            self.Values.SetValue(str(val))
     
     def OnSelectValues(self, event = None):
         dlg = ParaSelectDialog()
@@ -1089,12 +1119,13 @@ class ParametricOption(wx.Panel):
     
     def make_structured(self):
         if not hasattr(self,'Values'):
-            self.Values = wx.TextCtrl(self, value = '1,2,3,4,5,6,7,8,9')
+            self.Values = wx.TextCtrl(self, value = '')
             self.Select = wx.Button(self, label = 'Select...')
             self.Select.Bind(wx.EVT_BUTTON,self.OnSelectValues)
             self.GetSizer().AddMany([self.Values,self.Select])
             self.GetSizer().Layout()
             self.Refresh()
+            self.OnChangeTerm()
         
 class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixin, TextEditMixin):
     """
@@ -1197,40 +1228,77 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
         i = len(self.data)-1
         self.data.pop(i)
         self.DeleteItem(i)
-                                 
+                               
+class HackedButton(wx.Button):
+    """
+    This is needed because of a bug in FlatMenu where clicking on a disabled 
+    item throws an exception
+    """
+    def __init__(self, parent, *args, **kwargs):
+        wx.Button.__init__(self, parent, *args, **kwargs)
+        
+        self.Enable()
+        
+    def Enable(self):
+        self.SetForegroundColour((50,50,50))
+        self._Enabled = True
+        self.SetEvtHandlerEnabled(True)
+        
+    def Disable(self):
+        self.SetForegroundColour((255,255,255))
+        self._Enabled = False
+        self.SetEvtHandlerEnabled(False)
+         
 class ParametricPanel(PDPanel):
-    def __init__(self, parent, configfile, items, **kwargs):
+    def __init__(self, parent, configdict, **kwargs):
         PDPanel.__init__(self, parent, **kwargs)
         
-        self.variables =  items
-        self.Structured = wx.Choice(self, -1, choices = ['Structured',
-                                                         'Unstructured'])
-        self.Structured.Bind(wx.EVT_CHOICE, self.OnChangeStructured)
-        self.Structured.SetSelection(0)
+        import wx.lib.agw.flatmenu as FM
+        from wx.lib.agw.fmresources import FM_OPT_SHOW_CUSTOMIZE, FM_OPT_SHOW_TOOLBAR, FM_OPT_MINIBAR
+        self._mb = FM.FlatMenuBar(self, wx.ID_ANY, 10, 5, options = FM_OPT_SHOW_TOOLBAR)
+        
+        self.Structured = wx.CheckBox(self._mb, label = 'Structured')
+        self._mb.AddControl(self.Structured)
+        self.Structured.Bind(wx.EVT_CHECKBOX, self.OnChangeStructured)
+        self.Structured.SetValue(1)
+        
+        self.AddButton = HackedButton(self._mb, label = 'Add Term')
+        self._mb.AddControl(self.AddButton)
+        self.AddButton.Bind(wx.EVT_BUTTON, self.OnAddTerm)
+        
+        self.BuildButton = HackedButton(self._mb, label = 'Build Table')
+        self._mb.AddControl(self.BuildButton)
+        self.BuildButton.Bind(wx.EVT_BUTTON, self.OnBuildTable)
+        self.BuildButton.Disable()
+        
+        self.RunButton = HackedButton(self._mb, label = 'Run Table')
+        self._mb.AddControl(self.RunButton)
+        self.RunButton.Bind(wx.EVT_BUTTON, self.OnRunTable)
+        self.RunButton.Disable()
+        
+        self.ZipButton = HackedButton(self._mb, label = 'Make Batch .zip')
+        self._mb.AddControl(self.ZipButton)
+        self.ZipButton.Bind(wx.EVT_BUTTON, self.OnZipBatch)
+        self.ZipButton.Disable()
         
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(self.Structured)
-        self.ButtonSizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.AddButton = wx.Button(self, label = "Add Term", style = wx.ID_ADD)
-        self.AddButton.Bind(wx.EVT_BUTTON, self.OnAddTerm)
-        self.ButtonSizer.Add(self.AddButton)
-        sizer.Add(self.ButtonSizer)
+        sizer.Add(self._mb,0,wx.EXPAND)
         self.SetSizer(sizer)
         sizer.Layout()
+        
         self.NTerms = 0
         self.ParamSizer = None
         self.ParamListSizer = None
         self.ParaList = None
-        self.RunButton = None
         
-        #Has no self.items, so all processing done through post_get_from_configfile
-        self.get_from_configfile('ParametricPanel')
+        self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().itervalues()} 
         
         # After all the building is done, check if it is unstructured, if so, 
         # collect the temporary values that were set 
-        if self.Structured.GetStringSelection() == 'Unstructured':
-            self.OnBuildTable()
+#        if self.Structured.GetValue() == True:
+#            self.OnBuildTable()
         self.Layout()
+        self.OnChangeStructured()
             
     def OnChangeStructured(self, event = None):
         
@@ -1238,28 +1306,30 @@ class ParametricPanel(PDPanel):
         terms = [term for term in self.Children if isinstance(term,ParametricOption)]
         
         for term in terms:
-            if self.Structured.GetStringSelection() == 'Structured':
-                term.make_structured()    
+            if self.Structured.GetValue() == True:
+                term.make_structured()
             else:
                 term.make_unstructured()
 
         self.GetSizer().Layout()
         self.Refresh()
             
-            
     def OnAddTerm(self, event = None):
         if self.NTerms == 0:
             self.ParamSizerBox = wx.StaticBox(self, label = "Parametric Terms")
             self.ParamSizer = wx.StaticBoxSizer(self.ParamSizerBox, wx.VERTICAL)
             self.GetSizer().Add(self.ParamSizer)
-            self.BuildButton = wx.Button(self, label = "Build Table")
-            self.BuildButton.Bind(wx.EVT_BUTTON, self.OnBuildTable)
-            self.ButtonSizer.Add(self.BuildButton)
-        option = ParametricOption(self, self.variables)
-        if self.Structured.GetStringSelection() == 'Structured':
-            option.make_structured()    
+            self.BuildButton.Enable()
+        # Get all the registered GUI objects
+        GUI_objects = self.main.get_GUI_object_dict()
+        # Create the option panel
+        option = ParametricOption(self, GUI_objects)
+        # Make it either structured or unstructured
+        if self.Structured.GetValue() == True:
+            option.make_structured()
         else:
             option.make_unstructured()
+        
         self.ParamSizer.Add(option)
         self.ParamSizer.Layout()
         self.NTerms += 1
@@ -1270,7 +1340,6 @@ class ParametricPanel(PDPanel):
         term.Destroy()
         self.NTerms -= 1
         if self.NTerms == 0:
-            self.BuildButton.Destroy()
             if self.ParamSizer is not None:
                 self.GetSizer().Remove(self.ParamSizer)
                 self.ParamSizer = None
@@ -1280,9 +1349,9 @@ class ParametricPanel(PDPanel):
             if self.ParamListSizer is not None:
                 self.GetSizer().Remove(self.ParamListSizer)
                 self.ParamListSizer = None
-            if self.RunButton is not None:
-                self.RunButton.Destroy()
-                self.RunButton = None
+            self.RunButton.Disable()
+            self.BuildButton.Disable()
+            self.ZipButton.Disable()
         else:
             self.ParamSizer.Layout()
         self.GetSizer().Layout()
@@ -1296,7 +1365,7 @@ class ParametricPanel(PDPanel):
         for param in self.ParamSizer.GetChildren():
             name, vals = param.Window.get_values()
             names.append(name)
-            if self.Structured.GetStringSelection() == 'Structured':
+            if self.Structured.GetValue() == True:
                 values.append(vals)
             else:
                 if hasattr(param.Window,'temporary_values'):
@@ -1322,7 +1391,7 @@ class ParametricPanel(PDPanel):
             self.RowCountSpinnerText.Destroy(); del self.RowCountSpinnerText
             
         #Build and add a sizer for the para values
-        if self.Structured.GetStringSelection() == 'Unstructured':
+        if self.Structured.GetValue() == False:
             self.RowCountLabel = wx.StaticText(self,label='Number of rows')
             self.RowCountSpinnerText = wx.TextCtrl(self, value = "1", size = (40,-1))
             h = self.RowCountSpinnerText.GetSize().height
@@ -1339,7 +1408,7 @@ class ParametricPanel(PDPanel):
                     
         self.GetSizer().Add(self.ParamListSizer,1,wx.EXPAND)
         self.ParaList = ParametricCheckList(self,names,values,
-                                            structured = self.Structured.GetStringSelection() == 'Structured')
+                                            structured = self.Structured.GetValue())
             
         self.ParamListSizer.Add(self.ParaList,1,wx.EXPAND)
         self.ParaList.SetMinSize((400,-1))
@@ -1347,13 +1416,11 @@ class ParametricPanel(PDPanel):
         self.GetSizer().Layout()
         self.Refresh() 
         
-        if self.RunButton is None:
-            self.RunButton = wx.Button(self, label='Run Table')
-            self.RunButton.Bind(wx.EVT_BUTTON, self.OnRunTable)
-            self.ButtonSizer.Add(self.RunButton)
-            self.ButtonSizer.Layout()
+        # Enable the batch buttons
+        self.RunButton.Enable()
+        self.ZipButton.Enable()
             
-        if self.Structured.GetStringSelection() == 'Unstructured':
+        if self.Structured.GetValue() == False:
             self.RowCountSpinner.SetValue(self.ParaList.GetItemCount())
             self.RowCountSpinnerText.SetValue(str(self.ParaList.GetItemCount()))
             #Bind a right click to opening a popup
@@ -1430,17 +1497,15 @@ class ParametricPanel(PDPanel):
         #Add a row
         self.ParaList.AddRow()
         
-    def OnRunTable(self, event=None):
-        """
-        Actually runs the parametric table
+    def build_all_scripts(self):
+        sims = []
         
-        This event can only fire if the table is built
-        """
-        Main = self.GetTopLevelParent()
-        sims=[]
-        #Column index 1 is the list of parameters
+        # Get a copy of the dictionary of all the registered terms
+        # 
+        
+        # Column index 1 is the list of parameters
         for Irow in range(self.ParaList.GetItemCount()):
-            #Loop over all the rows that are checked
+            # Loop over all the rows that are checked
             if self.ParaList.IsChecked(Irow):
                 
                 #Empty lists for this run
@@ -1454,50 +1519,117 @@ class ParametricPanel(PDPanel):
                     names.append(self.ParaList.GetColumn(Icol+1).Text)
                     
                 # The attributes corresponding to the names
-                attrs = [self._get_attr_from_name(name) for name in names]
+                keys = [self.GUI_map[name] for name in names]
                 
-                # Run the special handler for any additional terms that are
-                # not handled in the conventional way using self.items in the 
-                # panel.  This is meant for optional terms primarily
-                #
-                # It can set terms in the GUI so that they can be loaded back by the 
-                # simulation builder
-                #
-                # apply_additional_parametric_terms returns a tuple of attrs, vals 
-                # for the terms that were unmatched by the parametric
-                # preprocessors
-
-                try:
-                    attrs, vals = Main.MTB.InputsTB.apply_additional_parametric_terms(attrs, vals, self.variables)
-                except ValueError:
-                    raise
+                # Set the value in the GUI
+                for key,val in zip(keys,vals):
+                    self.main.set_GUI_object_value(key, val)
                 
-                # Get the textboxes for the remaining attributes
-                textboxes = [self._get_textbox_from_attr(attr) for attr in attrs]
-                
-                #Anything left will be set in the GUI for further processing
-                prior_values = {}
-                for val, textbox in zip(vals, textboxes):
-                    # Store the old value
-                    prior_values[textbox] = val
-                    # Actually set the value in the GUI's textbox
-                    textbox.SetValue(str(val))
-                
-                #Build the recip or the scroll using the GUI parameters
-                #Don't apply the plugins or call the post_set functions
-                if Main.SimType == 'recip':
-                    raise NotImplementedError
-                    script_name = Main.build_recip(post_set = False, apply_plugins = False)
-                elif Main.SimType == 'scroll':
-                    script_name = Main.build_scroll(run_index = Irow+1)
-                else:
-                    raise AttributeError('Invalid Main.SimType : '+str(Main.SimType))
+                #Build the simulation script using the GUI parameters
+                script_name = self.main.build_simulation_script()
                             
                 #Add sim to the list (actually append the path to the script)
                 sims.append(script_name)
+                
+        # Check that there is a difference between the files generated 
+        if not self.check_scripts_are_different(sims):
+            dlg = wx.MessageDialog(None,'Cannot run batch because some of the batch files are exactly the same. Deleting generated scripts')
+            dlg.ShowModal()
+            dlg.Destroy()
+            
+            for file in sims:
+                # Full path to file
+                fName = os.path.join(PDSimGUI.pdsim_home_folder,file)
+                # Remove the file generated, don't do anything if error
+                try:
+                    os.unlink(fName)
+                except OSError:
+                    pass
+            
+            return []
         
-        #Actually run the batch with the sims that have been built
-        Main.run_batch(sims)
+        return sims
+        
+    def OnRunTable(self, event=None):
+        """
+        Actually runs the parametric table
+        
+        This event can only fire if the table is built
+        """
+        
+        #Build all the scripts
+        sims = self.build_all_scripts()
+        
+        if sims:
+            #Actually run the batch with the sims that have been built
+            self.main.run_batch(sims)
+        
+    def check_scripts_are_different(self, scripts):
+        """
+        return ``True`` if the scripts differ by more than the time stamp, ``False`` otherwise
+        
+        The first 10 lines are not considered in the diff
+        """
+        
+        # Take the lines that follow the first 10 lines
+        chopped_scripts = [open(os.path.join(PDSimGUI.pdsim_home_folder,fName),'r').readlines()[10::] for fName in scripts]
+        
+        for i in range(len(chopped_scripts)):
+            for j in range(i+1,len(chopped_scripts)):
+                # If the list of unified diffs is empty, the files are the same
+                # This is a failure
+                if not [d for d in difflib.unified_diff(chopped_scripts[i],chopped_scripts[j])]:
+                    return False
+        # sMade it this far, return True, all the files are different
+        return True
+        
+    def OnZipBatch(self, event = None):
+        
+        template = textwrap.dedent(
+        """
+        import glob, os
+        from PDSim.misc.hdf5 import HDF5Writer
+        
+        H = HDF5Writer()
+        
+        for file in glob.glob('script_*.py'):
+            root,ext = os.path.splitext(file)
+            mod = __import__(root)
+            sim = mod.build()
+            mod.run(sim)
+            
+            #Remove FlowsStorage as it is enormous
+            del sim.FlowStorage
+            
+            H.write_to_file(sim,root+'.h5')
+               
+           """
+           )
+        
+        sims = self.build_all_scripts()
+        
+        if sims:
+            
+            FD = wx.FileDialog(None,
+                               "Save zip file",
+                               defaultDir='.',
+                               wildcard =  "ZIP files (*.zip)|*.zip|All Files|*.*",
+                               style = wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
+            if wx.ID_OK==FD.ShowModal():
+                zip_file_path = FD.GetPath()
+            else:
+                zip_file_path = ''
+            FD.Destroy()
+        
+            if zip_file_path:
+                with zipfile.ZipFile(zip_file_path,'w') as z:
+                    for file in sims:
+                        # Full path to file
+                        fName = os.path.join(PDSimGUI.pdsim_home_folder,file)
+                        # write the file, strip off the path
+                        z.write(fName, arcname = file)
+                    
+                    z.writestr('run.py',template)
         
     def post_prep_for_configfile(self):
         """
@@ -1545,70 +1677,6 @@ class ParametricPanel(PDPanel):
         else:
             self.ParamSizer.GetItem(I).Window.Terms.SetStringSelection(string_)
             self.ParamSizer.GetItem(I).Window.temporary_values = value
-        
-    def _get_textbox_from_name(self, Name):
-        """
-        Returns the textbox corresponding to the given name
-        
-        Raises
-        ------
-        ``KeyError`` if not found
-        """
-        for item in self.variables:
-            if item['text'] == Name:
-                print item
-                return item['textbox']
-        raise KeyError
-    
-    def _get_attr_from_name(self, Name):
-        """
-        Returns the attribute name corresponding to the given name
-        
-        Raises
-        ------
-        ``KeyError`` if not found
-        """
-        for item in self.variables:
-            if item['text'] == Name:
-                return item['attr']
-        raise KeyError
-    
-    def _get_textbox_from_attr(self, attr):
-        """
-        Returns the attribute name corresponding to the given attribute
-        
-        Raises
-        ------
-        ``KeyError`` if not found
-        """
-        for item in self.variables:
-            if item['attr'] == attr:
-                return item['textbox']
-        raise KeyError
-        
-    def update_parametric_terms(self, items):
-        """
-        Sets the list of possible parametric terms
-        """
-        self.variables = items
-        for child in self.Children:
-            if isinstance(child,ParametricOption):
-                child.update_parametric_terms(items)
-                
-    def flush_parametric_terms(self):
-        """
-        Remove all the terms in the parametric table
-        """
-        terms = [term for term in self.Children if isinstance(term,ParametricOption)]
-        for term in terms:
-            self.RemoveTerm(term)
-            
-    def set_parametric_terms(self):
-        """
-        Set all the parametric terms using the config files
-        """
-        self.get_from_configfile('ParametricPanel')
-            
 
 def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True, tooltip = None):
     """

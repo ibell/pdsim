@@ -242,8 +242,12 @@ class SolverToolBook(wx.Toolbook):
         
         #Make the panels.  Name should be consistent with configuration file
         pane1=SolverInputsPanel(self, configdict['SolverInputsPanel'], name = 'SolverInputsPanel')
-        pane2 = wx.Panel(self)
-        #pane2=pdsim_panels.ParametricPanel(self, configdict, items, name='ParametricPanel')
+        
+        if hasattr(configdict,'ParametricPanel'):
+            pane2=pdsim_panels.ParametricPanel(self, configdict['ParametricPanel'], name='ParametricPanel')
+        else: # No configuration information for the parametric table
+            pane2=pdsim_panels.ParametricPanel(self, {}, name='ParametricPanel')
+        
         self.panels=(pane1, pane2)
         
         for Name,index,panel in zip(['Params','Parametric'],indices,self.panels):
@@ -1424,13 +1428,14 @@ class MainToolBook(wx.Toolbook):
 
 class MainFrame(wx.Frame):
     def __init__(self, configfile = None, position = None, size = None):
-        wx.Frame.__init__(self, None, title = "PDSim GUI", size = (700, 700))
+        wx.Frame.__init__(self, None, title = "PDSim GUI", size = (700, 700),style=wx.DEFAULT_FRAME_STYLE |
+                          wx.NO_FULL_REPAINT_ON_RESIZE)
         
         self.GUI_object_library = {}
         
         if configfile is None: #No file name or object passed in
             
-            configfile = os.path.join('configs','default.cfg')
+            defaultconfig = os.path.join('configs','default.pdc')
             
             #First see if a command line option provided
             if '--config' in sys.argv:
@@ -1443,9 +1448,9 @@ class MainFrame(wx.Frame):
                     warnings.warn('Sorry but your --config file "'+_configfile+'" is not found, loading the default configuration')
                     self.config = yaml.load(open(configfile, 'rb'))
                 
-#            #Then see if there is a file at configs/default.cfg
-#            elif os.path.exists(configfile):
-#                configbuffer = open(configfile,'rb')
+            #Then see if there is a file at configs/default.pdc
+            elif os.path.exists(defaultconfig):
+                self.config = yaml.load(open(defaultconfig,'rb'))
                 
             # Then use the internal default scroll
             else:
@@ -1499,16 +1504,6 @@ class MainFrame(wx.Frame):
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnIdle, self.timer)
         self.timer.Start(1000) #1000 ms between checking the queue
-        
-        self.default_configfile = default_configs.get_recip_defaults()
-        
-    def get_config_objects(self):
-        if self.SimType == 'recip':
-            return (self.config_parser, self.config_parser_default_recip)
-        elif self.SimType == 'scroll':
-            return (self.config_parser, self.config_parser_default_scroll)
-        else:
-            raise AttributeError
     
     def register_GUI_objects(self, annotated_GUI_objects):
         """
@@ -1527,6 +1522,9 @@ class MainFrame(wx.Frame):
                 raise TypeError('You can only register lists of AnnotatedGUIObjects')
             if o.key in self.GUI_object_library:
                 raise KeyError('Your key [{k:s}] is already in the parameter library'.format(k = o.key))
+            if o.annotation in [oo.annotation for oo in self.GUI_object_library.itervalues()]:
+                raise KeyError('Your annotation [{a:s}] is already in the parameter library for key [{k:s}]'.format(a = o.annotation, k = o.key))
+        
             self.GUI_object_library[o.key] = o
         
     def get_GUI_object(self, key):
@@ -1707,19 +1705,6 @@ class MainFrame(wx.Frame):
 #        #After loading plugins, try to set the parameters in the parametric table
 #        self.MTB.SolverTB.flush_parametric_terms()
 #        self.MTB.SolverTB.set_parametric_terms()
-            
-    def build_recip(self, post_set = True):
-        #Instantiate the recip class
-        recip=Recip()
-        #Pull things from the GUI as much as possible
-        self.MTB.InputsTB.set_params(recip)
-        self.MTB.SolverTB.set_params(recip)
-        if post_set:
-            self.MTB.InputsTB.post_set_params(recip)
-            self.MTB.SolverTB.post_set_params(recip)
-            #Build the model the rest of the way
-            RecipBuilder(recip)
-        return recip
     
     def build_simulation_script(self, run_index = 1):
         """
@@ -2028,7 +2013,7 @@ class MainFrame(wx.Frame):
                 if not isinstance(TB, wx.Toolbook):
                     continue
                 
-                if hasattr(TB,'get_config_chunks'):
+                if hasattr(TB, 'get_config_chunks'):
                     string_list.append(yaml.dump(TB.get_config_chunks()))
             
 #            for plugin in self.plugins_list:
@@ -2087,10 +2072,6 @@ class MainFrame(wx.Frame):
             print 'readying to get simulation; ',
             sim = self.results_list.get()
             print 'got a simulation'
-                
-#            from plugins.HDF5_plugin import HDF5Writer
-#            HDF5 = HDF5Writer()
-#            HDF5.write_to_file(sim,'sim.hd5')
             
 #            self.MTB.OutputsTB.plot_outputs(sim)
 #            self.MTB.OutputsTB.DataPanel.add_runs([sim])

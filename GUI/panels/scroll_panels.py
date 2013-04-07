@@ -627,10 +627,10 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                     c_upper_bearing = ('Upper bearing clearance [m]','m'),
                     D_crank_bearing = ('Crank bearing journal diameter [m]','m'),
                     L_crank_bearing = ('Crank bearing length [m]','m'),
-                    c_crank_bearing = ('Upper bearing clearance [m]','m'),
+                    c_crank_bearing = ('Crank bearing clearance [m]','m'),
                     D_lower_bearing = ('Lower bearing journal diameter [m]','m'),
                     L_lower_bearing = ('Lower bearing length [m]','m'),
-                    c_lower_bearing = ('Upper bearing clearance [m]','m'),
+                    c_lower_bearing = ('Lower bearing clearance [m]','m'),
                     journal_tune_factor = ('Tuning factor on journal bearing losses [-]','-'),
                     thrust_friction_coefficient = ('Thrust bearing friction coefficient [-]','-'),
                     thrust_ID = ('Thrust bearing inner diameter [m]','m'),
@@ -675,6 +675,10 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
             self.motor_choices.SetSelection(0)
             #Set the value in the panel
             self.motor_choices.eta_motor.SetValue(str(config['eta_motor']))
+            # When the motor efficiency is changed by something else, it means
+            # we want to use the motor efficiency rather than the motor curves,
+            # so set it back to using constant efficiency
+            self.motor_choices.eta_motor.Bind(wx.EVT_TEXT,lambda event: self.motor_choices.SetSelection(0))
             
         elif ('eta_motor' not in config
             and 'eta_motor_coeffs' in config
