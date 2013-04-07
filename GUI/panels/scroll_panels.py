@@ -1,22 +1,27 @@
 # -*- coding: utf-8 -*-
-import pdsim_panels
+
+from math import pi
+import textwrap
+
 import wx
 from wx.lib.mixins.listctrl import TextEditMixin
 from wx.lib.scrolledpanel import ScrolledPanel
-import numpy as np
-from math import pi
-from PDSim.scroll.core import Scroll
-import matplotlib as mpl
-import textwrap
 
+import matplotlib as mpl
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as WXCanvas
 from matplotlib.backends.backend_wxagg import NavigationToolbar2Wx as WXToolbar
+
+from CoolProp import State as CPState
+import numpy as np
+import yaml
+
+from PDSim.scroll.core import Scroll
 from PDSim.scroll.plots import plotScrollSet, ScrollAnimForm
 from PDSim.flow.flow import FlowPath
 from PDSim.core.core import Tube
 from PDSim.core.motor import Motor
 from PDSim.misc.datatypes import AnnotatedValue
-from CoolProp import State as CPState
+import pdsim_panels
 from pdsim_panels import LaTeXImageMaker, MotorChoices, PlotPanel
 from datatypes import HeaderStaticText
 
@@ -321,6 +326,16 @@ class GeometryPanel(pdsim_panels.PDPanel):
             
         self.PP.canvas.draw()
         
+    def get_config_chunk(self):
+        
+        keys = ['Vdisp','Vratio','t','ro','phi_fi0','phi_fis','phi_fos',
+                'use_offset','delta_offset','delta_flank','delta_radial',
+                'd_discharge','inlet_tube_length', 'inlet_tube_ID', 
+                'outlet_tube_length', 'outlet_tube_ID']
+        
+        #Dictionary of the values
+        return {key:self.main.get_GUI_object_value(key) for key in keys}
+        
     def get_script_chunks(self):
         
         def get(key):
@@ -367,10 +382,8 @@ class GeometryPanel(pdsim_panels.PDPanel):
             sim.set_disc_geo('2Arc', r2 = 0) #hard-coded
             sim.d_discharge = {d_discharge:s}
             
-            # self.delta_flank and self.delta_radial are set in the conventional way
-            # using the parametric table
-            sim.geo.delta_flank = {delta_flank:s}
-            sim.geo.delta_radial = {delta_radial:s}
+            sim.geo.delta_flank = {delta_flank:s} # [m]
+            sim.geo.delta_radial = {delta_radial:s} # [m]
             
             sim.geo.phi_ie_offset = {phi_ie_offset:s}  
             """.format(**str_params))
@@ -440,11 +453,10 @@ class MassFlowPanel(pdsim_panels.PDPanel):
             model = configdict[flow]['model']
             options = configdict[flow]['options']
             
-        no_flow_dict = dict(model = 'No Flow',options = {})
         sizer = wx.BoxSizer(wx.VERTICAL)
-        self.flow1 = FlowOptions(self, 'sa-s1', [configdict['sa-s1'],no_flow_dict])
-        self.flow2 = FlowOptions(self, 'sa-s2', [configdict['sa-s2'],no_flow_dict])
-        self.flow3 = FlowOptions(self, 'inlet.2-sa', [configdict['inlet.2-sa'],no_flow_dict])
+        self.flow1 = FlowOptions(self, 'sa-s1', [configdict['sa-s1']])
+        self.flow2 = FlowOptions(self, 'sa-s2', [configdict['sa-s2']])
+        self.flow3 = FlowOptions(self, 'inlet.2-sa', [configdict['inlet.2-sa']])
         
         sizer.Add(pdsim_panels.HeaderStaticText(self,'Flow model parameters') , 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(10)
@@ -477,18 +489,21 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         min_width = max([flow.label.GetSize()[0] for flow in flows])
         for flow in flows:
             flow.label.SetMinSize((min_width,-1))
-     
-    def post_prep_for_configfile(self):
-        """
-        Prepare a string that saves the flow coefficients to file
-        """
-        s=''
-        for flow in self.flows:
-            param_dict = {p['attr']:p['value'] for p in flow.params_dict}
-            s += 'Xd_{key1:s}_{key2:s} = float, {Xd:g}, flow coefficient\n'.format(key1 = flow.key1,
-                                                          key2 = flow.key2,
-                                                          Xd = param_dict.pop('X_d'))
-        return s
+        
+    def get_config_chunk(self):
+        
+        Xd_sa_s1 = self.main.get_GUI_object_value('flow pathsa-s1|Xd')
+        Xd_sa_s2 = self.main.get_GUI_object_value('flow pathsa-s2|Xd')
+        Xd_inlet = self.main.get_GUI_object_value('flow pathinlet.2-sa|Xd')
+                       
+        configdict = {}
+        configdict['sa-s1'] = dict(options = dict(Xd = Xd_sa_s1), 
+                                   model='IsentropicNozzle')
+        configdict['sa-s2'] = dict(options = dict(Xd = Xd_sa_s2), 
+                                   model='IsentropicNozzle')
+        configdict['inlet.2-sa'] = dict(options = dict(Xd = Xd_inlet), 
+                                        model='IsentropicNozzle')
+        return configdict
         
     def get_script_chunks(self):
         
@@ -715,6 +730,30 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         
         sizer.Layout()
         
+    def get_config_chunk(self):
+        configdict = {}
+        
+        if self.motor_choices.GetSelection() == 0:
+            configdict['eta_motor'] = float(self.motor_choices.eta_motor.GetValue())
+        elif self.motor_choices.GetSelection() == 1:
+            c = self.motor_choices.MCT.get_coeffs()
+            configdict['tau_motor_coeffs'] = c[0]
+            configdict['eta_motor_coeffs'] = c[1]
+            configdict['omega_motor_coeffs'] = c[2]
+            
+        keys = ['h_shell','A_shell','Tamb','mu_oil',
+                'D_upper_bearing','L_upper_bearing','c_upper_bearing',
+                'D_crank_bearing','L_crank_bearing','c_crank_bearing',
+                'D_lower_bearing','L_lower_bearing','c_lower_bearing',
+                'journal_tune_factor',
+                'thrust_friction_coefficient', 'thrust_ID', 'thrust_OD', 
+                'orbiting_scroll_mass', 'L_ratio_bearings', 'HTC'
+                ]
+        for key in keys:
+            configdict[key] = self.main.get_GUI_object_value(key)
+            
+        return configdict
+                           
     def get_script_chunks(self):
         """
         Returns a formatted string for the script that will be execfile-d

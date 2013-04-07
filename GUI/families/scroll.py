@@ -39,6 +39,12 @@ class InputsToolBook(pdsim_panels.InputsToolBook):
             
         #: A dictionary that maps name to panel 
         self.panels_dict = {panel.Name:panel for panel in self.panels}
+    
+    def get_config_chunks(self):
+        chunks = {}
+        for panel in self.panels:
+            chunks[panel.name] = panel.get_config_chunk()
+        return chunks
         
 scroll_yaml=(
 """
@@ -63,9 +69,15 @@ GeometryPanel:
   outlet_tube_ID : 0.02 # Outlet tube inner diameter [m]
 
 MassFlowPanel:
-  Xd_sa_s1 : 0.8 # Discharge coefficient for sa-s1 flow
-  Xd_sa_s2 : 0.8 # Discharge coefficient for sa-s2 flow
-  Xd_inlet.2_sa : 0.8 # Discharge coefficient for sa-s1 flow
+  sa-s1:
+      model : IsentropicNozzle
+      options : {Xd : 0.8}
+  sa-s2:
+      model : IsentropicNozzle
+      options : {Xd : 0.8}
+  inlet.2-sa:
+      model : IsentropicNozzle
+      options : {Xd : 0.8}
 
 MechanicalLossesPanel:
   eta_motor : 0.95 # Motor efficiency [-]

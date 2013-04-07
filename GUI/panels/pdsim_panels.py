@@ -770,7 +770,7 @@ class OutputTreePanel(wx.Panel):
                     self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
                     _recursive_hdf5_add(child, [o[thing] for o in objects])
         
-        
+
 #        t1 = clock()
 #        _recursive_hdf5_add(self.root, runs)
 #        t2 = clock()
@@ -1934,6 +1934,12 @@ class StateInputsPanel(PDPanel):
             pratio = config['discharge']['pratio']
             pressure = pratio * inletState.p
             Tsat = CP.Props('T','P',pressure,'Q',1,inletState.Fluid)
+        elif 'pressure' in config['discharge']:
+            pressure = config['discharge']['pressure']
+            pratio = pressure / inletState.p
+            Tsat = CP.Props('T','P',pressure,'Q',1,inletState.Fluid)
+        else:
+            raise ValueError('either pratio or pressure must be provided for discharge')
              
         disc_annotated_values = [
             AnnotatedValue('discPressure', pressure, *self.desc_map['discPressure']),
@@ -1991,6 +1997,19 @@ class StateInputsPanel(PDPanel):
         self.main.set_GUI_object_value('discPressure',pdisc)
         self.main.set_GUI_object_value('discPratio',pratio)
         self.main.set_GUI_object_value('discTsat',Tsat)
+        
+    def get_config_chunk(self):
+        
+        inletState = self.SuctionStatePanel.GetState()
+        
+        configdict = {}
+        configdict['omega'] = self.main.get_GUI_object_value('omega')
+        configdict['discharge'] = dict(pressure = self.main.get_GUI_object_value('discPressure'))
+        configdict['inletState'] = dict(Fluid = inletState.Fluid,
+                                        T = inletState.T,
+                                        rho = inletState.rho)
+        
+        return configdict
         
     def get_script_chunks(self):
         """

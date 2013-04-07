@@ -177,6 +177,14 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         self.SetSizer(sizer)
         sizer.Layout()
     
+    def get_config_chunk(self):
+  
+        configdict = dict(eps_cycle = self.main.get_GUI_object_value('eps_cycle'),
+                          cycle_integrator = 'RK45',
+                          integrator_options = dict(RK_eps = float(self.IC.RK45_eps.GetValue()))
+                          )
+        return configdict
+        
     def get_script_chunks(self):
         
         eps_cycle = self.main.get_GUI_object('eps_cycle').GetValue()
@@ -241,6 +249,13 @@ class SolverToolBook(wx.Toolbook):
         for Name,index,panel in zip(['Params','Parametric'],indices,self.panels):
             self.AddPage(panel, Name, imageId=index)
             
+    def get_config_chunks(self):
+        chunks = {}
+        for panel in self.panels:
+            if hasattr(panel,'get_config_chunk'):
+                chunks[panel.name] = panel.get_config_chunk()
+        return chunks
+    
     def get_script_chunks(self):
         """
         Pull all the values out of the child panels, using the values in 
@@ -1749,8 +1764,6 @@ class MainFrame(wx.Frame):
         
         self.script_chunks.extend(["if __name__ == '__main__':\n    sim = build()\n    run(sim)"])
         
-        # Write to file
-        
         # Create a string in the form xxxxxxxx where each x is in '0123456789abcdef'
         # This is a simple way to ensure that the file name is unique.  
         random_string = ''.join([random.choice('0123456789abcdef') for i in range(12)])
@@ -1860,26 +1873,26 @@ class MainFrame(wx.Frame):
         """
         Load any machine families into the GUI that are found in families folder
         """
-        import glob
+        import glob, pkgutil
         self.plugins_list = []
-        #Look at each .py file in plugins folder
-        for py_file in glob.glob(os.path.join('families','*.py')):
-            #Get the root filename (/path/to/AAA.py --> AAA)
-            fname = py_file.split(os.path.sep,1)[1].split('.')[0]
-            
-            # Skip __init__.py file
-            if fname == '__init__': continue
-            
-            # Load the families package
-            mods = __import__('families.'+fname)
-            # Try to import the file as a module
-            mod = getattr(mods,fname)
+        
+        def load_all_modules_from_dir(dirname, keep_loaded = True):
+            mods = []
+            for importer, package_name, _ in pkgutil.iter_modules([dirname]):
+                full_package_name = '%s.%s' % (dirname, package_name)
+                if full_package_name not in sys.modules or keep_loaded:
+                    module = importer.find_module(package_name
+                                ).load_module(full_package_name)
+                    mods.append(module)
+            return mods
+        
+        for mod in load_all_modules_from_dir('families'):
             
             # Get the name of the family
             if hasattr(mod,'family_menu_name'):
                 family_menu_name = mod.family_menu_name 
             else:
-                raise AttributeError('Family InputToolBook must provide the attribute family_menu_name with the name of the menu item')
+                raise AttributeError('Family must provide the attribute family_menu_name with the name of the menu item')
             
             # Create a menu item for the plugin
             menuItem = wx.MenuItem(FamiliesMenu, -1, family_menu_name, "", wx.ITEM_CHECK)
@@ -1889,7 +1902,9 @@ class MainFrame(wx.Frame):
             
             # Attach a pointer to the module for this family
             if not hasattr(self,'families_dict'): self.families_dict = {}
+            
             # Add both the menu label and module names to the dictionary 
+            fname = mod.__name__.rsplit('.',1)[1] #families.scroll --> scroll
             self.families_dict[fname] = mod
             self.families_dict[family_menu_name] = mod
             
@@ -1969,81 +1984,75 @@ class MainFrame(wx.Frame):
         FD = wx.FileDialog(None,"Load Configuration file",defaultDir='configs',
                            style=wx.FD_OPEN)
         if wx.ID_OK==FD.ShowModal():
-            file_path=FD.GetPath()
+            file_path = FD.GetPath()
+            configdict = yaml.load(open(file_path,'r'))
             #Now rebuild the GUI using the desired configuration file
-            self.rebuild(file_path)
+            self.rebuild(configdict)
         FD.Destroy()
         
     def OnConfigSave(self,event):
-        FD = wx.FileDialog(None,"Save Configuration file",defaultDir='configs',
+        """
+        Write the configuration file
+        """
+        FD = wx.FileDialog(None,
+                           "Save Configuration file",
+                           defaultDir='configs',
                            style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
-        if wx.ID_OK==FD.ShowModal():
+        if wx.ID_OK == FD.ShowModal():
+            #Get the file path
             file_path=FD.GetPath()
+            
             print 'Writing configuration file to ', file_path   
+            
             #Build the config file entry
             string_list = []
             
-            #Based on mode selected in menu select type to be written to file
-            if self.TypeRecip.IsChecked():
-                Type = 'recip'
-            elif self.TypeScroll.IsChecked():
-                Type = 'scroll'
-            else:
-                raise ValueError
-            
-            if self.TypeCompressor.IsChecked():
-                mode = 'compressor'
-            elif self.TypeExpander.IsChecked():
-                mode = 'expander'
-            else:
-                raise ValueError
-            
+            time_generation = time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime())
             #Header information
             header_string_template = textwrap.dedent(
                  """
-                 [Globals]
-                 Type = {CompressorType}
-                 Mode = {Mode}
+                 # Generated by PDSimGUI on {time_generation:s}
+                 family : {family:s}
                  """
-                 ) 
-            terms = dict(CompressorType = Type, Mode = mode)
+                 )
+            terms = dict(time_generation = time_generation,
+                         family = self.machinefamily)
             header_string = header_string_template.format(**terms)
 
-            string_list.append(unicode(header_string,'latin-1'))
+            string_list.append(unicode(header_string,'utf-8'))
             
-            #Do all the "conventional" panels 
+            #Do all the "conventional" panels
             for TB in self.MTB.Children:
                 
                 #Skip anything that isnt a toolbook
-                if not isinstance(TB,wx.Toolbook):
+                if not isinstance(TB, wx.Toolbook):
                     continue
                 
-                #Loop over the panels that are in the toolbook
-                for panel in TB.Children:
-                    
-                          
-                    #Skip any panels that do not subclass PDPanel
-                    if not isinstance(panel,pdsim_panels.PDPanel):
-                        continue
-                    
-                    #Collect the string for writing to file
-                    panel_string = panel.prep_for_configfile()
-                    if isinstance(panel_string,str):
-                        string_list.append(unicode(panel_string,'latin-1'))
-                    elif isinstance(panel_string,unicode):
-                        #Convert to a string
-                        panel_string = unicode.decode(panel_string,'latin-1')
-                        string_list.append(panel_string)
+                if hasattr(TB,'get_config_chunks'):
+                    string_list.append(yaml.dump(TB.get_config_chunks()))
             
-            for plugin in self.plugins_list:
-                pass
-#                if plugin.is_activated():
-#                    if hasattr(plugin, ''):
-#                        pass
+#            for plugin in self.plugins_list:
+#                pass
+##                if plugin.is_activated():
+##                    if hasattr(plugin, ''):
+##                        pass
                     
             fp = codecs.open(file_path,'w',encoding = 'latin-1')
             fp.write(u'\n'.join(string_list))
             fp.close()
+            
+            # Recreate this frame using the config file to make sure it is 100% the same
+            configdict = yaml.load(open(file_path,'r'))
+            check_frame = MainFrame(configdict)
+            check_dict = check_frame.get_GUI_object_dict()
+            my_dict = self.get_GUI_object_dict()
+            
+            if not sorted(check_dict.keys()) == sorted(my_dict.keys()):
+                print 'Not all the keys are the same'
+            else:
+                for k in check_dict.iterkeys():
+                    print check_dict[k].GetValue(),my_dict[k].GetValue()
+            
         FD.Destroy()
         
     def OnStart(self, event):
