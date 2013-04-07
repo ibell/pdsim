@@ -1081,18 +1081,32 @@ class ParametricOption(wx.Panel):
     def get_values(self):
         """
         Get a list of floats from the items in the textbox
+        
+        Returns
+        -------
+        annotation
+        vals
         """
-        name = self.Terms.GetStringSelection()
+        annotation = self.Terms.GetStringSelection()
         #To list of floats
         if hasattr(self,'Values'):
             values = [float(val) for val in self.Values.GetValue().split(',') if not val == '']
         else:
             values = None
-        return name, values
+        return annotation, values
     
-    def set_values(self,key,value):
-        self.Terms.SetStringSelection(key)
-        self.Values.SetValue(value)
+    def set_values(self,key,vals):
+        """
+        Parameters
+        ----------
+        key : the registered term key
+        vals : A list of values as floats
+        """
+        annotation = self.GetTopLevelParent().get_GUI_object(key).annotation
+        self.Terms.SetStringSelection(annotation)
+        if hasattr(self,'Values'):
+            strvalues = ', '.join([str(v) for v in vals])
+            self.Values.SetValue(strvalues)
         
     def update_parametric_terms(self, items):
         """
@@ -1240,7 +1254,7 @@ class HackedButton(wx.Button):
         self.Enable()
         
     def Enable(self):
-        self.SetForegroundColour((50,50,50))
+        self.SetForegroundColour((70,70,70))
         self._Enabled = True
         self.SetEvtHandlerEnabled(True)
         
@@ -1260,7 +1274,7 @@ class ParametricPanel(PDPanel):
         self.Structured = wx.CheckBox(self._mb, label = 'Structured')
         self._mb.AddControl(self.Structured)
         self.Structured.Bind(wx.EVT_CHECKBOX, self.OnChangeStructured)
-        self.Structured.SetValue(1)
+        self.Structured.SetValue(configdict['structured'])
         
         self.AddButton = HackedButton(self._mb, label = 'Add Term')
         self._mb.AddControl(self.AddButton)
@@ -1292,6 +1306,9 @@ class ParametricPanel(PDPanel):
         self.ParaList = None
         
         self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().itervalues()} 
+        
+        # Populate the terms from the configuration dictionary 
+        self.populate_terms(configdict)
         
         # After all the building is done, check if it is unstructured, if so, 
         # collect the temporary values that were set 
@@ -1335,6 +1352,7 @@ class ParametricPanel(PDPanel):
         self.NTerms += 1
         self.GetSizer().Layout()
         self.Refresh()
+        return option
     
     def RemoveTerm(self, term):
         term.Destroy()
@@ -1584,6 +1602,10 @@ class ParametricPanel(PDPanel):
         return True
         
     def OnZipBatch(self, event = None):
+        """
+        Write all the script files and a runner to a zip file - this can be
+        nice to do batches outside the GUI.
+        """
         
         template = textwrap.dedent(
         """
@@ -1631,29 +1653,39 @@ class ParametricPanel(PDPanel):
                     
                     z.writestr('run.py',template)
         
-    def post_prep_for_configfile(self):
+    def populate_terms(self,configdict):
         """
-        This panel's outputs for the save file
+        Load the terms if there are any
         """
-        if not hasattr(self, 'ParaList'):
-            return ''
+        if 'terms' not in configdict:
+            return
         
-        if self.Structured.GetStringSelection() == 'Structured':
-            s = 'Structured = PPStructured, True\n'
-            for i, param in enumerate(self.ParamSizer.GetChildren()):
-                name, vals = param.Window.get_values()
-                if vals is not None:
-                    values = ';'.join([str(val) for val in vals])
-                else:
-                    values = ''
-                s += 'Term' + str(i+1) + ' = Term,' + name +',' + values + '\n'
-        else:
-            s = 'Structured = PPStructured, False\n'
-            for i, param in enumerate(self.ParamSizer.GetChildren()):
-                name, _dummy = param.Window.get_values()
-                values = ';'.join([str(row[i]) for row in self.ParaList.data])
-                s += 'Term' + str(i+1) + ' = Term,' + name +',' + values + '\n' 
-        return s
+        for term in configdict['terms']:
+            option = self.OnAddTerm()
+            if configdict['structured']:
+                option.set_values(term['key'], term['vals'])
+            else:
+                option.set_values(term['key'], [])
+        
+        if (self.BuildButton._Enabled):
+            self.OnBuildTable()
+        
+    def get_config_chunk(self):
+        
+        configdict = {}
+        configdict['structured'] = self.Structured.GetValue()
+        
+        if not hasattr(self, 'ParaList'):
+            return configdict
+        
+        terms = []
+        for i, child in enumerate(self.GetChildren()):
+            if isinstance(child, ParametricOption):
+                annotation, vals = child.get_values()
+                key = self.GUI_map[annotation]
+                terms.append(dict(key = key, vals = vals))
+        configdict['terms'] = terms
+        return configdict
     
     def post_get_from_configfile(self, key, value):
         if not value.split(',')[0].startswith('Term'):

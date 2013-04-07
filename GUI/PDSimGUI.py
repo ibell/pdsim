@@ -241,14 +241,9 @@ class SolverToolBook(wx.Toolbook):
         self.AssignImageList(il)
         
         #Make the panels.  Name should be consistent with configuration file
-        pane1=SolverInputsPanel(self, configdict['SolverInputsPanel'], name = 'SolverInputsPanel')
-        
-        if hasattr(configdict,'ParametricPanel'):
-            pane2=pdsim_panels.ParametricPanel(self, configdict['ParametricPanel'], name='ParametricPanel')
-        else: # No configuration information for the parametric table
-            pane2=pdsim_panels.ParametricPanel(self, {}, name='ParametricPanel')
-        
-        self.panels=(pane1, pane2)
+        pane1 = SolverInputsPanel(self, configdict['SolverInputsPanel'], name = 'SolverInputsPanel')
+        pane2 = pdsim_panels.ParametricPanel(self, configdict['ParametricPanel'], name='ParametricPanel')
+        self.panels = (pane1, pane2)
         
         for Name,index,panel in zip(['Params','Parametric'],indices,self.panels):
             self.AddPage(panel, Name, imageId=index)

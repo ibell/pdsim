@@ -112,10 +112,7 @@ StatePanel:
       pratio : 2.0
 
 ParametricPanel:
-  Term1 : 
-      string : Rotational speed [rad/s]
-      attr : omega
-      values : [250.0, 300.0]
+  structured : True
 
 SolverInputsPanel:
   cycle_integrator: RK45
