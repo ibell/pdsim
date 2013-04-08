@@ -1,7 +1,7 @@
 # -*- coding: latin-1 -*-
 
 # Python imports
-import warnings, codecs, textwrap,os, itertools, difflib, zipfile
+import warnings, codecs, textwrap,os, itertools, difflib, zipfile, types
 from multiprocessing import Process
 
 # wxPython imports
@@ -454,6 +454,11 @@ class PDPanel(wx.Panel):
                         textbox.default_units = 'Cubic Meter'
                     elif unicode_units == u'rad/s':
                         textbox.default_units = 'Radians per second'
+                    elif unicode_units == u'kPa':
+                        textbox.default_units = 'kPa'
+                    elif unicode_units == u'K':
+                        textbox.default_units = 'Kelvin'
+                    
                     
                     #If it has units bind the unit changing callback on right-click
                     if textbox.default_units:
@@ -2052,11 +2057,26 @@ class StateInputsPanel(PDPanel):
         AGO_disc[0].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'pressure'))
         AGO_disc[1].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'pratio'))
         AGO_disc[2].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'Tsat'))
-        AGO_disc[0].GUI_location.Bind(wx.EVT_TEXT,lambda event: self.OnChangeDischargeValue(event, 'pressure'))
-        AGO_disc[1].GUI_location.Bind(wx.EVT_TEXT,lambda event: self.OnChangeDischargeValue(event, 'pratio'))
-        AGO_disc[2].GUI_location.Bind(wx.EVT_TEXT,lambda event: self.OnChangeDischargeValue(event, 'Tsat'))
         
         self.main.register_GUI_objects([AGO_omega, AGO_inletState] + AGO_disc)
+        
+        # Hack the discharge textctrl so that when they are updated using SetValue() they fire the EVT_KILL_FOCUS event
+        def HackedSetValue(self, value):
+            # Set the value without firing any events
+            self.ChangeValue(value)
+            # Create the event to be posted
+            event = wx.PyCommandEvent(wx.EVT_KILL_FOCUS.typeId, self.GetId())
+            # Post the event
+            wx.PostEvent(self.GetEventHandler(), event)
+            # And now process it
+            self.ProcessPendingEvents()
+            
+        # Lambda to cut down code duplication
+        get = lambda k: self.main.get_GUI_object(k).GUI_location
+        
+        for item in [get('discPressure'), get('discPratio'), get('discTsat')]:
+            # Hook up the hacked bound SetValue method
+            item.SetValue = types.MethodType( HackedSetValue, item )
         
         sizer.Add(HeaderStaticText(self,'Rotational Speed'), 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
@@ -2078,7 +2098,7 @@ class StateInputsPanel(PDPanel):
         Set the internal pressure variable when the value is changed in the TextCtrl
         """
         
-        suction_state = self.SuctionStatePanel.GetState() 
+        suction_state = self.SuctionStatePanel.GetState()
         psuction = suction_state.p
         Fluid = suction_state.Fluid
         

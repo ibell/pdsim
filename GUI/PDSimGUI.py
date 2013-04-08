@@ -271,39 +271,6 @@ class SolverToolBook(wx.Toolbook):
             if hasattr(panel,'get_script_chunks'):
                 chunks.append(panel.get_script_chunks())
         return chunks
-    
-    def collect_parametric_terms(self):
-        """
-        Collect parametric terms from the panels in this toolbook
-        """
-        return []
-    
-    def update_parametric_terms(self, items):
-        """
-        Set parametric terms in the parametric table
-        """
-        for child in self.Children:
-            if isinstance(child,pdsim_panels.ParametricPanel):
-                child.update_parametric_terms(items)
-                
-    def collect_output_terms(self):
-        terms = []
-        for panel in self.panels:
-            if hasattr(panel,'collect_output_terms'):
-                terms += panel.collect_output_terms()
-        return terms
-    
-    def flush_parametric_terms(self):
-        """ Remove all the entries in the parametric table """
-        for panel in self.panels:
-            if isinstance(panel, pdsim_panels.ParametricPanel):
-                panel.flush_parametric_terms()
-    
-    def set_parametric_terms(self):
-        """ Set the terms in the parameteric table """
-        for panel in self.panels:
-            if isinstance(panel, pdsim_panels.ParametricPanel):
-                panel.set_parametric_terms()
 
 class WriteOutputsPanel(wx.Panel):
     def __init__(self,parent):
@@ -417,7 +384,7 @@ class RunToolBook(wx.Panel):
         self.cmdRunOne = wx.Button(self,-1,'  \nRun!\n  ')
         self.cmdRunOne.Bind(wx.EVT_BUTTON, self.GetTopLevelParent().OnStart)
         self.cmdRunParametric = wx.Button(self,-1,'Run\nParametric\nTable')
-        self.cmdRunParametric.Bind(wx.EVT_BUTTON, self.GetTopLevelParent().OnStart)
+        #self.cmdRunParametric.Bind(wx.EVT_BUTTON, self.GetTopLevelParent().OnStart)
         self.cmdAbort = wx.Button(self,-1,'Stop\nAll\nRuns')
         self.cmdAbort.Bind(wx.EVT_BUTTON, self.GetTopLevelParent().OnStop)
         
