@@ -230,6 +230,10 @@ class GeometryPanel(pdsim_panels.PDPanel):
         # parameter 
         for o in annotated_GUI_objects:
             o.GUI_location.Bind(wx.EVT_KILL_FOCUS, self.OnRefresh)
+            
+        #Add another callback for use_offset checkbox
+        chkbox = self.main.get_GUI_object('use_offset').GUI_location
+        chkbox.Bind(wx.EVT_CHECKBOX,self.OnRefresh)
         
         # The plot of the scroll wraps
         self.PP = PlotPanel(scrolled_panel)

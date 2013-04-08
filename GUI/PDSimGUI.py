@@ -48,6 +48,8 @@ import datatypes
 # The path to the home folder that will hold everything
 home = os.getenv('USERPROFILE') or os.getenv('HOME')
 pdsim_home_folder = os.path.join(home,'.pdsim-temp')
+if not os.path.exists(pdsim_home_folder):
+    os.mkdir(pdsim_home_folder)
     
 class IntegratorChoices(wx.Choicebook):
     def __init__(self, parent, **kwargs):
@@ -1505,10 +1507,11 @@ class MainFrame(wx.Frame):
         
         Returns
         -------
-        val : int,float,string
+        val : int,float,string, bool
             value of the GUI object, converted away from string if possible
         """
         val = self.GUI_object_library[key].GetValue()
+        if isinstance(val, bool): return val
         try:
             return int(val) #Convert to integer
         except (ValueError,TypeError):
