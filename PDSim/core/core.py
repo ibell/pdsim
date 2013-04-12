@@ -1562,6 +1562,31 @@ class PDSimCore(_PDSimCore):
         #Save the elapsed time for simulation
         self.elapsed_time = clock()-t1
         
+    def get_prune_keys(self):
+        """
+        Remove some elements when the simulation finishes that are not 
+        very useful and/or are very large when stored to file
+        
+        Returns
+        -------
+        prune_key_list: list
+            A list of keys that are to be removed from the HDF5 file
+        """
+        
+        return ['/CVs/CVs',
+                '/CVs/Nodes',
+                '/CVs/T',
+                '/CVs/cp',
+                '/CVs/cv',
+                '/CVs/dpdT',
+                '/CVs/exists_CV',
+                '/CVs/exists_indices',
+                '/CVs/exists_keys',
+                '/CVs/h',
+                '/CVs/p',
+                '/CVs/rho'
+                ]
+        
     def post_solve(self):
         """
         Do some post-processing to calculate flow rates, efficiencies, etc.  
@@ -1577,6 +1602,8 @@ class PDSimCore(_PDSimCore):
         self.rho = self.rho[:,0:self.Ntheta]
         self.V = self.V[:,0:self.Ntheta]
         self.dV = self.dV[:,0:self.Ntheta]
+        self.h = self.p[:,0:self.Ntheta]
+        self.xL = self.p[:,0:self.Ntheta]
         self.xValves = self.xValves[:,0:self.Ntheta]
         
         print 'mdot*(h2-h1),P-v,Qamb', self.Wdot, self.Wdot_pv, self.Qamb

@@ -624,7 +624,6 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
     desc_map = dict(h_shell = ('Shell-ambient mean HTC','W/m^2/K'),
                     A_shell = ('Shell outer area [m\xb2]','m^2'),
                     Tamb = ('Ambient temperature [K]','K'),
-                    
                     mu_oil = ('Viscosity of the oil [Pa-s]','Pa-s'),
                     D_upper_bearing = ('Upper bearing journal diameter [m]','m'),
                     L_upper_bearing = ('Upper bearing length [m]','m'),
@@ -641,7 +640,9 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                     thrust_OD = ('Thrust bearing outer diameter [m]','m'), 
                     orbiting_scroll_mass = ('Orbiting scroll mass [kg]','kg'), 
                     L_ratio_bearings = ('Ratio of lengths to the bearings [-]','-'),
-                    
+                    scroll_plate_thickness = ('Thickness of the orbiting scroll plate [m]','m',0.002),
+                    scroll_density = ('Orbiting scroll material density [kg/m\xb3]','kg/m^3',2700),
+                    scroll_added_mass = ('Additional OS mass added at COM [kg]','kg',0.0),
                     HTC = ('Heat transfer coefficient in the scrolls [W/m\xb2/K]','W/m^2/K'),
                     )
     
@@ -709,7 +710,8 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                 'D_lower_bearing','L_lower_bearing','c_lower_bearing',
                 'journal_tune_factor',
                 'thrust_friction_coefficient', 'thrust_ID', 'thrust_OD', 
-                'orbiting_scroll_mass', 'L_ratio_bearings', 'HTC'
+                'orbiting_scroll_mass', 'L_ratio_bearings', 'HTC',
+                'scroll_plate_thickness','scroll_density','scroll_added_mass'
                 ]
         
         # The list for all the annotated objects
@@ -717,10 +719,20 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         
         # Loop over the first group of inputs
         for key in keys:
-            # Get the annotation and the units for the term 
-            annotation, units = self.desc_map[key]
-            # Add the annotated object to the list of objects
-            self.annotated_values.append(AnnotatedValue(key, config[key], annotation, units))
+            mapped_val = self.desc_map[key]
+            
+            if len(mapped_val) == 2:
+                # Get the annotation and the units for the term 
+                annotation, units = mapped_val 
+                # Add the annotated object to the list of objects
+                self.annotated_values.append(AnnotatedValue(key, config[key], annotation, units))
+            elif len(mapped_val) == 3:
+                # Get the annotation and the units for the term 
+                annotation, units, default = mapped_val 
+                # Add the annotated object to the list of objects
+                self.annotated_values.append(AnnotatedValue(key, default, annotation, units))
+            else:
+                raise ValueError('Invalid tuple in desc_map')
             
         # Build the items and return the list of annotated GUI objects
         annotated_GUI_objects = self.construct_items(self.annotated_values, 
@@ -778,6 +790,9 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                sim.motor = Motor()
                sim.motor.set_eta({eta_motor:s})
                sim.motor.suction_fraction = 1.0 #hard-coded
+               
+               from PDSim.core.core import struct
+               sim.mech = struct()
                """.format(eta_motor = self.motor_choices.eta_motor.GetValue()))
         elif self.motor_choices.GetSelection() == 1:
             # Get the tuple of list of coeffs from the MCT, then unpack the tuple
@@ -791,6 +806,9 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                                     eta_coeffs = {eta_coeffs:s},
                                     omega_coeffs = {omega_coeffs:s})
                sim.motor.suction_fraction = 1.0 #hard-coded
+               
+               from PDSim.core.core import struct
+               sim.mech = struct()
                """.format(tau_coeffs = str(c[0]),
                           eta_coeffs = str(c[1]),
                           omega_coeffs = str(c[2])
@@ -798,16 +816,21 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         else:
             raise NotImplementedError
         
-        for term in ['h_shell','A_shell','Tamb','mu_oil',
+        #Terms that do not go in the mech struct
+        for term in ['h_shell','A_shell','Tamb','HTC']:
+            val = self.main.get_GUI_object_value(term)
+            motor_chunk += 'sim.{name:s} = {value:s}\n'.format(name = term,
+                                                             value = str(val))
+         
+        #Terms that go in the mech struct
+        for term in ['mu_oil','journal_tune_factor',
                 'D_upper_bearing','L_upper_bearing','c_upper_bearing',
                 'D_crank_bearing','L_crank_bearing','c_crank_bearing',
                 'D_lower_bearing','L_lower_bearing','c_lower_bearing',
-                'journal_tune_factor',
                 'thrust_friction_coefficient', 'thrust_ID', 'thrust_OD', 
-                'orbiting_scroll_mass', 'L_ratio_bearings', 'HTC'
-                ]:
+                'orbiting_scroll_mass', 'L_ratio_bearings']:
             val = self.main.get_GUI_object_value(term)
-            motor_chunk += 'sim.{name:s} = {value:s}\n'.format(name = term,
+            motor_chunk += 'sim.mech.{name:s} = {value:s}\n'.format(name = term,
                                                              value = str(val)) 
         return motor_chunk
         

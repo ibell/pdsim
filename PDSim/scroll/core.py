@@ -706,12 +706,12 @@ class Scroll(PDSimCore, _Scroll):
         
     def crank_bearing(self):
         
-        JB = journal_bearing(r_b = self.D_crank_bearing/2,
-                             L = self.L_crank_bearing,
+        JB = journal_bearing(r_b = self.mech.D_crank_bearing/2,
+                             L = self.mech.L_crank_bearing,
                              omega = self.omega,
                              W = self.forces.corr_Fm*1000,
-                             c = self.c_crank_bearing,
-                             eta_0 = self.mu_oil
+                             c = self.mech.c_crank_bearing,
+                             eta_0 = self.mech.mu_oil
                              )
         self.losses.crank_bearing_dict = JB
     
@@ -723,12 +723,12 @@ class Scroll(PDSimCore, _Scroll):
         the lower bearing.  Torques need to balance around the upper bearing
         """
         
-        JB = journal_bearing(r_b = self.D_upper_bearing/2,
-                             L = self.L_upper_bearing,
+        JB = journal_bearing(r_b = self.mech.D_upper_bearing/2,
+                             L = self.mech.L_upper_bearing,
                              omega = self.omega,
-                             W = self.forces.corr_Fm*1000*(1+1/self.L_ratio_bearings),
-                             c = self.c_upper_bearing,
-                             eta_0 = self.mu_oil
+                             W = self.forces.corr_Fm*1000*(1+1/self.mech.L_ratio_bearings),
+                             c = self.mech.c_upper_bearing,
+                             eta_0 = self.mech.mu_oil
                              )
         self.losses.upper_bearing_dict = JB
 
@@ -740,12 +740,12 @@ class Scroll(PDSimCore, _Scroll):
         the lower bearing.  Torques need to balance around the upper bearing
         """
         
-        JB = journal_bearing(r_b = self.D_lower_bearing/2,
-                             L = self.L_lower_bearing,
+        JB = journal_bearing(r_b = self.mech.D_lower_bearing/2,
+                             L = self.mech.L_lower_bearing,
                              omega = self.omega,
-                             W = self.forces.corr_Fm*1000*(1/self.L_ratio_bearings),
-                             c = self.c_lower_bearing,
-                             eta_0 = self.mu_oil
+                             W = self.forces.corr_Fm*1000*(1/self.mech.L_ratio_bearings),
+                             c = self.mech.c_lower_bearing,
+                             eta_0 = self.mech.mu_oil
                              )
         self.losses.lower_bearing_dict = JB
 
@@ -759,7 +759,7 @@ class Scroll(PDSimCore, _Scroll):
         V = self.geo.ro*self.omega
         #Use the corrected force to account for the decrease in back area due to the bearing
         N = self.forces.corr_Fz*1000 #[N]
-        TB = thrust_bearing(mu = self.thrust_friction_coefficient,
+        TB = thrust_bearing(mu = self.mech.thrust_friction_coefficient,
                             V = V,
                             N = N)
         self.losses.thrust_bearing_dict = TB
@@ -1234,7 +1234,7 @@ class Scroll(PDSimCore, _Scroll):
         if isinstance(orbiting_back_pressure, float):
             # The back gas pressure on the orbiting scroll pushes the scroll back down
             # Subtract the back pressure from all the elements 
-            self.forces.summed_Fz -= orbiting_back_pressure*pi*self.thrust_ID**2/4.0
+            self.forces.summed_Fz -= orbiting_back_pressure*pi*self.mech.thrust_ID**2/4.0
         else:
             raise NotImplementedError('calculate_force_terms must get a float back pressure for now')
         
@@ -1363,7 +1363,7 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.mean_Mz = np.trapz(self.forces.summed_Mz, self.t[_slice])/(2*pi)
                 
         #: The inertial forces on the orbiting scroll
-        self.forces.inertial = self.orbiting_scroll_mass * self.omega**2 * self.geo.ro / 1000
+        self.forces.inertial = self.mech.orbiting_scroll_mass * self.omega**2 * self.geo.ro / 1000
         
         self.forces.corr_Fm = self.forces.mean_Fm + self.forces.inertial
         

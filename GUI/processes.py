@@ -265,12 +265,13 @@ class RedirectedWorkerThread(Thread):
                 except WindowsError:
                     pass
                 
-                identifier = 'PDSim recip ' + time.strftime('%Y-%m-%d-%H-%M-%S')+'_t'+self.name.split('-')[1]
+                identifier = 'PDSimGUI ' + time.strftime('%Y-%m-%d-%H-%M-%S')+'_t'+self.name.split('-')[1]
                 hdf5_path = os.path.join(temp_folder, identifier + '.h5')
                 
                 from plugins.HDF5_plugin import HDF5Writer
                 HDF5 = HDF5Writer()
                 HDF5.write_to_file(sim, hdf5_path)
+                HDF5.prune(hdf5_path, sim.get_prune_keys())
                 print 'Wrote hdf5 file to', hdf5_path
                 
                 "Send the data back to the GUI"

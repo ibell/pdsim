@@ -51,6 +51,26 @@ pdsim_home_folder = os.path.join(home,'.pdsim-temp')
 if not os.path.exists(pdsim_home_folder):
     os.mkdir(pdsim_home_folder)
     
+class ConfigurationManager(object):
+    def __init__(self):
+        # Load the config file for the GUI
+        if os.path.exists(os.path.join(pdsim_home_folder,'gui_config.yaml')):
+            self.config = yaml.load(open(os.path.join(pdsim_home_folder,'gui_config.yaml'),'r'))
+        else:
+            self.config = {}
+            
+    def set(self, k, v):
+        self.config[k] = v
+        yaml.dump(self.config,open(os.path.join(pdsim_home_folder,'gui_config.yaml'),'w'))
+        
+    def get(self, k, default):
+        if k not in self.config:
+            return default
+        else:
+            return self.config[k]
+
+GUIconfig = ConfigurationManager()
+    
 class IntegratorChoices(wx.Choicebook):
     def __init__(self, parent, **kwargs):
         wx.Choicebook.__init__(self, parent, id = wx.ID_ANY, **kwargs)
@@ -936,315 +956,67 @@ class FileOutputDialog(wx.Dialog):
             fp.close()
     
 class OutputDataPanel(pdsim_panels.PDPanel):
-    def __init__(self, parent, variables, configfile, **kwargs):
+    def __init__(self, parent, runs, **kwargs):
         pdsim_panels.PDPanel.__init__(self, parent, **kwargs)
         
-        self.results = []
+        import wx.lib.agw.flatmenu as FM
+        from wx.lib.agw.fmresources import FM_OPT_SHOW_CUSTOMIZE, FM_OPT_SHOW_TOOLBAR, FM_OPT_MINIBAR
         
-        self.variables = variables
-        #Make the items
-        cmdLoad = wx.Button(self, label = "Add Runs...")
-        cmdRefresh = wx.Button(self, label = "Refresh")
-        cmdSelect = wx.Button(self, label = "Select Columns...")
-        #Make the sizers
-        hsizer = wx.BoxSizer(wx.HORIZONTAL)
+        self._mb = FM.FlatMenuBar(self, wx.ID_ANY, 10, 5, options = FM_OPT_SHOW_TOOLBAR)
+        
+        self.LoadButton = pdsim_panels.HackedButton(self._mb, label = 'Load Results')
+        self._mb.AddControl(self.LoadButton)
+        self.LoadButton.Bind(wx.EVT_BUTTON, self.OnLoadRuns)
+        
+        self.RefreshButton = pdsim_panels.HackedButton(self._mb, label = 'Refresh')
+        self._mb.AddControl(self.RefreshButton)
+        #self.BuildButton.Bind(wx.EVT_BUTTON, self.OnBuildTable)
+        self.RefreshButton.Disable()
+        
+        self.RunButton = pdsim_panels.HackedButton(self._mb, label = 'Run Table')
+        self._mb.AddControl(self.RunButton)
+        #self.RunButton.Bind(wx.EVT_BUTTON, self.OnRunTable)
+        self.RunButton.Disable()
+        
+        self.OutputTree = pdsim_panels.OutputTreePanel(self, runs)
+        
+        #Layout of the panel
         sizer = wx.BoxSizer(wx.VERTICAL)
-        #Put the things into sizers
-        hsizer.Add(cmdLoad)
-        hsizer.Add(cmdSelect)
-        hsizer.Add(cmdRefresh)
-        sizer.Add(hsizer)
-        #Bind events
-        cmdLoad.Bind(wx.EVT_BUTTON, self.OnLoadRuns)
-        cmdSelect.Bind(wx.EVT_BUTTON, self.OnSelectCols)
-        cmdRefresh.Bind(wx.EVT_BUTTON, self.OnRefresh)
-        
+        sizer.Add(self._mb, 0, wx.EXPAND)
+        sizer.Add(self.OutputTree, 1, wx.EXPAND)
         self.SetSizer(sizer)
-        self.ResultsList = None
-        self.WriteButton = None
-        
-        #Create a list of possible columns
-        self.column_options = {'mdot': 'Mass flow rate [kg/s]',
-                               'eta_v': 'Volumetric efficiency [-]',
-                               'eta_a': 'Adiabatic efficiency [-]',
-                               'Td': 'Discharge temperature [K]',
-                               'motor.losses': 'Motor losses [kW]',
-                               'Wdot_electrical': 'Electrical power [kW]',
-                               'Wdot_mechanical': 'Mechanical power [kW]',
-                               'Qamb': 'Ambient heat transfer [kW]',
-                               'run_index': 'Run Index',
-                               'eta_oi': 'Overall isentropic efficiency [-]',
-                               'elapsed_time': 'Elapsed time [s]'
-                               }
-        
-        # Add all the parameters that arrive from the self.items lists from the 
-        # pdsim_panels.PDPanel instances from the SolverToolbook and the 
-        # InputsToolbook
-        for var in self.variables:
-            key = var['attr']
-            value = var['text']
-            self.column_options[key] = value
-        
-        self.columns_selected = []
         sizer.Layout()
-        
-        self.Bind(wx.EVT_SIZE, self.OnRefresh)
-        
-        self.get_from_configfile('OutputDataPanel')
     
-    def _get_nested_attr(self,sim,attr):
+    def add_runs(self, runs):
         """
-        Get a nested attribute of the class.  Can be a combination of indexing
-        as well as dotted attribute access.  For instance
-        
-            "injection.massflow['injection_line.1.1']"
-            
-        The only delimiters allowed are [ ] . ' 
-        
-        Returns
-        -------
-        The value if found, ``None`` otherwise
-        """   
-        def _clean_string(_string):
-            """ returns True if doesn't contain any of the delimiters """
-            return (_string.find(".") < 0
-                    and _string.find("[") < 0
-                    and _string.find("]") < 0
-                    and _string.find("'") < 0)
-        
-        def _next_delimiter(_string):
-            """ returns the next delimiter, or None if none found """
-            dels = ["[","'","."]
-            i = 9999
-            for _del in dels:
-                Ifound = _string.find(_del)
-                if Ifound >= 0 and Ifound < i:
-                    i = Ifound
-            
-            if i == 9999:
-                return None
-            else:
-                return _string[i] 
-        
-        def _last_delimiter(_string):
-            """ returns the last delimiter, or None if none found """
-            dels = ["[","'","."]
-            i = -1
-            for _del in dels:
-                Ifound = _string.find(_del)
-                if Ifound >= 0 and Ifound > i:
-                    i = Ifound
-            
-            if i == -1:
-                return None
-            else:
-                return _string[i]
-                
-        var = sim
-        while len(attr)>0:
-            
-            # Just return the attribute if it has it
-            if hasattr(var, attr):
-                return getattr(var, attr)
-            
-            # If the attr you are looking up has no funny delimiters, but isn't
-            # in the class, return None (not found)
-            elif _clean_string(attr):
-                return None
-            
-            # Split at the dot (.) if there is nothing funny in the left part
-            elif len(attr.split('.')) > 1 and _clean_string(attr.split('.',1)[0]):
-                # Actually split the string
-                left, right = attr.split('.',1)
-                # Update variable using the left side, update attribute using right
-                if hasattr(var, left):
-                    var = getattr(var, left)
-                    attr = right
-                else:
-                    return None
-            
-            # If the next delimiter is a [ but does not start the string, 
-            # you are doing some sort of indexing.  This can't be a return
-            # value
-            elif _next_delimiter(attr) == '[' and not attr[0] == '[':
-                # Actually split the string
-                left, right = attr.split('[',1)
-                #Right gets its bracket back
-                right = '[' + right
-                # Update variable using the left side, update attribute using right
-                if hasattr(var, left):
-                    var = getattr(var,left)
-                    attr = right
-                else:
-                    return None
-            
-            #If the next thing is an index
-            elif attr[0] == '[':
-                #Remove the leading bracket
-                attr = attr[1:len(attr)]
-                #Get the part in-between the brackets, rest is attr
-                index_string, attr = attr.split(']', 1)
-                #If it is wrapped in single-quotes it is a string, otherwise it must be an integer
-                try:
-                    if index_string[0] == "'" and index_string[-1] == "'":
-                        # It is a string, discard the single-quotes
-                        index_string = index_string[1:len(index_string)-1]
-                        # A string index
-                        var = var[index_string]
-                    else:
-                        # An integer index
-                        var = var[int(index_string)]
-                        
-                except IndexError:
-                    return None
-                
-                if len(attr)==0:
-                    return var             
-                    
-    def _hasattr(self, sim, attr):
-        #If the attribute exists at the top-level of the simulation class
-        if hasattr(sim, attr):
-            return True
-        else:
-            val = self._get_nested_attr(sim, attr)
-            if val is None:
-                return False
-            else:
-                return True 
-        
-    def rebuild(self):
-        
-        if self.results: #as long as it isn't empty
-            
-            #Remove the items on the panel
-            if self.ResultsList is not None:
-                self.WriteButton.Destroy()
-                self.RemoveButton.Destroy()
-                self.PlotButton.Destroy()
-                self.ResultsList.Destroy()
-                self.GetSizer().Layout()
-            
-            #Remove any keys that are in cols_selected but not in col_options
-            #Iterate over a copy so that removing the keys works properly
-            for key in self.columns_selected[:]:
-                if key not in self.column_options:
-                    self.columns_selected.remove(key)
-                    warnings.warn('The key '+key+' was found in columns_selected but not in column_options.')
-                
-            for attr in reversed(self.columns_selected):
-                #If the key is in any of the simulations 
-                if not any([self._hasattr(sim,attr) for sim in self.results]):
-                    print 'removing column_heading', attr,' since it is not found in any simulation'
-                    self.columns_selected.remove(attr)
-                        
-            rows = []
-            for sim in self.results: #loop over the results
-                row = []
-                for attr in self.columns_selected:
-                    if self._hasattr(sim, attr):
-                        value = self._get_nested_attr(sim, attr)
-                        row.append(value)
-                    else:
-                        print 'Trying to add attribute \'' + attr + '\' to output but it is not found found in simulation instance'
-                rows.append(row)
-            headers = [self.column_options[attr] for attr in self.columns_selected]
-            
-            #The items being created
-            self.ResultsList = ResultsList(self, headers, rows, self.results)
-
-            
-            self.WriteButton = wx.Button(self, label = 'Write to file...')
-            self.WriteButton.Bind(wx.EVT_BUTTON, self.OnWriteFiles)
-            
-            self.RemoveButton = wx.Button(self,label = 'Remove selected')
-            self.RemoveButton.Bind(wx.EVT_BUTTON, self.OnRemoveSelected)
-            
-            self.PlotButton = wx.Button(self,label = 'Plot selected')
-            self.PlotButton.Bind(wx.EVT_BUTTON, self.OnPlotSelected)
-            
-            #Do the layout of the panel
-            sizer = self.GetSizer()
-            
-            hsizer = wx.BoxSizer(wx.HORIZONTAL)
-            hsizer.Add(self.ResultsList,1,wx.EXPAND)
-            sizer.Add(hsizer)
-            
-            hsizer = wx.BoxSizer(wx.HORIZONTAL)
-            hsizer.Add(self.WriteButton)
-            hsizer.Add(self.RemoveButton)
-            hsizer.Add(self.PlotButton)
-            sizer.Add(hsizer)
-            
-            sizer.Layout()
-            self.Refresh()
-            
-        else:
-            #Destroy the items associated with the output data
-            if self.ResultsList is not None:
-                self.WriteButton.Destroy()
-                self.RemoveButton.Destroy()
-                self.PlotButton.Destroy()
-                self.ResultsList.Destroy()
-                self.ResultsList = None
-                
-            sizer = self.GetSizer()
-            sizer.Layout()
-            self.Refresh()
-    
-    def add_runs(self, results, rebuild = False):
-        self.results += results
-        if rebuild:
-            self.rebuild()
-            
-    def add_output_terms(self, items):
-        
-        for var in items:
-            key = var['attr']
-            value = var['text']
-            self.column_options[key] = value
-      
-    def change_output_attrs(self, key_dict):
-        """
-        Change column attributes
-        
-        For instance::
-        
-            change_output_attrs( dict(t = 'geo.t') )
         
         Parameters
         ----------
-        key_dict : dict
-            A dictionary with keys of old key and value of new key
+        runs : list
+            A list of paths to HDF5 files to be loaded into the GUI
         """
-        for old_key,new_key in key_dict.iteritems():
-            #Replace the value in columns selected if it is selected
-            if old_key in self.columns_selected:
-                i = self.columns_selected.index(old_key)
-                self.columns_selected[i] = new_key
-            if old_key in self.column_options:
-                #Make a copy using the old_key
-                val = self.column_options.pop(str(old_key))
-                #Use the old value with the updated key
-                self.column_options[new_key] = val
-            
-        self.rebuild()
+        self.OutputTree.add_runs(runs)
+        
+    def remove_run(self, index):
+        """
+        
+        Remove a run at the index given by ``index``
+        """
+        self.OutputTree.remove_run(index)
         
     def OnLoadRuns(self, event = None):
         """
-        Load a pickled run from a file
+        Load a HDF5 of output from PDSimGUI
         """
-        home = os.getenv('USERPROFILE') or os.getenv('HOME')
-        temp_folder = os.path.join(home,'.pdsim-temp')
         
-        FD = wx.FileDialog(None,"Load Runs",defaultDir = temp_folder,
-                           wildcard = 'PDSim Runs (*.mdl)|*.mdl',
+        FD = wx.FileDialog(None,"Load Runs",defaultDir = pdsim_home_folder,
+                           wildcard = 'PDSim Runs (*.h5)|*.h5',
                            style=wx.FD_OPEN|wx.FD_MULTIPLE|wx.FD_FILE_MUST_EXIST)
         if wx.ID_OK == FD.ShowModal():
             file_paths = FD.GetPaths()
             for file in file_paths:
-                sim = cPickle.load(open(file,'rb'))
-                self.add_runs([sim])
-            self.rebuild()
+                self.OutputTree.add_runs(h5py.File(file,'r'))
+                print 'added',file
         FD.Destroy()
     
     def OnPlotSelected(self, event):
@@ -1286,7 +1058,6 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             #Rebuild the ResultsList
             self.rebuild()
                 
-    
     def OnWriteFiles(self, event):
         """
         Event that fires when the button is clicked to write a selection of things to files
@@ -1299,28 +1070,8 @@ class OutputDataPanel(pdsim_panels.PDPanel):
     def OnRefresh(self, event):
         self.rebuild()
         
-    def OnSelectCols(self, event = None):
-        dlg = ColumnSelectionDialog(None, self.column_options, self.columns_selected)
-        if dlg.ShowModal() == wx.ID_OK:
-            self.columns_selected = dlg.GetSelections() 
-        dlg.Destroy()
-        self.rebuild()
-    
-    def post_get_from_configfile(self, key, value):
-        if not key == 'selected':
-            raise KeyError
-        
-        list_str = value.split(',',1)[1].replace("'","").replace('[','').replace(']','').replace("u'","'")
-        for attr in list_str.split(';'):
-            #Strip leading and trailing space
-            attr = attr.strip()
-            self.columns_selected.append(attr)
-    
-    def post_prep_for_configfile(self):
-        return 'selected  = selected,'+str(self.columns_selected).replace(',',';').replace("u'","'")+'\n'
-        
 class OutputsToolBook(wx.Toolbook):
-    def __init__(self,parent,configfile):
+    def __init__(self, parent, configdict):
         wx.Toolbook.__init__(self, parent, wx.ID_ANY, style=wx.BK_LEFT)
         il = wx.ImageList(32, 32)
         indices=[]
@@ -1329,20 +1080,17 @@ class OutputsToolBook(wx.Toolbook):
             indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
         self.AssignImageList(il)
         
-#        variables = self.Parent.InputsTB.collect_parametric_terms()
-#        self.PlotsPanel = wx.Panel(self)
-#        self.DataPanel = OutputDataPanel(self,
-#                                         variables = variables, 
-#                                         name = 'OutputDataPanel',
-#                                         configfile = configfile)
-        
-    
         # Load the runs into memory
         runa = h5py.File('runa.h5')#, driver = 'core', backing_store = False)
         runb = h5py.File('runb.h5')#, driver = 'core', backing_store = False)
-    
+        
+        runs = [runa,runb]
+#        variables = self.Parent.InputsTB.collect_parametric_terms()
+#        self.PlotsPanel = wx.Panel(self)
+        self.DataPanel = OutputDataPanel(self, runs = runs, name = 'OutputDataPanel')
+        
         #Make a  instance
-        self.panels = (pdsim_panels.OutputTreePanel(self,[runa, runb]), wx.Panel(self))#self.PlotsPanel)
+        self.panels = (self.DataPanel, wx.Panel(self))#self.PlotsPanel)
         #self.panels = (wx.Panel(self), wx.Panel(self))#self.PlotsPanel)
         for Name,index,panel in zip(['Data','Plots'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
@@ -1931,13 +1679,21 @@ class MainFrame(wx.Frame):
         frm.Show()
         
     def OnConfigOpen(self,event):
-        FD = wx.FileDialog(None,"Load Configuration file",defaultDir='configs',
+        
+        default_dir = GUIconfig.get('config_path', default = 'configs')
+        
+        FD = wx.FileDialog(None,"Load Configuration file",defaultDir=default_dir,
                            style=wx.FD_OPEN)
         if wx.ID_OK==FD.ShowModal():
             file_path = FD.GetPath()
             configdict = yaml.load(open(file_path,'r'))
             #Now rebuild the GUI using the desired configuration file
             self.rebuild(configdict)
+            
+            # Write current location to config
+            current_path,fname = os.path.split(file_path)
+            GUIconfig.set('config_path',current_path)
+            
         FD.Destroy()
         
     def OnConfigSave(self,event):
@@ -1948,6 +1704,7 @@ class MainFrame(wx.Frame):
                            "Save Configuration file",
                            defaultDir='configs',
                            style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
+        
         if wx.ID_OK == FD.ShowModal():
             #Get the file path
             file_path=FD.GetPath()
@@ -2002,6 +1759,10 @@ class MainFrame(wx.Frame):
             else:
                 for k in check_dict.iterkeys():
                     print check_dict[k].GetValue(),my_dict[k].GetValue()
+                    
+            # Write current location to config
+            current_path,fname = os.path.split(file_path)
+            GUIconfig.set('config_path',current_path)
             
         FD.Destroy()
         

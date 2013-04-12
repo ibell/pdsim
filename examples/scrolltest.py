@@ -18,6 +18,7 @@ from math import pi
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo
+from PDSim.core.core import struct
 from PDSim.scroll.core import Scroll
 from PDSim.core.containers import ControlVolume
 from PDSim.core.core import Tube
@@ -54,28 +55,28 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False):
     
     ScrollComp.omega = 4500/60*2*pi
     ScrollComp.Tamb = 298.0
-    ScrollComp.eta_motor = 0.9
     
     #Temporarily set the bearing dimensions
-    ScrollComp.D_upper_bearing = 0.04
-    ScrollComp.L_upper_bearing = 0.04
-    ScrollComp.c_upper_bearing = 20e-6
-    ScrollComp.D_crank_bearing = 0.04
-    ScrollComp.L_crank_bearing = 0.04
-    ScrollComp.c_crank_bearing = 20e-6
-    ScrollComp.D_lower_bearing = 0.025
-    ScrollComp.L_lower_bearing = 0.025
-    ScrollComp.c_lower_bearing = 20e-6
-    ScrollComp.thrust_ID = 0.05
-    ScrollComp.thrust_friction_coefficient = 0.028 #From Chen thesis
-    ScrollComp.orbiting_scroll_mass = 2.5
-    ScrollComp.L_ratio_bearings = 3
+    ScrollComp.mech = struct()
+    ScrollComp.mech.D_upper_bearing = 0.04
+    ScrollComp.mech.L_upper_bearing = 0.04
+    ScrollComp.mech.c_upper_bearing = 20e-6
+    ScrollComp.mech.D_crank_bearing = 0.04
+    ScrollComp.mech.L_crank_bearing = 0.04
+    ScrollComp.mech.c_crank_bearing = 20e-6
+    ScrollComp.mech.D_lower_bearing = 0.025
+    ScrollComp.mech.L_lower_bearing = 0.025
+    ScrollComp.mech.c_lower_bearing = 20e-6
+    ScrollComp.mech.thrust_ID = 0.05
+    ScrollComp.mech.thrust_friction_coefficient = 0.028 #From Chen thesis
+    ScrollComp.mech.orbiting_scroll_mass = 2.5
+    ScrollComp.mech.L_ratio_bearings = 3
+    ScrollComp.mech.mu_oil = 0.008
     
     ScrollComp.h_shell = 10
     ScrollComp.A_shell = 0.05
     ScrollComp.HTC = 0.0
     
-    ScrollComp.mu_oil = 0.008
     ScrollComp.motor = Motor()
     ScrollComp.motor.set_eta(0.9)
     ScrollComp.motor.suction_fraction = 1.0

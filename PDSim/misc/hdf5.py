@@ -75,3 +75,16 @@ class HDF5Writer(object):
         f = h5py.File(fName,'w')
         self._recursive_write(f, struct)
         f.close()
+        
+    def prune(self, fName, keys):
+        """
+        Prune datasets and groups that are nested below the keys requested
+        """
+        
+        f = h5py.File(fName,'r+') #open r/w
+        for key in keys:
+            if key in f:
+                del f[key]
+            else:
+                print 'Could not prune this key from HFD5 file:',key
+        f.close()

@@ -5,7 +5,7 @@ import warnings, codecs, textwrap,os, itertools, difflib, zipfile, types
 from multiprocessing import Process
 
 # wxPython imports
-import wx
+import wx, wx.grid, wx.stc
 from wx.lib.mixins.listctrl import CheckListCtrlMixin,TextEditMixin,ListCtrlAutoWidthMixin
 
 import CoolProp
@@ -27,6 +27,7 @@ import PDSimGUI
 
 import h5py
 import quantities as pq
+from time import clock
 
 length_units = {
                 'Meter': pq.length.m,
@@ -459,7 +460,6 @@ class PDPanel(wx.Panel):
                     elif unicode_units == u'K':
                         textbox.default_units = 'Kelvin'
                     
-                    
                     #If it has units bind the unit changing callback on right-click
                     if textbox.default_units:
                         self.Bind(wx.EVT_CONTEXT_MENU,self.OnChangeUnits,textbox)  
@@ -470,193 +470,6 @@ class PDPanel(wx.Panel):
             return annotated_GUI_objects[0]
         else:
             return annotated_GUI_objects
-              
-        
-    def prep_for_configfile(self):
-        """
-        Writes the panel to a format ready for writing to config file
-        using the entries in ``self.items``.  
-        
-        If there are other fields that need to get saved to file, the panel 
-        can provide the ``post_prep_for_configfile`` function and add the additional fields 
-        
-        This function will call the ``post_prep_for_configfile`` if the subclass has it
-        and add to the returned string
-        """
-        if self.name=='':
-            return ''
-            
-        if not hasattr(self,'items'):
-            self.items=[]
-        
-        s='['+self.name+']\n'
-        
-        for item in self.items:
-            val = item['textbox'].GetValue()
-            # Description goes into the StaticText control
-            try:
-                int(val)
-                type_='int'
-            except ValueError:
-                try: 
-                    float(val)
-                    type_='float'
-                except ValueError:
-                    type_='string'
-            s+=item['attr']+' = '+type_+','+item['textbox'].GetValue().encode('latin-1')+','+item['text']+'\n'
-            
-        if hasattr(self,'post_prep_for_configfile'):
-            s+=self.post_prep_for_configfile()
-        
-        s=s.replace('%','%%')
-        return s
-           
-    def _get_from_configfile(self, name, value):
-        """
-        Takes in a string from the config file and figures out how to parse it
-        
-        Returns
-        -------
-        d : value
-            Variable type
-        desc : string
-            The description from the config file
-        """
-        #Split at the first comma to get type, and value+description
-        type,val_desc = value.split(',',1)
-        #If it has a description, use it, otherwise, just use the config file key
-        if len(val_desc.split(','))==2:
-            val,desc_=val_desc.split(',')
-            desc=desc_.strip()
-        else:
-            val=val_desc
-            desc=name.strip()
-            
-        if type=='int':
-            d=int(val)
-        elif type=='float':
-            d=float(val)
-        elif type=='str':
-            d=unicode(val)
-        elif type=='State':
-            Fluid,T,rho=val.split(',')
-            d=dict(Fluid=Fluid,T=float(T),rho=float(rho))
-        else:
-            #Try to let the panel use the (name, value) directly
-            if hasattr(self,'post_get_from_configfile'):
-                d = self.post_get_from_configfile(name, value)
-            else:
-                raise KeyError('Type in line '+name+' = ' +value+' must be one of int,float,str')     
-        return d, desc 
-               
-    def get_from_configfile(self, section, key = None, default = False):
-        """
-        This function will get parameters from the config file
-        
-        Parameters
-        ----------
-        section : string
-            The section of the config file to retrieve values from
-        key : string, optional
-            The key of the value to return
-        default : boolean, optional
-            If ``True``, ALWAYS use the default config file
-        
-        Notes
-        -----
-        If section and key are provided, it will return just the value, either from
-        the main config file if found or the default config file if not found.  
-        If the parameter default is ``True``, it will ALWAYS use the default config file 
-        
-        Each of the values in the configuration 
-        file may have a string in the format 
-        
-        int,3,
-        float,3.0
-        string,hello
-        
-        so that the code can know what type the value is.  If the value is something else,
-        ask post_get_from_configfile if it knows what to do with it
-        
-        """
-        d, desc={}, {}
-        
-        Main = wx.GetTopLevelParent(self)
-        parser, default_parser = Main.get_config_objects()
-        
-        #Section not included, use the default section from the default config file
-        if not parser.has_section(section):
-            dlg = wx.MessageDialog(None,'Section '+section+' was not found, falling back to default configuration file')
-            dlg.ShowModal()
-            dlg.Destroy()
-            _parser = default_parser
-        elif default:
-            # We are programmatically using the default parameters, 
-            # don't warn'
-            _parser = default_parser
-        else:
-            _parser = parser
-        
-        if key is not None:
-            if default:
-                #Use the default value
-                value = default_parser.get(section, key)
-                d[key],desc[key] =  self._get_from_configfile(key, value)
-                return d,desc
-            
-            #Return the value from the file directly if the key is found
-            elif _parser.has_option(section,key):
-                value = _parser.get(section, key)
-                _d,_desc =  self._get_from_configfile(key, value)
-                return _d,_desc
-            
-            else:
-                #Fall back to the default file
-                warnings.warn('Did not find the key ['+key+'] in section '+section+', falling back to default config' )
-                value = default_parser.get(section, key)
-                _d,_desc =  self._get_from_configfile(key, value)
-                return _d,_desc
-        
-        for name, value in _parser.items(section):
-            d[name], desc[name] = self._get_from_configfile(name,value)
-            
-        return d,desc
-    
-    def get_additional_parametric_terms(self):
-        """
-        Provide additional parametric terms to the parametric table builder
-        
-        This function, when implemented in the derived class, will provide 
-        additional terms to the parametric table builder.  If unimplemented, will
-        just return ``None``.
-        
-        The format of the returned list should be a list of dictionaries with
-        the terms:
-            
-            parent : a reference to this panel
-            attr : the attribute in the simulation that will be linked with this term
-            text : the label for the term
-            
-        Notes
-        -----
-        ``attr`` need not be actually the term that will ultimately be set in the simulation model
-        
-        It will be parsed by the apply_additional_parametric_term() function 
-        below
-        """
-        pass
-    
-    def apply_additional_parametric_terms(self, attrs, vals, items):
-        """
-        
-        Returns
-        -------
-        list of items that were unmatched
-        
-        Raises
-        ------
-        """
-        return attrs, vals
     
     def BindChangeUnits(self, TextCtrl):
         self.Bind(wx.EVT_KEY_DOWN, self.OnChangeUnits, TextCtrl)
@@ -691,68 +504,84 @@ class OutputTreePanel(wx.Panel):
                                            #| wx.TR_NO_LINES 
                                            | wx.TR_FULL_ROW_HIGHLIGHT
                                            )
-
+        
+#        # Make a list of list of keys for each HDF5 file
+#        lists_of_keys = []
+#        for run in runs:
+#            keys = []
+#            run.visit(keys.append) #For each thing in HDF5 file, append its name to the keys list
+#            lists_of_keys.append(keys)
+#        
+#        from time import clock
+#        t1 = clock()
+#        
+#        mylist = []
+#        def func(name, obj):
+#            if isinstance(obj, h5py.Dataset):
+#                try:
+#                    mylist.append((name, obj.value))
+#                except ValueError:
+#                    pass
+#            elif isinstance(obj, h5py.Group):
+#                mylist.append((name, None))
+#            else:
+#                return
+#                
+#        run.visititems(func)
+#        
+#        for el in mylist:
+#            r,v = el
+#            
+#            # Always make this level
+#            child = self.tree.AppendItem(self.root, r)
+#            self.tree.SetItemImage(child, fldridx, which = wx.TreeItemIcon_Normal)
+#            self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
+#            self.tree.SetItemText(child, str(v), 1)
+#            
+#        t2 = clock()
+#        print t2 - t1, 'to get all the items'
+            
+        self.runs = runs
+        self.Disable()
+        self.rebuild()
+        
+    def rebuild(self):
+        
+        self.Enable()
+        
+        # Remove all the columns that are in the tree
+        ncols = self.tree.GetColumnCount()
+        if ncols > 1: #There's already something there
+            for col in range(0, ncols):
+                self.tree.RemoveColumn(0) # Keep removing the first column
+             
+        self.tree.DeleteAllItems()
+        self.tree.DeleteRoot()
+        
+        if not self.runs:
+            return
+        
         isz = (16, 16)
         il = wx.ImageList(*isz)
         fldridx     = il.Add(wx.ArtProvider_GetBitmap(wx.ART_FOLDER,      wx.ART_OTHER, isz))
         fldropenidx = il.Add(wx.ArtProvider_GetBitmap(wx.ART_FILE_OPEN,   wx.ART_OTHER, isz))
         fileidx     = il.Add(wx.ArtProvider_GetBitmap(wx.ART_NORMAL_FILE, wx.ART_OTHER, isz))
-
+        
         self.tree.SetImageList(il)
         self.il = il
         self.tree.AddColumn("Main column")
         self.tree.SetMainColumn(0) # the one with the tree in it...
         self.tree.SetColumnWidth(0, 175)
         
-        # Flush everything
-        
         # Build the columns
-        for i, run in enumerate(runs):
+        for i, run in enumerate(self.runs):
             self.tree.AddColumn("Run {i:d}".format(i = i))  
 
-        # Create some columns
+        # Create the root column
         self.root = self.tree.AddRoot("The Root Item")
+        
         self.tree.SetItemImage(self.root, fldridx, which = wx.TreeItemIcon_Normal)
         self.tree.SetItemImage(self.root, fldropenidx, which = wx.TreeItemIcon_Expanded)
-        
-        # Make a list of list of keys for each HDF5 file
-        lists_of_keys = []
-        for run in runs:
-            keys = []
-            run.visit(keys.append) #For each thing in HDF5 file, append its name to the keys list
-            lists_of_keys.append(keys)
-        
-        from time import clock
-        t1 = clock()
-        
-        mylist = []
-        def func(name, obj):
-            if isinstance(obj, h5py.Dataset):
-                try:
-                    mylist.append((name, obj.value))
-                except ValueError:
-                    pass
-            elif isinstance(obj, h5py.Group):
-                mylist.append((name, None))
-            else:
-                return
-                
-        run.visititems(func)
-        
-        
-        for el in mylist:
-            r,v = el
-            
-            # Always make this level
-            child = self.tree.AppendItem(self.root, r)
-            self.tree.SetItemImage(child, fldridx, which = wx.TreeItemIcon_Normal)
-            self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
-            self.tree.SetItemText(child, str(v), 1)
-            
-        t2 = clock()
-        print t2 - t1, 'to get all the items'
-            
-        self.runs = runs
         
         def _recursive_hdf5_add(root, objects):
             for thing in objects[0]:
@@ -776,218 +605,239 @@ class OutputTreePanel(wx.Panel):
                     self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
                     _recursive_hdf5_add(child, [o[thing] for o in objects])
         
-
-#        t1 = clock()
-#        _recursive_hdf5_add(self.root, runs)
-#        t2 = clock()
+        t1 = clock()
+        _recursive_hdf5_add(self.root, self.runs)
+        t2 = clock()
         
-#        print t2-t1,'secs elapsed to load output tree'
+        print t2-t1,'secs elapsed to load output tree'
         
         self.tree.Expand(self.root)
 
         self.tree.GetMainWindow().Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
         self.tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.OnActivate)
-
+        
     def OnActivate(self, evt):
         print('OnActivate: %s' % self.tree.GetItemText(evt.GetItem()))
-
+        
     def OnRightUp(self, evt):
         pos = evt.GetPosition()
         item, flags, col = self.tree.HitTest(pos)
-        if item:
-            print('Flags: %s, Col:%s, Text: %s' %
-                           (flags, col, self.tree.GetItemText(item, col)))
+        #print('Flags: %s, Col:%s, Text: %s' %(flags, col, self.tree.GetItemText(item, col)))
+
+        # Make a menu
+        menu = wx.Menu()
+        
+        # If you are in a data column, allow you to remove the column
+        if col > 0:
+            menuitem1 = wx.MenuItem(menu, -1, 'Remove this column')
+            self.Bind(wx.EVT_MENU, lambda event: self.OnRemoveCol(event, col), menuitem1)
+            menu.AppendItem(menuitem1)
+        
+        # If 
+        if self.tree.GetItemText(item,col).startswith('<HDF5 dataset'):
+            _isHDF5array = True
+        else:
+            _isHDF5array = False
+            
+        if len(self.tree.GetItemText(item,col)) > 300:
+            _isScript = True
+        else:
+            _isScript = False
+        
+        if _isHDF5array:    
+            menuitem = wx.MenuItem(menu, -1, 'Display this  parameter')
+            self.Bind(wx.EVT_MENU, lambda event: self.OnArrayDisplay(event, item, col), menuitem)
+            menu.AppendItem(menuitem)
+            
+        if _isScript:
+            menuitem = wx.MenuItem(menu, -1, 'View Script')
+            self.Bind(wx.EVT_MENU, lambda event: self.OnScriptDisplay(event, item, col), menuitem)
+            menu.AppendItem(menuitem)
+             
+        # If you are in a dataset row, allow you to sort based on it
+        values = [self.tree.GetItemText(item, col) for col in range(1, self.tree.ColumnCount)]
+        if any(values):
+            menuitem = wx.MenuItem(menu, -1, 'Sort by this parameter')
+            self.Bind(wx.EVT_MENU, lambda event: self.OnSortByRow(event, item), menuitem)
+            menu.AppendItem(menuitem)
+        
+        if menu.GetMenuItems():
+            # Popup the menu.  If an item is selected then its handler
+            # will be called before PopupMenu returns.
+            self.PopupMenu(menu)
+        menu.Destroy()
+        
+    
+    def OnArrayDisplay(self, event, item, col):
+        path = ''
+        title = self.tree.GetItemText(item, 0)
+        while not item == self.tree.GetRootItem():
+            path = '/' +  self.tree.GetItemText(item, 0)
+            item = self.tree.GetItemParent(item)
+            
+        val = self.runs[col-1].get(path).value
+        
+        frm = ArrayDisplay(val, title = title)
+        frm.Show()
+        
+    def OnScriptDisplay(self, event, item, col):
+        path = ''
+        script = self.tree.GetItemText(item, col)
+        
+        frm = ScriptDisplay(script)
+        frm.Show()
+        
+    def OnSortByRow(self, event, item):
+        
+        #Skip column 0 which is the header column
+        values = [self.tree.GetItemText(item, col) for col in range(1, self.tree.ColumnCount)]
+            
+        print 'row values', values
+    
+    def OnRemoveCol(self, event, col):
+        
+        if col > 0:
+            self.remove_run(col-1) #Column index 1 is the self.runs index 0
+            self.rebuild()
 
     def OnSize(self, evt):
         self.tree.SetSize(self.GetSize())
         
-        
-        
-class ChangeParamsDialog(wx.Dialog):
-    def __init__(self, params, **kwargs):
-        wx.Dialog.__init__(self, None, **kwargs)
-    
-        self.params = params
-        sizer = wx.FlexGridSizer(cols = 2)
-        self.labels = []
-        self.values = []
-        self.attrs = []
-    
-        for p in self.params:
-            l, v = LabeledItem(self,
-                               label = p['desc'],
-                               value = str(p['value'])
-                               )
-            self.labels.append(l)
-            self.values.append(v)
-            self.attrs.append(p['attr'])
-            
-            sizer.AddMany([l,v])
-            
-        self.SetSizer(sizer)
-        min_width = min([l.GetSize()[0] for l in self.labels])
-        for l in self.labels:
-            l.SetMinSize((min_width,-1))
-        sizer.Layout()
-        self.Fit()
-        
-         #Bind a key-press event to all objects to get Esc 
-        children = self.GetChildren()
-        for child in children:
-            child.Bind(wx.EVT_KEY_UP,  self.OnKeyPress)
-    
-    def get_values(self):
-        params = []
-        for l,v,k in zip(self.labels, self.values, self.attrs):
-            params += [dict(desc = l.GetLabel(),
-                           attr = k,
-                           value = float(v.GetValue())
-                        )]
-        return params
-            
-    def OnAccept(self, event = None):
-        self.EndModal(wx.ID_OK)
-        
-    def OnKeyPress(self,event = None):
-        """ cancel if Escape key is pressed or accept if Enter """
-        event.Skip()
-        if event.GetKeyCode() == wx.WXK_ESCAPE:
-            self.EndModal(wx.ID_CANCEL)
-        elif event.GetKeyCode() == wx.WXK_RETURN:
-            self.EndModal(wx.ID_OK)
-    
-    def CancelValues(self, event = None):
-        self.EndModal(wx.ID_CANCEL)
-        
-
-class MassFlowOptionPanel(wx.Panel):
-    """
-    A wx.Panel for selecting the flow model and associated parameters
-    
-    Should not be instantiated directly, rather subclassed in order to provide the list of dictionaries
-    of flow models for a given type of machine
-    """
-    def __init__(self,
-                 parent,
-                 key1, 
-                 key2,
-                 label = 'NONE',
-                 types = None,
-                 ):
-        
-        wx.Panel.__init__(self, parent)
-        
-        self.key1 = key1
-        self.key2 = key2
-        
-        #Build the panel
-        self.label = wx.StaticText(self, label=label)
-        self.flowmodel_choices = wx.Choice(self)
-        
-        #Get the options from the derived class and store in a list
-        self.options_list = self.model_options()
-        
-        #Load up the choicebox with the possible flow models possible
-        for option in self.options_list:
-            self.flowmodel_choices.Append(option['desc'])
-        self.flowmodel_choices.SetSelection(0)
-        
-        #A button to fire the chooser
-        self.params_button = wx.Button(self, label='Params...')
-        
-        for option in self.options_list:
-            
-            if option['desc'] == self.flowmodel_choices.GetStringSelection():
-                
-                #If parameters not provided (or not needed), disable the button
-                if not 'params' in option or not option['params']:
-                    self.params_button.Enable(False)
+    def add_runs(self, runs):
+        if isinstance(runs, h5py.File):
+            self.runs += [runs]
+        else:
+            for run in runs:
+                if isinstance(runs, h5py.File):
+                    self.runs += [run]
                 else:
-                    self.params_dict = option['params']
-                    self.update_tooltip()            
-                    self.params_button.Bind(wx.EVT_BUTTON, self.OnChangeParams)
-                    
-                TTS = self.dict_to_tooltip_string(option['params'])
-                self.params_button.SetToolTipString(TTS)
+                    raise ValueError("Can only add instances of h5py.File")
+        self.rebuild()
         
-        sizer = wx.BoxSizer(wx.HORIZONTAL)
-        sizer.Add(self.label)
-        sizer.Add(self.flowmodel_choices)
-        sizer.Add(self.params_button)
-        self.SetSizer(sizer)
-        sizer.Layout()
-        
-    def model_options(self):
+    def remove_run(self, index):
         """
-        This function should return a list of dictionaries.  
-        In each dictionary, the following terms must be defined:
-        
-        * desc : string
-            Very terse description of the term 
-        * function_name : function
-            the function in the main machine class to be called
-        * params : list of dictionaries with the keys 'attr', 'value', 'desc'
-        
-        MUST be implemented in the sub-class
+        Remove the run at the given index
         """
-        raise NotImplementedError
+        self.runs.pop(index)
+        
+class ScriptDisplay(wx.Frame):
     
-    def update_tooltip(self):
-        for option in self.options_list:
-            if option['desc'] == self.flowmodel_choices.GetStringSelection():
-                TTS = self.dict_to_tooltip_string(self.params_dict)
-                self.params_button.SetToolTipString(TTS)
+    def __init__(self, text, **kwargs):
+        wx.Frame.__init__(self, None, **kwargs)
         
-    def OnChangeParams(self, event):
-        """
-        Open a dialog to change the values
-        """
-        dlg = ChangeParamsDialog(self.params_dict)
-        if dlg.ShowModal() == wx.ID_OK:
-            self.params_dict = dlg.get_values()
-            self.update_tooltip()
-        dlg.Destroy()
+        panel = wx.Panel(self)
         
-    def dict_to_tooltip_string(self, params):
-        """
-        Take the dictionary of terms and turn it into a nice string for use in the
-        tooltip of the textbox
-        
-        """
-        
-        s = ''
-        for param in params:
-            s += param['desc'] + ': ' + str(param['value']) + '\n'
-        return s
+        stc = wx.stc.StyledTextCtrl(panel, -1)
     
-    def get_function_name(self):
-        for option in self.options_list:
-            if option['desc'] == self.flowmodel_choices.GetStringSelection():
-                return option['function_name']
-        raise AttributeError
+        import keyword
+        stc.SetLexer(wx.stc.STC_LEX_PYTHON)
+        stc.SetKeyWords(0, " ".join(keyword.kwlist))
+        
+        stc.SetText(text)
     
-    def set_attr(self, attr, value):
-        """
-        Set an attribute in the params list of dictionaries
+        stc.SetMargins(0,0)
+    
+        stc.SetViewWhiteSpace(False)
+        #self.SetBufferedDraw(False)
+        #self.SetViewEOL(True)
+        #self.SetEOLMode(stc.STC_EOL_CRLF)
+        #self.SetUseAntiAliasing(True)
         
-        Parameters
-        ----------
-        attr : string
-            Attribute to be set
-        value : 
-            The value to be given to this attribute
-        """
+        stc.SetEdgeMode(wx.stc.STC_EDGE_BACKGROUND)
+        stc.SetEdgeColumn(78)
+    
+#        self.Bind(stc.EVT_STC_UPDATEUI, self.OnUpdateUI)
+#        self.Bind(stc.EVT_STC_MARGINCLICK, self.OnMarginClick)
+#        self.Bind(wx.EVT_KEY_DOWN, self.OnKeyPressed)
+    
+        faces = {'times': 'Courier New',
+              'mono' : 'Courier New',
+              'helv' : 'Courier New',
+              'other': 'Courier New',
+              'size' : 10,
+              'size2': 10}
+        # Global default styles for all languages
+        stc.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT,"face:Courier New,size:10")
         
-        #self.options_list is a list of dictionaries with the keys 'desc','function_name','params'
-        for option in self.options_list:
-            #Each param is a dictionary with keys of 'attr', 'value', 'desc'
-            for param in option['params']:
-                if param['attr'] == attr:
-                    param['value'] = value
-                    self.update_tooltip()
-                    return
+        # Default 
+        stc.StyleSetSpec(wx.stc.STC_P_DEFAULT, "fore:#000000,face:%(helv)s,size:%(size)d" % faces)
+        # Comments
+        stc.StyleSetSpec(wx.stc.STC_P_COMMENTLINE, "fore:#007F00,face:%(other)s,size:%(size)d" % faces)
+        # Number
+        stc.StyleSetSpec(wx.stc.STC_P_NUMBER, "fore:#007F7F,size:%(size)d" % faces)
+        # String
+        stc.StyleSetSpec(wx.stc.STC_P_STRING, "fore:#7F007F,face:%(helv)s,size:%(size)d" % faces)
+        # Single quoted string
+        stc.StyleSetSpec(wx.stc.STC_P_CHARACTER, "fore:#7F007F,face:%(helv)s,size:%(size)d" % faces)
+        # Keyword
+        stc.StyleSetSpec(wx.stc.STC_P_WORD, "fore:#00007F,bold,size:%(size)d" % faces)
+        # Triple quotes
+        stc.StyleSetSpec(wx.stc.STC_P_TRIPLE, "fore:#7F0000,size:%(size)d" % faces)
+        # Triple double quotes
+        stc.StyleSetSpec(wx.stc.STC_P_TRIPLEDOUBLE, "fore:#7F0000,size:%(size)d" % faces)
+        # Class name definition
+        stc.StyleSetSpec(wx.stc.STC_P_CLASSNAME, "fore:#0000FF,bold,underline,size:%(size)d" % faces)
+        # Function or method name definition
+        stc.StyleSetSpec(wx.stc.STC_P_DEFNAME, "fore:#007F7F,bold,size:%(size)d" % faces)
+        # Operators
+        stc.StyleSetSpec(wx.stc.STC_P_OPERATOR, "bold,size:%(size)d" % faces)
+        # Identifiers
+        stc.StyleSetSpec(wx.stc.STC_P_IDENTIFIER, "fore:#000000,face:%(helv)s,size:%(size)d" % faces)
+        # Comment-blocks
+        stc.StyleSetSpec(wx.stc.STC_P_COMMENTBLOCK, "fore:#7F7F7F,size:%(size)d" % faces)
+        # End of line where string is not closed
+        stc.StyleSetSpec(wx.stc.STC_P_STRINGEOL, "fore:#000000,face:%(mono)s,back:#E0C0E0,eol,size:%(size)d" % faces)
+
+        stc.SetCaretForeground("BLUE")
+        
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(stc,1,wx.EXPAND)
+        panel.SetSizer(sizer)
+        
+        # Frame layout
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        main_sizer.Add(panel,1, wx.EXPAND)
+        self.SetSizer(main_sizer)
+        main_sizer.Layout()
+    
+class ArrayDisplay(wx.Frame):
+    
+    def __init__(self, array, **kwargs):
+        
+        wx.Frame.__init__(self, None, **kwargs)
+        
+        panel = wx.Panel(self)
+        
+        array = np.array(array, ndmin = 2)
+        self.grid = wx.grid.Grid(panel)
+
+        # Make the grid the same shape as the data
+        self.grid.CreateGrid(*array.shape)
+        
+        # Values
+        for row in range(array.shape[0]):
+            for col in range(array.shape[1]):
+                self.grid.SetCellValue(row,col,str(array[row][col]))
                 
-        raise KeyError('Did not find the attribute '+attr)
+        # Column headers
+        for col in range(array.shape[1]):
+            self.grid.SetColLabelValue(col,str(col))
+        
+        # Row "headers"
+        for row in range(array.shape[0]):
+            self.grid.SetRowLabelValue(row,str(row))
+                
+        # Panel layout
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.grid,1,wx.EXPAND)
+        panel.SetSizer(sizer)
+        
+        # Frame layout
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        main_sizer.Add(panel,1, wx.EXPAND)
+        self.SetSizer(main_sizer)
+        main_sizer.Layout()
         
 class ParaSelectDialog(wx.Dialog):
     def __init__(self):
@@ -1040,7 +890,7 @@ class ParametricOption(wx.Panel):
         self.GUI_map = {o.annotation:o.key for o in GUI_objects.itervalues()} 
         
         self.Terms = wx.ComboBox(self)
-        self.Terms.AppendItems(labels)
+        self.Terms.AppendItems(sorted(labels))
         self.Terms.SetSelection(0)
         self.Terms.SetEditable(False)
         self.RemoveButton = wx.Button(self, label = '-', style = wx.ID_REMOVE)
@@ -1112,18 +962,6 @@ class ParametricOption(wx.Panel):
         if hasattr(self,'Values'):
             strvalues = ', '.join([str(v) for v in vals])
             self.Values.SetValue(strvalues)
-        
-    def update_parametric_terms(self, items):
-        """
-        Update the items in each of the comboboxes
-        """
-        labels = [item['text'] for item in items]
-        #Get the old string
-        old_val = self.Terms.GetStringSelection()
-        #Update the contents of the combobox
-        self.Terms.SetItems(labels)
-        #Reset the string
-        self.Terms.SetStringSelection(old_val)
         
     def make_unstructured(self):
         if hasattr(self,'Values'):
