@@ -790,7 +790,6 @@ class ScriptDisplay(wx.Frame):
 
         stc.SetCaretForeground("BLUE")
         
-        
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(stc,1,wx.EXPAND)
         panel.SetSizer(sizer)

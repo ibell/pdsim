@@ -1019,6 +1019,57 @@ class PlotThread(TaskThread):
         if self._GUI.btn.Value == True:
             wx.CallAfter(self._GUI.plotStep)
 
+class OSCrossSectionPanel(wx.Panel):
+    """
+    A figure with the cross-section of the scroll wrap
+    """
+    def __init__(self, parent, dictionary, phiv, h, w):
+        wx.Panel.__init__(self, parent)
+        
+        self.pltpanel = PlotPanel(self, size = (300,300))
+        
+        # Get the axes
+        ax = self.pltpanel.axes
+         
+        D = 0.1
+        
+        tplate = dictionary['scroll_plate_thickness']
+        thrust_ID = dictionary['thrust_ID']
+        Ljournal = dictionary['L_crank_bearing']
+        journal_IR = dictionary['D_crank_bearing']/2.0
+        thrust_IR = thrust_ID/2.0
+        tthrust = tplate
+        
+        ax.fill([-D/2, D/2, D/2, -D/2, -D/2], [-tplate, -tplate, 0, 0, -tplate],'grey')
+        
+        # The thrust bearing
+        ax.fill([-1.5*thrust_IR,-thrust_IR,-thrust_IR,-1.5*thrust_IR,-1.5*thrust_IR],[-tplate-tthrust,-tplate-tthrust,-tplate,-tplate,-tplate-tthrust],'red')
+        ax.fill([1.5*thrust_IR,thrust_IR,thrust_IR,1.5*thrust_IR,1.5*thrust_IR],[-tplate-tthrust,-tplate-tthrust,-tplate,-tplate,-tplate-tthrust],'red')
+        
+        # The journal housing
+        ax.fill([-1.5*journal_IR,-journal_IR,-journal_IR,-1.5*journal_IR,-1.5*journal_IR],[-tplate-Ljournal,-tplate-Ljournal,-tplate,-tplate,-tplate-Ljournal],'blue')
+        ax.fill([1.5*journal_IR,journal_IR,journal_IR,1.5*journal_IR,1.5*journal_IR],[-tplate-Ljournal,-tplate-Ljournal,-tplate,-tplate,-tplate-Ljournal],'blue')
+        
+        for phi in phiv:
+            phi0 = 0
+            rb = 0.003
+            y = rb*(sin(phi) - (phi - phi0)*cos(phi))
+            ax.fill([y-w/2,y+w/2,y+w/2,y-w/2,y-w/2],[0,0,h,h,0],'grey')
+            
+        ax.set_aspect('equal')
+        ax.axis('off')
+        
+        # Layout
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.pltpanel)
+        self.SetSizer(sizer)
+        sizer.Layout()
+        
+    def add_wrap(self, pos, w, h):
+        pass
+        
+        
+
 class ScrollAnimForm(wx.Frame):
  
     #----------------------------------------------------------------------

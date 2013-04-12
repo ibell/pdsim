@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from math import pi
+from math import pi, cos, sin
 import textwrap
 
 import wx
@@ -106,10 +106,14 @@ class ScrollWrapAnglesFrame(wx.Frame):
                                    label7, self.rb,
                                    label8, self.hs])
         
-        #Do the layout
+        
+        self.CloseButton = wx.Button(panel, label='Close')
+        self.CloseButton.Bind(wx.EVT_BUTTON, lambda event: self.Close())
+        
+        # Do the layout
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(sizer_for_outputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
-        sizer.Add(wx.Button(panel, label='Close'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(self.CloseButton, 0, wx.ALIGN_CENTER_HORIZONTAL)
         
         panel.SetSizer(sizer)
         sizer.Layout()
@@ -273,6 +277,34 @@ class GeometryPanel(pdsim_panels.PDPanel):
         
         # Refresh the panel
         self.OnRefresh()
+        
+    def get_wrap_crossection_involutes(self, axis = 'x'):
+        """
+        Returns
+        phiv : array of centerline involute angles
+        
+        """
+        
+        phi0 = (self.Scroll.geo.phi_i0+self.Scroll.geo.phi_o0)/2
+        phie = (self.Scroll.geo.phi_ie+self.Scroll.geo.phi_oe)/2
+        
+        phiv = []
+        from PDSim.scroll.scroll_geo import coords_inv
+        
+        def objective(phi):
+            return cos(phi)+(phi-phi0)*sin(phi)
+        
+        from scipy.optimize import newton
+        phi = newton(objective, phi0 + 0.3)
+        if phi < phi0: phi += 2*pi
+        
+        while phi < phie:
+            phiv.append(phi)
+            phi = newton(objective, phi + pi)
+        
+        phiv.append(phi)
+        
+        return phiv, self.Scroll.geo.h, self.Scroll.geo.t
         
     def OnShowWrapGeo(self, event = None):
         if event is not None: event.Skip()
@@ -619,6 +651,24 @@ class MassFlowPanel(pdsim_panels.PDPanel):
 #                       ])
 #        return _T
     
+class OSCrossSectionFrame(wx.Frame):
+    def __init__(self, dictionary, phiv, h, w):
+        """
+        Parameters
+        ----------
+        dictionary : dict
+            Dictionary from the GUI of all the annotated terms
+        """
+        wx.Frame.__init__(self,None)
+        
+        from PDSim.scroll.plots import OSCrossSectionPanel
+        panel = OSCrossSectionPanel(self, dictionary, phiv, h, w)
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(panel, 0, wx.EXPAND)
+        self.SetSizer(sizer)
+        sizer.Layout()
+        
 class MechanicalLossesPanel(pdsim_panels.PDPanel):
     
     desc_map = dict(h_shell = ('Shell-ambient mean HTC','W/m^2/K'),
@@ -722,15 +772,20 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
             mapped_val = self.desc_map[key]
             
             if len(mapped_val) == 2:
-                # Get the annotation and the units for the term 
+                # Get the annotation and the units for the term (no default provided)
                 annotation, units = mapped_val 
                 # Add the annotated object to the list of objects
                 self.annotated_values.append(AnnotatedValue(key, config[key], annotation, units))
             elif len(mapped_val) == 3:
+                
                 # Get the annotation and the units for the term 
                 annotation, units, default = mapped_val 
-                # Add the annotated object to the list of objects
-                self.annotated_values.append(AnnotatedValue(key, default, annotation, units))
+                if key in config:
+                    # Add the annotated object to the list of objects
+                    self.annotated_values.append(AnnotatedValue(key, config[key], annotation, units))
+                else:
+                    # Add the annotated object to the list of objects
+                    self.annotated_values.append(AnnotatedValue(key, default, annotation, units))
             else:
                 raise ValueError('Invalid tuple in desc_map')
             
@@ -742,10 +797,14 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         # Register terms in the GUI database
         self.main.register_GUI_objects(annotated_GUI_objects)
         
+        self.ViewButton = wx.Button(scrolled_panel, label='View Cross-Section')
+        self.ViewButton.Bind(wx.EVT_BUTTON, self.OnViewCrossSection)
+        
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(wx.StaticText(scrolled_panel, -1, "Motor Model"))
         sizer.Add(wx.StaticLine(scrolled_panel, -1, (25, 50), (300,1)))
         sizer.Add(self.motor_choices)
+        sizer.Add(self.ViewButton)
         sizer.AddSpacer(20)
         sizer.Add(sizer_for_inputs)
         
@@ -833,61 +892,15 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
             motor_chunk += 'sim.mech.{name:s} = {value:s}\n'.format(name = term,
                                                              value = str(val)) 
         return motor_chunk
-        
-        
-        
-    def post_get_from_configfile(self,key,value):
-        """
-        Parse the coefficients or other things that are not handled in the normal way
-        """
-        #value starts as a string like 'coeffs,1;2;3' --> list of string
-        values = value.split(',')[1].split(';')
-        #Return a list of coefficients - whitespace is ignored in the float() call
-        return [float(v) for v in values] 
-        
-    def collect_output_terms(self):
-        return [dict(attr = "losses.crank_bearing",
-                       text = "Crank bearing loss [kW]",
-                       parent = self
-                       ),
-                dict(attr = "losses.upper_bearing",
-                       text = "Upper bearing loss [kW]",
-                       parent = self
-                       ),
-                dict(attr = "losses.lower_bearing",
-                       text = "Lower bearing loss [kW]",
-                       parent = self
-                       ),
-                dict(attr = "losses.thrust_bearing",
-                       text = "Thrust bearing loss [kW]",
-                       parent = self
-                       ),
-                dict(attr = 'forces.mean_Fm',
-                     text = 'Mean pin force magnitude [kN]',
-                     parent = self),
-                dict(attr = 'forces.mean_Fz',
-                     text = 'Mean axial force [kN]',
-                     parent = self),
-                dict(attr = 'forces.mean_Fr',
-                     text = 'Mean radial force [kN]',
-                     parent = self),
-                dict(attr = 'forces.mean_Ft',
-                     text = 'Mean tangential force [kN]',
-                     parent = self),
-                dict(attr = 'forces.inertial',
-                     text = 'Inertial forces on orb. scroll [kN]',
-                     parent = self),
-                  ]
     
-    def post_prep_for_configfile(self):
-        """
-        Custom code for output to config file to handle motor
-        """
-        if self.motor_choices.GetSelection() == 0:
-            eta = self.motor_choices.eta_motor.GetValue()
-            return 'eta_motor = float, '+eta+', Motor Efficiency [-]'
-        else:
-            return self.motor_choices.MCT.string_for_configfile()
+    def OnViewCrossSection(self, event):
+        
+        GeoPanel = self.main.get_GUI_object('Vratio').GUI_location.GetGrandParent()
+        
+        phiv, h, w = GeoPanel.get_wrap_crossection_involutes()
+        frm = OSCrossSectionFrame(self.main.get_GUI_object_value_dict(), phiv, h, w)
+        frm.Show()
+        
 #            
 #        
 #if __name__=='__main__':

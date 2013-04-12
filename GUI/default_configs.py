@@ -100,12 +100,13 @@ MechanicalLossesPanel:
   L_lower_bearing : 0.025 # Lower bearing length [m]
   c_lower_bearing : 20e-6 # Lower bearing gap [m]
   thrust_friction_coefficient : 0.03 # Thrust bearing friction coefficient [-]
-  thrust_ID : 0.15 # Thrust bearing inner diameter [m]
+  thrust_ID : 0.08 # Thrust bearing inner diameter [m]
   thrust_OD : 0.3 # Thrust bearing outer diameter [m]
   orbiting_scroll_mass : 2.0 # Orbiting scroll mass [kg]
   L_ratio_bearings : 3.0 # Ratio of lengths for bearings [-]
   HTC : 0.0 # Heat transfer coefficient in scrolls [-]
   journal_tune_factor : 1.0 # Journal loss tune factor [-]
+  scroll_plate_thickness : 0.008
 
 StatePanel:
   omega : 377.0 # Rotational speed [rad/s]

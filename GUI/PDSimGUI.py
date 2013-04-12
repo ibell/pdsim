@@ -1268,6 +1268,12 @@ class MainFrame(wx.Frame):
             except (TypeError,ValueError):
                 return val
     
+    def get_GUI_object_value_dict(self):
+        """
+        Return an dictionary of the values of the annotated items in the GUI
+        """
+        return {key:self.get_GUI_object_value(key) for key in self.get_GUI_object_dict().keys()}
+    
     def set_GUI_object_value(self, key, val):
         """
         Set the value of an annotated GUI object's value, converted to the same 
