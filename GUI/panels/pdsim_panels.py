@@ -21,7 +21,7 @@ from matplotlib.backends.backend_wxagg import NavigationToolbar2Wx as WXToolbar
 from PDSim.scroll import scroll_geo
 from PDSim.scroll.plots import plotScrollSet, ScrollAnimForm
 from PDSim.misc.datatypes import AnnotatedValue
-from datatypes import AnnotatedGUIObject, HeaderStaticText
+from datatypes import AnnotatedGUIObject, HeaderStaticText, CoupledAnnotatedGUIObject
 
 import PDSimGUI
 
@@ -1360,9 +1360,6 @@ class ParametricPanel(PDPanel):
     def build_all_scripts(self):
         sims = []
         
-        # Get a copy of the dictionary of all the registered terms
-        # 
-        
         # Column index 1 is the list of parameters
         for Irow in range(self.ParaList.GetItemCount()):
             # Loop over all the rows that are checked
@@ -1380,6 +1377,26 @@ class ParametricPanel(PDPanel):
                     
                 # The attributes corresponding to the names
                 keys = [self.GUI_map[name] for name in names]
+                
+                # Get a list of the objects that are coupled with other GUI objects
+                coupled_objects = []
+                for k in keys:
+                    if isinstance(self.main.get_GUI_object(k), CoupledAnnotatedGUIObject):
+                        coupled_objects.append(self.main.get_GUI_object(k))
+                            
+                # First check if any of the terms are coupled gui objects
+                if coupled_objects:
+                    # If they are, handle them differently
+                    for o in coupled_objects:
+                        # Check the partners exist
+                        for o in o.required_partners:
+                            if o not in coupled_objects:
+                                raise KeyError("Coupled object [{o:s}] not found".format(o = o))
+                    
+                    #Pass all the coupled objects to the handler
+                    o.handler(coupled_objects,keys,vals)
+                else:
+                    print 'no coupled objects'
                 
                 # Set the value in the GUI
                 for key,val in zip(keys,vals):
@@ -1431,17 +1448,22 @@ class ParametricPanel(PDPanel):
         The first 10 lines are not considered in the diff
         """
         
-        # Take the lines that follow the first 10 lines
+        # Take the lines that follow the first 10 lines and read into memory
         chopped_scripts = [open(os.path.join(PDSimGUI.pdsim_home_folder,fName),'r').readlines()[10::] for fName in scripts]
         
+        # Compare each file with all other files
         for i in range(len(chopped_scripts)):
             for j in range(i+1,len(chopped_scripts)):
                 # If the list of unified diffs is empty, the files are the same
                 # This is a failure
                 if not [d for d in difflib.unified_diff(chopped_scripts[i],chopped_scripts[j])]:
                     return False
-        # sMade it this far, return True, all the files are different
+        # Made it this far, return True, all the files are different
         return True
+    
+    
+        
+    
         
     def OnZipBatch(self, event = None):
         """
@@ -1789,7 +1811,7 @@ class StatePanel(wx.Panel):
         return self.GetState()
     
     def SetValue(self, State_val):
-        self.set_state(State_val.Fluid, dict(T= State_val.T, D = State_val.rho))
+        self.set_state(State_val.Fluid, dict(T = State_val.T, D = State_val.rho))
     
     def set_state(self, Fluid, **kwargs):
         """
@@ -1835,6 +1857,23 @@ class StatePanel(wx.Panel):
         # post the update event, with arbitrary data attached
         wx.PostEvent(self, self.StateUpdateEvent())
 
+class StateVariablesShimClass(object):
+    """
+    This class provides a shim that allows for state variables in the parametric
+    table to set the value in the state panel
+    
+    It mirrors the functions in TextCtrl
+    """
+    
+    def __init__(self, parent, val):
+        self.val = val
+        
+    def SetValue(self, value):
+        self.val = value
+        
+    def GetValue(self):
+        return self.val
+    
 class StateInputsPanel(PDPanel):
     
     desc_map = dict(omega = ('Rotational speed [rad/s]','rad/s'),
@@ -1842,6 +1881,8 @@ class StateInputsPanel(PDPanel):
                     discPratio = ('Pressure ratio (disc/suction)','-'),
                     discPressure = ('Discharge pressure [kPa]','kPa'),
                     discTsat = ('Discharge saturation temperature [K]','K'),
+                    suctTsat = ('Suction saturation temperature [K]','K'),
+                    suctDTsh = ('Suction superheat [K]','K'),
                     )
     
     def __init__(self, parent, config, **kwargs):
@@ -1869,7 +1910,17 @@ class StateInputsPanel(PDPanel):
         
         # Construct StatePanel
         self.SuctionStatePanel = StatePanel(self, CPState = inletState)
-        AGO_inletState = AnnotatedGUIObject(AnnotatedValue('inletState', inletState, *self.desc_map['inletState']), self.SuctionStatePanel)
+        
+        self.Tsat = StateVariablesShimClass(self, 300)
+        self.DTsh = StateVariablesShimClass(self, 11.1)
+        
+        # Construct the coupled annotated terms for the suction state
+        CAGO_suctTsat = CoupledAnnotatedGUIObject(AnnotatedValue('suctTsat', self.Tsat, *self.desc_map['suctTsat']), self.Tsat, handler = self.parse_coupled_parametric_terms)
+        CAGO_suctDTsh = CoupledAnnotatedGUIObject(AnnotatedValue('suctDTsh', self.DTsh, *self.desc_map['suctDTsh']), self.DTsh, handler = self.parse_coupled_parametric_terms)
+        
+        #Link required parameters
+        CAGO_suctTsat.link_required_parameters([CAGO_suctDTsh])
+        CAGO_suctDTsh.link_required_parameters([CAGO_suctTsat])
         
         #Construct the discharge state
         if 'pratio' in config['discharge']:
@@ -1895,7 +1946,7 @@ class StateInputsPanel(PDPanel):
         AGO_disc[1].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'pratio'))
         AGO_disc[2].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'Tsat'))
         
-        self.main.register_GUI_objects([AGO_omega, AGO_inletState] + AGO_disc)
+        self.main.register_GUI_objects([AGO_omega, CAGO_suctTsat, CAGO_suctDTsh] + AGO_disc)
         
         # Hack the discharge textctrl so that when they are updated using SetValue() they fire the EVT_KILL_FOCUS event
         def HackedSetValue(self, value):
@@ -1997,159 +2048,28 @@ class StateInputsPanel(PDPanel):
                        omega = str(omega)
                        )
             )
-    
-    def post_set_params(self, simulation):
-        Fluid = self.SuctionState.GetState().Fluid
         
-        simulation.inletState = self.SuctionState.GetState()
-            
-        simulation.discharge_pressure = self._discharge_pressure
-            
-        #Set the state variables in the simulation
-        simulation.suction_pressure = self.SuctionState.GetState().p
-        simulation.suction_temp = self.SuctionState.GetState().T
+    def parse_coupled_parametric_terms(self, terms, keys, vals):
         
-        if self.SuctionState.GetState().p < CP.Props(Fluid,'pcrit'):
-            #If subcritical, also calculate the superheat and sat_temp
-            p = simulation.suction_pressure
-            simulation.suction_sat_temp = CP.Props('T', 'P', p, 'Q', 1.0, Fluid)
-            simulation.suction_superheat = simulation.suction_temp-simulation.suction_sat_temp
+        # Map key to value from the parametric table
+        val_map = { k:v for k,v in zip(keys,vals)}
+        
+        terms_keys = [t.key for t in terms]
+        
+        if 'suctDTsh' in terms_keys and 'suctTsat' in terms_keys:
+            Tsat = val_map['suctTsat']
+            DTsh = val_map['suctDTsh']
+            
+            Fluid = self.SuctionStatePanel.GetState().Fluid
+            p = CP.Props('P','T',Tsat,'Q',1,Fluid)
+            
+            self.SuctionStatePanel.set_state(Fluid, **dict(T = Tsat+DTsh, P = p))
+            
+            # Update the discharge pressure ratio (Tsat disc and pdisc do not change)
+            self.OnChangeDischargeValue(changed_parameter = 'discPressure')
+            
         else:
-            #Otherwise remove the parameters
-            del simulation.suction_sat_temp
-            del simulation.suction_superheat
-            
-        #Set the state variables in the simulation
-        simulation.discharge_pratio = simulation.discharge_pressure/simulation.suction_pressure
-        
-        if simulation.discharge_pressure < CP.Props(Fluid,'pcrit'):
-            p = simulation.discharge_pressure
-            simulation.discharge_sat_temp = CP.Props('T', 'P', p, 'Q', 1.0, Fluid)
-        else:
-            if hasattr(self,"discharge_sat_temp"):
-                del simulation.discharge_sat_temp
-        
-    def post_prep_for_configfile(self):
-        """
-        Write a string representation of the state
-        """
-        State_ = self.SuctionState.GetState()
-        StateString = 'inletState = State,'+State_.Fluid+','+str(State_.T)+','+str(State_.rho)
-        DischargeString = 'discharge = Discharge,'+str(self.DischargeValue.GetValue())+','+self.cmbDischarge.GetStringSelection()
-        return StateString+'\n'+DischargeString+'\n'
-    
-    def get_additional_parametric_terms(self):
-        return [dict(attr = 'suction_pressure',
-                     text = 'Suction pressure [kPa]',
-                     parent = self),
-                dict(attr = 'suction_sat_temp',
-                     text = 'Suction saturated temperature (dew) [K]',
-                     parent = self),
-                dict(attr = 'suction_temp',
-                     text = 'Suction temperature [K]',
-                     parent = self),
-                dict(attr = 'suction_superheat',
-                     text = 'Superheat [K]',
-                     parent = self),
-                dict(attr = 'discharge_pressure',
-                     text = 'Discharge pressure [kPa]',
-                     parent = self),
-                dict(attr = 'discharge_sat_temp',
-                     text = 'Discharge saturated temperature (dew) [K]',
-                     parent = self),
-                dict(attr = 'discharge_pratio',
-                     text = 'Discharge pressure ratio [-]',
-                     parent = self)
-                ]
-    
-    def apply_additional_parametric_terms(self, attrs, vals, panel_items):
-        """
-        Set parametric terms for the state panel based on parameters obtained
-        from the parametric table
-        """
-        panel_attrs = [panel_item['attr'] for panel_item in panel_items]
-        # First check about the suction state; if two suction related terms are 
-        # provided, use them to fix the inlet state
-        suct_params = [(par,val) for par,val in zip(attrs,vals) if par.startswith('suction')]
-        num_suct_params = len(suct_params)
-        
-        #Get a copy of the state from the StatePanel
-        inletState = self.SuctionState.GetState()
-        
-        if num_suct_params>0:
-            #Unzip the parameters (List of tuples -> tuple of lists)
-            suct_attrs, suct_vals = zip(*suct_params)
-            
-        if num_suct_params == 2:
-            # Remove all the entries that correspond to the suction state - 
-            # we need them and don't want to set them in the conventional way
-            for a in suct_attrs:
-                i = attrs.index(a)
-                vals.pop(i)
-                attrs.pop(i)
-            
-            #Temperature and pressure provided
-            if 'suction_temp' in suct_attrs and 'suction_pressure' in suct_attrs:
-                suction_temp = suct_vals[suct_attrs.index('suction_temp')]
-                suction_pressure = suct_vals[suct_attrs.index('suction_pressure')]
-                self.SuctionState.set_state(inletState.Fluid,
-                                            T=suction_temp, 
-                                            P=suction_pressure)
-                
-            #Dew temperature and superheat provided
-            elif 'suction_sat_temp' in suct_attrs and 'suction_superheat' in suct_attrs:
-                suction_sat_temp = suct_vals[suct_attrs.index('suction_sat_temp')]
-                suction_superheat = suct_vals[suct_attrs.index('suction_superheat')]
-                suction_temp = suction_sat_temp + suction_superheat
-                suction_pressure = CP.Props('P','T',suction_sat_temp,'Q',1.0,inletState.Fluid)
-                self.SuctionState.set_state(inletState.Fluid,
-                                            T=suction_temp, 
-                                            P=suction_pressure)
-            else:
-                raise ValueError('Invalid combination of suction states: '+str(suct_attrs))
-            
-        elif num_suct_params == 1:
-            raise NotImplementedError('only one param provided')
-        elif num_suct_params >2:
-            raise ValueError ('Only two inlet state parameters can be provided in parametric table')
-        
-        # Then check about the discharge state; only one variable is allowed
-        disc_params = [(par,val) for par,val in zip(attrs,vals) if par.startswith('discharge')]
-        num_disc_params = len(disc_params)
-        
-        if num_disc_params>0:
-            #Unzip the parameters (List of tuples -> tuple of lists)
-            disc_attrs, disc_vals = zip(*disc_params)
-            
-        if num_disc_params == 1:
-            # Remove all the entries that correspond to the discharge state - 
-            # we need them and don't want to set them in the conventional way
-            for a in disc_attrs:
-                i = attrs.index(a)
-                vals.pop(i)
-                attrs.pop(i)
-                
-            if 'discharge_pressure' in disc_attrs:
-                discharge_pressure = disc_vals[disc_attrs.index('discharge_pressure')]
-                self._discharge_pressure = discharge_pressure
-                
-            elif 'discharge_pratio' in disc_attrs:
-                discharge_pratio = disc_vals[disc_attrs.index('discharge_pratio')]
-                p_suction = self.SuctionState.GetState().p
-                self._discharge_pressure = discharge_pratio * p_suction
-        
-            elif 'discharge_sat_temp' in disc_attrs:
-                Tsat = disc_vals[disc_attrs.index('discharge_sat_temp')]
-                Fluid = inletState.Fluid
-                self._discharge_pressure = CP.Props('P','T',Tsat,'Q',1.0,Fluid)
-            
-            #Fire the event manually to update the textbox
-            self.OnChangeDischargeVariable()
-            
-        elif num_disc_params > 1:
-            raise ValueError ('Only one discharge pressure parameter can be provided in parametric table')
-            
-        return attrs, vals
+            raise NotImplementedException('This combination of coupled inlet state values is not supported')
     
 class MotorCoeffsTable(wx.ListCtrl, TextEditMixin):
     
