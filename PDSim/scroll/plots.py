@@ -1032,7 +1032,7 @@ class OSCrossSectionPanel(wx.Panel):
         ax = self.pltpanel.axes
          
         D = 0.1
-        
+        ro = dictionary['ro']
         tplate = dictionary['scroll_plate_thickness']
         thrust_ID = dictionary['thrust_ID']
         Ljournal = dictionary['L_crank_bearing']
@@ -1056,6 +1056,9 @@ class OSCrossSectionPanel(wx.Panel):
             y = rb*(sin(phi) - (phi - phi0)*cos(phi))
             ax.fill([y-w/2,y+w/2,y+w/2,y-w/2,y-w/2],[0,0,h,h,0],'grey')
             
+        ax.plot([1.5*journal_IR + ro,1.5*journal_IR + ro],[-tplate-Ljournal, -tplate],'b:')
+        ax.plot([-1.5*journal_IR + ro, -1.5*journal_IR + ro],[-tplate-Ljournal, -tplate],'b:')
+        
         ax.set_aspect('equal')
         ax.axis('off')
         
@@ -1078,11 +1081,27 @@ class ScrollAnimForm(wx.Frame):
  
         # Add a panel so it looks the correct on all platforms
         panel = wx.Panel(self, wx.ID_ANY)
+        
+        import wx.lib.agw.flatmenu as FM
+        
+        self._mb = FM.FlatMenuBar(panel, wx.ID_ANY, 32, 5)
+
+        layersMenu = FM.FlatMenu()
+        
+        self.LayerCoordinateAxes = FM.FlatMenuItem(layersMenu, -1, "Show coordinate axes", "Tooltip", wx.ITEM_CHECK)
+        self.LayerCoordinateAxes.Check(False)
+        self.Bind(FM.EVT_FLAT_MENU_SELECTED, self.OnApplyLayers,id = self.LayerCoordinateAxes.GetId())
+        layersMenu.AppendItem(self.LayerCoordinateAxes)
+        
+        self._mb.Append(layersMenu, "&Layers")
+        
         # Create the items
         self.btn = btn = wx.ToggleButton(panel, -1, "Start")
         self.pltpanel = PlotPanel(panel, -1, size=size)
+        
         # Do the layout
         sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self._mb,0,wx.EXPAND)
         sizer.Add(self.btn, 0, wx.ALL|wx.CENTER, 5)
         sizer.Add(self.pltpanel, 0, wx.ALL|wx.CENTER, 5)
         panel.SetSizer(sizer)
@@ -1093,12 +1112,12 @@ class ScrollAnimForm(wx.Frame):
         self.theta=0
         self.N=50
         self.geo=geo
-        self.OS=plotScrollSet(0,
-                              axis=self.pltpanel.axes,
-                              geo=self.geo,
-                              lw=1,
-                              discOn=False,
-                              offsetScroll = self.geo.phi_ie_offset>0)
+        self.OS = plotScrollSet(0,
+                                axis=self.pltpanel.axes,
+                                geo=self.geo,
+                                lw=1,
+                                discOn=False,
+                                offsetScroll = self.geo.phi_ie_offset>0)
         
         self.ax = self.pltpanel.axes
         
@@ -1106,9 +1125,48 @@ class ScrollAnimForm(wx.Frame):
         
         self.SetSize(sizer.GetMinSize())
         
+        self.orbiting_layers = []
         if start:
             self.start()
         
+    def OnApplyLayers(self, event):
+        self.ax.cla()
+        self.OS = plotScrollSet(0,
+                                axis=self.pltpanel.axes,
+                                geo=self.geo,
+                                lw=1,
+                                discOn=False,
+                                offsetScroll = self.geo.phi_ie_offset>0)
+        self.apply_stationary_layers()
+        self.apply_orbiting_layers()
+
+        self.ax.figure.canvas.draw() #Annoyingly this draw is required to flush the ghost orbiting scroll
+        
+    def apply_stationary_layers(self):
+        if self.LayerCoordinateAxes.IsChecked():
+            
+            self.ax.plot(0, 0, 'k+')
+            self.ax.plot([0, 0.01], [0,0], 'k')
+            self.ax.plot([0,0], [0.01, 0], 'k')
+            self.ax.text(0.01,0,'$x$')
+            self.ax.text(0,0.01,'$y$')
+            
+    def apply_orbiting_layers(self, theta = 0):
+        if self.LayerCoordinateAxes.IsChecked():
+            
+            om = self.geo.phi_ie-theta+3.0*pi/2.0
+            xo = self.geo.rb*cos(om)
+            yo = self.geo.rb*sin(om)
+            
+            layer, = self.ax.plot(xo, yo, 'k+')
+            self.orbiting_layers.append(layer)
+            
+#            self.ax.plot([0, 0.01], [0,0], 'k')
+#            self.ax.plot([0,0], [0.01, 0], 'k')
+#            self.ax.text(0.01,0,'$x$')
+#            self.ax.text(0,0.01,'$y$')
+            
+    
     def start(self):
         """
         Start the plotting machinery
@@ -1143,6 +1201,12 @@ class ScrollAnimForm(wx.Frame):
             self.plotThread.start()
 
     def plotStep(self):
+        
+        for item in self.orbiting_layers:
+            del item
+        
+        self.apply_orbiting_layers(self.theta)
+            
         self.theta += 2*np.pi/(self.N-1)
         
         #If offset scroll, don't shave the orbiting scroll        

@@ -706,10 +706,14 @@ class OutputTreePanel(wx.Panel):
     def add_runs(self, runs):
         if isinstance(runs, h5py.File):
             self.runs += [runs]
+        elif isinstance(runs, basestring) and os.path.exists(runs):
+            self.runs += [h5py.File(runs,'r')]
         else:
             for run in runs:
-                if isinstance(runs, h5py.File):
-                    self.runs += [run]
+                if isinstance(run, h5py.File):
+                    self.runs += [run] 
+                elif isinstance(run, basestring) and os.path.exists(run):
+                    self.runs += [h5py.File(run,'r')]
                 else:
                     raise ValueError("Can only add instances of h5py.File")
         self.rebuild()
@@ -2005,6 +2009,9 @@ class StateInputsPanel(PDPanel):
             pdisc = CP.Props('P', 'T', Tsat, 'Q', 1.0, Fluid)
             pratio = pdisc / psuction
             
+        else:
+            raise ValueError('Your parameter [{s:s}] is invalid for OnChangeDischargeValue.  Must be one of (pressure, pratio, Tsat)'.format(s = changed_parameter))
+            
         # Set all the values again - we use ChangeValue manually to ensure that they 
         # don't emit change events which would result in infinite recursion
         self.main.get_GUI_object('discPressure').GUI_location.ChangeValue(str(pdisc))
@@ -2066,7 +2073,7 @@ class StateInputsPanel(PDPanel):
             self.SuctionStatePanel.set_state(Fluid, **dict(T = Tsat+DTsh, P = p))
             
             # Update the discharge pressure ratio (Tsat disc and pdisc do not change)
-            self.OnChangeDischargeValue(changed_parameter = 'discPressure')
+            self.OnChangeDischargeValue(changed_parameter = 'pressure')
             
         else:
             raise NotImplementedException('This combination of coupled inlet state values is not supported')

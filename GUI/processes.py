@@ -275,7 +275,7 @@ class RedirectedWorkerThread(Thread):
                 print 'Wrote hdf5 file to', hdf5_path
                 
                 "Send the data back to the GUI"
-                wx.CallAfter(self.done_callback, sim)
+                wx.CallAfter(self.done_callback, hdf5_path)
             else:
                 print "Didn't get any simulation data"
         return 1

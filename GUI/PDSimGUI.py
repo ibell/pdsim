@@ -405,8 +405,8 @@ class RunToolBook(wx.Panel):
         # The action buttons
         self.cmdRunOne = wx.Button(self,-1,'  \nRun!\n  ')
         self.cmdRunOne.Bind(wx.EVT_BUTTON, self.GetTopLevelParent().OnStart)
-        self.cmdRunParametric = wx.Button(self,-1,'Run\nParametric\nTable')
-        #self.cmdRunParametric.Bind(wx.EVT_BUTTON, self.GetTopLevelParent().OnStart)
+        self.cmdRunParametric = wx.Button(self,-1,'Go To\nParametric\nTable')
+        self.cmdRunParametric.Bind(wx.EVT_BUTTON, self.OnGotoParametric)
         self.cmdAbort = wx.Button(self,-1,'Stop\nAll\nRuns')
         self.cmdAbort.Bind(wx.EVT_BUTTON, self.GetTopLevelParent().OnStop)
         
@@ -485,323 +485,14 @@ class RunToolBook(wx.Panel):
         bottom_pane_sizer.Layout()
         
         main_sizer.Layout()
-        
-class AutoWidthListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
-    def __init__(self, parent, ID = wx.ID_ANY, pos=wx.DefaultPosition,
-                 size=wx.DefaultSize, style=0):
-        
-        wx.ListCtrl.__init__(self, parent, ID, pos, size, style)
-        ListCtrlAutoWidthMixin.__init__(self)
-        
-class ResultsList(wx.Panel, ColumnSorterMixin):
-    def __init__(self, parent, headers, values, results):
-        """
-        
-        parent : wx.Window
-            parent of the Panel
-            
-        headers: a list of strings
-            Each element is the string that will be the header of the column
-            
-        values: a list of list of values.  
-            Each entry in the list should be as long as the number of headers
-            
-        results : PDSimCore instances
-            The simulation runs
-        """
-        wx.Panel.__init__(self, parent)
-        
-        #: The list of strings of the header
-        self.headers = list(headers)
-        #: The values in the table
-        self.values = list(values)
-        #: The PDSimCore instances that have all the data
-        self.results = list(results)
-        
-        self.list = AutoWidthListCtrl(self, 
-                                      style=wx.LC_REPORT | wx.BORDER_NONE
-                                      )
-        #Build the headers
-        for i, header in enumerate(headers):
-            self.list.InsertColumn(i, header)
-        
-        #Add the values one row at a time
-        self.itemDataMap = {}
-        for i, row in enumerate(self.values):
-            #Add an entry to the data map
-            self.itemDataMap[i] = tuple(row)
-            
-            self.list.InsertStringItem(i,str(row[0]))
-            self.list.SetItemData(i,i)
-            
-            for j in range(1,len(row)):
-                self.list.SetStringItem(i,j,str(row[j]))
-        
-        total_width = 0    
-        for i in range(len(headers)):
-            self.list.SetColumnWidth(i, wx.LIST_AUTOSIZE_USEHEADER)
-            total_width += self.list.GetColumnWidth(i)
-            
-        width_available = self.Parent.GetSize()[0]
-        self.list.SetMinSize((width_available,200))
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(self.list,1,wx.EXPAND)
-        
-        self.il = wx.ImageList(16, 16)
-        SmallUpArrow = PyEmbeddedImage(
-            "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAADxJ"
-            "REFUOI1jZGRiZqAEMFGke2gY8P/f3/9kGwDTjM8QnAaga8JlCG3CAJdt2MQxDCAUaOjyjKMp"
-            "cRAYAABS2CPsss3BWQAAAABJRU5ErkJggg==")
-        SmallDnArrow = PyEmbeddedImage(
-            "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAEhJ"
-            "REFUOI1jZGRiZqAEMFGke9QABgYGBgYWdIH///7+J6SJkYmZEacLkCUJacZqAD5DsInTLhDR"
-            "bcPlKrwugGnCFy6Mo3mBAQChDgRlP4RC7wAAAABJRU5ErkJggg==")
-        
-        self.sm_up = self.il.Add(SmallUpArrow.GetBitmap())
-        self.sm_dn = self.il.Add(SmallDnArrow.GetBitmap())
-        self.list.SetImageList(self.il, wx.IMAGE_LIST_SMALL)
-
-        ColumnSorterMixin.__init__(self,len(headers)+1)
-        
-        self.SetSizer(sizer)
-        self.SetAutoLayout(True)
-        
-    def OnSortOrderChanged(self, *args, **kwargs):
-        """
-        Overload the base class method to resort the internal structures 
-        when the table is sorted
-        """
-        self._sort_objects()
-        return ColumnSorterMixin.OnSortOrderChanged(self, *args, **kwargs)
-        
-    def __getitem__(self, index):
-        """
-        Provided to be able to index the class
-        returns the index of the run returned
-        """
-        
-        return self.results[index]
     
-    def _sort_objects(self):
+    def OnGotoParametric(self, event):
         """
-        Sort the internal data structures based on the table sort state
+        Go to the parametric table
         """
+        self.GetTopLevelParent().MTB.SetSelection(1)
+        self.GetTopLevelParent().MTB.SolverTB.SetSelection(1)
         
-        # Sort the output csv table in the same way as the listctrl
-        iCol, direction = self.GetSortState()
-        
-        #If sorted, sort the variables
-        if iCol >= 0:
-        
-            # Get a sorted version of self.values sorted by the column used in list
-            values_results = zip(self.values, self.results)
-            
-            # Sort the results and the rows together
-            sorted_things = sorted(values_results, key=itemgetter(iCol))
-            
-            # Unpack
-            self.values, self.results = zip(*sorted_things)
-            
-            # tuples --> list
-            self.values = list(self.values)
-            self.results = list(self.results)
-        
-    def remove_item(self, index):
-        """
-        Remove the item from the ResultsList instance
-        """
-        #Remove the item from the data map
-        self.itemDataMap.pop(index)
-        #Remove the item from the values
-        del self.values[index]
-        #Remove the item from the results
-        del self.results[index]
-        
-    def get_results(self):
-        """
-        Return the list of PDSimCore instances
-        """
-        return self.results
- 
-    def GetListCtrl(self):
-        """
-        Required method for ColumnSorterMixin
-        
-        Used by the ColumnSorterMixin, see wx/lib/mixins/listctrl.py
-        """
-        return self.list
-    
-    def GetSortImages(self):
-        """
-        Required method for ColumnSorterMixin
-        
-        Used by the ColumnSorterMixin, see wx/lib/mixins/listctrl.py
-        """
-        return (self.sm_dn, self.sm_up)
-    
-    def AsString(self):
-        """
-        Return a csv formatted table of the ResultsList
-        
-        """
-        
-        #Sort the internal data structures based on table sort
-        self._sort_objects()
-        
-        header_string = [','.join(self.headers)]
-        def tostr(row):
-            return [str(r) for r in row]
-        rows_string = [','.join(tostr(row)) for row in self.values]
-        return '\n'.join(header_string+rows_string)
-
-class ColumnSelectionDialog(wx.Dialog):
-    def __init__(self, parent, col_options, cols_selected):
-        wx.Dialog.__init__(self,parent,size = (800,350))
-        
-        self.col_options = col_options
-
-        self.selected = [col_options[col] for col in cols_selected]
-        self.not_selected = [col_options[col] for col in col_options if col not in cols_selected]
-        
-        self.col_library_label = wx.StaticText(self, label = 'Available columns:')
-        self.col_used_label = wx.StaticText(self, label = 'Selected columns:')
-        self.col_library = wx.ListBox(self, choices = self.not_selected, style = wx.LB_EXTENDED)
-        self.col_used = wx.ListBox(self, choices = self.selected, style = wx.LB_EXTENDED)
-        self.col_library.SetMinSize((300,300))
-        self.col_used.SetMinSize((300,300))
-        
-        #The central column with add and remove buttons
-        self.AddAllButton=wx.Button(self, label='All ->')
-        self.RemoveAllButton=wx.Button(self, label='<- All')
-        self.AddButton=wx.Button(self, label='-->')
-        self.RemoveButton=wx.Button(self, label='<--')
-        self.AddButton.Bind(wx.EVT_BUTTON,self.OnAdd)
-        self.RemoveButton.Bind(wx.EVT_BUTTON,self.OnRemove)
-        self.AddAllButton.Bind(wx.EVT_BUTTON,self.OnAddAll)
-        self.RemoveAllButton.Bind(wx.EVT_BUTTON,self.OnRemoveAll)
-        vsizer = wx.BoxSizer(wx.VERTICAL)
-        vsizer.AddMany([self.AddAllButton, self.RemoveAllButton])
-        vsizer.AddSpacer(40)
-        vsizer.AddMany([self.AddButton, self.RemoveButton])
-
-        #The far-right column with up,down, ok, cancel buttons      
-        self.Up = wx.Button(self, label='Move Up')
-        self.Up.Bind(wx.EVT_BUTTON,self.OnUp)
-        self.Down = wx.Button(self, label='Move Down')
-        self.Down.Bind(wx.EVT_BUTTON,self.OnDown)
-        self.OkButton = wx.Button(self, label='Ok')
-        self.OkButton.Bind(wx.EVT_BUTTON,self.OnAccept)
-        self.CancelButton = wx.Button(self, label='Cancel')
-        self.CancelButton.Bind(wx.EVT_BUTTON,self.OnClose)
-        vsizer2 = wx.BoxSizer(wx.VERTICAL)
-        vsizer2.AddMany([self.Up,self.Down])
-        vsizer2.AddSpacer(40)
-        vsizer2.AddMany([self.CancelButton, self.OkButton])
-        
-        #Layout the dialog
-        sizer = wx.BoxSizer(wx.HORIZONTAL)
-        
-        vsizer0 = wx.BoxSizer(wx.VERTICAL)
-        vsizer0.Add(self.col_library_label)
-        vsizer0.Add(self.col_library, 1, wx.EXPAND)
-        sizer.Add(vsizer0)
-        sizer.AddSpacer(10)
-        sizer.Add(vsizer,0,wx.ALIGN_CENTER_VERTICAL)
-        sizer.AddSpacer(10)
-        vsizer20 = wx.BoxSizer(wx.VERTICAL)
-        vsizer20.Add(self.col_used_label)
-        vsizer20.Add(self.col_used, 1, wx.EXPAND)
-        sizer.Add(vsizer20)
-        sizer.AddSpacer(10)
-        sizer.Add(vsizer2,0,wx.ALIGN_CENTER_VERTICAL)
-        self.SetSizer(sizer)
-        sizer.Layout()
-        
-        #Bind a key-press event to all objects to get Esc key press
-        children = self.GetChildren()
-        for child in children:
-            child.Bind(wx.EVT_KEY_UP,  self.OnKeyPress) 
-
-    def OnKeyPress(self,event):
-        """ cancel if Escape key is pressed """
-        event.Skip()
-        if event.GetKeyCode() == wx.WXK_ESCAPE:
-            self.EndModal(wx.ID_CANCEL)
-        elif event.GetKeyCode() == wx.WXK_RETURN:
-            self.EndModal(wx.ID_OK)
-        
-    def label2attr(self,label):
-        for col in self.col_options:
-            if self.col_options[col] == label:
-                return col
-        raise KeyError
-        
-    def OnAccept(self, event):
-        self.EndModal(wx.ID_OK)
-        
-    def OnClose(self,event):
-        self.EndModal(wx.ID_CANCEL)
-        
-    def OnAddAll(self, event):
-        self.selected += self.not_selected
-        self.not_selected = []
-        self.col_library.SetItems(self.not_selected)
-        self.col_used.SetItems(self.selected)
-        
-    def OnRemoveAll(self, event):
-        self.not_selected += self.selected
-        self.selected = []
-        self.col_library.SetItems(self.not_selected)
-        self.col_used.SetItems(self.selected)
-        
-    def OnAdd(self, event):
-        indices = self.col_library.GetSelections()
-        labels = [self.col_library.GetString(index) for index in indices]
-
-        for label in reversed(labels):
-            i = self.not_selected.index(label)
-            self.selected.append(self.not_selected.pop(i))
-        self.col_library.SetItems(self.not_selected)
-        self.col_used.SetItems(self.selected)
-        
-    def OnRemove(self, event):
-        indices = self.col_used.GetSelections()
-        labels = [self.col_used.GetString(index) for index in indices]
-
-        for label in reversed(labels):
-            i = self.selected.index(label)
-            self.not_selected.append(self.selected.pop(i))
-        self.col_library.SetItems(self.not_selected)
-        self.col_used.SetItems(self.selected)
-        
-    def OnUp(self, event):
-        indices = self.col_used.GetSelections()
-        labels = [self.col_used.GetString(index) for index in indices]
-        for label in labels:
-            i = self.selected.index(label)
-            if i>0:
-                #swap item and the previous item
-                self.selected[i-1],self.selected[i]=self.selected[i],self.selected[i-1]
-        self.col_used.SetItems(self.selected)
-        if len(labels) == 1:
-            self.col_used.SetSelection(indices[0]-1)
-    
-    def OnDown(self, event):
-        indices = self.col_used.GetSelections()
-        labels = [self.col_used.GetString(index) for index in indices]
-        for label in labels:
-            i = self.selected.index(label)
-            if i<len(self.selected)-1:
-                #swap item and the next item
-                self.selected[i+1],self.selected[i]=self.selected[i],self.selected[i+1]
-        self.col_used.SetItems(self.selected)
-        if len(labels) == 1:
-            self.col_used.SetSelection(indices[0]+1)
-    
-    def GetSelections(self):
-        labels = self.col_used.GetStrings()
-        attrs = [self.label2attr(label) for label in labels]
-        return attrs
 
 class FileOutputDialog(wx.Dialog):
     def __init__(self,Simulations, table_string):
@@ -999,7 +690,6 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         
     def remove_run(self, index):
         """
-        
         Remove a run at the index given by ``index``
         """
         self.OutputTree.remove_run(index)
@@ -1081,10 +771,10 @@ class OutputsToolBook(wx.Toolbook):
         self.AssignImageList(il)
         
         # Load the runs into memory
-        runa = h5py.File('runa.h5')#, driver = 'core', backing_store = False)
-        runb = h5py.File('runb.h5')#, driver = 'core', backing_store = False)
+#        runa = h5py.File('runa.h5')#, driver = 'core', backing_store = False)
+#        runb = h5py.File('runb.h5')#, driver = 'core', backing_store = False)
         
-        runs = [runa,runb]
+        runs = []
 #        variables = self.Parent.InputsTB.collect_parametric_terms()
 #        self.PlotsPanel = wx.Panel(self)
         self.DataPanel = OutputDataPanel(self, runs = runs, name = 'OutputDataPanel')
@@ -1806,7 +1496,7 @@ class MainFrame(wx.Frame):
             print 'got a simulation'
             
 #            self.MTB.OutputsTB.plot_outputs(sim)
-#            self.MTB.OutputsTB.DataPanel.add_runs([sim])
+            self.MTB.OutputsTB.DataPanel.add_runs([sim])
 #            self.MTB.OutputsTB.DataPanel.rebuild()
             
             #Check whether there are no more results to be processed and threads list is empty

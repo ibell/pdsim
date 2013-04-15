@@ -669,6 +669,8 @@ class OSCrossSectionFrame(wx.Frame):
         self.SetSizer(sizer)
         sizer.Layout()
         
+        self.SetSize(sizer.GetMinSize())
+        
 class MechanicalLossesPanel(pdsim_panels.PDPanel):
     
     desc_map = dict(h_shell = ('Shell-ambient mean HTC','W/m^2/K'),
