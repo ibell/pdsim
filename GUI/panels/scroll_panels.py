@@ -24,6 +24,7 @@ from PDSim.misc.datatypes import AnnotatedValue
 import pdsim_panels
 from pdsim_panels import LaTeXImageMaker, MotorChoices, PlotPanel
 from datatypes import HeaderStaticText, AnnotatedGUIObject
+from PDSim.scroll import scroll_geo
 
 LabeledItem = pdsim_panels.LabeledItem
         
@@ -278,6 +279,10 @@ class GeometryPanel(pdsim_panels.PDPanel):
         # Refresh the panel
         self.OnRefresh()
         
+        Vwrap, cx, cy = scroll_geo.scroll_wrap(self.Scroll.geo)
+        
+        print Vwrap,cx,cy
+        
     def get_wrap_crossection_involutes(self, axis = 'x'):
         """
         Returns
@@ -423,17 +428,6 @@ class GeometryPanel(pdsim_panels.PDPanel):
             
             sim.geo.phi_ie_offset = {phi_ie_offset:s}  
             """.format(**str_params))
-    
-    def collect_output_terms(self):
-        """
-        
-        Hacked to change the parameters in the output table
-        """
-        print 'changing params'
-        Main = self.GetTopLevelParent()
-        Main.MTB.OutputsTB.DataPanel.change_output_attrs(dict(t = 'geo.t',
-                                                              ro = 'geo.ro',))
-        return []
         
 class FlowOptions(pdsim_panels.PDPanel):
     """
@@ -816,6 +810,8 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         
         sizer.Layout()
         
+        self.calculate_scroll_mass()
+        
     def get_config_chunk(self):
         configdict = {}
         
@@ -889,7 +885,9 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                 'D_crank_bearing','L_crank_bearing','c_crank_bearing',
                 'D_lower_bearing','L_lower_bearing','c_lower_bearing',
                 'thrust_friction_coefficient', 'thrust_ID', 'thrust_OD', 
-                'orbiting_scroll_mass', 'L_ratio_bearings']:
+                'orbiting_scroll_mass', 'L_ratio_bearings','scroll_plate_thickness',
+                'scroll_density','scroll_added_mass'
+                ]:
             val = self.main.get_GUI_object_value(term)
             motor_chunk += 'sim.mech.{name:s} = {value:s}\n'.format(name = term,
                                                              value = str(val)) 
@@ -902,6 +900,39 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         phiv, h, w = GeoPanel.get_wrap_crossection_involutes()
         frm = OSCrossSectionFrame(self.main.get_GUI_object_value_dict(), phiv, h, w)
         frm.Show()
+        
+    def calculate_scroll_mass(self):
+        tplate = self.main.get_GUI_object_value('scroll_plate_thickness')
+        rho = self.main.get_GUI_object_value('scroll_density')
+        mplus = self.main.get_GUI_object_value('scroll_added_mass')
+        Lbearing = self.main.get_GUI_object_value('L_crank_bearing')
+        Dijournal = self.main.get_GUI_object_value('D_crank_bearing')
+        Dojournal = 1.5*Dijournal
+        
+        GeoPanel = self.main.get_GUI_object('Vratio').GUI_location.GetGrandParent()
+        
+        Dplate = GeoPanel.Scroll.geo.r_wall*2
+        
+        Vwrap,cx,cy = scroll_geo.scroll_wrap(GeoPanel.Scroll.geo)
+        
+        mwrap = rho * Vwrap
+        mplate = rho * pi * tplate * Dplate**2/4.0
+        mjournal = rho * pi * Lbearing * (Dojournal**2-Dijournal**2)/4.0
+        mtotal = mwrap + mplate + mjournal
+        
+        zwrap = Lbearing+tplate+GeoPanel.Scroll.geo.h/2
+        zplate = Lbearing+tplate/2
+        zjournal = Lbearing/2
+        
+        zcm = (mwrap*zwrap + mjournal*zjournal + mplate*zplate)/mtotal
+        
+        print 'mwrap', mwrap
+        print 'mplate', mplate
+        print 'mjournal', mjournal
+        print 'zcm', zcm
+        print 'zarm',zcm-Lbearing/2
+        print 'Marm',(zcm-Lbearing/2)*mtotal*0.004*377**2/1000
+        
         
 #            
 #        

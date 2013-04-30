@@ -292,7 +292,7 @@ class PlotNotebook(wx.Panel):
         #Radial force magnitude
             
         axes = self.add('Radial force magnitude').gca()
-        theta=self.Sim.t
+        theta=self.Sim.t[0:self.Sim.Ntheta]
         Fr=self.Sim.forces.Fr[0:self.Sim.Ntheta].T
         Fr[np.abs(Fr)<1e-12]=np.nan
         axes.plot(theta,Fr)

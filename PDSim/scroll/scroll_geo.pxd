@@ -21,6 +21,7 @@ cdef class geoVals:
     cdef public double x0_wall,y0_wall,r_wall
     cdef public double delta_radial, delta_flank
     cdef public double phi_ie_offset, delta_suction_offset
+    cdef public double cx_scroll, cy_scroll, V_scroll
     
 cpdef double fxA(double rb, double phi, double phi0)
 cpdef double fyA(double rb, double phi, double phi0)
@@ -32,6 +33,8 @@ cpdef tuple _coords_inv_d(double phi, geoVals geo, double theta, flag = *)
 
 cpdef double radial_leakage_area(double theta, geoVals geo, bytes key1, bytes key2, location = *) except *
 cpdef tuple radial_leakage_angles(double theta, geoVals geo, bytes key1, bytes key2)
+
+cpdef tuple scroll_wrap(geoVals geo)
 
 cpdef int getNc(double theta, geoVals geo)
 

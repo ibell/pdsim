@@ -597,10 +597,13 @@ class OutputTreePanel(wx.Panel):
                         else:
                             # A place holder for now - will develop a frame to display the matrix
                             self.tree.SetItemText(child, str(o[thing]), i+1)
+                        
+                        if o[thing].attrs and 'note' in o[thing].attrs: #If it has any annotations
+                            self.tree.SetItemPyData(child, dict(annotation = o[thing].attrs['note']))
+                            self.tree.SetItemBackgroundColour(child,(50,50,100)) #Color the cell
                 
                 # Otherwise if it is a group, change the icon and recurse into the group
                 elif isinstance(objects[0][thing], h5py.Group):
-                    
                     self.tree.SetItemImage(child, fldridx, which = wx.TreeItemIcon_Normal)
                     self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
                     _recursive_hdf5_add(child, [o[thing] for o in objects])
@@ -614,10 +617,16 @@ class OutputTreePanel(wx.Panel):
         self.tree.Expand(self.root)
 
         self.tree.GetMainWindow().Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
-        self.tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.OnActivate)
+        self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnActivate)
         
     def OnActivate(self, evt):
-        print('OnActivate: %s' % self.tree.GetItemText(evt.GetItem()))
+        
+        annotation_dict = self.tree.GetItemPyData(evt.GetItem())
+        if annotation_dict:
+            self.GetParent().AnnotationTarget.SetLabel('Annotation: ' + annotation_dict['annotation'])
+        else:
+            self.GetParent().AnnotationTarget.SetLabel('Annotation: None' )
+        
         
     def OnRightUp(self, evt):
         pos = evt.GetPosition()
@@ -644,8 +653,8 @@ class OutputTreePanel(wx.Panel):
         else:
             _isScript = False
         
-        if _isHDF5array:    
-            menuitem = wx.MenuItem(menu, -1, 'Display this  parameter')
+        if _isHDF5array:
+            menuitem = wx.MenuItem(menu, -1, 'Display this parameter')
             self.Bind(wx.EVT_MENU, lambda event: self.OnArrayDisplay(event, item, col), menuitem)
             menu.AppendItem(menuitem)
             

@@ -775,12 +775,12 @@ def polycentroid(xi,yi):
     
 
 
-def CoordsOrbScroll(theta,geo,shaveOn=True):
+def CoordsOrbScroll(theta,geo,shaveOn=True, just_involutes = False):
     shaveDelta=None
     if shaveOn==True:
         shaveDelta=pi/2
     else:
-        shaveDelta=1e-12
+        shaveDelta=1e-16
     (xshave,yshave)=Shave(geo,theta,shaveDelta)
     
     
@@ -805,8 +805,12 @@ def CoordsOrbScroll(theta,geo,shaveOn=True):
     xarc2_o=-xarc2+ro*cos(om)
     yarc2_o=-yarc2+ro*sin(om)
     
-    x=np.r_[x_oo,xshave,x_oi[::-1],xarc1_o,xline_o,xarc2_o]
-    y=np.r_[y_oo,yshave,y_oi[::-1],yarc1_o,yline_o,yarc2_o]
+    if just_involutes:
+        x=np.r_[x_oo,x_oi[::-1]]
+        y=np.r_[y_oo,y_oi[::-1]]
+    else:
+        x=np.r_[x_oo,xshave,x_oi[::-1],xarc1_o,xline_o,xarc2_o]
+        y=np.r_[y_oo,yshave,y_oi[::-1],yarc1_o,yline_o,yarc2_o]
     
     #Output as a column vector
     x=x.reshape(len(x),1)
@@ -1093,6 +1097,16 @@ class ScrollAnimForm(wx.Frame):
         self.Bind(FM.EVT_FLAT_MENU_SELECTED, self.OnApplyLayers,id = self.LayerCoordinateAxes.GetId())
         layersMenu.AppendItem(self.LayerCoordinateAxes)
         
+        self.LayerOldham = FM.FlatMenuItem(layersMenu, -1, "Oldham ring", "Tooltip", wx.ITEM_CHECK)
+        self.LayerOldham.Check(False)
+        self.Bind(FM.EVT_FLAT_MENU_SELECTED, self.OnApplyLayers,id = self.LayerOldham.GetId())
+        layersMenu.AppendItem(self.LayerOldham)
+        
+        self.LayerOrbitingScroll = FM.FlatMenuItem(layersMenu, -1, "Orbiting scroll", "Tooltip", wx.ITEM_CHECK)
+        self.LayerOrbitingScroll.Check(False)
+        self.Bind(FM.EVT_FLAT_MENU_SELECTED, self.OnApplyLayers,id = self.LayerOrbitingScroll.GetId())
+        layersMenu.AppendItem(self.LayerOrbitingScroll)
+        
         self._mb.Append(layersMenu, "&Layers")
         
         # Create the items
@@ -1109,14 +1123,14 @@ class ScrollAnimForm(wx.Frame):
         btn.Bind(wx.EVT_TOGGLEBUTTON,self.onButton)
         self.Bind(wx.EVT_CLOSE,self.preClose)
         
-        self.theta=0
-        self.N=50
-        self.geo=geo
+        self.theta = 0
+        self.N = 100
+        self.geo = geo
         self.OS = plotScrollSet(0,
-                                axis=self.pltpanel.axes,
-                                geo=self.geo,
-                                lw=1,
-                                discOn=False,
+                                axis = self.pltpanel.axes,
+                                geo = self.geo,
+                                lw = 1,
+                                discOn = False,
                                 offsetScroll = self.geo.phi_ie_offset>0)
         
         self.ax = self.pltpanel.axes
@@ -1130,15 +1144,16 @@ class ScrollAnimForm(wx.Frame):
             self.start()
         
     def OnApplyLayers(self, event):
+        self.remove_orbiting_layers()
         self.ax.cla()
-        self.OS = plotScrollSet(0,
+        self.OS = plotScrollSet(self.theta,
                                 axis=self.pltpanel.axes,
                                 geo=self.geo,
                                 lw=1,
                                 discOn=False,
                                 offsetScroll = self.geo.phi_ie_offset>0)
         self.apply_stationary_layers()
-        self.apply_orbiting_layers()
+        self.apply_orbiting_layers(self.theta)
 
         self.ax.figure.canvas.draw() #Annoyingly this draw is required to flush the ghost orbiting scroll
         
@@ -1151,22 +1166,143 @@ class ScrollAnimForm(wx.Frame):
             self.ax.text(0.01,0,'$x$')
             self.ax.text(0,0.01,'$y$')
             
+    def _proj_onto_xd(self, x, y, beta):
+        
+        # unit vector pointing in the +xbeta direction
+        ubeta = np.array([cos(beta),sin(beta)])
+        r = np.array([x,y])
+        proj = np.dot(r,ubeta)*ubeta
+        return proj
+    
+    def _proj_onto_yd(self, x, y, beta):
+        
+        # unit vector pointing in the +xbeta direction
+        ubeta = np.array([-cos(beta),sin(beta)])
+        r = np.array([x,y])
+        proj = np.dot(r,ubeta)*ubeta
+        return proj
+        
     def apply_orbiting_layers(self, theta = 0):
+        
+        self.remove_orbiting_layers()
+        
+        def rotated_rectangle(x0,y0,w,h,rot):
+            
+            x = np.array([-w/2,w/2,w/2,-w/2,-w/2])
+            y = np.array([-h/2,-h/2,h/2,h/2,-h/2])
+            
+            xrot = x*cos(rot)-y*sin(rot)
+            yrot = x*sin(rot)+y*cos(rot) 
+            
+            return xrot+x0, yrot+y0
+        
         if self.LayerCoordinateAxes.IsChecked():
             
             om = self.geo.phi_ie-theta+3.0*pi/2.0
-            xo = self.geo.rb*cos(om)
-            yo = self.geo.rb*sin(om)
+            xo = self.geo.ro*cos(om)
+            yo = self.geo.ro*sin(om)
             
-            layer, = self.ax.plot(xo, yo, 'k+')
-            self.orbiting_layers.append(layer)
-            
-#            self.ax.plot([0, 0.01], [0,0], 'k')
-#            self.ax.plot([0,0], [0.01, 0], 'k')
-#            self.ax.text(0.01,0,'$x$')
-#            self.ax.text(0,0.01,'$y$')
-            
+            self.orbiting_layers.append(self.ax.plot(xo, yo, 'ko')[0])
     
+        if self.LayerOldham.IsChecked():
+            
+            om = self.geo.phi_ie-theta+3.0*pi/2.0
+            xo = self.geo.ro*cos(om)
+            yo = self.geo.ro*sin(om)
+            
+            beta = pi/6
+            
+            OSkeys = [dict(r = 0.04, height = 0.005, width = 0.005, length = 0.005),
+                      dict(r = 0.04, height = 0.005, width = 0.005, length = 0.005, betaplus = pi)]
+            FSkeys = [dict(r = 0.03, height = 0.005, width = 0.005, length = 0.005),
+                      dict(r = 0.03, height = 0.005, width = 0.005, length = 0.005, betaplus = pi)]
+            
+            for key in OSkeys:
+                r = key['r']
+                width = key['width']
+                length = key['length']
+                betaplus = key.get('betaplus',0)
+                
+                betakey = beta + betaplus + pi/2
+                
+                xo = self.geo.ro*cos(om)
+                yo = self.geo.ro*sin(om)
+                
+#                xbeta = 0
+#                ybeta = -self.geo.ro*cos(om)*sin(beta)+self.geo.ro*sin(om)*cos(beta)
+                
+                xbeta = self.geo.ro*cos(om)*cos(beta)+self.geo.ro*sin(om)*sin(beta)
+                ybeta = 0 
+                
+                xoffset = xbeta*cos(beta)+ybeta*sin(beta)
+                yoffset = xbeta*sin(beta)-ybeta*cos(beta)
+                
+                x,y = rotated_rectangle(r*cos(betakey),r*sin(betakey),length+3*self.geo.ro,width,beta+pi/2)
+                self.orbiting_layers.append(self.ax.fill(x+xo,y+yo,'green', alpha = 0.5)[0])
+                x,y = rotated_rectangle(r*cos(betakey),r*sin(betakey),width,length,beta)
+                self.orbiting_layers.append(self.ax.fill(x+xoffset,y+yoffset,'k')[0])
+                
+            for key in FSkeys:
+                
+                r = key['r']
+                width = key['width']
+                length = key['length']
+                betaplus = key.get('betaplus',0)
+                
+                betakey = beta + betaplus
+                
+                xbeta = self.geo.ro*cos(om)*cos(beta)+self.geo.ro*sin(om)*sin(beta)
+                ybeta = 0 
+                
+                xoffset = xbeta*cos(beta)+ybeta*sin(beta)
+                yoffset = xbeta*sin(beta)-ybeta*cos(beta)
+                
+                x,y = rotated_rectangle(r*cos(betakey),r*sin(betakey),length+3*self.geo.ro,width,beta)
+                self.orbiting_layers.append(self.ax.fill(x,y,'yellow', alpha = 0.5)[0])
+                x,y = rotated_rectangle(r*cos(betakey),r*sin(betakey),width,length,beta)
+                self.orbiting_layers.append(self.ax.fill(x+xoffset,y+yoffset,'k')[0])
+                
+        if self.LayerOrbitingScroll.IsChecked():
+            
+            om = self.geo.phi_ie-theta+3.0*pi/2.0
+            xo = self.geo.ro*cos(om)
+            yo = self.geo.ro*sin(om)
+            
+            beta = pi/6
+            
+            OSkeys = [dict(r = 0.04, height = 0.005, width = 0.005, length = 0.005),
+                      dict(r = 0.04, height = 0.005, width = 0.005, length = 0.005, betaplus = pi)]
+            FSkeys = [dict(r = 0.03, height = 0.005, width = 0.005, length = 0.005),
+                      dict(r = 0.03, height = 0.005, width = 0.005, length = 0.005, betaplus = pi)]
+            
+            for key in OSkeys:
+                r = key['r']
+                width = key['width']
+                length = key['length']
+                betaplus = key.get('betaplus',0)
+                
+                betakey = beta + betaplus + pi/2
+                
+                xo = self.geo.ro*cos(om)
+                yo = self.geo.ro*sin(om)
+                
+                xbeta = self.geo.ro*cos(om)*cos(beta)+self.geo.ro*sin(om)*sin(beta)
+                ybeta = 0 
+                
+                xoffset = xbeta*cos(beta)+ybeta*sin(beta)
+                yoffset = xbeta*sin(beta)-ybeta*cos(beta)
+                
+                x,y = rotated_rectangle(r*cos(betakey),r*sin(betakey),length+3*self.geo.ro,width,beta+pi/2)
+                self.orbiting_layers.append(self.ax.fill(x+xo,y+yo,'green', alpha = 0.5)[0])
+                x,y = rotated_rectangle(r*cos(betakey),r*sin(betakey),width,length,beta)
+                self.orbiting_layers.append(self.ax.fill(x+xoffset,y+yoffset,'k')[0])
+            
+    def remove_orbiting_layers(self):
+        #Clean out all the items from the orbiting layers
+        for item in self.orbiting_layers:
+            item.remove() # Remove from the GUI
+        self.orbiting_layers = []
+        
     def start(self):
         """
         Start the plotting machinery
@@ -1202,12 +1338,12 @@ class ScrollAnimForm(wx.Frame):
 
     def plotStep(self):
         
-        for item in self.orbiting_layers:
-            del item
+        self.remove_orbiting_layers()
         
-        self.apply_orbiting_layers(self.theta)
-            
         self.theta += 2*np.pi/(self.N-1)
+        
+        # Plot the orbiting layers
+        self.apply_orbiting_layers(self.theta)
         
         #If offset scroll, don't shave the orbiting scroll        
         (x,y)=CoordsOrbScroll(self.theta,
@@ -1230,8 +1366,129 @@ class ScrollAnimForm(wx.Frame):
 
 if __name__== "__main__":
     geo = geoVals()
-    Scroll2WRL('Scroll.wrl')
-    plotScrollSet(pi/2,lw=1.0,saveCoords=True)
+    #Scroll2WRL('Scroll.wrl')
+    #plotScrollSet(pi/2,lw=1.0,saveCoords=True)
+    
+    x, y = CoordsOrbScroll(0, geo, shaveOn = False)
+    xo = x - geo.ro*cos(geo.phi_ie-pi/2)
+    yo = y - geo.ro*sin(geo.phi_ie-pi/2)
+    xf = geo.ro*cos(geo.phi_ie-pi/2) - x
+    yf = geo.ro*sin(geo.phi_ie-pi/2) - y
+    
+    f = open('coordsOS.txt','w')
+    last = ''
+    old_xy = (9999999999,9999999999999)
+    for _x,_y in zip(xo, yo):
+        this = '[{x:g}, {y:g}],\n'.format(x = _x[0]*1000, y = _y[0]*1000)
+        if (not this == last) and ((old_xy[0]-_x[0])**2+(old_xy[1]-_y[0])**2)**(0.5)>1e-6:
+            f.write(this)
+        else:
+            print this, last
+        last = this
+        old_xy = _x[0], _y[0]
+    f.close()
+    
+    import textwrap
+    
+    template = textwrap.dedent(
+    """module scroll()
+    {{
+        linear_extrude(height = {hs:g})
+        {{
+            polygon([
+        
+                {polygondata:s}
+                
+            ]);
+        }}
+    }}
+    
+    union()
+    {{
+        scroll();
+        translate([0,0,-10]){{cylinder(r = 75, h = 10, $fn = 300);}}
+    }}""")
+    
+    with open('OSscad.scad','w') as f:
+        f.write(template.format(polygondata = open('coordsOS.txt','r').read(),
+                          hs = geo.h*1000))
+        
+    f = open('coordsFS.txt','w')
+    last = ''
+    old_xy = (9999999999,9999999999999)
+    for _x,_y in zip(xf,yf):
+        this = '[{x:g}, {y:g}],\n'.format(x = _x[0]*1000, y = _y[0]*1000)
+        if (not this == last) and ((old_xy[0]-_x[0])**2+(old_xy[1]-_y[0])**2)**(0.5)>1e-6:
+            f.write(this)
+        else:
+            print this, last
+        last = this
+        old_xy = _x[0], _y[0]
+    f.close()
+    
+    template = textwrap.dedent(
+    """module scroll()
+    {{
+        linear_extrude(height = {hs:g})
+        {{
+            polygon([
+        
+                {polygondata:s}
+                
+            ]);
+        }}
+    }}
+    
+    union()
+    {{
+        scroll();
+        translate([0,0,+90+{hs:g}]){{cylinder(r = 75, h = 10, $fn = 300);}}
+    }}""")
+    
+    with open('FSscad.scad','w') as f:
+        f.write(template.format(polygondata = open('coordsFS.txt','r').read(),
+                          hs = geo.h*1000))
+
+    for root in ['FSscad','OSscad']:
+        subprocess.check_call(['C:\Program Files (x86)\OpenSCAD\openscad.exe','-o',root + '.off',root + '.scad'])
+        subprocess.call(['C:\Program Files\VCG\MeshLab\meshlabserver.exe','-i',root + '.off','-o',root + '.x3d'])
+    
+        def inject(fName, diffuse, specular, MatDEF):
+            """
+            Parameters
+            ----------
+            fName : string
+            diffuse : string
+            specular : string
+            """
+            
+            injected_string = textwrap.dedent(
+            """
+            <Appearance>
+                <Material id='{MatDEF:s}' DEF='{MatDEF:s}' diffuseColor='{diffuse:s}' specularColor='{specular:s}' />
+            </Appearance>
+            """.format(MatDEF = MatDEF,
+                                    diffuse = diffuse, 
+                                    specular = specular)
+            )
+            
+            lines = open(fName,'r').readlines()
+            
+            iLine = -1
+            for i,line in enumerate(lines):
+                if line.find('<Shape>') > -1:
+                    iLine = i
+                    break
+            
+            lines.insert(iLine+1, injected_string.strip())
+            
+            with open(fName,'w') as f:
+                f.write(''.join(lines))
+            
+        inject(root + '.x3d', diffuse = '0.8 0.8 0.8', specular = '0.2 0.2 0.2', MatDEF = 'scrollMat')
+        
+#    pylab.fill(x,y)
+#    pylab.show()
 ##     pylab.show()
     pass
     

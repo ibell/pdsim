@@ -704,12 +704,12 @@ class Scroll(PDSimCore, _Scroll):
             
         return disable,h
         
-    def crank_bearing(self):
+    def crank_bearing(self, W):
         
         JB = journal_bearing(r_b = self.mech.D_crank_bearing/2,
                              L = self.mech.L_crank_bearing,
                              omega = self.omega,
-                             W = self.forces.corr_Fm*1000,
+                             W = W,
                              c = self.mech.c_crank_bearing,
                              eta_0 = self.mech.mu_oil
                              )
@@ -800,7 +800,7 @@ class Scroll(PDSimCore, _Scroll):
             self.journal_tune_factor = 1.0
             
         #Conduct the calculations for the bearings
-        self.losses.crank_bearing = self.crank_bearing()*self.journal_tune_factor
+        self.losses.crank_bearing = self.crank_bearing(W = self.forces.corr_Fm*1000)*self.journal_tune_factor
         self.losses.upper_bearing = self.upper_bearing()*self.journal_tune_factor
         self.losses.lower_bearing = self.lower_bearing()*self.journal_tune_factor
         self.losses.thrust_bearing = self.thrust_bearing()
@@ -1229,12 +1229,15 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.Fz[np.isnan(self.forces.Fz)] = 0
         #Sum the terms for the applied gas force from each of the control volumes
         self.forces.summed_Fz = np.sum(self.forces.Fz, axis = 0) #kN
+        
+        
 #        
         #If the orbiting_back_pressure is a floating point value, use it to calculate the back pressure correction
         if isinstance(orbiting_back_pressure, float):
             # The back gas pressure on the orbiting scroll pushes the scroll back down
             # Subtract the back pressure from all the elements 
-            self.forces.summed_Fz -= orbiting_back_pressure*pi*self.mech.thrust_ID**2/4.0
+            self.forces.Fbackpressure = orbiting_back_pressure*pi*self.mech.thrust_ID**2/4.0
+            self.forces.summed_Fz -= self.forces.Fbackpressure
         else:
             raise NotImplementedError('calculate_force_terms must get a float back pressure for now')
         
@@ -1243,8 +1246,6 @@ class Scroll(PDSimCore, _Scroll):
         
         # Calculate the mean axial force
         self.forces.mean_Fz = np.trapz(self.forces.summed_Fz, t)/(2*pi)
-        
-        
         
         # The corrected axial load accounts for the fact that the area of the 
         # thrust bearing does not contribute to compensating for the load
@@ -1312,35 +1313,58 @@ class Scroll(PDSimCore, _Scroll):
                 self.forces.cy[I,:] = [comp['cy'] for comp in geo_components]
                 self.forces.Mz[I,:] = [comp['M_O_p'] for comp in geo_components]*p
         
+        # The thrust load from JUST the working chambers
+        self.forces.summed_gas_Fz = np.sum(self.forces.Fz, axis = 0)
+        
         # Point of action of the thrust forces - weighted by the axial force
-        self.forces.cx_thrust = np.sum(self.forces.cx*self.forces.Fz, axis = 0) / np.sum(self.forces.Fz, axis = 0)
-        self.forces.cy_thrust = np.sum(self.forces.cy*self.forces.Fz, axis = 0) / np.sum(self.forces.Fz, axis = 0)
+        self.forces.cx_thrust = np.sum(self.forces.cx*self.forces.Fz, axis = 0) / self.forces.summed_gas_Fz
+        self.forces.cy_thrust = np.sum(self.forces.cy*self.forces.Fz, axis = 0) / self.forces.summed_gas_Fz
+        
+        self.forces.THETA = self.geo.phi_ie-pi/2-self.t[_slice]
+        # Position of the pin as a function of crank angle
+        self.forces.xpin = self.geo.ro*np.cos(self.forces.THETA)
+        self.forces.ypin = self.geo.ro*np.sin(self.forces.THETA)
+        
+        # Moment around the x axis and y-axis from the thrust load caused by the working chambers
+        # Sign convention on force is backwards here (in this case, forces pointing down are positive
+        self.forces.Mx = -(self.forces.cy_thrust-self.forces.ypin)*self.forces.Fz
+        self.forces.My = +(self.forces.cx_thrust-self.forces.xpin)*self.forces.Fz
+        
+        # TODO: add plate thickness
+        self.forces.Mx += -self.forces.Fy*(self.geo.h/2+self.mech.L_upper_bearing/2) #If Fy is in the positive y direction, the moment is in the negative x direction
+        self.forces.My += self.forces.Fx*(self.geo.h/2+self.mech.L_upper_bearing/2) #If Fx is in the positive x direction, the moment is in the positive y direction
+        
+        # The moments from the backpressure acting on the back side of the orbiting scroll
+        self.forces.Mx += -(-self.forces.ypin)*self.forces.Fbackpressure
+        self.forces.My += +(-self.forces.xpin)*self.forces.Fbackpressure
         
         # Remove all the NAN placeholders
         self.forces.Fx[np.isnan(self.forces.Fx)] = 0
         self.forces.Fy[np.isnan(self.forces.Fy)] = 0
         self.forces.Mz[np.isnan(self.forces.Mz)] = 0
+        self.forces.Mx[np.isnan(self.forces.Mx)] = 0
+        self.forces.My[np.isnan(self.forces.My)] = 0
+        
+        # Magnitude of the overturning moment generated by the gas forces (Fr, Ftheta, Fz)
+        self.forces.Moverturn = np.sqrt(self.forces.Mx**2+self.forces.My**2)
         
         # Sum the terms at each crank angle
-        self.forces.summed_Fx = np.sum(self.forces.Fx,axis = 0) #kN
-        self.forces.summed_Fy = np.sum(self.forces.Fy,axis = 0) #kN
-        self.forces.summed_Mz = np.sum(self.forces.Mz,axis = 0) #kN-m
+        self.forces.summed_Fx = np.sum(self.forces.Fx, axis = 0) #kN
+        self.forces.summed_Fy = np.sum(self.forces.Fy, axis = 0) #kN
+        self.forces.summed_Mz = np.sum(self.forces.Mz, axis = 0) #kN-m
+        self.forces.summed_Mx = np.sum(self.forces.Mx, axis = 0) #kN-m
+        self.forces.summed_My = np.sum(self.forces.My, axis = 0) #kN-m
+        self.forces.summed_Moverturn = np.sum(self.forces.Moverturn, axis = 0) #kN-m
         
         #Calculate the radial force on the crank pin at each crank angle
-        #
-        #Position of the pin as a function of crank angle
-        self.forces.xpin = self.geo.ro*np.cos(self.geo.phi_ie-pi/2-self.t[_slice])
-        self.forces.ypin = self.geo.ro*np.sin(self.geo.phi_ie-pi/2-self.t[_slice])
-        #
-        #The radial component magnitude is just the projection of the force onto a vector going from origin to center of orbiting coordinate system 
-        self.forces.Fr = (self.forces.xpin*self.forces.Fx+self.forces.ypin*self.forces.Fy)/self.geo.ro
-        
-        #The tangent component magnitude is just the projection of the force onto a vector going from origin to center of orbiting coordinate system
+        #The radial component magnitude is just the projection of the force onto a vector going from origin to center of orbiting scroll
+        self.forces.Fr = (np.cos(self.forces.THETA)*self.forces.Fx + np.sin(self.forces.THETA)*self.forces.Fy)
         #
         #Components of the unit vector in the direction of rotation
-        x_dot =  np.sin(self.geo.phi_ie-pi/2-self.t[_slice])
-        y_dot = -np.cos(self.geo.phi_ie-pi/2-self.t[_slice])
-        self.forces.Ft = (x_dot*self.forces.Fx+y_dot*self.forces.Fy)
+        x_dot = +np.sin(self.forces.THETA)
+        y_dot = -np.cos(self.forces.THETA)
+        # Direction of rotation is opposite the positive theta direction, so need to flip sign for Ft
+        self.forces.Ft = -(x_dot*self.forces.Fx+y_dot*self.forces.Fy)
         
         #Remove all the NAN placeholders
         self.forces.Fr[np.isnan(self.forces.Fr)]=0
@@ -1349,9 +1373,8 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.summed_Fr = np.sum(self.forces.Fr,axis = 0) #kN
         self.forces.summed_Ft = np.sum(self.forces.Ft,axis = 0) #kN
 
-        self.forces.Fm = np.sqrt(np.power(self.forces.summed_Fx,2)
-                                 +np.power(self.forces.summed_Fy,2)
-                                 )
+        self.forces.Fm = np.sqrt(self.forces.summed_Fx**2+self.forces.summed_Fy**2)
+        self.forces.Fm_rt = np.sqrt(self.forces.summed_Fr**2+self.forces.summed_Ft**2)
         
         self.forces.tau = self.forces.xpin*self.forces.summed_Fy-self.forces.ypin*self.forces.summed_Fx
         # Calculate the mean normal force on the crank pin
@@ -1362,12 +1385,164 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.mean_tau = np.trapz(self.forces.tau, self.t[_slice])/(2*pi)
         self.forces.mean_Mz = np.trapz(self.forces.summed_Mz, self.t[_slice])/(2*pi)
                 
-        #: The inertial forces on the orbiting scroll
+        #: The inertial forces on the orbiting scroll [kN]
         self.forces.inertial = self.mech.orbiting_scroll_mass * self.omega**2 * self.geo.ro / 1000
         
         self.forces.corr_Fm = self.forces.mean_Fm + self.forces.inertial
         
-    def scroll_involute_axial_force(self,theta, Nphi = 20):
+        self.force_analysis()
+        
+    def force_analysis(self):
+        
+        muthrust = 0.027 #from Ishii 1986
+        
+        # These parameters are hard coded for now
+        beta = 0
+        
+        if not hasattr(self,'losses'):
+            self.losses = struct()
+        
+        mu1 = mu2 = mu3 = mu4 = mu5 = 0.027 #from Ishii 1986
+        r1 = r2 = r3 = r4 = 0.08
+        w1 = w2 = w3 = w4 = 0.01
+        mOR = 0.194
+        mOS = 3
+        wOR = 0.01
+        hkeyOR = 0.005
+        g = 9.81
+        
+        _slice = range(self.Itheta+1)
+        theta = self.t[_slice]
+        
+        # The initial guesses for the moment generated by the journal bearing - it should be positive since Ms is negative
+        self.forces.F_B0 = np.sqrt((self.forces.summed_Fr + self.forces.inertial)**2+self.forces.summed_Ft**2)
+        mu_B = np.zeros_like(self.forces.F_B0)
+        self.forces.M_B0 = mu_B*self.mech.D_crank_bearing/2*self.forces.F_B0
+        
+        THETA = self.geo.phi_ie-pi/2-theta
+        vOR_xbeta = self.geo.ro*self.omega*(np.sin(THETA)*np.cos(beta)-np.cos(THETA)*np.sin(beta)) #Velocity of the oldham ring in the xbeta direction
+        aOR_xbeta = self.geo.ro*self.omega**2*(-np.cos(THETA)*np.cos(beta)-np.sin(THETA)*np.sin(beta))
+        UPSILON = vOR_xbeta/np.abs(vOR_xbeta)
+        vOS_ybeta = -self.geo.ro*self.omega*(np.sin(THETA)*np.sin(beta)+np.cos(THETA)*np.cos(beta)) #Velocity of the orbiting scroll in the y_beta direction
+        PSI = vOS_ybeta/np.abs(vOS_ybeta)
+        vOS = self.geo.ro*self.omega
+        aOS_x = -self.geo.ro*self.omega**2*np.cos(THETA)
+        aOS_y = -self.geo.ro*self.omega**2*np.sin(THETA)
+        
+        Nsteps = self.Itheta+1
+        A = np.zeros((4,4,Nsteps))
+        b = np.zeros((4,Nsteps))
+        F = np.zeros((4,Nsteps))
+        
+        # Make a matrix stack where each entry in the third index corresponds to a 4x4 matrix of the terms
+        # Oldham x-beta direction
+        A[0,0,:] = -mu1*UPSILON
+        A[0,1,:] = -mu2*UPSILON
+        A[0,2,:] = 1
+        A[0,3,:] = -1
+        b[0,:] = mOR*aOR_xbeta/1000+mu5*UPSILON*mOR*g/1000
+        
+        # Oldham ybeta direction
+        A[1,0,:] = 1    
+        A[1,1,:] = -1 
+        A[1,2,:] = -mu3*PSI
+        A[1,3,:] = -mu4*PSI
+        b[1,:] = 0
+            
+        # Oldham moments around the central z-direction axis
+        A[2,0,:] = r1-mu1*UPSILON*w1-(wOR+hkeyOR)*mu5*UPSILON
+        A[2,1,:] = r2+mu2*UPSILON*w2+(wOR+hkeyOR)*mu5*UPSILON
+        A[2,2,:] = -r3+mu3*PSI*w3
+        A[2,3,:] = -r4-mu4*PSI*w4
+        b[2,:] = 0
+        
+        # Orbiting scroll moments around the central axis
+        A[3,0,:] = 0
+        A[3,0,:] = 0
+        A[3,0,:] = r3-mu3*PSI*w3
+        A[3,0,:] = r4+mu4*PSI*w4
+        
+        # Use the initial guess for the bearing moments
+        self.forces.M_B = self.forces.M_B0
+        self.forces.F_B = self.forces.F_B0
+        
+        FBold = np.sqrt((self.forces.summed_Fr + self.forces.inertial)**2+self.forces.summed_Ft**2)
+        step = 1
+        while step <= 2:
+            
+            for i in _slice:
+                self.crank_bearing(self.forces.F_B[i]*1000)
+                mu_B[i] = self.losses.crank_bearing_dict['f']
+            self.forces.M_B = mu_B*self.mech.D_crank_bearing/2*self.forces.F_B
+            
+            # This term depends on M_B which is re-calculated at each iteration.  All other terms are independent of M_B
+            b[3,:] = -self.forces.summed_Mz-self.forces.M_B-muthrust*(self.forces.summed_My*np.cos(THETA)-self.forces.summed_Mx*np.sin(THETA))
+            
+            for i in _slice:
+                F[:,i] = np.linalg.solve(A[:,:,i], b[:,i])
+        
+                #debug_plots(self)
+            F1, F2, F3, F4 = F
+        
+            # Bearing forces on the scroll re-calculated based on force balances in the x- and y-axes
+            Fbx = mOS*aOS_x/1000-muthrust*self.forces.summed_Fz*np.sin(THETA)+mu3*PSI*F3*np.sin(beta)+mu4*PSI*F4*np.sin(beta)-F4*np.cos(beta)+F3*np.cos(beta)-self.forces.summed_Fx#-mOS*self.geo.ro*self.omega**2*np.cos(THETA)/1000
+            Fby = mOS*aOS_y/1000-muthrust*self.forces.summed_Fz*np.cos(THETA)-mu3*PSI*F3*np.cos(beta)-mu4*PSI*F4*np.cos(beta)-F4*np.sin(beta)+F3*np.sin(beta)-self.forces.summed_Fy#-mOS*self.geo.ro*self.omega**2*np.sin(THETA)/1000
+            self.forces.M_B = mu_B*self.mech.D_crank_bearing/2*np.sqrt(Fbx**2+Fby**2) #Update the forces on the bearing
+            
+            Fbold = np.sqrt(Fbx**2+Fby**2)
+            
+            step += 1
+        
+        self.forces.Wdot_F1 = np.abs(F1*vOR_xbeta*mu1)
+        self.forces.Wdot_F2 = np.abs(F2*vOR_xbeta*mu2)
+        self.forces.Wdot_F3 = np.abs(F3*vOS_ybeta*mu3)
+        self.forces.Wdot_F4 = np.abs(F4*vOS_ybeta*mu4)
+        self.forces.Wdot_OS_journal = np.abs(self.omega*self.forces.M_B)*2.6
+        self.forces.Wdot_thrust = np.abs(muthrust*self.forces.summed_Fz*vOS)
+        
+        self.forces.Wdot_total = self.forces.Wdot_F1+self.forces.Wdot_F2+self.forces.Wdot_F3+self.forces.Wdot_F4+self.forces.Wdot_OS_journal+self.forces.Wdot_thrust
+        self.forces.Wdot_total_mean = np.trapz(self.forces.Wdot_total, theta)/(2*pi)
+        print self.forces.Wdot_total_mean,'average losses'
+            
+        import matplotlib.pyplot as plt
+            
+        fig = plt.figure()
+        fig.add_subplot(141)
+        plt.plot(FBold,np.sqrt(Fbx**2+Fby**2))
+        fig.add_subplot(142)
+        plt.plot(theta, mOS*aOS_x/1000, theta, self.forces.summed_Fx, theta, -F4*np.cos(beta)+F3*np.cos(beta), theta, -mOS*self.geo.ro*self.omega**2*np.cos(THETA)/1000, theta, Fbx,':')
+        fig.add_subplot(143)
+        plt.plot(theta, Fby,':')
+        fig.add_subplot(144)
+        plt.plot(theta,self.forces.Wdot_F1,label='F1')
+        plt.plot(theta,self.forces.Wdot_F2,label='F2')
+        plt.plot(theta,self.forces.Wdot_F3,label='F3')
+        plt.plot(theta,self.forces.Wdot_F4,label='F4')
+        plt.plot(theta,self.forces.Wdot_OS_journal,label='journal')
+        plt.plot(theta,self.forces.Wdot_thrust,label='thrust')
+        plt.plot(theta,self.forces.Wdot_total,lw=3)
+        plt.legend()
+        plt.show()
+        
+        plt.close('all')
+        fig = plt.figure()
+        fig.add_subplot(141)
+        plt.gca().set_title('Oldham acceleration [g]')
+        plt.plot(theta,(F[2,:].T-F[3,:].T)*1000/9.81/mOR,'o',lw=2)
+        plt.plot(theta, aOR_xbeta/9.81,'-',lw=2)
+        fig.add_subplot(142)
+        plt.plot(theta,F.T)
+        plt.gca().set_title('Key forces [kN]')
+        fig.add_subplot(143)
+        plt.plot(theta,self.forces.summed_Ft)
+        plt.gca().set_title('Tangential force [kN]')
+        fig.add_subplot(144)
+        plt.plot(theta,self.forces.summed_Fr)
+        plt.gca().set_title('Radial force [kN]')
+        plt.show()
+        
+    
+    def scroll_involute_axial_force(self, theta, Nphi = 20):
         """
         Calculate the axial force generated by the pressure distribution 
         along the top of the scroll wrap 

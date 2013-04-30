@@ -20,7 +20,8 @@ geoValsvarlist=['h','phi_i0','phi_is','phi_ie','phi_e',
                 'b_line', 't1_line', 't2_line', 'm_line',
                 'x0_wall','y0_wall','r_wall',
                 'delta_radial', 'delta_flank',
-                'phi_ie_offset','delta_suction_offset']
+                'phi_ie_offset','delta_suction_offset',
+                'cx_scroll','cy_scroll','V_scroll']
  
 def rebuild_geoVals(d):
     geo = geoVals()
@@ -431,6 +432,35 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
     else:
         raise AttributeError('Type not understood, should be one of 2Arc or ArcLineArc')
 
+cdef double x_antideriv(phi, phi_0):
+    return -cos(phi)*((phi_0-phi)**2-3)-3*sin(phi)*(phi_0-phi)
+
+cdef double y_antideriv(phi, phi_0):
+    return +3*cos(phi)*(phi_0-phi)-sin(phi)*((phi_0-phi)**2-3)
+    
+cpdef tuple scroll_wrap(geoVals geo):
+    """
+    Calculate the scroll wrap centroid and volume
+    """
+        
+    # Initial angle of the midpoint of the scroll wrap
+    phi_0 = (geo.phi_i0 + geo.phi_o0)/2
+    # Ending angle of the centerline of the scroll wrap
+    phi_e = (geo.phi_ie + geo.phi_oe)/2
+    
+    #print 'h', geo.h
+    #print 'rb', geo.rb
+    #print 't', geo.t
+    #print 'phi_0', phi_0
+    #print 'phi_e', phi_e
+    #print 'rat', (x_antideriv(phi_e, phi_0)-x_antideriv(phi_0, phi_0))/(phi_e**2/2.0-phi_0**2/2.0-(phi_e-phi_0)*phi_0)
+    
+    Vwrap = geo.h*geo.rb*geo.t*(phi_e**2/2.0-phi_0**2/2.0-(phi_e-phi_0)*phi_0)
+    xstar = geo.h*geo.rb**2*geo.t/Vwrap*(x_antideriv(phi_e, phi_0)-x_antideriv(phi_0, phi_0))
+    ystar = geo.h*geo.rb**2*geo.t/Vwrap*(y_antideriv(phi_e, phi_0)-y_antideriv(phi_0, phi_0))
+    
+    return Vwrap, xstar, ystar
+    
 def overlay_injection_port(theta, geo, phi, ax, inner_outer):
     """
     Plot the injection ports on an axis - no scroll wrap plot is generated.  Also see

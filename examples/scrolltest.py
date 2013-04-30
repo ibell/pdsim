@@ -45,7 +45,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False):
     ScrollComp=Scroll()
     #This runs if the module code is run directly
     
-    ScrollComp.set_scroll_geo(100e-6, 2.3, 0.005, 0.006) #Set the scroll wrap geometry
+    ScrollComp.set_scroll_geo(83e-6, 3.3, 0.005, 0.006) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2=0)
     ScrollComp.geo.delta_flank = 15e-6
     ScrollComp.geo.delta_radial = 15e-6
@@ -53,7 +53,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False):
     ScrollComp.geo.delta_suction_offset = 0.0e-3
     ScrollComp.geo.phi_ie_offset = 0.0
     
-    ScrollComp.omega = 4500/60*2*pi
+    ScrollComp.omega = 3000/60*2*pi
     ScrollComp.Tamb = 298.0
     
     #Temporarily set the bearing dimensions

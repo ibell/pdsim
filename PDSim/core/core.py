@@ -20,9 +20,9 @@ import PDSim.core.callbacks
 
 ##-- Non-package imports  --
 import numpy as np
-
 from scipy.integrate import trapz, simps
 from scipy.optimize import newton
+import h5py
 
 ## matplotlib imports
 import matplotlib.pyplot as plt
@@ -1570,7 +1570,7 @@ class PDSimCore(_PDSimCore):
         Returns
         -------
         prune_key_list: list
-            A list of keys that are to be removed from the HDF5 file
+            A list of HDF5 keys that are to be removed from the HDF5 file.
         """
         
         return ['/CVs/CVs',
@@ -1584,8 +1584,62 @@ class PDSimCore(_PDSimCore):
                 '/CVs/exists_keys',
                 '/CVs/h',
                 '/CVs/p',
-                '/CVs/rho'
+                '/CVs/rho',
+                '/callbacks',
+                '/core',
+                '/steps',
+                '/theta'
                 ]
+        
+    def attach_HDF5_annotations(self, fName):
+        """
+        In this function, annotations can be attached to each HDF5 field.  The format is simply a dictionary
+        
+        Parameters
+        ----------
+        fName : string
+            The file name for the HDF5 file that is to be used
+        """ 
+        attrs_dict = {
+                '/t':'The array of the independent variable in the solution, either time or crank angle [rad or s]',
+                '/m':'The NCV x Nt matrix with the mass in each control volume [kg]',
+                '/T':'The NCV x Nt matrix with the temperature in each control volume [K]',
+                '/V':'The NCV x Nt matrix with the volume in each control volume [m^3]',
+                '/dV':'The NCV x Nt matrix with the derivative of volume w.r.t. crank angle in each control volume [m^3/radian]',
+                '/h':'The NCV x Nt matrix with the enthalpy in each control volume [kJ/kg]',
+                '/p':'The NCV x Nt matrix with the pressure in each control volume [kPa]',
+                '/rho':'The NCV x Nt matrix with the density in each control volume [kg/m^3]',
+                '/Q':'The NCV x Nt matrix with the heat transfer TO the gas in each control volume [kW]',
+                '/xL':'The NCV x Nt matrix with the oil mass fraction in each control volume [-]',
+                '/A_shell':'The shell area of the machine [m^2]',
+                '/key_inlet':'The key for the inlet node',
+                '/key_outlet':'The key for the outlet node',
+                '/elapsed_time':'The elapsed time for the simulation run [s]',
+                '/eta_a': 'Adiabatic efficiency [-]',
+                '/eta_oi':'Overall isentropic efficiency [-]',
+                '/eta_v':'Volumetric efficiency [-]',
+                '/Qamb':'Rate of heat transfer from the machine TO the ambient [kW]',
+                '/RK45_eps':'Step error tolerance for Runge-Kutta method [varied]',
+                '/Tamb':'Ambient temperature [K]',
+                '/Wdot_pv':'Mechanical power calculated as the integral of -pdV [kW]',
+                '/Wdot_electrical':'Electrical power of the machine [kW]',
+                '/Wdot_forces':'Mechanical power calculated from the mechanical analysis [kW]',
+                '/motor/eta_motor':'Motor efficiency [-]',
+                '/motor/losses':'Losses generated in the motor [kW]',
+                '/motor/suction_fraction':'Fraction of the motor losses that are added to the suction gas [-]',
+                '/motor/type':'The model used to simulate the motor'
+                '/run_index':'A unique identifier for runs in a batch'
+                }
+        
+        hf = h5py.File(fName,'a')
+        
+        for k, v in attrs_dict.iteritems():
+            dataset = hf.get(k)
+            if dataset is None:
+                print 'bad key',k
+            else:
+                dataset.attrs['note'] = v
+        hf.close()
         
     def post_solve(self):
         """
@@ -1859,4 +1913,6 @@ class PDSimCore(_PDSimCore):
                         raise AttributeError('The name of the function ['+Flow.MdotFcn.Function+']is not found in the PDSimCore derived class instance')
             
 if __name__=='__main__':
+    PC = PDSimCore()
+    PC.attach_HDF5_annotations('runa.h5')
     print 'This is the base class that is inherited by other compressor types.  Running this file doesn\'t do anything'

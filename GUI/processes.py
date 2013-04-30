@@ -271,7 +271,9 @@ class RedirectedWorkerThread(Thread):
                 from plugins.HDF5_plugin import HDF5Writer
                 HDF5 = HDF5Writer()
                 HDF5.write_to_file(sim, hdf5_path)
+                #Prune off undesired keys as provided by get_prune_keys function
                 HDF5.prune(hdf5_path, sim.get_prune_keys())
+                sim.attach_HDF5_annotations(hdf5_path)
                 print 'Wrote hdf5 file to', hdf5_path
                 
                 "Send the data back to the GUI"

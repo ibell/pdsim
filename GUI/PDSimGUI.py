@@ -670,10 +670,12 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         self.RunButton.Disable()
         
         self.OutputTree = pdsim_panels.OutputTreePanel(self, runs)
+        self.AnnotationTarget = wx.StaticText(self, label='Annnotation:')
         
         #Layout of the panel
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self._mb, 0, wx.EXPAND)
+        sizer.Add(self.AnnotationTarget,0,wx.EXPAND)
         sizer.Add(self.OutputTree, 1, wx.EXPAND)
         self.SetSizer(sizer)
         sizer.Layout()
