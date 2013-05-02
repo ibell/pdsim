@@ -1529,10 +1529,8 @@ class PDSimCore(_PDSimCore):
             #If the abort function returns true, quit this loop
             if self.Abort() or OneCycle:
                 print 'Quitting OBJECTIVE function in core.solve'
-                if hasattr(self,'mechanical_losses'):
-                    self.mechanical_losses('low')
-                if self.callbacks.lumps_energy_balance_callback is not None:
-                    self.callbacks.lumps_energy_balance_callback()
+#                if self.callbacks.lumps_energy_balance_callback is not None:
+#                    self.callbacks.lumps_energy_balance_callback()
                 return None
                     
             # (3) After convergence of the inner loop, check the energy balance on the lumps
@@ -1593,7 +1591,7 @@ class PDSimCore(_PDSimCore):
         
     def attach_HDF5_annotations(self, fName):
         """
-        In this function, annotations can be attached to each HDF5 field.  The format is simply a dictionary
+        In this function, annotations can be attached to each HDF5 field
         
         Parameters
         ----------
@@ -1612,6 +1610,7 @@ class PDSimCore(_PDSimCore):
                 '/Q':'The NCV x Nt matrix with the heat transfer TO the gas in each control volume [kW]',
                 '/xL':'The NCV x Nt matrix with the oil mass fraction in each control volume [-]',
                 '/A_shell':'The shell area of the machine [m^2]',
+                '/h_shell':'The heat transfer coefficient between the shell and the ambient [kW/m^2/K]',
                 '/key_inlet':'The key for the inlet node',
                 '/key_outlet':'The key for the outlet node',
                 '/elapsed_time':'The elapsed time for the simulation run [s]',
@@ -1627,7 +1626,7 @@ class PDSimCore(_PDSimCore):
                 '/motor/eta_motor':'Motor efficiency [-]',
                 '/motor/losses':'Losses generated in the motor [kW]',
                 '/motor/suction_fraction':'Fraction of the motor losses that are added to the suction gas [-]',
-                '/motor/type':'The model used to simulate the motor'
+                '/motor/type':'The model used to simulate the motor',
                 '/run_index':'A unique identifier for runs in a batch'
                 }
         

@@ -1,4 +1,3 @@
-
 #cython: embedsignature=True
 
 from __future__ import division
@@ -522,10 +521,12 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, int ot
     State_down : :class:`State <CoolProp.State.State>` instance
         Downstream ``State`` instance
     other_output : int
-        Default is to return the mass flow rate, can over-ride by passing OUTPUT_VELOCITY or OUTPUT_MA instead
+        Default is to return the mass flow rate, can over-ride by passing ``flow_models.OUTPUT_VELOCITY`` or ``flow_models.OUTPUT_MA`` instead
         
     Returns
     -------
+    out : double
+        Default is to return the mass flow rate, can over-ride by passing flags in the other_output variable
     
     """
     
@@ -576,7 +577,7 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, int ot
         return Ma
      
 @cython.cdivision(True)
-cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State State_down, double delta, int Type, double t = -1.0, double ro = -1.0, bint full_output = False):
+cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State State_down, double delta, int Type, double t = -1.0, double ro = -1.0):
     """
     Frictionally-corrected nozzle model - the so-called hybrid leakage model
     
@@ -598,16 +599,12 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
         Scroll wrap thickness in m
     ro : float
         Orbiting radius in m
-    full_output : boolean
-        If False, just return float value of mdot. If True, return tuple of 
-        mdot and others, where others is a dictionary of other outputs with the
-        keys `` 
         
     Notes
     -----
-    If Type is ``radial``, t must be provided
+    If Type is ``flow_models.TYPE_RADIAL``, t must be provided
     
-    If Type is ``flank``, ro must be provided
+    If Type is ``flow_models.TYPE_FLANK``, ro must be provided
         
     Implements the frictionally-corrected method of 
     Bell, I, Groll, E, Braun, J. E, & W. Travis, H. (in press, 2013). A computationally efficient hybrid leakage model for positive displacement compressors and expanders. International Journal of Refrigeration. 
@@ -650,6 +647,5 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
     else:
         mdot_ratio=1.0
     mdot=mdot/mdot_ratio
-    
     
     return mdot

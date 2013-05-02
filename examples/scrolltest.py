@@ -13,7 +13,7 @@ from math import pi
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
 # PDSim should also be built using a command like python build_ext --inplace to keep all the extension modules next to the .pyx files
-#sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
@@ -37,7 +37,7 @@ import time
 Injection = False
 check_valve = False
 
-def Compressor(Te = 273, Tc = 300, f = None,TTSE = False):
+def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     if TTSE:
         CP.set_TTSESinglePhase_LUT_size("Propane", 500, 500)
         CP.enable_TTSE_LUT('Propane')
@@ -259,7 +259,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False):
                                  key_outlet='outlet.2',
                                  solver_method='RK45',
                                  UseNR = False, #If True, use Newton-Raphson ND solver to determine the initial state
-                                 OneCycle = False,
+                                 OneCycle = OneCycle,
                                  plot_every_cycle= False,
                                  hmin = 1e-8
                                  )

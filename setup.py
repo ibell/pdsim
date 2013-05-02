@@ -38,9 +38,9 @@ fp.close()
 
 if len(sys.argv) == 1:
     #sys.argv += ['build_ext','--force','--inplace']
-#    sys.argv += ['build_ext','--inplace']
+#    sys.argv += ['build','build_ext','--inplace','install']
 #    sys.argv += ['build','--force','install']
-    sys.argv += ['build','install']
+    sys.argv += ['clean','build','install']
 
 import Cython
 
@@ -52,6 +52,7 @@ import numpy
 
 #Each of the Pure-Python or PYX files in this list will be compiled to a python module       
 pyx_list = [
+            "PDSim/core/_bearings.pyx",
             "PDSim/core/_core.pyx",
             "PDSim/core/containers.pyx",
             "PDSim/core/callbacks.pyx",

@@ -600,7 +600,7 @@ class OutputTreePanel(wx.Panel):
                         
                         if o[thing].attrs and 'note' in o[thing].attrs: #If it has any annotations
                             self.tree.SetItemPyData(child, dict(annotation = o[thing].attrs['note']))
-                            self.tree.SetItemBackgroundColour(child,(50,50,100)) #Color the cell
+                            self.tree.SetItemBackgroundColour(child,(255,0,0)) #Color the cell
                 
                 # Otherwise if it is a group, change the icon and recurse into the group
                 elif isinstance(objects[0][thing], h5py.Group):
@@ -678,10 +678,14 @@ class OutputTreePanel(wx.Panel):
         
     
     def OnArrayDisplay(self, event, item, col):
-        path = ''
+        
+        # Title for the viewer
         title = self.tree.GetItemText(item, 0)
+        
+        # Build the path to this term
+        path = ''
         while not item == self.tree.GetRootItem():
-            path = '/' +  self.tree.GetItemText(item, 0)
+            path = '/' +  self.tree.GetItemText(item, 0) + path
             item = self.tree.GetItemParent(item)
             
         val = self.runs[col-1].get(path).value

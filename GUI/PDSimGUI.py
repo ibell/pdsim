@@ -889,9 +889,9 @@ class MainFrame(wx.Frame):
 #            def flush(self):
 #                return None
                 
-#        redir=RedirectText(self.MTB.RunTB.log_ctrl)
-#        sys.stdout=redir
-#        sys.stderr=redir
+        redir=RedirectText(self.MTB.RunTB.main_log_ctrl)
+        sys.stdout=redir
+        sys.stderr=redir
         
         self.SetPosition(position)
         self.SetSize(size)
@@ -923,7 +923,7 @@ class MainFrame(wx.Frame):
             
         for o in annotated_GUI_objects:
             if not isinstance(o, datatypes.AnnotatedGUIObject):
-                raise TypeError('You can only register lists of AnnotatedGUIObjects')
+                raise TypeError('You can only register lists of AnnotatedGUIObjects. The bad item is:' + str(o))
             if o.key in self.GUI_object_library:
                 raise KeyError('Your key [{k:s}] is already in the parameter library'.format(k = o.key))
             if o.annotation in [oo.annotation for oo in self.GUI_object_library.itervalues()]:
@@ -1368,7 +1368,7 @@ class MainFrame(wx.Frame):
     ################################
     
     def OnOpenConsole(self, event):
-        frm = wx.Frame(None)
+        frm = wx.Frame(None, size = (600,400))
         from wx.py.crust import Crust
         console = Crust(frm, intro = 'Welcome to the debug console within PDSim', locals = locals())
         sizer = wx.BoxSizer(wx.VERTICAL)

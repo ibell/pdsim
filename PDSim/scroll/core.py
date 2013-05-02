@@ -717,7 +717,7 @@ class Scroll(PDSimCore, _Scroll):
     
         return JB['Wdot_loss']/1000.0
         
-    def upper_bearing(self):
+    def upper_bearing(self, W):
         """
         Moment balance around the upper bearing gives the force for
         the lower bearing.  Torques need to balance around the upper bearing
@@ -726,7 +726,7 @@ class Scroll(PDSimCore, _Scroll):
         JB = journal_bearing(r_b = self.mech.D_upper_bearing/2,
                              L = self.mech.L_upper_bearing,
                              omega = self.omega,
-                             W = self.forces.corr_Fm*1000*(1+1/self.mech.L_ratio_bearings),
+                             W = W,
                              c = self.mech.c_upper_bearing,
                              eta_0 = self.mech.mu_oil
                              )
@@ -734,7 +734,7 @@ class Scroll(PDSimCore, _Scroll):
 
         return JB['Wdot_loss']/1000.0
     
-    def lower_bearing(self):
+    def lower_bearing(self, W):
         """
         Moment balance around the upper bearing gives the force for
         the lower bearing.  Torques need to balance around the upper bearing
@@ -743,7 +743,7 @@ class Scroll(PDSimCore, _Scroll):
         JB = journal_bearing(r_b = self.mech.D_lower_bearing/2,
                              L = self.mech.L_lower_bearing,
                              omega = self.omega,
-                             W = self.forces.corr_Fm*1000*(1/self.mech.L_ratio_bearings),
+                             W = W,
                              c = self.mech.c_lower_bearing,
                              eta_0 = self.mech.mu_oil
                              )
@@ -758,7 +758,7 @@ class Scroll(PDSimCore, _Scroll):
         from PDSim.core.bearings import thrust_bearing
         V = self.geo.ro*self.omega
         #Use the corrected force to account for the decrease in back area due to the bearing
-        N = self.forces.corr_Fz*1000 #[N]
+        N = self.forces.summed_Fz*1000 #[N]
         TB = thrust_bearing(mu = self.mech.thrust_friction_coefficient,
                             V = V,
                             N = N)
@@ -796,19 +796,25 @@ class Scroll(PDSimCore, _Scroll):
         if not hasattr(self,'losses'):
             self.losses = struct()
             
-        if not hasattr(self,'journal_tune_factor'):
-            self.journal_tune_factor = 1.0
+        if not hasattr(self.mech,'journal_tune_factor'):
+            self.mech.journal_tune_factor = 1.0
             
         #Conduct the calculations for the bearings
-        self.losses.crank_bearing = self.crank_bearing(W = self.forces.corr_Fm*1000)*self.journal_tune_factor
-        self.losses.upper_bearing = self.upper_bearing()*self.journal_tune_factor
-        self.losses.lower_bearing = self.lower_bearing()*self.journal_tune_factor
+        W_OSB = np.sqrt((self.forces.summed_Fr + self.forces.inertial)**2+self.forces.summed_Ft**2)*1000
+        self.losses.crank_bearing = self.crank_bearing(W = W_OSB)*self.mech.journal_tune_factor
+        self.losses.upper_bearing = self.upper_bearing(W = W_OSB*(1+1/self.mech.L_ratio_bearings))*self.mech.journal_tune_factor
+        self.losses.lower_bearing = self.lower_bearing(W = W_OSB/self.mech.L_ratio_bearings)*self.mech.journal_tune_factor
         self.losses.thrust_bearing = self.thrust_bearing()
         
-        self.losses.bearings  = (self.losses.crank_bearing 
-                                 + self.losses.upper_bearing 
-                                 + self.losses.lower_bearing
-                                 + self.losses.thrust_bearing)
+        _slice = range(self.Itheta+1)
+        theta = self.t[_slice]
+        theta_range = theta[-1]-theta[0]
+        
+        # Sum up each loss v. theta curve
+        self.losses.summed = self.losses.crank_bearing + self.losses.upper_bearing + self.losses.lower_bearing + self.losses.thrust_bearing
+        
+        # Get the mean losses over one cycle
+        self.losses.bearings  = np.trapz(self.losses.summed[_slice], theta)/theta_range
         
         print 'mechanical losses: ', self.losses.bearings
         return self.losses.bearings #[kW]
@@ -821,11 +827,12 @@ class Scroll(PDSimCore, _Scroll):
         #Update the heat transfer to the gas in the shell
         self.suction_heating()
         
-    def post_solve(self):
-        """
-        """
-        self.mechanical_losses('low')
-        PDSimCore.post_solve(self)
+#    def post_solve(self):
+#        """
+#        Overload the base class post_solve in order to re-calculate the mechanical losses
+#        """
+#        self.mechanical_losses('low')
+#        PDSimCore.post_solve(self)
         
     def ambient_heat_transfer(self, Tshell):
         """
@@ -921,7 +928,6 @@ class Scroll(PDSimCore, _Scroll):
         print OBJECTIVE(T0-50)
         print OBJECTIVE(T0+50)
         return newton(OBJECTIVE,T0)
-        
         
     def lump_energy_balance_callback(self):
         """
@@ -1229,8 +1235,6 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.Fz[np.isnan(self.forces.Fz)] = 0
         #Sum the terms for the applied gas force from each of the control volumes
         self.forces.summed_Fz = np.sum(self.forces.Fz, axis = 0) #kN
-        
-        
 #        
         #If the orbiting_back_pressure is a floating point value, use it to calculate the back pressure correction
         if isinstance(orbiting_back_pressure, float):
@@ -1246,12 +1250,6 @@ class Scroll(PDSimCore, _Scroll):
         
         # Calculate the mean axial force
         self.forces.mean_Fz = np.trapz(self.forces.summed_Fz, t)/(2*pi)
-        
-        # The corrected axial load accounts for the fact that the area of the 
-        # thrust bearing does not contribute to compensating for the load
-        
-        #: Corrected axial load [kN-m]
-        self.forces.corr_Fz = self.forces.mean_Fz
         
         ####################################################
         #############  "Radial" force components ###########
@@ -1374,7 +1372,6 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.summed_Ft = np.sum(self.forces.Ft,axis = 0) #kN
 
         self.forces.Fm = np.sqrt(self.forces.summed_Fx**2+self.forces.summed_Fy**2)
-        self.forces.Fm_rt = np.sqrt(self.forces.summed_Fr**2+self.forces.summed_Ft**2)
         
         self.forces.tau = self.forces.xpin*self.forces.summed_Fy-self.forces.ypin*self.forces.summed_Fx
         # Calculate the mean normal force on the crank pin
@@ -1388,33 +1385,36 @@ class Scroll(PDSimCore, _Scroll):
         #: The inertial forces on the orbiting scroll [kN]
         self.forces.inertial = self.mech.orbiting_scroll_mass * self.omega**2 * self.geo.ro / 1000
         
-        self.forces.corr_Fm = self.forces.mean_Fm + self.forces.inertial
+        if hasattr(self.mech,'detailed_analysis') and self.mech.detailed_analysis == True:
+            self.detailed_mechanical_analysis()
         
-        self.force_analysis()
-        
-    def force_analysis(self):
-        
-        muthrust = 0.027 #from Ishii 1986
-        
-        # These parameters are hard coded for now
-        beta = 0
+    def detailed_mechanical_analysis(self):
         
         if not hasattr(self,'losses'):
             self.losses = struct()
+            
+        muthrust = self.mech.thrust_friction_coefficient
         
-        mu1 = mu2 = mu3 = mu4 = mu5 = 0.027 #from Ishii 1986
-        r1 = r2 = r3 = r4 = 0.08
-        w1 = w2 = w3 = w4 = 0.01
-        mOR = 0.194
-        mOS = 3
-        wOR = 0.01
-        hkeyOR = 0.005
-        g = 9.81
+        # These parameters are hard coded for now
+        beta = self.mech.oldham_rotation_beta
+        
+        mu1 = mu2 = mu3 = mu4 = mu5 = self.mech.oldham_key_friction_coefficient
+        r1 = r2 = r3 = r4 = self.mech.oldham_ring_radius
+        w1 = w2 = w3 = w4 = self.mech.oldham_key_width
+        mOR = self.mech.oldham_mass
+        mOS = self.mech.orbiting_scroll_mass
+        wOR = self.mech.oldham_thickness
+        hkeyOR = self.mech.oldham_key_height
+        
+        # Gravitional acceleration
+        g = 9.80665 
         
         _slice = range(self.Itheta+1)
         theta = self.t[_slice]
         
-        # The initial guesses for the moment generated by the journal bearing - it should be positive since Ms is negative
+        # The initial guesses for the moment generated by the journal bearing - 
+        # it should be positive since Ms is negative and Ms and M_B act in 
+        # opposite directions
         self.forces.F_B0 = np.sqrt((self.forces.summed_Fr + self.forces.inertial)**2+self.forces.summed_Ft**2)
         mu_B = np.zeros_like(self.forces.F_B0)
         self.forces.M_B0 = mu_B*self.mech.D_crank_bearing/2*self.forces.F_B0
@@ -1497,104 +1497,136 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.Wdot_F2 = np.abs(F2*vOR_xbeta*mu2)
         self.forces.Wdot_F3 = np.abs(F3*vOS_ybeta*mu3)
         self.forces.Wdot_F4 = np.abs(F4*vOS_ybeta*mu4)
-        self.forces.Wdot_OS_journal = np.abs(self.omega*self.forces.M_B)*2.6
+        self.forces.Wdot_OS_journal = np.abs(self.omega*self.forces.M_B)
+        
         self.forces.Wdot_thrust = np.abs(muthrust*self.forces.summed_Fz*vOS)
         
         self.forces.Wdot_total = self.forces.Wdot_F1+self.forces.Wdot_F2+self.forces.Wdot_F3+self.forces.Wdot_F4+self.forces.Wdot_OS_journal+self.forces.Wdot_thrust
         self.forces.Wdot_total_mean = np.trapz(self.forces.Wdot_total, theta)/(2*pi)
-        print self.forces.Wdot_total_mean,'average losses'
+        print self.forces.Wdot_total_mean,'average mechanical losses'
             
-        import matplotlib.pyplot as plt
-            
-        fig = plt.figure()
-        fig.add_subplot(141)
-        plt.plot(FBold,np.sqrt(Fbx**2+Fby**2))
-        fig.add_subplot(142)
-        plt.plot(theta, mOS*aOS_x/1000, theta, self.forces.summed_Fx, theta, -F4*np.cos(beta)+F3*np.cos(beta), theta, -mOS*self.geo.ro*self.omega**2*np.cos(THETA)/1000, theta, Fbx,':')
-        fig.add_subplot(143)
-        plt.plot(theta, Fby,':')
-        fig.add_subplot(144)
-        plt.plot(theta,self.forces.Wdot_F1,label='F1')
-        plt.plot(theta,self.forces.Wdot_F2,label='F2')
-        plt.plot(theta,self.forces.Wdot_F3,label='F3')
-        plt.plot(theta,self.forces.Wdot_F4,label='F4')
-        plt.plot(theta,self.forces.Wdot_OS_journal,label='journal')
-        plt.plot(theta,self.forces.Wdot_thrust,label='thrust')
-        plt.plot(theta,self.forces.Wdot_total,lw=3)
-        plt.legend()
-        plt.show()
+#        import matplotlib.pyplot as plt
+#            
+#        fig = plt.figure()
+#        fig.add_subplot(141)
+#        plt.plot(FBold,np.sqrt(Fbx**2+Fby**2))
+#        fig.add_subplot(142)
+#        plt.plot(theta, mOS*aOS_x/1000, theta, self.forces.summed_Fx, theta, -F4*np.cos(beta)+F3*np.cos(beta), theta, -mOS*self.geo.ro*self.omega**2*np.cos(THETA)/1000, theta, Fbx,':')
+#        fig.add_subplot(143)
+#        plt.plot(theta, Fby,':')
+#        fig.add_subplot(144)
+#        plt.plot(theta,self.forces.Wdot_F1,label='F1')
+#        plt.plot(theta,self.forces.Wdot_F2,label='F2')
+#        plt.plot(theta,self.forces.Wdot_F3,label='F3')
+#        plt.plot(theta,self.forces.Wdot_F4,label='F4')
+#        plt.plot(theta,self.forces.Wdot_OS_journal,label='journal')
+#        plt.plot(theta,self.forces.Wdot_thrust,label='thrust')
+#        plt.plot(theta,self.forces.Wdot_total,lw=3)
+#        plt.legend()
+#        plt.show()
+#        
+#        plt.close('all')
+#        fig = plt.figure()
+#        fig.add_subplot(141)
+#        plt.gca().set_title('Oldham acceleration [g]')
+#        plt.plot(theta,(F[2,:].T-F[3,:].T)*1000/9.81/mOR,'o',lw=2)
+#        plt.plot(theta, aOR_xbeta/9.81,'-',lw=2)
+#        fig.add_subplot(142)
+#        plt.plot(theta,F.T)
+#        plt.gca().set_title('Key forces [kN]')
+#        fig.add_subplot(143)
+#        plt.plot(theta,self.forces.summed_Ft)
+#        plt.gca().set_title('Tangential force [kN]')
+#        fig.add_subplot(144)
+#        plt.plot(theta,self.forces.summed_Fr)
+#        plt.gca().set_title('Radial force [kN]')
+#        plt.show()
         
-        plt.close('all')
-        fig = plt.figure()
-        fig.add_subplot(141)
-        plt.gca().set_title('Oldham acceleration [g]')
-        plt.plot(theta,(F[2,:].T-F[3,:].T)*1000/9.81/mOR,'o',lw=2)
-        plt.plot(theta, aOR_xbeta/9.81,'-',lw=2)
-        fig.add_subplot(142)
-        plt.plot(theta,F.T)
-        plt.gca().set_title('Key forces [kN]')
-        fig.add_subplot(143)
-        plt.plot(theta,self.forces.summed_Ft)
-        plt.gca().set_title('Tangential force [kN]')
-        fig.add_subplot(144)
-        plt.plot(theta,self.forces.summed_Fr)
-        plt.gca().set_title('Radial force [kN]')
-        plt.show()
-        
-    
-    def scroll_involute_axial_force(self, theta, Nphi = 20):
+    def scroll_involute_axial_force(self, theta):
         """
         Calculate the axial force generated by the pressure distribution 
         along the top of the scroll wrap 
         
+        Pressure along inner and outer walls is considered to act over one-half 
+        of the thickness of the scroll wrap.
+        
         Notes
         -----
         The following assumptions are employed:
-        1. Currently does not include the area of the curves that make the tip of the scroll wrap
-        2. 
+        1. Involute extended to the base circle to account for discharge region
+        2. Half of the 
+        
+        The length of an involute section can be given by
+        
+        .. math::
+            
+            s = r_b\left(\frac{\phi_2^2-\phi_1^2}{2}-\phi_{0}(\phi_2-\phi_1)\right)
         
         Returns
         -------
-        Faxial: float
+        F: numpy array
             Axial force from the top of the scroll [kN]
         """
         
-        # Initial angle of the midpoint of the scroll wrap
-        phi_0 = (self.geo.phi_i0 + self.geo.phi_o0)/2
-        # Ending angle of the centerline of the scroll wrap
-        phi_e = (self.geo.phi_ie + self.geo.phi_oe)/2
-        # Array of involute angles to be considered
-        phivals = np.linspace(phi_0, phi_e, Nphi)
+        _slice = range(len(theta))
         
-        #Initialize the array to zeros
-        self.forces.Faxial_wrap = np.zeros_like(theta)
+        #Get the break angle (simplified solution)
+        phi_s_sa = self.geo.phi_oe-pi
         
-        # At each step in theta
-        for i, _theta in enumerate(theta):
-            # At each involute angle
-            for j in range(len(phivals)-1):
-                phi1 = phivals[j]
-                phi2 = phivals[j+1]
-                # Use the mean involute angle to determine partners
-                phi = (phi1+phi2)/2
-                # Indices of the control volumes at the inner and outer involutes
-                iI = self.CVs.keys.index(self._get_injection_CVkey(phi, _theta, inner_outer = 'i'))
-                iO = self.CVs.keys.index(self._get_injection_CVkey(phi, _theta, inner_outer = 'o'))
-                # Pressure of the inner and outer involutes
-                pI = self.p[iI,i]
-                pO = self.p[iO,i]
-                # Arc length along the centerline of the wrap [m] (Eq. 4.256 from Bell)
-                ds = self.geo.rb*(0.5*(phi2**2-phi1**2)-phi_0*(phi2-phi1))
-                # Area of the segment under consideration [m^2]
-                dA = self.geo.t*ds
-                # Force generated by this segment
-                df = (pI + pO)/2*dA
-                if np.isnan(df):
-                    continue
-                # Add it on
-                self.forces.Faxial_wrap[i] += df
+        F = np.zeros_like(self.p)
+        F = F[:,_slice]
         
-        return self.forces.Faxial_wrap
+        #Parameters for the SA chamber
+        phi2 = self.geo.phi_oe
+        phi1 = phi_s_sa
+        ds_SA = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_o0*(phi2-phi1))
+        I = self.CVs.index('sa')
+        F[I,:] = ds_SA*self.geo.t/2*self.p[I,_slice]
+        
+        #Parameters for the S1 chamber
+        phi2 = phi_s_sa
+        phi1 = phi_s_sa-theta
+        ds_S1 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_o0*(phi2-phi1))
+        I = self.CVs.index('s1')
+        F[I,:] = ds_S1*self.geo.t/2*self.p[I,_slice]
+        
+        # Parameters for the S2 chamber
+        phi2 = self.geo.phi_ie
+        phi1 = self.geo.phi_ie-theta
+        ds_S2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_i0*(phi2-phi1))
+        I = self.CVs.index('s2')
+        F[I,:] = ds_S2*self.geo.t/2*self.p[I,_slice]
+        
+        for I in range(1, scroll_geo.nC_Max(self.geo)+1):
+            phi2 = self.geo.phi_oe-pi-theta-2*pi*(I-1)
+            phi1 = self.geo.phi_oe-pi-theta-2*pi*(I)
+            ds_C1 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_o0*(phi2-phi1))
+            ICV = self.CVs.index('c1.'+str(I))
+            F[ICV,:] = ds_C1*self.geo.t/2*self.p[ICV,_slice]
+            
+            phi2 = self.geo.phi_ie-theta-2*pi*(I-1)
+            phi1 = self.geo.phi_ie-theta-2*pi*(I)
+            ds_C2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_i0*(phi2-phi1))
+            ICV = self.CVs.index('c2.'+str(I))
+            F[ICV,:] = ds_C2*self.geo.t/2*self.p[ICV,_slice]
+        
+        phi2 = self.geo.phi_oe-pi-theta-2*pi*(scroll_geo.nC_Max(self.geo)-1)
+        phi1 = self.geo.phi_os
+        ds_D1 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_o0*(phi2-phi1))
+        ICV = self.CVs.index('d1')
+        F[ICV,:] = ds_D1*self.geo.t/2*self.p[ICV,_slice]
+        
+        phi2 = self.geo.phi_ie-theta-2*pi*(scroll_geo.nC_Max(self.geo)-1)
+        phi1 = self.geo.phi_i0 #Extended all the way to account for the discharge region
+        ds_D2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_i0*(phi2-phi1))
+        ICV = self.CVs.index('d2')
+        F[ICV,:] = ds_D2*self.geo.t/2*self.p[ICV,_slice]
+        
+        # Remove all the nan placeholders
+        F[np.isnan(F)] = 0
+        
+        # Sum at each crank angle
+        return np.sum(F, axis = 0)
         
     def IsentropicNozzleFMSafe(self,*args,**kwargs):
         """
@@ -1607,5 +1639,107 @@ class Scroll(PDSimCore, _Scroll):
         A thin wrapper around the base class function for pickling purposes
         """
         return PDSimCore.IsentropicNozzleFM(self, *args, **kwargs)
+    
+    def attach_HDF5_annotations(self, fName):
+        """
+        In this function, annotations can be attached to each HDF5 field
+        
+        Here we add other scroll-specific terms
+        
+        Parameters
+        ----------
+        fName : string
+            The file name for the HDF5 file that is to be used
+        """ 
+        #Use the base annotations
+        PDSimCore.attach_HDF5_annotations(self, fName)
+        
+        attrs_dict = {
+                '/forces/F_B':'The normal force applied to the orbiting scroll journal bearing [kN]',
+                '/forces/F_B0':'The normal force applied to the orbiting scroll journal bearing [kN]',
+                '/forces/Fbackpressure':'The force applied to the orbiting scroll due to the back pressure [kN]',
+                '/forces/Fm':'The normal force applied to the orbiting scroll journal bearing [kN]',
+                '/forces/Fr':'The radial gas force on the orbiting scroll [kN]',
+                '/forces/Ft':'The tangential gas force on the orbiting scroll [kN]',
+                '/forces/Fx':'The gas force on the orbiting scroll in the x-direction [kN]',
+                '/forces/Fy':'The gas force on the orbiting scroll in the y-direction [kN]',
+                '/forces/Fz':'The gas force on the orbiting scroll in the negative z-direction [kN]',
+                '/forces/M_B':'The journal bearing moment on the orbiting scroll in the positive x-direction [kN-m]',
+                '/forces/M_B0':'The journal bearing moment on the orbiting scroll in the positive x-direction [kN-m]',
+                '/forces/Moverturn':'The magnitude of the overturning moment on the orbiting scroll [kN-m]',
+                '/forces/Mx':'The overturning moment around the x-axis [kN-m]',
+                '/forces/My':'The overturning moment around the y-axis [kN-m]',
+                '/forces/Mz':'The spinning moment from the gas around the z-axis [kN-m]',
+                '/forces/THETA':'The shifted angle that is used to locate the center of the orbiting scroll [rad]',
+                '/forces/Wdot_F1':'The frictional dissipation at key 1 of Oldham ring [kW]',
+                '/forces/Wdot_F2':'The frictional dissipation at key 2 of Oldham ring [kW]',
+                '/forces/Wdot_F3':'The frictional dissipation at key 3 of Oldham ring [kW]',
+                '/forces/Wdot_F4':'The frictional dissipation at key 4 of Oldham ring [kW]',
+                '/forces/Wdot_OS_journal':'The frictional dissipation at journal bearing of orbiting scroll [kW]',
+                '/forces/Wdot_thrust':'The frictional dissipation from thrust bearing [kW]',
+                '/forces/Wdot_total':'The frictional dissipation of bearings and friction [kW]',
+                '/forces/Wdot_total_mean':'The mean frictional dissipation of bearings and friction over one rotation[kW]',
+                '/forces/cx':'The x-coordinate of the centroid of each control volume [m]',
+                '/forces/cx_thrust':'Effective x-coordinate of the centroid of all chambers [m]',
+                '/forces/cx':'The y-coordinate of the centroid of each control volume [m]',
+                '/forces/cy_thrust':'Effective y-coordinate of the centroid of all chambers [m]',
+                '/forces/fxp':'Fx/p from geometric analysis for each control volume [kN/kPa]',
+                '/forces/fyp':'Fy/p from geometric analysis for each control volume [kN/kPa]',
+                '/forces/inertial':'Magnitude of inertial force (m*omega^2*r) [kN]',
+                '/forces/mean_Fm':'Mean of Fm over one rotation [kN]',
+                '/forces/mean_Fr':'Mean of Fr over one rotation [kN]',
+                '/forces/mean_Ft':'Mean of Ft over one rotation [kN]',
+                '/forces/mean_Fz':'Mean of Fz over one rotation [kN]',
+                '/forces/mean_Mz':'Mean of Mz over one rotation [kN-m]',
+                '/forces/mean_tau':'Mean of tau over one rotation [kN-m]',
+                '/forces/summed_Fr':'Summation of CV contributions to Fr [kN]',
+                '/forces/summed_Ft':'Summation of CV contributions to Ft [kN]',
+                '/forces/summed_Fx':'Summation of CV contributions to Fx [kN]',
+                '/forces/summed_Fy':'Summation of CV contributions to Fy [kN]',
+                '/forces/summed_Fz':'Summation of CV contributions to Fz [kN]',
+                '/forces/summed_Moverturn':'Summation of CV contributions to overturning moment [kN-m]',
+                '/forces/summed_Mx':'Summation of CV contributions to Mx [kN-m]',
+                '/forces/summed_My':'Summation of CV contributions to My [kN-m]',
+                '/forces/summed_Mz':'Summation of CV contributions to Mz [kN-m]',
+                '/forces/summed_gas_Fz':'Summation of CV contributions to Fz (only from the CV) [kN-m]',
+                '/forces/tau':'Torque generated by gas around the central axis of shaft [kN-m]',
+                '/forces/xpin':'x-coordinate of the orbiting scroll center [m]',
+                '/forces/ypin':'y-coordinate of the orbiting scroll center [m]',
+                '/mech/D_crank_bearing':'Diameter of the crank journal bearing [m]',
+                '/mech/D_lower_bearing':'Diameter of the lower journal bearing [m]',
+                '/mech/D_upper_bearing':'Diameter of the upper journal bearing [m]',
+                '/mech/L_crank_bearing':'Length of the crank journal bearing [m]',
+                '/mech/L_lower_bearing':'Length of the lowe journal bearing [m]',
+                '/mech/L_ratio_bearings':'Ratio of the distances from the upper bearing to the crank bearing [m]',
+                '/mech/L_upper_bearing':'Length of the upper journal bearing [m]',
+                '/mech/c_crank_bearing':'Clearance (D/2-rb) of the crank journal bearing [m]',
+                '/mech/c_lower_bearing':'Clearance (D/2-rb) of the lower journal bearing [m]',
+                '/mech/c_upper_bearing':'Clearance (D/2-rb) of the upper journal bearing [m]',
+                '/mech/detailed_analysis':'True if detailed mechanical analysis is being used',
+                '/mech/journal_tune_factor':'Tuning factor that muliplies losses in each journal bearing [-]',
+                '/mech/mu_oil':'Viscosity of the oil [Pa-s]',
+                '/mech/oldham_key_friction_coefficient':'Friction coefficient for all keys in Oldham ring [-]',
+                '/mech/oldham_key_height':'Height of each key of Oldham ring [m]',
+                '/mech/oldham_key_width':'Width of each key of Oldham ring [m]',
+                '/mech/oldham_mass':'Mass of Oldham ring [kg]',
+                '/mech/oldham_ring_radius':'Radius of Oldham ring [m]',
+                '/mech/oldham_rotation_beta':'Angle between Oldham sliding axis and x-axis [radian]',
+                '/mech/oldham_thickness':'Thickness of the main ring of Oldham ring [m]',
+                '/mech/orbiting_scroll_mass':'Mass of orbiting scroll [kg]',
+                '/mech/scroll_density':'Scroll density [kg]',
+                '/mech/scroll_plate_thickness':'Scroll plate thickness [m]',
+                '/mech/thrust_ID':'Thrust bearing inner diameter [m]',
+                '/mech/thrust_OD':'Thrust bearing outer diameter [m]',
+                '/mech/thrust_friction_coefficient':'Thrust bearing friction coefficient [m]'
+                }
+        
+        import h5py
+        hf = h5py.File(fName,'a')
+        
+        for k, v in attrs_dict.iteritems():
+            dataset = hf.get(k)
+            if dataset is not None:
+                dataset.attrs['note'] = v
+        hf.close()
         
         

@@ -279,10 +279,6 @@ class GeometryPanel(pdsim_panels.PDPanel):
         # Refresh the panel
         self.OnRefresh()
         
-        Vwrap, cx, cy = scroll_geo.scroll_wrap(self.Scroll.geo)
-        
-        print Vwrap,cx,cy
-        
     def get_wrap_crossection_involutes(self, axis = 'x'):
         """
         Returns
@@ -683,13 +679,20 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                     journal_tune_factor = ('Tuning factor on journal bearing losses [-]','-'),
                     thrust_friction_coefficient = ('Thrust bearing friction coefficient [-]','-'),
                     thrust_ID = ('Thrust bearing inner diameter [m]','m'),
-                    thrust_OD = ('Thrust bearing outer diameter [m]','m'), 
-                    orbiting_scroll_mass = ('Orbiting scroll mass [kg]','kg'), 
+                    thrust_OD = ('Thrust bearing outer diameter [m]','m'),  
                     L_ratio_bearings = ('Ratio of lengths to the bearings [-]','-'),
                     scroll_plate_thickness = ('Thickness of the orbiting scroll plate [m]','m',0.002),
                     scroll_density = ('Orbiting scroll material density [kg/m\xb3]','kg/m^3',2700),
                     scroll_added_mass = ('Additional OS mass added at COM [kg]','kg',0.0),
+                    oldham_ring_radius = ('Oldham ring radius [m]','m',0.08),
+                    oldham_mass = ('Mass of the Oldham ring [kg]','kg',0.1),
+                    oldham_thickness = ('Height of the Oldham ring (without the keys) [m]','m',0.008),
+                    oldham_key_height = ('Height of the keys of the Oldham ring [m]','m',0.006),
+                    oldham_key_width = ('Width of the keys of the Oldham ring [m]','m',0.006),
+                    oldham_key_friction_coefficient = ('Friction coefficient of the Oldham ring [-]','-',0.01),
+                    oldham_rotation_beta = ('Angle between Oldham sliding axis and x-axis [radian]','rad',0),
                     HTC = ('Heat transfer coefficient in the scrolls [W/m\xb2/K]','W/m^2/K'),
+                    detailed_analysis = ('Use detailed analysis of the mechanical losses','',True)
                     )
     
     def __init__(self, parent, config, **kwargs):
@@ -715,6 +718,11 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         Either the motor rejects its heat to the ambient (as in open-drive), or
         it rejects its heat to the suction volume
         """
+        
+        if 'orbiting_scroll_mass' in config:
+            import warnings
+            warnings.warn('the term "orbiting_scroll_mass" has been deprecated, please remove it from your configuration')
+            config.pop('orbiting_scroll_mass')
         
         self.motor_choices = MotorChoices(scrolled_panel)
         
@@ -750,45 +758,90 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         else:
             raise ValueError('Your combination of motor terms is not valid')
         
-        keys = ['h_shell','A_shell','Tamb','mu_oil',
-                'D_upper_bearing','L_upper_bearing','c_upper_bearing',
+        annotated_GUI_objects = []
+        self.config = config
+        self.keys_for_config = []
+        
+        #----------------------------------------------------------------------
+        # The sizer for all the heat transfer terms
+        sizer_for_HT_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+        
+        # Loop over the HT inputs
+        annotated_values = self.get_annotated_values(['h_shell','A_shell','Tamb','HTC'])
+            
+        # Build the items and return the list of annotated GUI objects, add to existing list
+        annotated_GUI_objects += self.construct_items(annotated_values,
+                                                       sizer = sizer_for_HT_inputs,
+                                                       parent = scrolled_panel)
+        
+        #----------------------------------------------------------------------
+        # The sizer for all the journal bearings terms
+        sizer_for_journal_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+        
+        keys = ['D_upper_bearing','L_upper_bearing','c_upper_bearing',
                 'D_crank_bearing','L_crank_bearing','c_crank_bearing',
                 'D_lower_bearing','L_lower_bearing','c_lower_bearing',
-                'journal_tune_factor',
-                'thrust_friction_coefficient', 'thrust_ID', 'thrust_OD', 
-                'orbiting_scroll_mass', 'L_ratio_bearings', 'HTC',
-                'scroll_plate_thickness','scroll_density','scroll_added_mass'
-                ]
-        
-        # The list for all the annotated objects
-        self.annotated_values = []
-        
-        # Loop over the first group of inputs
-        for key in keys:
-            mapped_val = self.desc_map[key]
+                'journal_tune_factor','L_ratio_bearings']
+        annotated_values = self.get_annotated_values(keys)
             
-            if len(mapped_val) == 2:
-                # Get the annotation and the units for the term (no default provided)
-                annotation, units = mapped_val 
-                # Add the annotated object to the list of objects
-                self.annotated_values.append(AnnotatedValue(key, config[key], annotation, units))
-            elif len(mapped_val) == 3:
-                
-                # Get the annotation and the units for the term 
-                annotation, units, default = mapped_val 
-                if key in config:
-                    # Add the annotated object to the list of objects
-                    self.annotated_values.append(AnnotatedValue(key, config[key], annotation, units))
-                else:
-                    # Add the annotated object to the list of objects
-                    self.annotated_values.append(AnnotatedValue(key, default, annotation, units))
-            else:
-                raise ValueError('Invalid tuple in desc_map')
+        # Build the items and return the list of annotated GUI objects, add to existing list
+        annotated_GUI_objects += self.construct_items(annotated_values,
+                                                      sizer = sizer_for_journal_inputs,
+                                                      parent = scrolled_panel)
+        
+        #----------------------------------------------------------------------
+        # The sizer for all the Oldham ring terms
+        sizer_for_oldham_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+        
+        # Loop over the oldham inputs
+
+        keys = ['oldham_mass', 'oldham_thickness', 'oldham_key_height', 
+                'oldham_key_width', 'oldham_key_friction_coefficient',
+                'oldham_rotation_beta','oldham_ring_radius']
+        annotated_values = self.get_annotated_values(keys)
+        
+        # Build the items and return the list of annotated GUI objects, add to existing list
+        annotated_GUI_objects += self.construct_items(annotated_values,
+                                                      sizer = sizer_for_oldham_inputs,
+                                                      parent = scrolled_panel)
+        
+        #----------------------------------------------------------------------
+        # The sizer for all the orbiting scroll terms
+        sizer_for_orbiting_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+        
+        # Loop over the inputs
+        keys = ['scroll_plate_thickness', 'scroll_density', 'scroll_added_mass']
+        annotated_values = self.get_annotated_values(keys)
             
-        # Build the items and return the list of annotated GUI objects
-        annotated_GUI_objects = self.construct_items(self.annotated_values, 
-                                                     sizer_for_inputs, 
-                                                     parent = scrolled_panel)
+        # Build the items and return the list of annotated GUI objects, add to existing list
+        annotated_GUI_objects += self.construct_items(annotated_values,
+                                                      sizer = sizer_for_orbiting_inputs,
+                                                      parent = scrolled_panel)
+        
+        #----------------------------------------------------------------------
+        # The sizer for all the thrust bearing terms
+        sizer_for_thrust_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+        
+        # Loop over the inputs
+        keys = ['thrust_friction_coefficient', 'thrust_ID', 'thrust_OD']
+        annotated_values = self.get_annotated_values(keys)
+            
+        # Build the items and return the list of annotated GUI objects, add to existing list
+        annotated_GUI_objects += self.construct_items(annotated_values,
+                                                      sizer = sizer_for_thrust_inputs,
+                                                      parent = scrolled_panel)
+        
+         #----------------------------------------------------------------------
+        # The sizer for all the thrust bearing terms
+        sizer_for_general_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+        
+        # Loop over the inputs
+        annotated_values = self.get_annotated_values(['mu_oil','detailed_analysis'])
+            
+        # Build the items and return the list of annotated GUI objects, add to existing list
+        annotated_GUI_objects += self.construct_items(annotated_values,
+                                                      sizer = sizer_for_general_inputs,
+                                                      parent = scrolled_panel)
         
         # Register terms in the GUI database
         self.main.register_GUI_objects(annotated_GUI_objects)
@@ -797,21 +850,64 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         self.ViewButton.Bind(wx.EVT_BUTTON, self.OnViewCrossSection)
         
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(wx.StaticText(scrolled_panel, -1, "Motor Model"))
-        sizer.Add(wx.StaticLine(scrolled_panel, -1, (25, 50), (300,1)))
-        sizer.Add(self.motor_choices)
-        sizer.Add(self.ViewButton)
+        sizer.Add(self.ViewButton,0,wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(10)
+        sizer.Add(HeaderStaticText(scrolled_panel, "Motor Model"), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(self.motor_choices,0,wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(20)
-        sizer.Add(sizer_for_inputs)
+        sizer.Add(HeaderStaticText(scrolled_panel, 'Heat Transfer Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_HT_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(20)
+        sizer.Add(HeaderStaticText(scrolled_panel, 'General Mechanical Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_general_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(20)
+        sizer.Add(HeaderStaticText(scrolled_panel, 'Bearing Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_journal_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(20)
+        sizer.Add(HeaderStaticText(scrolled_panel, 'Oldham Ring Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_oldham_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(20)
+        sizer.Add(HeaderStaticText(scrolled_panel, 'Orbiting Scroll Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_orbiting_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(20)
+        sizer.Add(HeaderStaticText(scrolled_panel, 'Thrust Bearing Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_thrust_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
         
         scrolled_panel.SetSizer(sizer)
-        main_sizer.Add(scrolled_panel, 1, wx.EXPAND)
+        main_sizer.Add(scrolled_panel, 1, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL)
         self.SetSizer(main_sizer)
         
         sizer.Layout()
         
-        self.calculate_scroll_mass()
+    def get_annotated_values(self, keys):
         
+        annotated_values = []
+        for key in keys:
+            mapped_val = self.desc_map[key]
+            if len(mapped_val) == 2:
+                # Get the annotation and the units for the term (no default provided)
+                annotation, units = mapped_val 
+                # Add the annotated object to the list of objects
+                annotated_values.append(AnnotatedValue(key, self.config[key], annotation, units))
+            elif len(mapped_val) == 3:
+                # Get the annotation and the units for the term 
+                annotation, units, default = mapped_val 
+                if key in self.config:
+                    # Add the annotated object to the list of objects
+                    annotated_values.append(AnnotatedValue(key, self.config[key], annotation, units))
+                else:
+                    # Add the annotated object to the list of objects
+                    annotated_values.append(AnnotatedValue(key, default, annotation, units))
+                    
+            self.keys_for_config.append(key)
+        return annotated_values
+                    
     def get_config_chunk(self):
         configdict = {}
         
@@ -823,15 +919,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
             configdict['eta_motor_coeffs'] = c[1]
             configdict['omega_motor_coeffs'] = c[2]
             
-        keys = ['h_shell','A_shell','Tamb','mu_oil',
-                'D_upper_bearing','L_upper_bearing','c_upper_bearing',
-                'D_crank_bearing','L_crank_bearing','c_crank_bearing',
-                'D_lower_bearing','L_lower_bearing','c_lower_bearing',
-                'journal_tune_factor',
-                'thrust_friction_coefficient', 'thrust_ID', 'thrust_OD', 
-                'orbiting_scroll_mass', 'L_ratio_bearings', 'HTC'
-                ]
-        for key in keys:
+        for key in self.keys_for_config:
             configdict[key] = self.main.get_GUI_object_value(key)
             
         return configdict
@@ -880,17 +968,27 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                                                              value = str(val))
          
         #Terms that go in the mech struct
-        for term in ['mu_oil','journal_tune_factor',
+        for term in ['mu_oil','detailed_analysis','journal_tune_factor',
                 'D_upper_bearing','L_upper_bearing','c_upper_bearing',
                 'D_crank_bearing','L_crank_bearing','c_crank_bearing',
                 'D_lower_bearing','L_lower_bearing','c_lower_bearing',
                 'thrust_friction_coefficient', 'thrust_ID', 'thrust_OD', 
-                'orbiting_scroll_mass', 'L_ratio_bearings','scroll_plate_thickness',
-                'scroll_density','scroll_added_mass'
+                'L_ratio_bearings','scroll_plate_thickness',
+                'scroll_density','oldham_key_friction_coefficient', 
+                'oldham_ring_radius', 'oldham_key_width', 'oldham_mass', 
+                'oldham_thickness', 'oldham_key_height','oldham_rotation_beta'
                 ]:
             val = self.main.get_GUI_object_value(term)
             motor_chunk += 'sim.mech.{name:s} = {value:s}\n'.format(name = term,
                                                              value = str(val)) 
+            
+        # Handle the orbiting scroll mass
+        orbiting_scroll_mass, orbiting_scroll_zcm = self.calculate_scroll_mass()
+        orbiting_scroll_mass += self.main.get_GUI_object_value('scroll_added_mass') #add additional mass
+        motor_chunk += 'sim.mech.orbiting_scroll_mass = {value:s}\n'.format(name = term,
+                                                                            value = str(orbiting_scroll_mass)) 
+        
+        
         return motor_chunk
     
     def OnViewCrossSection(self, event):
@@ -926,12 +1024,14 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         
         zcm = (mwrap*zwrap + mjournal*zjournal + mplate*zplate)/mtotal
         
-        print 'mwrap', mwrap
-        print 'mplate', mplate
-        print 'mjournal', mjournal
-        print 'zcm', zcm
-        print 'zarm',zcm-Lbearing/2
-        print 'Marm',(zcm-Lbearing/2)*mtotal*0.004*377**2/1000
+#        print 'mwrap', mwrap
+#        print 'mplate', mplate
+#        print 'mjournal', mjournal
+#        print 'zcm', zcm
+#        print 'zarm',zcm-Lbearing/2
+#        print 'Marm',(zcm-Lbearing/2)*mtotal*0.004*377**2/1000
+        print 'orbiting_scroll_mass', mtotal
+        return mtotal,zcm
         
         
 #            
