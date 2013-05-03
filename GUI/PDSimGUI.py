@@ -187,7 +187,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         
         self.label_Ncore_max = wx.StaticText(self, label = "Maximum number of computational cores to use", )
         self.Ncore_max = wx.SpinCtrl(self, value = "10", )
-        self.Ncore_max.SetRange(1,max(1,cpu_count() - 1)) # Ensure that on single-core machines it can still run one core
+        self.Ncore_max.SetRange(1, max(1, cpu_count() - 1)) # Ensure that on single-core machines it can still run one core
         self.Ncore_max.SetValue(configdict.get('Ncore_max',1))
         av = datatypes.AnnotatedValue('Ncore_max', self.Ncore_max.GetValue(), 'Maximum number of cores to be used for computation [-]', '-')
         self.main.register_GUI_objects([datatypes.AnnotatedGUIObject(av,self.Ncore_max)])

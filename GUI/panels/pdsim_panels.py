@@ -1021,11 +1021,13 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
         CheckListCtrlMixin.__init__(self)
         TextEditMixin.__init__(self)
         
+        
         #Build the headers
         self.InsertColumn(0, '')
         self.SetColumnWidth(0, wx.LIST_AUTOSIZE)
         for i, header in enumerate(headers):
             self.InsertColumn(i+1, header)
+        self.headers = headers
         
         if not structured:
             #Transpose the nested lists
@@ -1072,6 +1074,11 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
         col_index = event.Column
         val = float(event.Text)
         self.data[row_index][col_index-1] = val
+        
+    def SetCellValue(self,Irow,Icol,val):
+        """ Set the string value of the cell at Irow,Icol """ 
+        self.data[Irow][Icol] = val
+        self.SetStringItem(Irow,Icol+1,val)
     
     def GetStringCell(self,Irow,Icol):
         """ Returns a string representation of the cell """
@@ -1083,7 +1090,7 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
     
     def AddRow(self):
         
-        row = [0]*self.GetColumnCount()
+        row = [0]*(self.GetColumnCount()-1)
         
         i = len(self.data)-1
         self.InsertStringItem(i,'')
@@ -1478,10 +1485,6 @@ class ParametricPanel(PDPanel):
         # Made it this far, return True, all the files are different
         return True
     
-    
-        
-    
-        
     def OnZipBatch(self, event = None):
         """
         Write all the script files and a runner to a zip file - this can be
@@ -1543,13 +1546,21 @@ class ParametricPanel(PDPanel):
         
         for term in configdict['terms']:
             option = self.OnAddTerm()
-            if configdict['structured']:
-                option.set_values(term['key'], term['vals'])
-            else:
-                option.set_values(term['key'], [])
-        
+            option.set_values(term['key'], term['vals'])
+            
         if (self.BuildButton._Enabled):
             self.OnBuildTable()
+            
+        if not configdict['structured']:
+            # Add the necessary rows
+            if len(configdict['terms']) > 0:
+                for i,v in enumerate(configdict['terms'][0]['vals']):
+                    if i > 0:
+                        self.ParaList.AddRow()
+            
+            for i,term in enumerate(configdict['terms']):
+                for j,v in enumerate(term['vals']):
+                    self.ParaList.SetCellValue(j,i,str(v))
         
     def get_config_chunk(self):
         
@@ -1560,36 +1571,21 @@ class ParametricPanel(PDPanel):
             return configdict
         
         terms = []
-        for i, child in enumerate(self.GetChildren()):
-            if isinstance(child, ParametricOption):
-                annotation, vals = child.get_values()
-                key = self.GUI_map[annotation]
-                terms.append(dict(key = key, vals = vals))
-        configdict['terms'] = terms
-        return configdict
-    
-    def post_get_from_configfile(self, key, value):
-        if not value.split(',')[0].startswith('Term'):
-            if value.split(',')[0].strip() == 'PPStructured':
-                if value.split(',')[1].strip() == 'True':
-                    self.Structured.SetStringSelection('Structured')
-                elif value.split(',')[1].strip() == 'False':
-                    self.Structured.SetStringSelection('Unstructured')
-                else:
-                    raise KeyError
-            return
-        #value is something like "Term1,Piston diameter [m],0.02;0.025"
-        string_, value = value.split(',')[1:3]
-        #value = Piston diameter [m],0.02;0.025
-        #Add a new entry to the table
-        self.OnAddTerm()
-        I = len(self.ParamSizer.GetChildren())-1
-        if self.Structured.GetStringSelection() == 'Structured':
-            #Load the values into the variables in the list of variables
-            self.ParamSizer.GetItem(I).Window.set_values(string_,value.replace(';',', '))
+        if self.Structured.GetValue():
+            for i, child in enumerate(self.GetChildren()):
+                if isinstance(child, ParametricOption):
+                    annotation, vals = child.get_values()
+                    key = self.GUI_map[annotation]
+                    terms.append(dict(key = key, vals = vals))
+            configdict['terms'] = terms
         else:
-            self.ParamSizer.GetItem(I).Window.Terms.SetStringSelection(string_)
-            self.ParamSizer.GetItem(I).Window.temporary_values = value
+            for i, head in enumerate(self.ParaList.headers):
+                key = self.GUI_map[head]
+                vals = [self.ParaList.data[j][i] for j in range(len(self.ParaList.data))]
+                terms.append(dict(key = key, vals = vals))
+            configdict['terms'] = terms
+        
+        return configdict
 
 def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True, tooltip = None):
     """
