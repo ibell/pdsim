@@ -31,14 +31,11 @@ path = []
 
 import glob,os
 
-for plugins in glob.glob(os.path.join('plugins','*.py')):
-	include_files.append(plugins)
-for ico in glob.glob(os.path.join('ico','*.png')):
-	include_files.append(ico)
-for img in glob.glob(os.path.join('imgs','*.png')):
-	include_files.append(img)
-for cfg in glob.glob(os.path.join('configs','*.cfg')):
-	include_files.append(cfg)
+include_files = glob.glob(os.path.join('plugins','*.py'))
+include_files += glob.glob(os.path.join('ico','*.png'))
+include_files += glob.glob(os.path.join('imgs','*.png'))
+include_files += glob.glob(os.path.join('configs','*.cfg'))
+include_files += glob.glob(os.path.join('families','*.py'))
 
 packages += ['quantities']
 
@@ -91,19 +88,19 @@ setup(
 # to clean up your folders or to do some particular post-compilation
 # actions.
 
-#if sys.platform.startswith('win'):
-#    #Further windows packaging things
-#    import subprocess
-#    #Compress the files if UPX is found on the system path
-#    subprocess.call(['upx','PDSimGUI/*.*'])
-#    #Make an installer using InnoSetup
-#    subprocess.call(['C:\Program Files (x86)\Inno Setup 5\Compil32.exe','/cc','package_gui.iss'])
-#    #Rename the installer to include the PDSim version
-#    old_name = os.path.join('Output','SetupPDSimGUI.exe')
-#    import PDSim
-#    new_name = os.path.join('Output','SetupPDSimGUI_version-'+PDSim.__version__+'.exe')
-#    if os.path.exists(new_name):
-#        os.remove(new_name)
-#    os.rename(old_name, new_name)
+if sys.platform.startswith('win'):
+    #Further windows packaging things
+    import subprocess
+    #Compress the files if UPX is found on the system path
+    subprocess.call(['upx','PDSimGUI/*.*'])
+    #Make an installer using InnoSetup
+    subprocess.call(['C:\Program Files (x86)\Inno Setup 5\Compil32.exe','/cc','package_gui.iss'])
+    #Rename the installer to include the PDSim version
+    old_name = os.path.join('Output','SetupPDSimGUI.exe')
+    import PDSim
+    new_name = os.path.join('Output','SetupPDSimGUI_version-'+PDSim.__version__+'.exe')
+    if os.path.exists(new_name):
+        os.remove(new_name)
+    os.rename(old_name, new_name)
 # And we are done. That's a setup script :-D
 

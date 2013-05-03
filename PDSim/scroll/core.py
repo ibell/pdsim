@@ -1498,6 +1498,8 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.Wdot_F3 = np.abs(F3*vOS_ybeta*mu3)
         self.forces.Wdot_F4 = np.abs(F4*vOS_ybeta*mu4)
         self.forces.Wdot_OS_journal = np.abs(self.omega*self.forces.M_B)
+        self.forces.Wdot_upper_journal = np.abs(self.omega*self.forces.M_B*(1+1/self.mech.L_ratio_bearings))
+        self.forces.Wdot_lower_journal = np.abs(self.omega*self.forces.M_B/self.mech.L_ratio_bearings)
         
         self.forces.Wdot_thrust = np.abs(muthrust*self.forces.summed_Fz*vOS)
         
