@@ -314,7 +314,11 @@ class GeometryPanel(pdsim_panels.PDPanel):
         frm.Show()
         
     def OnAnimate(self, event = None):
-        SAF = ScrollAnimForm(self.Scroll.geo, size=(400,400))
+        pd = dict(beta = self.main.get_GUI_object_value('oldham_rotation_beta'),
+                  oldham_ring_radius = self.main.get_GUI_object_value('oldham_ring_radius'),
+                  oldham_key_width = self.main.get_GUI_object_value('oldham_key_width'),
+                  )
+        SAF = ScrollAnimForm(self.Scroll.geo, size=(400,400), param_dict = pd)
         SAF.Show()
         
     def OnRefresh(self, event = None):

@@ -1080,7 +1080,7 @@ class OSCrossSectionPanel(wx.Panel):
 class ScrollAnimForm(wx.Frame):
  
     #----------------------------------------------------------------------
-    def __init__(self, geo = None, start = True, size = (400, 400)):
+    def __init__(self, geo = None, start = True, size = (400, 400), param_dict = {}):
         wx.Frame.__init__(self, None, wx.ID_ANY, "Scroll Model GUI")
  
         # Add a panel so it looks the correct on all platforms
@@ -1139,6 +1139,7 @@ class ScrollAnimForm(wx.Frame):
         
         self.SetSize(sizer.GetMinSize())
         
+        self.param_dict = param_dict
         self.orbiting_layers = []
         if start:
             self.start()
@@ -1198,24 +1199,27 @@ class ScrollAnimForm(wx.Frame):
         
         if self.LayerCoordinateAxes.IsChecked():
             
-            om = self.geo.phi_ie-theta+3.0*pi/2.0
+            om = self.geo.phi_ie-theta-pi/2.0
             xo = self.geo.ro*cos(om)
             yo = self.geo.ro*sin(om)
             
             self.orbiting_layers.append(self.ax.plot(xo, yo, 'ko')[0])
     
+        beta = self.param_dict.get('beta', pi/6)
+        rring = self.param_dict.get('oldham_ring_radius', 0.04)
+        lkey = wkey = self.param_dict.get('oldham_key_width', 0.005)
+        
         if self.LayerOldham.IsChecked():
             
-            om = self.geo.phi_ie-theta+3.0*pi/2.0
+            om = self.geo.phi_ie-theta-pi/2.0
+            
             xo = self.geo.ro*cos(om)
             yo = self.geo.ro*sin(om)
             
-            beta = pi/6
-            
-            OSkeys = [dict(r = 0.04, height = 0.005, width = 0.005, length = 0.005),
-                      dict(r = 0.04, height = 0.005, width = 0.005, length = 0.005, betaplus = pi)]
-            FSkeys = [dict(r = 0.03, height = 0.005, width = 0.005, length = 0.005),
-                      dict(r = 0.03, height = 0.005, width = 0.005, length = 0.005, betaplus = pi)]
+            OSkeys = [dict(r = rring, width = wkey, length = lkey),
+                      dict(r = rring, width = wkey, length = lkey, betaplus = pi)]
+            FSkeys = [dict(r = rring, width = wkey, length = lkey),
+                      dict(r = rring, width = wkey, length = lkey, betaplus = pi)]
             
             for key in OSkeys:
                 r = key['r']
@@ -1227,9 +1231,6 @@ class ScrollAnimForm(wx.Frame):
                 
                 xo = self.geo.ro*cos(om)
                 yo = self.geo.ro*sin(om)
-                
-#                xbeta = 0
-#                ybeta = -self.geo.ro*cos(om)*sin(beta)+self.geo.ro*sin(om)*cos(beta)
                 
                 xbeta = self.geo.ro*cos(om)*cos(beta)+self.geo.ro*sin(om)*sin(beta)
                 ybeta = 0 
@@ -1258,22 +1259,20 @@ class ScrollAnimForm(wx.Frame):
                 yoffset = xbeta*sin(beta)-ybeta*cos(beta)
                 
                 x,y = rotated_rectangle(r*cos(betakey),r*sin(betakey),length+3*self.geo.ro,width,beta)
-                self.orbiting_layers.append(self.ax.fill(x,y,'yellow', alpha = 0.5)[0])
+                self.orbiting_layers.append(self.ax.fill(x, y, 'yellow', alpha = 0.5)[0])
                 x,y = rotated_rectangle(r*cos(betakey),r*sin(betakey),width,length,beta)
-                self.orbiting_layers.append(self.ax.fill(x+xoffset,y+yoffset,'k')[0])
+                self.orbiting_layers.append(self.ax.fill(x+xoffset, y+yoffset, 'k')[0])
                 
         if self.LayerOrbitingScroll.IsChecked():
             
-            om = self.geo.phi_ie-theta+3.0*pi/2.0
+            om = self.geo.phi_ie-theta-pi/2.0
             xo = self.geo.ro*cos(om)
             yo = self.geo.ro*sin(om)
             
-            beta = pi/6
-            
-            OSkeys = [dict(r = 0.04, height = 0.005, width = 0.005, length = 0.005),
-                      dict(r = 0.04, height = 0.005, width = 0.005, length = 0.005, betaplus = pi)]
-            FSkeys = [dict(r = 0.03, height = 0.005, width = 0.005, length = 0.005),
-                      dict(r = 0.03, height = 0.005, width = 0.005, length = 0.005, betaplus = pi)]
+            OSkeys = [dict(r = rring, width = wkey, length = lkey),
+                      dict(r = rring, width = wkey, length = lkey, betaplus = pi)]
+            FSkeys = [dict(r = rring, width = wkey, length = lkey),
+                      dict(r = rring, width = wkey, length = lkey, betaplus = pi)]
             
             for key in OSkeys:
                 r = key['r']
@@ -1296,6 +1295,8 @@ class ScrollAnimForm(wx.Frame):
                 self.orbiting_layers.append(self.ax.fill(x+xo,y+yo,'green', alpha = 0.5)[0])
                 x,y = rotated_rectangle(r*cos(betakey),r*sin(betakey),width,length,beta)
                 self.orbiting_layers.append(self.ax.fill(x+xoffset,y+yoffset,'k')[0])
+        
+        self.ax.set_autoscale_on(True)
             
     def remove_orbiting_layers(self):
         #Clean out all the items from the orbiting layers
