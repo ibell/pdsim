@@ -149,7 +149,8 @@ class IntegratorChoices(wx.Choicebook):
         
 class SolverInputsPanel(pdsim_panels.PDPanel):
     
-    desc_map = {'eps_cycle' : ('Cycle-cycle convergence criterion','-')}
+    desc_map = {'eps_cycle' : ('Cycle-cycle convergence criterion','-')
+                }
     
     def __init__(self, parent, configdict,**kwargs):
         pdsim_panels.PDPanel.__init__(self, parent, **kwargs)
@@ -175,11 +176,24 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         # Register terms in the GUI database
         self.main.register_GUI_objects([annotated_GUI_objects])
 
+        from multiprocessing import cpu_count
+        
         sizer_advanced = wx.BoxSizer(wx.VERTICAL)
         self.OneCycle = wx.CheckBox(self, label = "Just run one cycle - not the full solution")
         self.plot_every_cycle = wx.CheckBox(self, label = "Open the plots after each cycle (warning - very annoying but good for debug)")
+        
+        
+        self.Ncore_max = wx.SpinCtrl(self, -1, "10", )
+        self.Ncore_max.SetRange(1,max(1,cpu_count() - 1)) # Ensure that on single-core machines it can still run one core
+        self.Ncore_max.SetValue(configdict.get('Ncore_max',1))
+        av = datatypes.AnnotatedValue('Ncore_max', self.Ncore_max.GetValue(), 'Maximum number of cores to be used for computation [-]', '-')
+        self.main.register_GUI_objects([datatypes.AnnotatedGUIObject(av,self.Ncore_max)])
+        
         sizer_advanced.AddMany([self.OneCycle,
-                                self.plot_every_cycle])
+                                self.plot_every_cycle,
+                                self.Ncore_max])
+        
+        
         
         # Layout the sizers
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -203,7 +217,8 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
   
         configdict = dict(eps_cycle = self.main.get_GUI_object_value('eps_cycle'),
                           cycle_integrator = 'RK45',
-                          integrator_options = dict(RK_eps = float(self.IC.RK45_eps.GetValue()))
+                          integrator_options = dict(RK_eps = float(self.IC.RK45_eps.GetValue())),
+                          Ncore_max = self.Ncore_max.GetValue()
                           )
         return configdict
         

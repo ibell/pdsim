@@ -799,25 +799,29 @@ class Scroll(PDSimCore, _Scroll):
         if not hasattr(self.mech,'journal_tune_factor'):
             self.mech.journal_tune_factor = 1.0
             
-        #Conduct the calculations for the bearings
-        W_OSB = np.sqrt((self.forces.summed_Fr + self.forces.inertial)**2+self.forces.summed_Ft**2)*1000
-        self.losses.crank_bearing = self.crank_bearing(W = W_OSB)*self.mech.journal_tune_factor
-        self.losses.upper_bearing = self.upper_bearing(W = W_OSB*(1+1/self.mech.L_ratio_bearings))*self.mech.journal_tune_factor
-        self.losses.lower_bearing = self.lower_bearing(W = W_OSB/self.mech.L_ratio_bearings)*self.mech.journal_tune_factor
-        self.losses.thrust_bearing = self.thrust_bearing()
-        
-        _slice = range(self.Itheta+1)
-        theta = self.t[_slice]
-        theta_range = theta[-1]-theta[0]
-        
-        # Sum up each loss v. theta curve
-        self.losses.summed = self.losses.crank_bearing + self.losses.upper_bearing + self.losses.lower_bearing + self.losses.thrust_bearing
-        
-        # Get the mean losses over one cycle
-        self.losses.bearings  = np.trapz(self.losses.summed[_slice], theta)/theta_range
-        
-        print 'mechanical losses: ', self.losses.bearings
-        return self.losses.bearings #[kW]
+        if hasattr(self.mech,'detailed_analysis') and self.mech.detailed_analysis == True:
+            self.detailed_mechanical_analysis()
+            return self.forces.Wdot_total_mean
+        else:
+            #Conduct the calculations for the bearings
+            W_OSB = np.sqrt((self.forces.summed_Fr + self.forces.inertial)**2+self.forces.summed_Ft**2)*1000
+            self.losses.crank_bearing = self.crank_bearing(W = W_OSB)*self.mech.journal_tune_factor
+            self.losses.upper_bearing = self.upper_bearing(W = W_OSB*(1+1/self.mech.L_ratio_bearings))*self.mech.journal_tune_factor
+            self.losses.lower_bearing = self.lower_bearing(W = W_OSB/self.mech.L_ratio_bearings)*self.mech.journal_tune_factor
+            self.losses.thrust_bearing = self.thrust_bearing()
+            
+            _slice = range(self.Itheta+1)
+            theta = self.t[_slice]
+            theta_range = theta[-1]-theta[0]
+            
+            # Sum up each loss v. theta curve
+            self.losses.summed = self.losses.crank_bearing + self.losses.upper_bearing + self.losses.lower_bearing + self.losses.thrust_bearing
+            
+            # Get the mean losses over one cycle
+            self.losses.bearings  = np.trapz(self.losses.summed[_slice], theta)/theta_range
+            
+            print 'mechanical losses: ', self.losses.bearings
+            return self.losses.bearings #[kW]
     
     def post_cycle(self):
         #Run the base-class method to set HT terms, etc.
@@ -1385,9 +1389,6 @@ class Scroll(PDSimCore, _Scroll):
         #: The inertial forces on the orbiting scroll [kN]
         self.forces.inertial = self.mech.orbiting_scroll_mass * self.omega**2 * self.geo.ro / 1000
         
-        if hasattr(self.mech,'detailed_analysis') and self.mech.detailed_analysis == True:
-            self.detailed_mechanical_analysis()
-        
     def detailed_mechanical_analysis(self):
         
         if not hasattr(self,'losses'):
@@ -1497,9 +1498,9 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.Wdot_F2 = np.abs(F2*vOR_xbeta*mu2)
         self.forces.Wdot_F3 = np.abs(F3*vOS_ybeta*mu3)
         self.forces.Wdot_F4 = np.abs(F4*vOS_ybeta*mu4)
-        self.forces.Wdot_OS_journal = np.abs(self.omega*self.forces.M_B)
-        self.forces.Wdot_upper_journal = np.abs(self.omega*self.forces.M_B*(1+1/self.mech.L_ratio_bearings))
-        self.forces.Wdot_lower_journal = np.abs(self.omega*self.forces.M_B/self.mech.L_ratio_bearings)
+        self.forces.Wdot_OS_journal = np.abs(self.omega*self.forces.M_B)*self.mech.journal_tune_factor
+        self.forces.Wdot_upper_journal = np.abs(self.omega*self.forces.M_B*(1+1/self.mech.L_ratio_bearings))*self.mech.journal_tune_factor
+        self.forces.Wdot_lower_journal = np.abs(self.omega*self.forces.M_B/self.mech.L_ratio_bearings)*self.mech.journal_tune_factor
         
         self.forces.Wdot_thrust = np.abs(muthrust*self.forces.summed_Fz*vOS)
         
