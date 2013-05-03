@@ -183,15 +183,20 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         self.plot_every_cycle = wx.CheckBox(self, label = "Open the plots after each cycle (warning - very annoying but good for debug)")
         
         
-        self.Ncore_max = wx.SpinCtrl(self, -1, "10", )
+        sizer_Ncore_max = wx.BoxSizer(wx.HORIZONTAL)
+        
+        self.label_Ncore_max = wx.StaticText(self, label = "Maximum number of computational cores to use", )
+        self.Ncore_max = wx.SpinCtrl(self, value = "10", )
         self.Ncore_max.SetRange(1,max(1,cpu_count() - 1)) # Ensure that on single-core machines it can still run one core
         self.Ncore_max.SetValue(configdict.get('Ncore_max',1))
         av = datatypes.AnnotatedValue('Ncore_max', self.Ncore_max.GetValue(), 'Maximum number of cores to be used for computation [-]', '-')
         self.main.register_GUI_objects([datatypes.AnnotatedGUIObject(av,self.Ncore_max)])
         
+        sizer_Ncore_max.AddMany([self.label_Ncore_max, self.Ncore_max])
+        
         sizer_advanced.AddMany([self.OneCycle,
                                 self.plot_every_cycle,
-                                self.Ncore_max])
+                                sizer_Ncore_max])
         
         # Layout the sizers
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -203,7 +208,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         sizer.AddSpacer(5)
         sizer.Add(sizer_for_solver_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(20)
-        sizer.Add(pdsim_panels.HeaderStaticText(self, 'Advanced & Debug options'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(pdsim_panels.HeaderStaticText(self, 'Advanced and Debug options'), 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
         sizer.Add(sizer_advanced, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(20)
