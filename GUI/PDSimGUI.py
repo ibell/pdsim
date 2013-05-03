@@ -193,8 +193,6 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
                                 self.plot_every_cycle,
                                 self.Ncore_max])
         
-        
-        
         # Layout the sizers
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(pdsim_panels.HeaderStaticText(self, 'Cycle Integrator Selection'), 0, wx.ALIGN_CENTER_HORIZONTAL)
@@ -278,9 +276,9 @@ class SolverToolBook(wx.Toolbook):
         self.AssignImageList(il)
         
         #Make the panels.  Name should be consistent with configuration file
-        pane1 = SolverInputsPanel(self, configdict['SolverInputsPanel'], name = 'SolverInputsPanel')
-        pane2 = pdsim_panels.ParametricPanel(self, configdict['ParametricPanel'], name='ParametricPanel')
-        self.panels = (pane1, pane2)
+        self.SolverPanel = SolverInputsPanel(self, configdict['SolverInputsPanel'], name = 'SolverInputsPanel')
+        self.ParaPanel = pdsim_panels.ParametricPanel(self, configdict['ParametricPanel'], name='ParametricPanel')
+        self.panels = (self.SolverPanel, self.ParaPanel)
         
         for Name,index,panel in zip(['Params','Parametric'],indices,self.panels):
             self.AddPage(panel, Name, imageId=index)
@@ -1202,7 +1200,9 @@ class MainFrame(wx.Frame):
             self.WTM = processes.WorkerThreadManager(sims, 
                                                      self.get_logctrls(),
                                                      done_callback = self.deliver_result,
-                                                     main_stdout = self.MTB.RunTB.main_log_ctrl)
+                                                     main_stdout = self.MTB.RunTB.main_log_ctrl,
+                                                     Ncores = self.MTB.SolverTB.SolverPanel.Ncore_max.GetValue()
+                                                     )
             self.WTM.setDaemon(True)
             self.WTM.start()
         else:

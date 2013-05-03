@@ -432,7 +432,7 @@ class PDPanel(wx.Panel):
                     sizer.Add(checkbox, 1, wx.EXPAND)
                 
                 # Add to the annotated objects
-                annotated_GUI_objects.append(AnnotatedGUIObject(o,checkbox))
+                annotated_GUI_objects.append(AnnotatedGUIObject(o, checkbox))
             
             # Otherwise make a TextCtrl 
             else:
