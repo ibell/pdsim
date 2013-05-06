@@ -775,7 +775,7 @@ def polycentroid(xi,yi):
     
 
 
-def CoordsOrbScroll(theta,geo,shaveOn=True, just_involutes = False):
+def CoordsOrbScroll(theta,geo,shaveOn=True, just_involutes = False, Ndict = {}):
     shaveDelta=None
     if shaveOn==True:
         shaveDelta=pi/2
@@ -783,18 +783,22 @@ def CoordsOrbScroll(theta,geo,shaveOn=True, just_involutes = False):
         shaveDelta=1e-16
     (xshave,yshave)=Shave(geo,theta,shaveDelta)
     
+    Nphi = Ndict.get('phi',500)
+    Narc1 = Ndict.get('arc1',100)
+    Nline = Ndict.get('line',100)
+    Narc2 = Ndict.get('arc2',100)
     
-    phi=np.linspace(geo.phi_is,geo.phi_ie,500)
+    phi=np.linspace(geo.phi_is,geo.phi_ie,Nphi)
     (x_oi,y_oi)=coords_inv(phi,geo,theta,flag="oi")
-    phi=np.linspace(geo.phi_os,geo.phi_oe-shaveDelta,500)
+    phi=np.linspace(geo.phi_os,geo.phi_oe-shaveDelta,Nphi)
     (x_oo,y_oo)=coords_inv(phi,geo,theta,flag="oo")
     
-    xarc1=geo.xa_arc1+geo.ra_arc1*cos(np.linspace(geo.t2_arc1,geo.t1_arc1,100))
-    yarc1=geo.ya_arc1+geo.ra_arc1*sin(np.linspace(geo.t2_arc1,geo.t1_arc1,100))
-    xline=np.linspace(geo.t1_line,geo.t2_line,100)
+    xarc1=geo.xa_arc1+geo.ra_arc1*cos(np.linspace(geo.t2_arc1,geo.t1_arc1,Narc1))
+    yarc1=geo.ya_arc1+geo.ra_arc1*sin(np.linspace(geo.t2_arc1,geo.t1_arc1,Narc1))
+    xline=np.linspace(geo.t1_line,geo.t2_line,Nline)
     yline=geo.m_line*xline+geo.b_line
-    xarc2=geo.xa_arc2+geo.ra_arc2*cos(np.linspace(geo.t1_arc2,geo.t2_arc2,100))
-    yarc2=geo.ya_arc2+geo.ra_arc2*sin(np.linspace(geo.t1_arc2,geo.t2_arc2,100))
+    xarc2=geo.xa_arc2+geo.ra_arc2*cos(np.linspace(geo.t1_arc2,geo.t2_arc2,Narc2))
+    yarc2=geo.ya_arc2+geo.ra_arc2*sin(np.linspace(geo.t1_arc2,geo.t2_arc2,Narc2))
     
     ro=geo.rb*(pi-geo.phi_i0+geo.phi_o0)
     om=geo.phi_ie-theta+3.0*pi/2.0
@@ -1366,30 +1370,44 @@ class ScrollAnimForm(wx.Frame):
         self.Destroy()
 
 if __name__== "__main__":
+    import textwrap
     geo = geoVals()
-    #Scroll2WRL('Scroll.wrl')
-    #plotScrollSet(pi/2,lw=1.0,saveCoords=True)
     
-    x, y = CoordsOrbScroll(0, geo, shaveOn = False)
+    def remove_duplicate_vertices(x,y):
+        x = x.squeeze()
+        y = y.squeeze()
+        xgood,ygood = [x[0]],[y[0]]
+        
+        for i in range(1,len(x)):
+            if ((x[i]-x[i-1])**2+(y[i]-y[i-1])**2)**(0.5)>1e-6:
+                xgood.append(x[i])
+                ygood.append(y[i])
+                
+        xgood.append(x[0])
+        ygood.append(y[0])
+        
+        return xgood, ygood
+    
+    def vertices_to_string(x,y):
+        """ convert lists for x, and y to a string in the format '[x,y],' """
+        s = ''
+        for _x,_y in zip(x,y):
+            s += '[{x:g},{y:g}],\n'.format(x = _x*1000, y = _y*1000)
+        return s
+            
+    x, y = CoordsOrbScroll(0, geo, shaveOn = False, Ndict = {'phi':100, 'arc1':10, 'arc2':10, 'line':0})
+
     xo = x - geo.ro*cos(geo.phi_ie-pi/2)
     yo = y - geo.ro*sin(geo.phi_ie-pi/2)
     xf = geo.ro*cos(geo.phi_ie-pi/2) - x
     yf = geo.ro*sin(geo.phi_ie-pi/2) - y
     
-    f = open('coordsOS.txt','w')
-    last = ''
-    old_xy = (9999999999,9999999999999)
-    for _x,_y in zip(xo, yo):
-        this = '[{x:g}, {y:g}],\n'.format(x = _x[0]*1000, y = _y[0]*1000)
-        if (not this == last) and ((old_xy[0]-_x[0])**2+(old_xy[1]-_y[0])**2)**(0.5)>1e-6:
-            f.write(this)
-        else:
-            print this, last
-        last = this
-        old_xy = _x[0], _y[0]
-    f.close()
+    ##----------------------------
+    ##       Orbiting scroll
+    ##----------------------------
     
-    import textwrap
+    xo,yo = remove_duplicate_vertices(xo, yo)
+    polydata = vertices_to_string(xo, yo)
     
     template = textwrap.dedent(
     """module scroll()
@@ -1407,25 +1425,19 @@ if __name__== "__main__":
     union()
     {{
         scroll();
-        translate([0,0,-10]){{cylinder(r = 75, h = 10, $fn = 300);}}
+        translate([0,0,-10]){{cylinder(r = 75, h = 10, $fn = 100);}}
     }}""")
     
     with open('OSscad.scad','w') as f:
-        f.write(template.format(polygondata = open('coordsOS.txt','r').read(),
-                          hs = geo.h*1000))
+        f.write(template.format(polygondata = polydata, hs = geo.h*1000))
+       
+       
+    ##----------------------------
+    ##       Fixed scroll
+    ##----------------------------
         
-    f = open('coordsFS.txt','w')
-    last = ''
-    old_xy = (9999999999,9999999999999)
-    for _x,_y in zip(xf,yf):
-        this = '[{x:g}, {y:g}],\n'.format(x = _x[0]*1000, y = _y[0]*1000)
-        if (not this == last) and ((old_xy[0]-_x[0])**2+(old_xy[1]-_y[0])**2)**(0.5)>1e-6:
-            f.write(this)
-        else:
-            print this, last
-        last = this
-        old_xy = _x[0], _y[0]
-    f.close()
+    xf, yf = remove_duplicate_vertices(xf, yf)
+    polydata = vertices_to_string(xf, yf)
     
     template = textwrap.dedent(
     """module scroll()
@@ -1443,19 +1455,84 @@ if __name__== "__main__":
     union()
     {{
         scroll();
-        translate([0,0,+90+{hs:g}]){{cylinder(r = 75, h = 10, $fn = 300);}}
+        translate([0,0,+90+{hs:g}]){{cylinder(r = 75, h = 10, $fn = 100);}}
     }}""")
     
     with open('FSscad.scad','w') as f:
-        f.write(template.format(polygondata = open('coordsFS.txt','r').read(),
-                          hs = geo.h*1000))
+        f.write(template.format(polygondata = polydata, hs = geo.h*1000))
+        
+    ##----------------------------
+    ##       Oldham ring
+    ##----------------------------
+    
+    template = textwrap.dedent(
+    """
+    hring = {hring:g};
+    wkey = {wkey:g};
+    hkey = {hkey:g};
+    ro = {ro:g};
+    ri = {ri:g};
+    
+    htotal = 2*hkey + hring;
+    
+    translate([0,0,-hkey]){{
+        difference()
+        {{
+            cylinder(r = ro, h = htotal, $fn = 100);
+            cylinder(r = ri, h = htotal, $fn = 100);
+             translate([-0.6*2*ro,wkey/2,hkey+hring]){{cube([1.2*ro*2,2*ro,htotal*1.1]);}}
+             translate([-0.6*2*ro,-wkey/2-2*ro,hkey+hring]){{cube([1.2*ro*2,2*ro,htotal*1.1]);}}
+             translate([wkey/2,-0.6*2*ro,]){{cube([2*ro,1.2*ro*2,hkey]);}}
+             translate([-wkey/2-2*ro,-0.6*2*ro,]){{cube([2*ro,1.2*ro*2,hkey]);}}
+        }}
+    }}""")
+    
+    ro = 70
+    t = geo.rb*(geo.phi_i0-geo.phi_o0)
+    with open('Oldham.scad','w') as f:
+        f.write(template.format(ro = ro, ri = ro - t*1000, hring = 2*t*1000, hkey = t*1000, wkey = t*1000))
+        
+    ##----------------------------
+    ##       Shell
+    ##----------------------------
+    
+    template = textwrap.dedent(
+    """
+    hbody = {h:g};
+    ro = {ro:g};
+    ri = {ri:g};
+    xcap = {xcap:g};
+    
+    htotal = 2*hkey + hring;
+    
+    module curved_cylinder(r,h,rcap)
+    {{
+        union()
+        {{
+            translate([0,0,h]){{scale([1.0,1.0,rcap/r]){{sphere(r, $fn = 100);}}}}
+           cylinder(r = r,h = h, $fn = 100);
+        }}
+    }};
+    
+    difference()
+    {{
+        curved_cylinder(ro,hbody,xcap*ro);
+        curved_cylinder(ri,hbody,xcap*ri);
+    }}""")
+    
+    ro = 100
+    with open('Shell.scad','w') as f:
+        f.write(template.format(ro = ro, ri = ro - 5, h = 300, xcap = 0.5))
 
-    for root in ['FSscad','OSscad']:
-        subprocess.check_call(['C:\Program Files (x86)\OpenSCAD\openscad.exe','-o',root + '.off',root + '.scad'])
-        subprocess.call(['C:\Program Files\VCG\MeshLab\meshlabserver.exe','-i',root + '.off','-o',root + '.x3d'])
+    for root in ['FSscad','OSscad','Oldham','Shell']:
+        subprocess.check_call(['C:\Program Files (x86)\OpenSCAD\openscad.exe','-o', root + '.off', root + '.scad'])
+        subprocess.check_call(['C:\Program Files\VCG\MeshLab\meshlabserver.exe','-i', root + '.off','-o', root + '.x3d'])
     
         def inject(fName, diffuse, specular, MatDEF):
             """
+            Inject material information into the x3d scene so that it can be referenced 
+            and doesn't appear as a solid white object
+            
             Parameters
             ----------
             fName : string
@@ -1486,7 +1563,9 @@ if __name__== "__main__":
             with open(fName,'w') as f:
                 f.write(''.join(lines))
             
-        inject(root + '.x3d', diffuse = '0.8 0.8 0.8', specular = '0.2 0.2 0.2', MatDEF = 'scrollMat')
+        inject(root + '.x3d', diffuse = '0.8 0.8 0.8', specular = '0.2 0.2 0.2', MatDEF = 'Mat')
+        
+    os.startfile('OS.xhtml')
         
 #    pylab.fill(x,y)
 #    pylab.show()
