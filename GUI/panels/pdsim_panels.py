@@ -641,6 +641,10 @@ class OutputTreePanel(wx.Panel):
             menuitem1 = wx.MenuItem(menu, -1, 'Remove this column')
             self.Bind(wx.EVT_MENU, lambda event: self.OnRemoveCol(event, col), menuitem1)
             menu.AppendItem(menuitem1)
+            
+            menuitem = wx.MenuItem(menu, -1, 'Plot this simulation')
+            self.Bind(wx.EVT_MENU, lambda event: self.OnPlotSimulation(event, item, col), menuitem)
+            menu.AppendItem(menuitem)
         
         # If 
         if self.tree.GetItemText(item,col).startswith('<HDF5 dataset'):
@@ -670,6 +674,7 @@ class OutputTreePanel(wx.Panel):
             self.Bind(wx.EVT_MENU, lambda event: self.OnSortByRow(event, item), menuitem)
             menu.AppendItem(menuitem)
         
+        
         if menu.GetMenuItems():
             # Popup the menu.  If an item is selected then its handler
             # will be called before PopupMenu returns.
@@ -692,6 +697,13 @@ class OutputTreePanel(wx.Panel):
         
         frm = ArrayDisplay(val, title = title)
         frm.Show()
+    
+    def OnPlotSimulation(self, event, item, col):
+        """
+        Plot the simulation
+        """
+        self.Parent.Parent.plot_outputs(self.runs[col-1])
+        
         
     def OnScriptDisplay(self, event, item, col):
         path = ''
@@ -704,7 +716,7 @@ class OutputTreePanel(wx.Panel):
         
         #Skip column 0 which is the header column
         values = [self.tree.GetItemText(item, col) for col in range(1, self.tree.ColumnCount)]
-            
+        print 'Not currently implemented'
         print 'row values', values
     
     def OnRemoveCol(self, event, col):

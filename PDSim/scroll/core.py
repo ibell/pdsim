@@ -959,11 +959,12 @@ class Scroll(PDSimCore, _Scroll):
         Qnet -= sum([Tube.Q for Tube in self.Tubes])
         
         self.Qamb = self.ambient_heat_transfer(self.Tlumps[0])
+        self.mech.Wdot_losses = self.mechanical_losses('low') 
         
         # Heat transfer with the ambient; Qamb is positive if heat is being removed, thus flip the sign
         Qnet -= self.Qamb
         
-        Qnet += self.mechanical_losses('low') 
+        Qnet += self.mech.Wdot_losses
         # Heat transfer with the gas in the working chambers.  mean_Q is positive
         # if heat is transfered to the gas in the working chamber, so flip the 
         # sign for the lump
@@ -972,7 +973,7 @@ class Scroll(PDSimCore, _Scroll):
         #Shaft power from forces on the orbiting scroll from the gas in the pockets [kW]
         self.Wdot_forces = self.omega*self.forces.mean_tau
         
-        self.Wdot_mechanical = self.Wdot_pv + self.losses.bearings
+        self.Wdot_mechanical = self.Wdot_pv + self.mech.Wdot_losses
         
         #The actual torque required to do the compression [N-m]
         self.tau_mechanical = self.Wdot_mechanical / self.omega * 1000
@@ -1395,10 +1396,7 @@ class Scroll(PDSimCore, _Scroll):
             self.losses = struct()
             
         muthrust = self.mech.thrust_friction_coefficient
-        
-        # These parameters are hard coded for now
         beta = self.mech.oldham_rotation_beta
-        
         mu1 = mu2 = mu3 = mu4 = mu5 = self.mech.oldham_key_friction_coefficient
         r1 = r2 = r3 = r4 = self.mech.oldham_ring_radius
         w1 = w2 = w3 = w4 = self.mech.oldham_key_width
@@ -1433,7 +1431,7 @@ class Scroll(PDSimCore, _Scroll):
         Nsteps = self.Itheta+1
         A = np.zeros((4,4,Nsteps))
         b = np.zeros((4,Nsteps))
-        F = np.zeros((4,Nsteps))
+        self.forces.Fkey = np.zeros((4,Nsteps))
         
         # Make a matrix stack where each entry in the third index corresponds to a 4x4 matrix of the terms
         # Oldham x-beta direction
@@ -1480,10 +1478,10 @@ class Scroll(PDSimCore, _Scroll):
             b[3,:] = -self.forces.summed_Mz-self.forces.M_B-muthrust*(self.forces.summed_My*np.cos(THETA)-self.forces.summed_Mx*np.sin(THETA))
             
             for i in _slice:
-                F[:,i] = np.linalg.solve(A[:,:,i], b[:,i])
+                self.forces.Fkey[:,i] = np.linalg.solve(A[:,:,i], b[:,i])
         
                 #debug_plots(self)
-            F1, F2, F3, F4 = F
+            F1, F2, F3, F4 = self.forces.Fkey
         
             # Bearing forces on the scroll re-calculated based on force balances in the x- and y-axes
             Fbx = mOS*aOS_x/1000-muthrust*self.forces.summed_Fz*np.sin(THETA)+mu3*PSI*F3*np.sin(beta)+mu4*PSI*F4*np.sin(beta)-F4*np.cos(beta)+F3*np.cos(beta)-self.forces.summed_Fx#-mOS*self.geo.ro*self.omega**2*np.cos(THETA)/1000
@@ -1660,6 +1658,7 @@ class Scroll(PDSimCore, _Scroll):
         attrs_dict = {
                 '/forces/F_B':'The normal force applied to the orbiting scroll journal bearing [kN]',
                 '/forces/F_B0':'The normal force applied to the orbiting scroll journal bearing [kN]',
+                '/forces/Fkey':'The forces applied at each key of the Oldham ring [kN]',
                 '/forces/Fbackpressure':'The force applied to the orbiting scroll due to the back pressure [kN]',
                 '/forces/Fm':'The normal force applied to the orbiting scroll journal bearing [kN]',
                 '/forces/Fr':'The radial gas force on the orbiting scroll [kN]',

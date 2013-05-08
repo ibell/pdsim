@@ -667,7 +667,7 @@ class OSCrossSectionFrame(wx.Frame):
         
 class MechanicalLossesPanel(pdsim_panels.PDPanel):
     
-    desc_map = dict(h_shell = ('Shell-ambient mean HTC','W/m^2/K'),
+    desc_map = dict(h_shell = ('Shell-ambient mean HTC [W/m\xb2/K]','W/m^2/K'),
                     A_shell = ('Shell outer area [m\xb2]','m^2'),
                     Tamb = ('Ambient temperature [K]','K'),
                     mu_oil = ('Viscosity of the oil [Pa-s]','Pa-s'),
@@ -688,7 +688,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                     scroll_plate_thickness = ('Thickness of the orbiting scroll plate [m]','m',0.002),
                     scroll_density = ('Orbiting scroll material density [kg/m\xb3]','kg/m^3',2700),
                     scroll_added_mass = ('Additional OS mass added at COM [kg]','kg',0.0),
-                    oldham_ring_radius = ('Oldham ring radius [m]','m',0.08),
+                    oldham_ring_radius = ('Oldham ring radius [m]','m',0.06),
                     oldham_mass = ('Mass of the Oldham ring [kg]','kg',0.1),
                     oldham_thickness = ('Height of the Oldham ring (without the keys) [m]','m',0.008),
                     oldham_key_height = ('Height of the keys of the Oldham ring [m]','m',0.006),

@@ -6,6 +6,7 @@ from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as Canvas
 from matplotlib.backends.backend_wxagg import NavigationToolbar2Wx as Toolbar
 import numpy as np
 from CoolProp.CoolProp import Props
+import h5py
 
 class Plot(wx.Panel):
     def __init__(self, parent, id = -1, dpi = None, **kwargs):
@@ -95,7 +96,10 @@ class PlotNotebook(wx.Panel):
     def stepsize_theta(self,event=None):
         #Stepsize
         axes = self.add('Stepsize').gca()
-        theta=self.Sim.t
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+        else:
+            theta=self.Sim.t
         h = theta[1::]-theta[0:len(theta)-1]
         axes.semilogy(theta[0:len(theta)-1],h)
         axes.set_ylabel('Stepsize [rad]')
@@ -104,8 +108,12 @@ class PlotNotebook(wx.Panel):
     def V_theta(self,event=None):
         #Volume
         axes = self.add('Volume').gca()
-        theta=self.Sim.t
-        V=self.Sim.V.T*1e6
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+            V = self.Sim.get('/V').value.T*1e6
+        else:
+            theta=self.Sim.t
+            V=self.Sim.V.T*1e6
         V[V<1e-15]=np.nan
         axes.plot(theta,V)
         axes.set_ylabel('Volume [cm$^{3}$]')
@@ -114,8 +122,12 @@ class PlotNotebook(wx.Panel):
     def dV_dtheta(self,event=None):
         #Derivative of Volume
         axes = self.add('Vol. Derivative').gca()
-        theta=self.Sim.t
-        dV=self.Sim.dV.T*1e6
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+            dV = self.Sim.get('/dV').value.T*1e6
+        else:
+            theta=self.Sim.t
+            dV=self.Sim.dV.T*1e6
         dV[np.abs(dV)<1e-15]=np.nan
         axes.plot(theta,dV)
         axes.set_ylabel('Volume Derivative [cm$^{3}$/rad]')
@@ -124,8 +136,12 @@ class PlotNotebook(wx.Panel):
     def T_theta(self,event=None):
         #Temperature
         axes = self.add('Temperature').gca()
-        theta=self.Sim.t
-        T=self.Sim.T.T
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+            T = self.Sim.get('/T').value.T
+        else:
+            theta = self.Sim.t
+            T = self.Sim.T.T
         T[T<0.1]=np.nan
         axes.plot(theta,T)
         axes.set_ylabel('Temperature [K]')
@@ -134,8 +150,12 @@ class PlotNotebook(wx.Panel):
     def p_theta(self,event=None):    
         #pressure
         axes = self.add('Pressure').gca()
-        theta=self.Sim.t
-        p=self.Sim.p.T
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+            p = self.Sim.get('/p').value.T
+        else:
+            theta = self.Sim.t
+            p = self.Sim.p.T
         p[p<0.1]=np.nan
         axes.plot(theta,p)
         axes.set_ylabel('Pressure [kPa]')
@@ -144,9 +164,13 @@ class PlotNotebook(wx.Panel):
     def p_V(self, event=None):
         #pressure-volume
         axes = self.add('P-V').gca()
-        p=self.Sim.p.T
+        if isinstance(self.Sim,h5py.File):
+            V = self.Sim.get('/V').value.T*1e6
+            p = self.Sim.get('/p').value.T
+        else:
+            V = self.Sim.V.T*1e6
+            p = self.Sim.p.T
         p[p<0.1]=np.nan
-        V=self.Sim.V.T*1e6
         V[V<1e-15]=np.nan
         axes.plot(V,p)
         axes.set_ylabel('Pressure [kPa]')
@@ -155,8 +179,13 @@ class PlotNotebook(wx.Panel):
     def rho_theta(self,event=None):    
         #density
         axes = self.add('Density').gca()
-        theta=self.Sim.t
-        rho=self.Sim.rho.T
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+            rho = self.Sim.get('/rho').value.T
+        else:
+            theta = self.Sim.t
+            rho = self.Sim.rho.T
+            
         rho[rho<0.1]=np.nan
         axes.plot(theta,rho)
         axes.set_ylabel('Density [kg/m$^{3}$]')
@@ -165,8 +194,14 @@ class PlotNotebook(wx.Panel):
     def m_theta(self,event=None):
         #Mass
         axes = self.add('Mass').gca()
-        theta=self.Sim.t
-        m=self.Sim.rho.T*self.Sim.V.T
+        
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+            m = self.Sim.get('/rho').value.T*self.Sim.get('/V').value.T
+        else:
+            theta = self.Sim.t
+            m=self.Sim.rho.T*self.Sim.V.T
+        
         m[m<1e-20]=np.nan
         axes.plot(theta,m)
         axes.set_ylabel('Mass [kg]')
@@ -192,24 +227,36 @@ class PlotNotebook(wx.Panel):
             axes.set_ylabel(r'Valve lift [m]')
         
     def temperature_pressure(self, event = None):
-        if not hasattr(self.Sim,'__hasLiquid__') or not self.Sim.__hasLiquid__:
-            #Fluid T-p plot
-            axes = self.add('T-P phase').gca()
-            Fluid=self.Sim.CVs.exists_CV[0].State.Fluid
-            #Saturation curve
-            Tsat=np.linspace(Props(Fluid,'Tmin')+0.1,Props(Fluid,'Tcrit')-1e-6)
-            psat=np.array([Props('P','T',T_,'Q',1.0,Fluid) for T_ in Tsat])
-            axes.plot(Tsat,psat)
-            axes.plot(self.Sim.T,self.Sim.p,'.')
-            axes.set_xlabel('Temperature [K]')
-            axes.set_ylabel(r'Pressure [kPa]')
+        #Fluid T-p plot
+        axes = self.add('T-P phase').gca()
+        if isinstance(self.Sim,h5py.File):
+            Fluid = self.Sim.get('/Tubes/0/State1/Fluid').value
+            T = self.Sim.get('/T').value.T
+            p = self.Sim.get('/p').value.T
+        else:
+            Fluid = self.Sim.CVs.exists_CV[0].State.Fluid
+            T = self.Sim.T
+            p = self.Sim.p
+            
+        #Saturation curve
+        Tsat = np.linspace(Props(Fluid,'Tmin')+0.1, Props(Fluid,'Tcrit')-1e-6)
+        psat = np.array([Props('P', 'T', T_, 'Q', 1.0, Fluid) for T_ in Tsat])
+        axes.plot(Tsat, psat)
+        axes.plot(T,p,'.')
+        axes.set_xlabel('Temperature [K]')
+        axes.set_ylabel(r'Pressure [kPa]')
             
     def heat_transfer(self, event = None):
         #Axial force
             
         axes = self.add('Heat transfer').gca()
-        theta = self.Sim.t
-        Q=self.Sim.Q[:,0:self.Sim.Ntheta].T
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+            Q = self.Sim.get('/Q').value.T
+        else:
+            theta = self.Sim.t
+            Q = self.Sim.Q.T
+            
         Q[np.abs(Q)<1e-12]=np.nan
         axes.plot(theta,Q)
         axes.plot(theta,self.Sim.HTProcessed.summed_Q[0:self.Sim.Ntheta],lw=2)
@@ -220,8 +267,13 @@ class PlotNotebook(wx.Panel):
         #Axial force
             
         axes = self.add('Axial Force').gca()
-        theta=self.Sim.t
-        Fz=self.Sim.forces.Fz[:,0:self.Sim.Ntheta].T
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+            Fz = self.Sim.get('/forces/Fz').value.T
+        else:
+            theta = self.Sim.t
+            Fz = self.Sim.Fz.T
+        
         Fz[np.abs(Fz)<1e-12]=np.nan
         axes.plot(theta,Fz)
         axes.set_ylabel(r'$F_z$ [kN]')
@@ -231,8 +283,14 @@ class PlotNotebook(wx.Panel):
         #x-direction force
             
         axes = self.add('X Force').gca()
-        theta=self.Sim.t
-        Fx=self.Sim.forces.Fx[:,0:self.Sim.Ntheta].T
+        
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+            Fx = self.Sim.get('/forces/Fx').value.T
+        else:
+            theta = self.Sim.t
+            Fx = self.Sim.Fx.T
+            
         Fx[np.abs(Fx)<1e-12]=np.nan
         axes.plot(theta,Fx)
         axes.set_ylabel(r'$F_x$ [kN]')
@@ -242,8 +300,13 @@ class PlotNotebook(wx.Panel):
         #y-direction force
 
         axes = self.add('Y Force').gca()
-        theta=self.Sim.t
-        Fy=self.Sim.forces.Fy[:,0:self.Sim.Ntheta].T
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+            Fy = self.Sim.get('/forces/Fy').value.T
+        else:
+            theta = self.Sim.t
+            Fy = self.Sim.Fy.T
+            
         Fy[np.abs(Fy)<1e-12]=np.nan
         axes.plot(theta,Fy)
         axes.set_ylabel(r'$F_y$ [kN]')
@@ -254,12 +317,15 @@ class PlotNotebook(wx.Panel):
             
         axes = self.add('Force trace').gca()
         theta=self.Sim.t
-        Fx=self.Sim.forces.Fx[:,0:self.Sim.Ntheta].T
-        Fx[np.abs(Fx)<1e-12]=np.nan
-        Fy=self.Sim.forces.Fy[:,0:self.Sim.Ntheta].T
-        Fy[np.abs(Fy)<1e-12]=np.nan
-        axes.plot(Fx,Fy)
+        if isinstance(self.Sim,h5py.File):
+            Fx = self.Sim.get('/forces/Fx').value.T
+            Fy = self.Sim.get('/forces/Fy').value.T
+        else:
+            Fx = self.Sim.Fx.T
+            Fy = self.Sim.Fy.T
+            
         
+        axes.plot(Fx,Fy)
         axes.set_ylabel(r'$F_x$ [kN]')
         axes.set_xlabel(r'$F_y$ [kN]')    
         
@@ -267,13 +333,18 @@ class PlotNotebook(wx.Panel):
         #trace of force components
             
         axes = self.add('Force trace').gca()
-        theta=self.Sim.t
-        Fx=self.Sim.forces.summed_Fx[0:self.Sim.Ntheta].T
+
+        if isinstance(self.Sim,h5py.File):
+            Fx = self.Sim.get('/forces/summed_Fx').value.T
+            Fy = self.Sim.get('/forces/summed_Fy').value.T
+        else:
+            Fx = self.Sim.summed_Fx.T
+            Fy = self.Sim.summed_Fy.T
+            
         Fx[np.abs(Fx)<1e-12]=np.nan
-        Fy=self.Sim.forces.summed_Fy[0:self.Sim.Ntheta].T
         Fy[np.abs(Fy)<1e-12]=np.nan
-        axes.plot(Fx,Fy)
         
+        axes.plot(Fx,Fy)
         axes.set_ylabel(r'$F_x$ [kN]')
         axes.set_xlabel(r'$F_y$ [kN]')
         
@@ -281,10 +352,15 @@ class PlotNotebook(wx.Panel):
         #Crank pin force magnitude
             
         axes = self.add('Shaft force magnitude').gca()
-        theta=self.Sim.t
-        Fm=self.Sim.forces.Fm[0:self.Sim.Ntheta].T
-        Fm[np.abs(Fm)<1e-12]=np.nan
-        axes.plot(theta,Fm)
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+            Fm = self.Sim.get('/forces/Fm').value.T
+        else:
+            theta = self.Sim.t
+            Fm = self.Sim.Fm.T
+            
+        Fm[np.abs(Fm)<1e-12] = np.nan
+        axes.plot(theta, Fm)
         axes.set_ylabel(r'$F_m$ [kN]')
         axes.set_xlabel(r'$\theta$ [rad]')
         
@@ -292,11 +368,18 @@ class PlotNotebook(wx.Panel):
         #Radial force magnitude
             
         axes = self.add('Radial force magnitude').gca()
-        theta=self.Sim.t[0:self.Sim.Ntheta]
-        Fr=self.Sim.forces.Fr[0:self.Sim.Ntheta].T
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+            Fr = self.Sim.get('/forces/Fr').value.T
+            mean_Fr = self.Sim.get('/forces/mean_Fr').value
+        else:
+            theta = self.Sim.t
+            Fr = self.Sim.Fr.T
+            mean_Fr = self.Sim.forces.mean_Fr
+            
         Fr[np.abs(Fr)<1e-12]=np.nan
         axes.plot(theta,Fr)
-        axes.plot(theta,self.Sim.forces.mean_Fr*(1.0+0.0*theta),'k--')
+        axes.plot(theta,mean_Fr*np.ones_like(theta),'k--')
         axes.set_ylabel(r'$F_r$ [kN]')
         axes.set_xlabel(r'$\theta$ [rad]')
         
@@ -304,24 +387,37 @@ class PlotNotebook(wx.Panel):
         #Tangential force magnitude
             
         axes = self.add('Tangential force magnitude').gca()
-        theta=self.Sim.t
-        Ft=self.Sim.forces.Ft[0:self.Sim.Ntheta].T
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+            Ft = self.Sim.get('/forces/Ft').value.T
+            mean_Ft = self.Sim.get('/forces/mean_Ft').value
+        else:
+            theta = self.Sim.t
+            Ft = self.Sim.Ft.T
+            mean_Ft = self.Sim.forces.mean_Ft
+            
         Ft[np.abs(Ft)<1e-12]=np.nan
         axes.plot(theta,Ft)
-        axes.plot(theta,self.Sim.forces.mean_Ft*(1.0+0.0*theta),'k--')
+        axes.plot(theta, mean_Ft*np.ones_like(theta), 'k--')
         axes.set_ylabel(r'$F_t$ [kN]')
         axes.set_xlabel(r'$\theta$ [rad]') 
     
         
     def torque(self, event = None):
         #Torque
-
         axes = self.add('Torque').gca()
-        theta=self.Sim.t
-        tau=self.Sim.forces.tau[0:self.Sim.Ntheta].T
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('/t').value
+            tau = self.Sim.get('/forces/tau').value.T
+            mean_tau = self.Sim.get('/forces/mean_tau').value
+        else:
+            theta = self.Sim.t
+            tau = self.Sim.tau.T
+            mean_tau = self.Sim.forces.mean_tau
+            
         tau[np.abs(tau)<1e-12]=np.nan
         axes.plot(theta,tau)
-        axes.plot(theta,self.Sim.forces.mean_tau*(1.0+0.0*theta),'k--')
+        axes.plot(theta, mean_tau*np.ones_like(theta),'k--')
         axes.set_ylabel(r'$\tau$ [kN-m]')
         axes.set_xlabel(r'$\theta$ [rad]')
          

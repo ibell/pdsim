@@ -677,16 +677,6 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         self._mb.AddControl(self.LoadButton)
         self.LoadButton.Bind(wx.EVT_BUTTON, self.OnLoadRuns)
         
-        self.RefreshButton = pdsim_panels.HackedButton(self._mb, label = 'Refresh')
-        self._mb.AddControl(self.RefreshButton)
-        #self.BuildButton.Bind(wx.EVT_BUTTON, self.OnBuildTable)
-        self.RefreshButton.Disable()
-        
-        self.RunButton = pdsim_panels.HackedButton(self._mb, label = 'Run Table')
-        self._mb.AddControl(self.RunButton)
-        #self.RunButton.Bind(wx.EVT_BUTTON, self.OnRunTable)
-        self.RunButton.Disable()
-        
         self.OutputTree = pdsim_panels.OutputTreePanel(self, runs)
         self.AnnotationTarget = wx.StaticText(self, label='Annnotation:')
         
@@ -791,39 +781,33 @@ class OutputsToolBook(wx.Toolbook):
         self.AssignImageList(il)
         
         # Load the runs into memory
-#        runa = h5py.File('runa.h5')#, driver = 'core', backing_store = False)
-#        runb = h5py.File('runb.h5')#, driver = 'core', backing_store = False)
+        runa = h5py.File('runa.h5')#, driver = 'core', backing_store = False)
+        runb = h5py.File('runb.h5')#, driver = 'core', backing_store = False)
         
         runs = []
-#        variables = self.Parent.InputsTB.collect_parametric_terms()
-#        self.PlotsPanel = wx.Panel(self)
+
+        self.PlotsPanel = wx.Panel(self)
         self.DataPanel = OutputDataPanel(self, runs = runs, name = 'OutputDataPanel')
         
         #Make a  instance
-        self.panels = (self.DataPanel, wx.Panel(self))#self.PlotsPanel)
+        self.panels = (self.DataPanel, self.PlotsPanel)
         #self.panels = (wx.Panel(self), wx.Panel(self))#self.PlotsPanel)
         for Name,index,panel in zip(['Data','Plots'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
             
         self.PN = None
             
-    def plot_outputs(self, recip = None):
-        parent = self.PlotsPanel
+    def plot_outputs(self, sim = None):
         # First call there is no plot notebook in existence
         if self.PN is None:
-            self.PN = PlotNotebook(recip,parent)
+            self.PN = PlotNotebook(sim, self.PlotsPanel)
             sizer = wx.BoxSizer(wx.VERTICAL)
-            sizer.Add(self.PN,1,wx.EXPAND)
-            parent.SetSizer(sizer)
-            parent.Fit() ##THIS IS VERY IMPORTANT!!!!!!!!!!! :)
+            sizer.Add(self.PN, 1, wx.EXPAND)
+            self.PlotsPanel.SetSizer(sizer)
+            sizer.Layout()
+            self.PlotsPanel.Fit() ##THIS IS VERY IMPORTANT!!!!!!!!!!! :)
         else:
-            self.PN.update(recip)
-            
-    def add_output_terms(self, items):
-        self.DataPanel.add_output_terms(items)
-        
-    def change_output_terms(self, key_dict):
-        self.DataPanel.change_output_terms(key_dict)
+            self.PN.update(sim)
             
 class MainToolBook(wx.Toolbook):
     def __init__(self, parent, configdict):
@@ -926,6 +910,9 @@ class MainFrame(wx.Frame):
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnIdle, self.timer)
         self.timer.Start(1000) #1000 ms between checking the queue
+        
+        #If configs folder doesn't exist, make it
+        if not os.path.exists('configs'): os.mkdir('configs')
     
     def register_GUI_objects(self, annotated_GUI_objects):
         """
