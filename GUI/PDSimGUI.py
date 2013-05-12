@@ -1202,9 +1202,9 @@ class MainFrame(wx.Frame):
             dlg.ShowModal()
             dlg.Destroy()
             
-    def deliver_result(self, sim = None):
-        if sim is not None:
-            self.results_list.put(sim)
+    def deliver_result(self, hdf5_path = None):
+        if hdf5_path is not None:
+            self.results_list.put(hdf5_path)
             wx.CallAfter(self.MTB.RunTB.main_log_ctrl.WriteText,'Result queued\n')
      
     def load_plugins(self, PluginsMenu):
@@ -1254,7 +1254,7 @@ class MainFrame(wx.Frame):
                         # file
                         for section in self.config_parser.sections():
                             if (section.startswith('Plugin')
-                                    and section.split(':')[1] ==  term):
+                                and section.split(':')[1] ==  term):
                                 # If it is, activate it and check the element
                                 # in the menu
                                 plugin.activate()
@@ -1348,9 +1348,6 @@ class MainFrame(wx.Frame):
         self.PluginsMenu = wx.Menu()
         #self.load_plugins(self.PluginsMenu)
         self.MenuBar.Append(self.PluginsMenu, "Plugins")
-        
-#        self.Bind(wx.EVT_MENU,self.OnChangeSimType,self.TypeScroll)
-#        self.Bind(wx.EVT_MENU,self.OnChangeSimType,self.TypeRecip)
         
         self.Solve = wx.Menu()
         self.SolveSolve = wx.MenuItem(self.Solve, -1, "Solve\tF5", "", wx.ITEM_NORMAL)

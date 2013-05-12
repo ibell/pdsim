@@ -1709,11 +1709,15 @@ cpdef dict D1_forces(double theta, geoVals geo, bint poly = False):
     phi1=phi_os+pi
     VO=hs*rb**2/6.0*((phi2-phi_i0)**3-(phi1-phi_i0)**3)
     dVO=-hs*rb**2/2.0*((phi2-phi_i0)**2)
+    cx_O=hs/VO*(fxA(rb,phi2,phi_i0)-fxA(rb,phi1,phi_i0))
+    cy_O=hs/VO*(fyA(rb,phi2,phi_i0)-fyA(rb,phi1,phi_i0))
     
     phi2=phi_ie-theta-2.0*pi*Nc-pi
     phi1=phi_os
     VIa=hs*rb**2/6.0*((phi2-phi_o0)**3-(phi1-phi_o0)**3)
     dVIa=-hs*rb**2/2.0*((phi2-phi_o0)**2)
+    cx_Ia=hs/VIa*(fxA(rb,phi2,phi_o0)-fxA(rb,phi1,phi_o0))
+    cy_Ia=hs/VIa*(fyA(rb,phi2,phi_o0)-fyA(rb,phi1,phi_o0))
     
     VIb=hs*rb*ro/2.0*((phi_os-phi_o0)*sin(theta+phi_os-phi_ie)+cos(theta+phi_os-phi_ie))
     dVIb=hs*rb*ro/2.0*((phi_os-phi_o0)*cos(theta+phi_os-phi_ie)-sin(theta+phi_os-phi_ie))
@@ -1729,11 +1733,7 @@ cpdef dict D1_forces(double theta, geoVals geo, bint poly = False):
     
     Vd1=VO-VI
     dVd1=dVO-dVI
-
-    cx_O=hs/VO*(fxA(rb,phi2,phi_i0)-fxA(rb,phi1,phi_i0))
-    cy_O=hs/VO*(fyA(rb,phi2,phi_i0)-fyA(rb,phi1,phi_i0))
-    cx_Ia=hs/VIa*(fxA(rb,phi2,phi_o0)-fxA(rb,phi1,phi_o0))
-    cy_Ia=hs/VIa*(fyA(rb,phi2,phi_o0)-fyA(rb,phi1,phi_o0))
+    
     cx_Ib=1.0/3.0*(-ro*sin(theta-phi_ie)+rb*(phi_os-phi_o0)*sin(phi_os)+rb*cos(phi_os))
     cy_Ib=1.0/3.0*(-ro*cos(theta-phi_ie)-rb*(phi_os-phi_o0)*cos(phi_os)+rb*sin(phi_os))
     cx_Ic=1.0/3.0*((rb*(-theta+phi_ie-phi_o0-2*pi*Nc-pi)-ro)*sin(theta-phi_ie)-rb*cos(theta-phi_ie))
@@ -1842,11 +1842,15 @@ cpdef dict D2_forces(double theta, geoVals geo, bint poly = False):
     phi1=phi_os+pi
     VO=hs*rb**2/6.0*((phi2-phi_i0)**3-(phi1-phi_i0)**3)
     dVO=-hs*rb**2/2.0*((phi2-phi_i0)**2)
+    cx_O=hs/VO*(fxA(rb,phi2,phi_i0)-fxA(rb,phi1,phi_i0))
+    cy_O=hs/VO*(fyA(rb,phi2,phi_i0)-fyA(rb,phi1,phi_i0))
     
     phi2=phi_ie-theta-2.0*pi*Nc-pi
     phi1=phi_os
     VIa=hs*rb**2/6.0*((phi2-phi_o0)**3-(phi1-phi_o0)**3)
     dVIa=-hs*rb**2/2.0*((phi2-phi_o0)**2)
+    cx_Ia=hs/VIa*(fxA(rb,phi2,phi_o0)-fxA(rb,phi1,phi_o0))
+    cy_Ia=hs/VIa*(fyA(rb,phi2,phi_o0)-fyA(rb,phi1,phi_o0))
     
     VIb=hs*rb*ro/2.0*((phi_os-phi_o0)*sin(theta+phi_os-phi_ie)+cos(theta+phi_os-phi_ie))
     dVIb=hs*rb*ro/2.0*((phi_os-phi_o0)*cos(theta+phi_os-phi_ie)-sin(theta+phi_os-phi_ie))
@@ -1863,10 +1867,8 @@ cpdef dict D2_forces(double theta, geoVals geo, bint poly = False):
     Vd1=VO-VI
     dVd1=dVO-dVI
 
-    cx_O=hs/VO*(fxA(rb,phi2,phi_i0)-fxA(rb,phi1,phi_i0))
-    cy_O=hs/VO*(fyA(rb,phi2,phi_i0)-fyA(rb,phi1,phi_i0))
-    cx_Ia=hs/VIa*(fxA(rb,phi2,phi_o0)-fxA(rb,phi1,phi_o0))
-    cy_Ia=hs/VIa*(fyA(rb,phi2,phi_o0)-fyA(rb,phi1,phi_o0))
+    
+    
     cx_Ib=1.0/3.0*(-ro*sin(theta-phi_ie)+rb*(phi_os-phi_o0)*sin(phi_os)+rb*cos(phi_os))
     cy_Ib=1.0/3.0*(-ro*cos(theta-phi_ie)-rb*(phi_os-phi_o0)*cos(phi_os)+rb*sin(phi_os))
     cx_Ic=1.0/3.0*((rb*(-theta+phi_ie-phi_o0-2*pi*Nc-pi)-ro)*sin(theta-phi_ie)-rb*cos(theta-phi_ie))
@@ -2216,6 +2218,9 @@ cpdef tuple DDD(double theta, geoVals geo, bint poly=False):
 
 cpdef dict DDD_forces(double theta, geoVals geo, bint poly=False):
     
+    ro=geo.ro
+    om=geo.phi_ie-pi/2-theta
+    
     if not poly:
         exact_dict = {}
         _D1_forces = D1_forces(theta,geo)
@@ -2223,6 +2228,8 @@ cpdef dict DDD_forces(double theta, geoVals geo, bint poly=False):
         _DD_forces = DD_forces(theta,geo)
         for key in _D1_forces:
             exact_dict[key] = _D1_forces[key]+_D2_forces[key]+_DD_forces[key]
+        exact_dict['cx'] = ro*cos(om)/2.0
+        exact_dict['cy'] = ro*sin(om)/2.0
         return exact_dict
     else:
         raise AttributeError('Polygons not coded for DDD chamber')

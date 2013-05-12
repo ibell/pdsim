@@ -79,8 +79,28 @@ class Run1(Process):
             del self.sim.Abort #Can't pickle because it is a pointer to a bound method
         
         if not self.sim._want_abort:
+            
+            temp_folder = pdsim_home_folder
+            try:
+                os.mkdir(temp_folder)
+            except OSError:
+                pass
+            except WindowsError:
+                pass
+            
+            identifier = 'PDSimGUI ' + time.strftime('%Y-%m-%d-%H-%M-%S')+'_t'+script_name.split('_')[1]
+            hdf5_path = os.path.join(temp_folder, identifier + '.h5')
+            
+            from plugins.HDF5_plugin import HDF5Writer
+            HDF5 = HDF5Writer()
+            HDF5.write_to_file(self.sim, hdf5_path)
+            #Prune off undesired keys as provided by get_prune_keys function
+            HDF5.prune(hdf5_path, self.sim.get_prune_keys())
+            self.sim.attach_HDF5_annotations(hdf5_path)
+            print 'Wrote hdf5 file to', hdf5_path
+            
             #Send simulation result back to calling thread
-            self.pipe_results.send(self.sim)
+            self.pipe_results.send(hdf5_path)
             print 'Sent simulation back to calling thread',
             #Wait for an acknowledgment of receipt
             while not self.pipe_results.poll():
@@ -244,7 +264,7 @@ class RedirectedWorkerThread(Thread):
             
             #Get back the results from the simulation process if they are waiting
             if pipe_results_outlet.poll():
-                sim = pipe_results_outlet.recv()
+                hdf5_path = pipe_results_outlet.recv()
                 pipe_results_outlet.send('ACK')
         
         #Flush out any remaining stuff left in the pipe after process ends
@@ -255,27 +275,7 @@ class RedirectedWorkerThread(Thread):
             print self.name+": Process has aborted successfully"
         else:
             wx.CallAfter(self.stdout_target.AppendText, self.name+": Process is done")
-            if sim is not None:
-                
-                temp_folder = pdsim_home_folder
-                try:
-                    os.mkdir(temp_folder)
-                except OSError:
-                    pass
-                except WindowsError:
-                    pass
-                
-                identifier = 'PDSimGUI ' + time.strftime('%Y-%m-%d-%H-%M-%S')+'_t'+self.name.split('-')[1]
-                hdf5_path = os.path.join(temp_folder, identifier + '.h5')
-                
-                from plugins.HDF5_plugin import HDF5Writer
-                HDF5 = HDF5Writer()
-                HDF5.write_to_file(sim, hdf5_path)
-                #Prune off undesired keys as provided by get_prune_keys function
-                HDF5.prune(hdf5_path, sim.get_prune_keys())
-                sim.attach_HDF5_annotations(hdf5_path)
-                print 'Wrote hdf5 file to', hdf5_path
-                
+            if hdf5_path is not None:
                 "Send the data back to the GUI"
                 wx.CallAfter(self.done_callback, hdf5_path)
             else:

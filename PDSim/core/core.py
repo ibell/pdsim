@@ -1556,6 +1556,10 @@ class PDSimCore(_PDSimCore):
             
         if hasattr(self,'resid_Td') and hasattr(self,'x_state'):
             del self.resid_Td, self.x_state
+        
+        # Save copies of the inlet and outlet states at the root of the HDF5 file
+        self.inlet_state = self.Tubes.Nodes[key_inlet]    
+        self.outlet_state = self.Tubes.Nodes[key_outlet]
             
         #Save the elapsed time for simulation
         self.elapsed_time = clock()-t1
@@ -1658,6 +1662,8 @@ class PDSimCore(_PDSimCore):
         self.h = self.p[:,0:self.Ntheta]
         self.xL = self.p[:,0:self.Ntheta]
         self.xValves = self.xValves[:,0:self.Ntheta]
+        
+        
         
         print 'mdot*(h2-h1),P-v,Qamb', self.Wdot, self.Wdot_pv, self.Qamb
         print 'Mass flow rate is',self.mdot*1000,'g/s'

@@ -667,7 +667,7 @@ class OSCrossSectionFrame(wx.Frame):
         
 class MechanicalLossesPanel(pdsim_panels.PDPanel):
     
-    desc_map = dict(h_shell = ('Shell-ambient mean HTC [W/m\xb2/K]','W/m^2/K'),
+    desc_map = dict(h_shell = ('Shell-ambient mean HTC [kW/m\xb2/K]','kW/m^2/K'),
                     A_shell = ('Shell outer area [m\xb2]','m^2'),
                     Tamb = ('Ambient temperature [K]','K'),
                     mu_oil = ('Viscosity of the oil [Pa-s]','Pa-s'),
@@ -695,7 +695,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                     oldham_key_width = ('Width of the keys of the Oldham ring [m]','m',0.006),
                     oldham_key_friction_coefficient = ('Friction coefficient of the Oldham ring [-]','-',0.01),
                     oldham_rotation_beta = ('Angle between Oldham sliding axis and x-axis [radian]','rad',0),
-                    HTC = ('Heat transfer coefficient in the scrolls [W/m\xb2/K]','W/m^2/K'),
+                    HTC = ('Heat transfer coefficient in the scrolls [kW/m\xb2/K]','kW/m^2/K'),
                     detailed_analysis = ('Use detailed analysis of the mechanical losses','',True)
                     )
     
