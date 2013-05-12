@@ -780,10 +780,6 @@ class OutputsToolBook(wx.Toolbook):
             indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
         self.AssignImageList(il)
         
-        # Load the runs into memory
-        runa = h5py.File('runa.h5')#, driver = 'core', backing_store = False)
-        runb = h5py.File('runb.h5')#, driver = 'core', backing_store = False)
-        
         runs = []
 
         self.PlotsPanel = wx.Panel(self)
