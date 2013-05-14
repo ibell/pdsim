@@ -471,6 +471,10 @@ class PDSimCore(_PDSimCore):
     def pre_cycle(self, x0 = None):
         """
         This runs before the cycle is run but after pre_run has been called
+        
+        Parameters
+        ----------
+        x0 : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
         """        
         self.t.fill(np.nan)
         self.T.fill(np.nan)

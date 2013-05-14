@@ -280,9 +280,9 @@ class Scroll(PDSimCore, _Scroll):
         Parameters
         ----------
         inletState
-            A ``State`` instance for the inlet to the scroll set.  Can be approximate
+            A :class:`State <CoolProp.State.State>` instance for the inlet to the scroll set.  Can be approximate
         outletState
-            A ``State`` instance for the outlet to the scroll set.  Can be approximate
+            A :class:`State <CoolProp.State.State>` instance for the outlet to the scroll set.  Can be approximate
             
         Notes
         -----
@@ -481,9 +481,7 @@ class Scroll(PDSimCore, _Scroll):
 
     def wrap_heat_transfer(self, **kwargs):
         """
-        This function evaluates the anti-derivative of 
-        the differential of wall heat transfer, and returns the amount of scroll-
-        wall heat transfer in kW
+        This function evaluates the anti-derivative of the differential of wall heat transfer, and returns the amount of scroll-wall heat transfer in kW
         
         Parameters
         ----------
@@ -831,13 +829,6 @@ class Scroll(PDSimCore, _Scroll):
         #Update the heat transfer to the gas in the shell
         self.suction_heating()
         
-#    def post_solve(self):
-#        """
-#        Overload the base class post_solve in order to re-calculate the mechanical losses
-#        """
-#        self.mechanical_losses('low')
-#        PDSimCore.post_solve(self)
-        
     def ambient_heat_transfer(self, Tshell):
         """
         The amount of heat transfer from the compressor to the ambient
@@ -846,8 +837,7 @@ class Scroll(PDSimCore, _Scroll):
     
     def initial_motor_losses(self, eta_a = 0.8):
         """
-        Assume a 70% adiabatic efficiency to estimate the motor power and 
-        motor losses
+        Assume an adiabatic efficiency to estimate the motor power and motor losses
         """
         
         for Tube in self.Tubes:
@@ -899,7 +889,7 @@ class Scroll(PDSimCore, _Scroll):
         """
         
         #Get an initial guess before running at all for the motor losses.
-        self.initial_motor_losses()
+        self.initial_motor_losses() #set the parameter self.motor.losses
         
         #Run the suction heating code
         self.suction_heating()
@@ -935,6 +925,7 @@ class Scroll(PDSimCore, _Scroll):
         
     def lump_energy_balance_callback(self):
         """
+        The callback where the energy balance is carried out on the lumps
         
         Notes
         -----
@@ -1395,6 +1386,35 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.inertial = self.mech.orbiting_scroll_mass * self.omega**2 * self.geo.ro / 1000
         
     def detailed_mechanical_analysis(self):
+        """
+        In this function the detailed mechanical analsysis is carried out.
+        
+        Notes
+        -----
+        This function implements the method of the documentation on the orbiting scroll
+        forces
+        
+        The applied force on each of the bearings can be given from::
+        
+                        **|  |**    -----
+                        **|  |**     |
+                      |      |       | z_upper
+                      |      |       |
+                    **|      |**     |
+                    **|      |**    -----   
+                    **|      |**     |
+                      |      |       |
+                      |      |       |
+                      |      |       |
+                      |      |       | z_lower
+                      |      |       |
+                      |      |       |
+                      |      |       |
+                    **|      |**     |
+                    **|      |**   -----
+        
+        and the ratio of bearing distances is given by ``mech.L_ratio_bearings`` which is z_lower/z_upper
+        """
         
         if not hasattr(self,'losses'):
             self.losses = struct()
@@ -1500,8 +1520,8 @@ class Scroll(PDSimCore, _Scroll):
             F1, F2, F3, F4 = self.forces.Fkey
         
             # Bearing forces on the scroll re-calculated based on force balances in the x- and y-axes
-            Fbx = mOS*aOS_x/1000-muthrust*self.forces.summed_Fz*np.sin(THETA)+mu3*PSI*F3*np.sin(beta)+mu4*PSI*F4*np.sin(beta)-F4*np.cos(beta)+F3*np.cos(beta)-self.forces.summed_Fx#-mOS*self.geo.ro*self.omega**2*np.cos(THETA)/1000
-            Fby = mOS*aOS_y/1000-muthrust*self.forces.summed_Fz*np.cos(THETA)-mu3*PSI*F3*np.cos(beta)-mu4*PSI*F4*np.cos(beta)-F4*np.sin(beta)+F3*np.sin(beta)-self.forces.summed_Fy#-mOS*self.geo.ro*self.omega**2*np.sin(THETA)/1000
+            Fbx = mOS*aOS_x/1000-muthrust*self.forces.summed_Fz*np.sin(THETA)+mu3*PSI*F3*np.sin(beta)+mu4*PSI*F4*np.sin(beta)-F4*np.cos(beta)+F3*np.cos(beta)-self.forces.summed_Fx
+            Fby = mOS*aOS_y/1000-muthrust*self.forces.summed_Fz*np.cos(THETA)-mu3*PSI*F3*np.cos(beta)-mu4*PSI*F4*np.cos(beta)-F4*np.sin(beta)+F3*np.sin(beta)-self.forces.summed_Fy
             Fbold = np.sqrt(Fbx**2+Fby**2)
             self.forces.M_B = self.forces.mu_B*self.mech.D_crank_bearing/2*Fbold
             self.forces.M_Bupper = self.forces.mu_Bupper*self.mech.D_upper_bearing/2*Fbold*(1.0+1.0/self.mech.L_ratio_bearings)
@@ -1581,8 +1601,9 @@ class Scroll(PDSimCore, _Scroll):
         Notes
         -----
         The following assumptions are employed:
+        
         1. Involute extended to the base circle to account for discharge region
-        2. Half of the 
+        2. Half of the width of the scroll is assumed to see the upstream pressure and the other half sees the downstream pressure
         
         The length of an involute section can be given by
         
@@ -1593,7 +1614,7 @@ class Scroll(PDSimCore, _Scroll):
         Returns
         -------
         F: numpy array
-            Axial force from the top of the scroll [kN]
+            Axial force matrix from the top of the scroll generated by each control volume [kN]
         """
         
         _slice = range(len(theta))
@@ -1665,7 +1686,6 @@ class Scroll(PDSimCore, _Scroll):
         # Remove all the nan placeholders
         F[np.isnan(F)] = 0
         
-        # Sum at each crank angle
         return F
         
     def IsentropicNozzleFMSafe(self,*args,**kwargs):

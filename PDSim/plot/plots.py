@@ -316,15 +316,12 @@ class PlotNotebook(wx.Panel):
         #trace of force components
             
         axes = self.add('Force trace').gca()
-        theta=self.Sim.t
         if isinstance(self.Sim,h5py.File):
             Fx = self.Sim.get('/forces/Fx').value.T
             Fy = self.Sim.get('/forces/Fy').value.T
         else:
             Fx = self.Sim.Fx.T
             Fy = self.Sim.Fy.T
-            
-        
         axes.plot(Fx,Fy)
         axes.set_ylabel(r'$F_x$ [kN]')
         axes.set_xlabel(r'$F_y$ [kN]')    

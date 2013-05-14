@@ -13,7 +13,7 @@ from math import pi
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
 # PDSim should also be built using a command like python build_ext --inplace to keep all the extension modules next to the .pyx files
-sys.path.insert(0, os.path.abspath('..'))
+#sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
