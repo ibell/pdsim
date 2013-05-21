@@ -232,18 +232,21 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
         DELTAP=dp_dz*L
 
         if fixed==1:
-            #The outlet temperature considering just the wall heat transfer 
+            # The outlet temperature considering just the wall heat transfer 
             T2_star=T_wall-(T_wall-T1)*exp(-pi*ID*L*alpha/(mdot*cp))
             
-            #Get the actual outlet temperature based on the additional heat input
-            T2 = T2_star + Q_add/(mdot*cp)
+            # Get the actual outlet enthalpy based on the additional heat input
+            S_star = State(Fluid,{'T':T2_star,'P':p + DELTAP/1000.0})
+            
+            h2 = S_star.h + Q_add/mdot/1000.0
+            
+            State2.update({'H':h2,'P':p+DELTAP/1000})
             
             # Q is defined to be positive if heat transferred from wall to fluid
             #
             # It only includes the term from the wall heat transfer 
             Q=mdot*cp*(T2_star-T1)
             
-            State2.update({'T':T2,'P':p+DELTAP/1000})
         else:
             #Get the wall heat transfer outlet temperature based on the additional heat input
             T2_star = T2 - Q_add/(mdot*cp)

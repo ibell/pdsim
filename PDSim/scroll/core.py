@@ -110,7 +110,7 @@ class Scroll(PDSimCore, _Scroll):
         -------
         
         """
-        return scroll_geo.SA(theta,self.geo)[0:2]
+        return scroll_geo.SA(theta,self.geo,Vremove = self.geo.Vremove)[0:2]
         
     def V_s1(self,theta):
         """
@@ -1225,7 +1225,7 @@ class Scroll(PDSimCore, _Scroll):
         # The force of the gas in each chamber pushes the orbiting scroll away
         # from the working chambers
         # It is only the active slice
-        self.forces.Fz = (self.p[:,_slice])/self.geo.h*self.V[:,_slice]
+        self.forces.Fz = self.p[:,_slice]*self.V[:,_slice]/self.geo.h
         
         #Remove all the NAN placeholders and replace them with zero values
         self.forces.Fz[np.isnan(self.forces.Fz)] = 0
@@ -1234,10 +1234,15 @@ class Scroll(PDSimCore, _Scroll):
 #        
         #If the orbiting_back_pressure is a floating point value, use it to calculate the back pressure correction
         if isinstance(orbiting_back_pressure, float):
-            # The back gas pressure on the orbiting scroll pushes the scroll back down
-            # Subtract the back pressure from all the elements 
-            self.forces.Fbackpressure = orbiting_back_pressure*pi*self.mech.thrust_ID**2/4.0
-            self.forces.summed_Fz -= self.forces.Fbackpressure
+             # The back gas pressure on the orbiting scroll pushes the scroll back down
+            # Subtract the back pressure from all the control volumes 
+            self.forces.Fbackpressure = orbiting_back_pressure*self.V[:,_slice]/self.geo.h
+            
+            #Remove all the NAN placeholders and replace them with zero values
+            self.forces.Fbackpressure[np.isnan(self.forces.Fbackpressure)] = 0
+            self.forces.summed_Fbackpressure = np.sum(self.forces.Fbackpressure, axis = 0) #kN
+            
+            self.forces.summed_Fz -= self.forces.summed_Fbackpressure
         else:
             raise NotImplementedError('calculate_force_terms must get a float back pressure for now')
         
@@ -1351,8 +1356,8 @@ class Scroll(PDSimCore, _Scroll):
         # The moments from the backpressure acting on the back side of the orbiting scroll
         # They must be added on separately because otherwise they are added in NCV times,
         # which is not the proper behavior
-        self.forces.summed_Mx += -(-self.forces.ypin)*self.forces.Fbackpressure
-        self.forces.summed_My += +(-self.forces.xpin)*self.forces.Fbackpressure
+        self.forces.summed_Mx += -(-self.forces.ypin)*self.forces.summed_Fbackpressure
+        self.forces.summed_My += +(-self.forces.xpin)*self.forces.summed_Fbackpressure
         
         #Calculate the radial force on the crank pin at each crank angle
         #The radial component magnitude is just the projection of the force onto a vector going from origin to center of orbiting scroll

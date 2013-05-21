@@ -696,7 +696,8 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                     oldham_key_friction_coefficient = ('Friction coefficient of the Oldham ring [-]','-',0.01),
                     oldham_rotation_beta = ('Angle between Oldham sliding axis and x-axis [radian]','rad',0),
                     HTC = ('Heat transfer coefficient in the scrolls [kW/m\xb2/K]','kW/m^2/K'),
-                    detailed_analysis = ('Use detailed analysis of the mechanical losses','',True)
+                    detailed_analysis = ('Use detailed analysis of the mechanical losses','',True),
+                    suction_fraction = ('Fraction of motor losses to suction gas','',1.0),
                     )
     
     def __init__(self, parent, config, **kwargs):
@@ -771,7 +772,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         sizer_for_HT_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
         
         # Loop over the HT inputs
-        annotated_values = self.get_annotated_values(['h_shell','A_shell','Tamb','HTC'])
+        annotated_values = self.get_annotated_values(['h_shell','A_shell','Tamb','HTC','suction_fraction'])
             
         # Build the items and return the list of annotated GUI objects, add to existing list
         annotated_GUI_objects += self.construct_items(annotated_values,
@@ -849,6 +850,8 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         
         # Register terms in the GUI database
         self.main.register_GUI_objects(annotated_GUI_objects)
+        
+        self.main.get_GUI_object('L_ratio_bearings').GUI_location.SetToolTipString('Ratio of z1/z2, where\n\nz1 : the length from the centerline of the upper bearing to the lower bearing\nz2 : the length from the centerline of the upper bearing to the orbiting scroll bearing')
         
         self.ViewButton = wx.Button(scrolled_panel, label='View Cross-Section')
         self.ViewButton.Bind(wx.EVT_BUTTON, self.OnViewCrossSection)
@@ -932,17 +935,21 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         """
         Returns a formatted string for the script that will be execfile-d
         """
+
         if self.motor_choices.GetSelection() == 0:
             #Use the value for the motor efficiency
             motor_chunk = textwrap.dedent(
                """
                sim.motor = Motor()
                sim.motor.set_eta({eta_motor:s})
-               sim.motor.suction_fraction = 1.0 #hard-coded
+               sim.motor.suction_fraction = {suction_fraction:g}
                
                from PDSim.core.core import struct
                sim.mech = struct()
-               """.format(eta_motor = self.motor_choices.eta_motor.GetValue()))
+               """.format(eta_motor = self.motor_choices.eta_motor.GetValue(),
+                          suction_fraction = self.main.get_GUI_object_value('suction_fraction')
+                          )
+                                          )
         elif self.motor_choices.GetSelection() == 1:
             # Get the tuple of list of coeffs from the MCT, then unpack the tuple
             # back into the call to set the coefficients
@@ -954,14 +961,16 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                sim.motor.set_coeffs(tau_coeffs = {tau_coeffs:s},
                                     eta_coeffs = {eta_coeffs:s},
                                     omega_coeffs = {omega_coeffs:s})
-               sim.motor.suction_fraction = 1.0 #hard-coded
+               sim.motor.suction_fraction = {suction_fraction:g}
                
                from PDSim.core.core import struct
                sim.mech = struct()
                """.format(tau_coeffs = str(c[0]),
                           eta_coeffs = str(c[1]),
-                          omega_coeffs = str(c[2])
-                          )        )
+                          omega_coeffs = str(c[2]),
+                          suction_fraction = self.main.get_GUI_object_value('suction_fraction')
+                          )        
+                                          )
         else:
             raise NotImplementedError
         
@@ -991,7 +1000,6 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         orbiting_scroll_mass += self.main.get_GUI_object_value('scroll_added_mass') #add additional mass
         motor_chunk += 'sim.mech.orbiting_scroll_mass = {value:s}\n'.format(name = term,
                                                                             value = str(orbiting_scroll_mass)) 
-        
         
         return motor_chunk
     

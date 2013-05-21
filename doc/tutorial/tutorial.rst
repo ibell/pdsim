@@ -10,7 +10,7 @@ Pre-Requisites
 
 Requirements:
 
-- `TortoiseGit <http://code.google.com/p/tortoisegit/>`_ Download an installer and install
+- `TortoiseGit <http://code.google.com/p/tortoisegit/>`_ Download an installer and install.  If you get errors about not having MSYS git, you can download MSYSGIT from `msysgit <http://code.google.com/p/msysgit/downloads/list?can=2&q=%22Full+installer+for+official+Git+for+Windows%22>`_
 - `Python(x,y) <http://code.google.com/p/pythonxy/>`_ (Version 2.7.2.3 used here).  Download and install the full installation.  When you go to install, you need to ensure that under Packages, you have cython, wxpython, matplotlib, nose, scipy, numpy checked, and under Other, you want SciTE, WinMerge, MinGW and SWIG.
 - `CoolProp` - see installation instructions in :ref:`CoolProp installation <install-PDSim>`.  The easiest solution is just to download and run the nightly build from http://sourceforge.net/projects/coolprop/files/CoolProp/Nightly/
 - A C++ compiler.  If you installed MinGW from Python(x,y), you are are all set. Otherwise you can get a copy of `Microsoft Visual Studio 2008 C++ Express <http://www.microsoft.com/visualstudio/en-us/products/2008-editions/express>`_ for free and it works great

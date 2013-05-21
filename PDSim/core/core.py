@@ -1594,7 +1594,8 @@ class PDSimCore(_PDSimCore):
                 '/callbacks',
                 '/core',
                 '/steps',
-                '/theta'
+                '/theta',
+                '/Flows'
                 ]
         
     def attach_HDF5_annotations(self, fName):

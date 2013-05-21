@@ -1380,7 +1380,9 @@ class MainFrame(wx.Frame):
         
         default_dir = GUIconfig.get('config_path', default = 'configs')
         
-        FD = wx.FileDialog(None,"Load Configuration file",defaultDir=default_dir,
+        FD = wx.FileDialog(None,
+                           "Load Configuration file",
+                           defaultDir=default_dir,
                            style=wx.FD_OPEN)
         if wx.ID_OK==FD.ShowModal():
             file_path = FD.GetPath()
@@ -1398,9 +1400,12 @@ class MainFrame(wx.Frame):
         """
         Write the configuration file
         """
+        
+        default_dir = GUIconfig.get('config_path', default = 'configs')
+        
         FD = wx.FileDialog(None,
                            "Save Configuration file",
-                           defaultDir='configs',
+                           defaultDir=default_dir,
                            style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
         
         if wx.ID_OK == FD.ShowModal():

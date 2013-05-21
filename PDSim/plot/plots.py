@@ -270,12 +270,15 @@ class PlotNotebook(wx.Panel):
         if isinstance(self.Sim,h5py.File):
             theta = self.Sim.get('/t').value
             Fz = self.Sim.get('/forces/Fz').value.T
+            summed_Fz = self.Sim.get('/forces/summed_Fz').value.T
         else:
             theta = self.Sim.t
-            Fz = self.Sim.Fz.T
+            Fz = self.Sim.forces.Fz.T
+            summed_Fz = self.Sim.forces.summed_Fz.T
         
         Fz[np.abs(Fz)<1e-12]=np.nan
         axes.plot(theta,Fz)
+        axes.plot(theta,summed_Fz,lw=2)
         axes.set_ylabel(r'$F_z$ [kN]')
         axes.set_xlabel(r'$\theta$ [rad]')
     
@@ -369,14 +372,17 @@ class PlotNotebook(wx.Panel):
             theta = self.Sim.get('/t').value
             Fr = self.Sim.get('/forces/Fr').value.T
             mean_Fr = self.Sim.get('/forces/mean_Fr').value
+            summed_Fr = self.Sim.get('/forces/summed_Fr').value
         else:
             theta = self.Sim.t
-            Fr = self.Sim.Fr.T
+            Fr = self.Sim.forces.Fr.T
             mean_Fr = self.Sim.forces.mean_Fr
+            summed_Fr = self.Sim.forces.summed_Fr
             
         Fr[np.abs(Fr)<1e-12]=np.nan
         axes.plot(theta,Fr)
         axes.plot(theta,mean_Fr*np.ones_like(theta),'k--')
+        axes.plot(theta,summed_Fr,lw=2)
         axes.set_ylabel(r'$F_r$ [kN]')
         axes.set_xlabel(r'$\theta$ [rad]')
         
@@ -388,10 +394,12 @@ class PlotNotebook(wx.Panel):
             theta = self.Sim.get('/t').value
             Ft = self.Sim.get('/forces/Ft').value.T
             mean_Ft = self.Sim.get('/forces/mean_Ft').value
+            summed_Ft = self.Sim.get('/forces/summed_Ft').value
         else:
             theta = self.Sim.t
-            Ft = self.Sim.Ft.T
+            Ft = self.Sim.forces.Ft.T
             mean_Ft = self.Sim.forces.mean_Ft
+            summed_Ft = self.Sim.forces.summed_Ft
             
         Ft[np.abs(Ft)<1e-12]=np.nan
         axes.plot(theta,Ft)
@@ -409,7 +417,7 @@ class PlotNotebook(wx.Panel):
             mean_tau = self.Sim.get('/forces/mean_tau').value
         else:
             theta = self.Sim.t
-            tau = self.Sim.tau.T
+            tau = self.Sim.forces.tau.T
             mean_tau = self.Sim.forces.mean_tau
             
         tau[np.abs(tau)<1e-12]=np.nan

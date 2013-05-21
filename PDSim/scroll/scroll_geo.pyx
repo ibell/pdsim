@@ -21,7 +21,7 @@ geoValsvarlist=['h','phi_i0','phi_is','phi_ie','phi_e',
                 'x0_wall','y0_wall','r_wall',
                 'delta_radial', 'delta_flank',
                 'phi_ie_offset','delta_suction_offset',
-                'cx_scroll','cy_scroll','V_scroll']
+                'cx_scroll','cy_scroll','V_scroll','Vremove']
  
 def rebuild_geoVals(d):
     geo = geoVals()
@@ -867,7 +867,7 @@ def plot_HT_angles(theta, geo, keys, involute):
     ax.set_ylim(0,len(keys)+1)
     plt.show()
       
-cpdef tuple SA(double theta, geoVals geo, bint poly=False, bint use_offset = True):
+cpdef tuple SA(double theta, geoVals geo, bint poly=False, bint use_offset = True, double Vremove = 0):
     """
     Volume and derivative of volume of SA chamber
     
@@ -882,6 +882,8 @@ cpdef tuple SA(double theta, geoVals geo, bint poly=False, bint use_offset = Tru
     use_offset : boolean
         If ``True``, use the offset value from geo.phi_ie_offset, else, don't 
         use any offset
+    Vremove : boolean
+        Volume to remove from the control volume [:math:`m^3`]
         
     Notes
     -----
@@ -971,7 +973,10 @@ cpdef tuple SA(double theta, geoVals geo, bint poly=False, bint use_offset = Tru
         
             V = Vcircle + VO - VI
             dV = dVcircle + dVO - dVI
-         
+    
+    # Remove the additional volume from the CV volume     
+    V -= Vremove
+    
     if not poly:
         return V,dV
     else:

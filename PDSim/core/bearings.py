@@ -1,9 +1,8 @@
-import quantities as pq
 from math import pi,sqrt,log
 import numpy as np
 from scipy.interpolate import interp1d, splev, splrep
 import scipy.optimize
-from _bearings import calculate_epsilon
+from _bearings import calculate_epsilon_short, calculate_epsilon_long
 
 class struct: pass
 
@@ -129,21 +128,40 @@ def journal_bearing(**kwargs):
     omega = kwargs['omega']
     c = kwargs['c']
        
-    #Short bearing analysis
-    Wr = W/(eta_0*omega*r_b*L)*(c/L)**2
+    # Short bearing analysis
+    Wr_short = W/(eta_0*omega*r_b*L)*(c/L)**2
     
-    logWr = np.log(Wr) #This can be an array
+    # Long bearing analysis
+    Wr_long = W/(eta_0*omega*r_b*L)*(c/r_b)**2
     
-    epsilon = calculate_epsilon(logWr)
+    #Select the first guess value based on the input to the function
+    if Wr_long < 5:
+        epsilon0_long = 0.01
+    else:
+        epsilon0_long = 0.8
         
-#    if isinstance(logWr,np.ndarray):
-#        epsilon = np.zeros_like(logWr)
-#        for i in range(len(logWr)):
-#            epsilon[i] = scipy.optimize.newton(lambda e: np.log(e/(4*(1-e**2)**2)*(16*e**2+pi**2*(1-e**2))**0.5) - logWr[i],0.5)
-#    else:
-#        epsilon = scipy.optimize.newton(lambda e: np.log(e/(4*(1-e**2)**2)*(16*e**2+pi**2*(1-e**2))**0.5) - logWr,0.5)
+    if Wr_short < 0.8:
+        epsilon0_short = 0.01
+    else:
+        epsilon0_short = 0.8
     
-    Fshear = 2*pi/np.sqrt(1-epsilon**2)*((L/r_b)**2*epsilon**2/(16*(1-epsilon**2)) +1)*eta_0*omega*r_b*L*(r_b/c)
+    # Sommerfeld number
+    S = eta_0*omega*r_b*L/(pi*W)*(r_b/c)**2
+    
+    if L/(2*r_b) < 0.5: #Short bearing analysis
+        epsilon = calculate_epsilon_short(np.log(Wr_short), epsilon0_short)
+        Fshear = 2*pi/np.sqrt(1-epsilon**2)*((L/r_b)**2*epsilon**2/(16*(1-epsilon**2)) +1)*eta_0*omega*r_b*L*(r_b/c)
+    
+    elif L/(2*r_b) > 2.0: #Infinitely-long analysis
+        epsilon = calculate_epsilon_long(np.log(Wr_long), epsilon0_long)
+        Fshear = pi/np.sqrt(1-epsilon**2)*(5*epsilon**2+4)/(epsilon**2+2)*eta_0*omega*r_b*L*(r_b/c)
+        
+    else: #Weighted average of the two to calculate the shear force
+        epsilon = calculate_epsilon_long(np.log(Wr_long),epsilon0_long)
+        Fshear_long = pi/np.sqrt(1-epsilon**2)*(5*epsilon**2+4)/(epsilon**2+2)*eta_0*omega*r_b*L*(r_b/c)
+        epsilon = calculate_epsilon_short(np.log(Wr_short),epsilon0_short)
+        Fshear_short = 2*pi/np.sqrt(1-epsilon**2)*((L/r_b)**2*epsilon**2/(16*(1-epsilon**2)) +1)*eta_0*omega*r_b*L*(r_b/c)
+        Fshear = (Fshear_long-Fshear_short)/1.5*(L/(2*r_b)-0.5) + Fshear_short
     
     hmin_over_c = 1-epsilon
     
@@ -153,8 +171,6 @@ def journal_bearing(**kwargs):
     
     #Frictional losses [W]
     Wdot_loss = omega*r_b*f*W
-    
-    S = eta_0*omega*r_b*L/(pi*W)*(r_b/c)**2
     
     return dict(
                 S = S,
@@ -240,7 +256,9 @@ def journal_bearing_design(**kwargs):
         hm_over_c_friction = 0.032*L_over_D**2 + 0.32*L_over_D - 0.052
         hm_over_c_load = 0.188272*log(L_over_D) + 0.541167
         hm_over_c = design*hm_over_c_load+(1-design)*hm_over_c_friction
-       
+    else:
+        raise ValueError('invalid value for parameter "design"')
+    
     #Interpolate in the data from to obtain S and rb/c*f
     _hm_c = [0.9,0.8,0.6,0.4,0.2,0.1,0.03]
     _L_D = [1,0.5,0.25]
@@ -285,7 +303,15 @@ def journal_bearing_design(**kwargs):
                 )
             
 if __name__ == '__main__':
-
+    d = journal_bearing(r_b = 0.043/2.0,
+                        L = 0.057,
+                        c = 5e-5,
+                        W = 12950,
+                        eta_0 = 0.0086,
+                        omega = 301.9402420413402)
+    
+    print d['epsilon']
+    
     print 'The following is the output from example 11.1 in Hamrock'
     print journal_bearing_design(r_b = 0.02, 
                         L = 0.04, 

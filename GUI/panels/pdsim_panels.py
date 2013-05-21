@@ -1439,7 +1439,7 @@ class ParametricPanel(PDPanel):
                     self.main.set_GUI_object_value(key, val)
                 
                 #Build the simulation script using the GUI parameters
-                script_name = self.main.build_simulation_script()
+                script_name = self.main.build_simulation_script(run_index = Irow)
                             
                 #Add sim to the list (actually append the path to the script)
                 sims.append(script_name)
