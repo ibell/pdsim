@@ -718,45 +718,6 @@ class OutputDataPanel(pdsim_panels.PDPanel):
                 self.OutputTree.add_runs(h5py.File(file,'r'))
                 print 'added',file
         FD.Destroy()
-    
-    def OnPlotSelected(self, event):
-        list_ = self.ResultsList.GetListCtrl()
-        
-        indices = []
-        index = list_.GetFirstSelected()
-        sim = self.results[index]
-        self.Parent.plot_outputs(sim)
-        
-        if list_.GetNextSelected(index) != -1:
-            dlg = wx.MessageDialog(None,'Sorry, only the first selected row will be used')
-            dlg.ShowModal()
-            dlg.Destroy()
-                
-    def OnRemoveSelected(self, event):
-        list_ = self.ResultsList.GetListCtrl()
-        
-        indices = []
-        index = list_.GetFirstSelected()
-        while index != -1:
-            indices.append(index)
-            index = list_.GetNextSelected(index)
-            
-        #Some runs to delete
-        if indices:
-            #Warn before removing
-            dlg = wx.MessageDialog(None,'You are about to remove '+str(len(indices))+' runs.  Ok to confirm', style = wx.OK|wx.CANCEL)
-            if dlg.ShowModal() == wx.ID_OK:
-                for index in reversed(indices):
-                    #Remove the item from the ResultsList
-                    self.ResultsList.remove_item(index)
-                    
-                #Update our copy of the results
-                self.results = self.ResultsList.get_results()
-                
-            dlg.Destroy()
-            
-            #Rebuild the ResultsList
-            self.rebuild()
                 
     def OnWriteFiles(self, event):
         """

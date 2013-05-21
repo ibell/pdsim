@@ -93,6 +93,14 @@ class PlotNotebook(wx.Panel):
         page.SetSizer(sizer)
         self.nb.AddPage(page,"Main")
     
+    def get_keys(self):
+        if isinstance(self.Sim,h5py.File):
+            NCV = self.Sim.get('/CVs/N').value
+            keys = [self.Sim.get('/CVs/keys/'+str(i)).value for i in range(NCV)]
+        else:
+            keys = self.Sim.CVs.keys
+        return keys
+        
     def stepsize_theta(self,event=None):
         #Stepsize
         axes = self.add('Stepsize').gca()
@@ -115,9 +123,14 @@ class PlotNotebook(wx.Panel):
             theta=self.Sim.t
             V=self.Sim.V.T*1e6
         V[V<1e-15]=np.nan
-        axes.plot(theta,V)
+        axes.plot(theta,V, lw = 1.5)
         axes.set_ylabel('Volume [cm$^{3}$]')
         axes.set_xlabel(r'$\theta$ [rad]')
+        
+        xmin,xmax = axes.get_xlim()
+        axes.set_xlim(xmin, xmin + (xmax-xmin)*1.5)
+        axes.legend(self.get_keys(), loc='upper right', bbox_to_anchor=(1, 1),
+          ncol=2, fancybox=True, shadow=True)
     
     def dV_dtheta(self,event=None):
         #Derivative of Volume
@@ -129,9 +142,14 @@ class PlotNotebook(wx.Panel):
             theta=self.Sim.t
             dV=self.Sim.dV.T*1e6
         dV[np.abs(dV)<1e-15]=np.nan
-        axes.plot(theta,dV)
+        axes.plot(theta,dV, lw = 1.5)
         axes.set_ylabel('Volume Derivative [cm$^{3}$/rad]')
         axes.set_xlabel(r'$\theta$ [rad]')
+        
+        xmin,xmax = axes.get_xlim()
+        axes.set_xlim(xmin, xmin + (xmax-xmin)*1.5)
+        axes.legend(self.get_keys(), loc='upper right', bbox_to_anchor=(1, 1),
+          ncol=2, fancybox=True, shadow=True)
     
     def T_theta(self,event=None):
         #Temperature
@@ -143,9 +161,14 @@ class PlotNotebook(wx.Panel):
             theta = self.Sim.t
             T = self.Sim.T.T
         T[T<0.1]=np.nan
-        axes.plot(theta,T)
+        axes.plot(theta,T, lw = 1.5)
         axes.set_ylabel('Temperature [K]')
         axes.set_xlabel(r'$\theta$ [rad]')
+        
+        xmin,xmax = axes.get_xlim()
+        axes.set_xlim(xmin, xmin + (xmax-xmin)*1.5)
+        axes.legend(self.get_keys(), loc='upper right', bbox_to_anchor=(1, 1),
+          ncol=2, fancybox=True, shadow=True)
         
     def p_theta(self,event=None):    
         #pressure
@@ -157,9 +180,14 @@ class PlotNotebook(wx.Panel):
             theta = self.Sim.t
             p = self.Sim.p.T
         p[p<0.1]=np.nan
-        axes.plot(theta,p)
+        axes.plot(theta,p, lw = 1.5)
         axes.set_ylabel('Pressure [kPa]')
         axes.set_xlabel(r'$\theta$ [rad]')
+        
+        xmin,xmax = axes.get_xlim()
+        axes.set_xlim(xmin, xmin + (xmax-xmin)*1.5)
+        axes.legend(self.get_keys(), loc='upper right', bbox_to_anchor=(1, 1),
+          ncol=2, fancybox=True, shadow=True)
         
     def p_V(self, event=None):
         #pressure-volume
@@ -172,7 +200,7 @@ class PlotNotebook(wx.Panel):
             p = self.Sim.p.T
         p[p<0.1]=np.nan
         V[V<1e-15]=np.nan
-        axes.plot(V,p)
+        axes.plot(V,p, lw = 1.5)
         axes.set_ylabel('Pressure [kPa]')
         axes.set_xlabel(r'Volume [cm$^{3}$]')
         
@@ -187,9 +215,14 @@ class PlotNotebook(wx.Panel):
             rho = self.Sim.rho.T
             
         rho[rho<0.1]=np.nan
-        axes.plot(theta,rho)
+        axes.plot(theta,rho, lw = 1.5)
         axes.set_ylabel('Density [kg/m$^{3}$]')
         axes.set_xlabel(r'$\theta$ [rad]')
+        
+        xmin,xmax = axes.get_xlim()
+        axes.set_xlim(xmin, xmin + (xmax-xmin)*1.5)
+        axes.legend(self.get_keys(), loc='upper right', bbox_to_anchor=(1, 1),
+          ncol=2, fancybox=True, shadow=True)
         
     def m_theta(self,event=None):
         #Mass
@@ -203,17 +236,22 @@ class PlotNotebook(wx.Panel):
             m=self.Sim.rho.T*self.Sim.V.T
         
         m[m<1e-20]=np.nan
-        axes.plot(theta,m)
+        axes.plot(theta,m, lw = 1.5)
         axes.set_ylabel('Mass [kg]')
         axes.set_xlabel(r'$\theta$ [rad]')
+        
+        xmin,xmax = axes.get_xlim()
+        axes.set_xlim(xmin, xmin + (xmax-xmin)*1.5)
+        axes.legend(self.get_keys(), loc='upper right', bbox_to_anchor=(1, 1),
+          ncol=2, fancybox=True, shadow=True)
         
     def mdot_theta(self,event=None):    
         #Mass Flow
         axes = self.add('Mdot').gca()
-        axes.plot(self.Sim.FlowsProcessed.t,self.Sim.FlowsProcessed.summed_mdot['outlet.1'])
-        axes.plot(self.Sim.FlowsProcessed.t,self.Sim.FlowsProcessed.summed_mdot['inlet.2'])
-        axes.plot(self.Sim.FlowsProcessed.t,self.Sim.FlowsProcessed.mean_mdot['outlet.1']*np.ones_like(self.Sim.FlowsProcessed.t))
-        axes.plot(self.Sim.FlowsProcessed.t,self.Sim.FlowsProcessed.mean_mdot['inlet.2']*np.ones_like(self.Sim.FlowsProcessed.t))
+        axes.plot(self.Sim.FlowsProcessed.t,self.Sim.FlowsProcessed.summed_mdot['outlet.1'], lw = 1.5)
+        axes.plot(self.Sim.FlowsProcessed.t,self.Sim.FlowsProcessed.summed_mdot['inlet.2'], lw = 1.5)
+        axes.plot(self.Sim.FlowsProcessed.t,self.Sim.FlowsProcessed.mean_mdot['outlet.1']*np.ones_like(self.Sim.FlowsProcessed.t), lw = 1.5)
+        axes.plot(self.Sim.FlowsProcessed.t,self.Sim.FlowsProcessed.mean_mdot['inlet.2']*np.ones_like(self.Sim.FlowsProcessed.t), lw = 1.5)
         axes.set_xlabel(r'$\theta$ [rad]')
         axes.set_ylabel(r'$\dot m$ [kg/s]')
     
@@ -221,8 +259,8 @@ class PlotNotebook(wx.Panel):
         #valve lift
         if hasattr(self.Sim,'__hasValves__') and self.Sim.__hasValves__:
             axes = self.add('Valves').gca()
-            axes.plot(self.Sim.t,self.Sim.xValves[0,:])
-            axes.plot(self.Sim.t,self.Sim.xValves[2,:])
+            axes.plot(self.Sim.t,self.Sim.xValves[0,:], lw = 1.5)
+            axes.plot(self.Sim.t,self.Sim.xValves[2,:], lw = 1.5)
             axes.set_xlabel(r'$\theta$ [rad]')
             axes.set_ylabel(r'Valve lift [m]')
         
@@ -241,7 +279,7 @@ class PlotNotebook(wx.Panel):
         #Saturation curve
         Tsat = np.linspace(Props(Fluid,'Tmin')+0.1, Props(Fluid,'Tcrit')-1e-6)
         psat = np.array([Props('P', 'T', T_, 'Q', 1.0, Fluid) for T_ in Tsat])
-        axes.plot(Tsat, psat)
+        axes.plot(Tsat, psat, lw = 1.5)
         axes.plot(T,p,'.')
         axes.set_xlabel('Temperature [K]')
         axes.set_ylabel(r'Pressure [kPa]')
@@ -258,10 +296,15 @@ class PlotNotebook(wx.Panel):
             Q = self.Sim.Q.T
             
         Q[np.abs(Q)<1e-12]=np.nan
-        axes.plot(theta,Q)
+        axes.plot(theta,Q, lw = 1.5)
         axes.plot(theta,self.Sim.HTProcessed.summed_Q[0:self.Sim.Ntheta],lw=2)
         axes.set_ylabel(r'$\dot Q$ [kW]')
         axes.set_xlabel(r'$\theta$ [rad]')
+        
+        xmin,xmax = axes.get_xlim()
+        axes.set_xlim(xmin, xmin + (xmax-xmin)*1.5)
+        axes.legend(self.get_keys(), loc='upper right', bbox_to_anchor=(1, 1),
+          ncol=2, fancybox=True, shadow=True)
     
     def axial_force(self, event = None):
         #Axial force
@@ -277,10 +320,15 @@ class PlotNotebook(wx.Panel):
             summed_Fz = self.Sim.forces.summed_Fz.T
         
         Fz[np.abs(Fz)<1e-12]=np.nan
-        axes.plot(theta,Fz)
-        axes.plot(theta,summed_Fz,lw=2)
-        axes.set_ylabel(r'$F_z$ [kN]')
+        axes.plot(theta,Fz, lw = 1.5)
+        axes.plot(theta,summed_Fz,lw=4)
+        axes.set_ylabel(r'$F_z$ (only from the applied gas) [kN]')
         axes.set_xlabel(r'$\theta$ [rad]')
+        
+        xmin,xmax = axes.get_xlim()
+        axes.set_xlim(xmin, xmin + (xmax-xmin)*1.5)
+        axes.legend(self.get_keys(), loc='upper right', bbox_to_anchor=(1, 1),
+          ncol=2, fancybox=True, shadow=True)
     
     def x_direction_force(self, event = None):
         #x-direction force
@@ -295,9 +343,14 @@ class PlotNotebook(wx.Panel):
             Fx = self.Sim.Fx.T
             
         Fx[np.abs(Fx)<1e-12]=np.nan
-        axes.plot(theta,Fx)
+        axes.plot(theta,Fx, lw = 1.5)
         axes.set_ylabel(r'$F_x$ [kN]')
         axes.set_xlabel(r'$\theta$ [rad]')
+        
+        xmin,xmax = axes.get_xlim()
+        axes.set_xlim(xmin, xmin + (xmax-xmin)*1.5)
+        axes.legend(self.get_keys(), loc='upper right', bbox_to_anchor=(1, 1),
+          ncol=2, fancybox=True, shadow=True)
         
     def y_direction_force(self, event = None):
         #y-direction force
@@ -311,9 +364,14 @@ class PlotNotebook(wx.Panel):
             Fy = self.Sim.Fy.T
             
         Fy[np.abs(Fy)<1e-12]=np.nan
-        axes.plot(theta,Fy)
+        axes.plot(theta,Fy, lw = 1.5)
         axes.set_ylabel(r'$F_y$ [kN]')
         axes.set_xlabel(r'$\theta$ [rad]')
+        
+        xmin,xmax = axes.get_xlim()
+        axes.set_xlim(xmin, xmin + (xmax-xmin)*1.5)
+        axes.legend(self.get_keys(), loc='upper right', bbox_to_anchor=(1, 1),
+          ncol=2, fancybox=True, shadow=True)
     
     def force_component_trace(self, event = None):
         #trace of force components
@@ -325,9 +383,9 @@ class PlotNotebook(wx.Panel):
         else:
             Fx = self.Sim.Fx.T
             Fy = self.Sim.Fy.T
-        axes.plot(Fx,Fy)
+        axes.plot(Fx,Fy, lw = 1.5)
         axes.set_ylabel(r'$F_x$ [kN]')
-        axes.set_xlabel(r'$F_y$ [kN]')    
+        axes.set_xlabel(r'$F_y$ [kN]')            
         
     def force_trace(self, event = None):
         #trace of force components
@@ -344,7 +402,7 @@ class PlotNotebook(wx.Panel):
         Fx[np.abs(Fx)<1e-12]=np.nan
         Fy[np.abs(Fy)<1e-12]=np.nan
         
-        axes.plot(Fx,Fy)
+        axes.plot(Fx,Fy, lw = 1.5)
         axes.set_ylabel(r'$F_x$ [kN]')
         axes.set_xlabel(r'$F_y$ [kN]')
         
@@ -360,7 +418,7 @@ class PlotNotebook(wx.Panel):
             Fm = self.Sim.Fm.T
             
         Fm[np.abs(Fm)<1e-12] = np.nan
-        axes.plot(theta, Fm)
+        axes.plot(theta, Fm, lw = 1.5)
         axes.set_ylabel(r'$F_m$ [kN]')
         axes.set_xlabel(r'$\theta$ [rad]')
         
@@ -380,11 +438,16 @@ class PlotNotebook(wx.Panel):
             summed_Fr = self.Sim.forces.summed_Fr
             
         Fr[np.abs(Fr)<1e-12]=np.nan
-        axes.plot(theta,Fr)
-        axes.plot(theta,mean_Fr*np.ones_like(theta),'k--')
-        axes.plot(theta,summed_Fr,lw=2)
-        axes.set_ylabel(r'$F_r$ [kN]')
+        axes.plot(theta,Fr, lw = 1.5)
+        axes.plot(theta,mean_Fr*np.ones_like(theta),'k--', lw = 1.5)
+        axes.plot(theta,summed_Fr,lw=4)
+        axes.set_ylabel(r'$F_r$ (only from the applied gas) [kN]')
         axes.set_xlabel(r'$\theta$ [rad]')
+        
+        xmin,xmax = axes.get_xlim()
+        axes.set_xlim(xmin, xmin + (xmax-xmin)*1.5)
+        axes.legend(self.get_keys(), loc='upper right', bbox_to_anchor=(1, 1),
+          ncol=2, fancybox=True, shadow=True)
         
     def tangential_force(self, event = None):
         #Tangential force magnitude
@@ -402,10 +465,16 @@ class PlotNotebook(wx.Panel):
             summed_Ft = self.Sim.forces.summed_Ft
             
         Ft[np.abs(Ft)<1e-12]=np.nan
-        axes.plot(theta,Ft)
-        axes.plot(theta, mean_Ft*np.ones_like(theta), 'k--')
-        axes.set_ylabel(r'$F_t$ [kN]')
-        axes.set_xlabel(r'$\theta$ [rad]') 
+        axes.plot(theta,Ft, lw = 1.5)
+        axes.plot(theta, mean_Ft*np.ones_like(theta), 'k--', lw = 1.5)
+        axes.plot(theta,summed_Ft, lw = 4)
+        axes.set_ylabel(r'$F_t$ (only from the applied gas) [kN]')
+        axes.set_xlabel(r'$\theta$ [rad]')
+        
+        xmin,xmax = axes.get_xlim()
+        axes.set_xlim(xmin, xmin + (xmax-xmin)*1.5)
+        axes.legend(self.get_keys(), loc='upper right', bbox_to_anchor=(1, 1),
+          ncol=2, fancybox=True, shadow=True)
     
         
     def torque(self, event = None):
@@ -421,8 +490,8 @@ class PlotNotebook(wx.Panel):
             mean_tau = self.Sim.forces.mean_tau
             
         tau[np.abs(tau)<1e-12]=np.nan
-        axes.plot(theta,tau)
-        axes.plot(theta, mean_tau*np.ones_like(theta),'k--')
+        axes.plot(theta,tau, lw = 1.5)
+        axes.plot(theta, mean_tau*np.ones_like(theta),'k--', lw = 1.5)
         axes.set_ylabel(r'$\tau$ [kN-m]')
         axes.set_xlabel(r'$\theta$ [rad]')
          

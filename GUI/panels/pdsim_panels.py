@@ -703,6 +703,7 @@ class OutputTreePanel(wx.Panel):
         Plot the simulation
         """
         self.Parent.Parent.plot_outputs(self.runs[col-1])
+        self.Parent.Parent.SetSelection(1)
         
         
     def OnScriptDisplay(self, event, item, col):
