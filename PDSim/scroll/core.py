@@ -1368,6 +1368,10 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.Fz[np.isnan(self.forces.Fz)] = 0
         self.forces.Mz[np.isnan(self.forces.Mz)] = 0
         
+        # Sum the terms at each crank angle
+        self.forces.summed_Fx = np.sum(self.forces.Fx, axis = 0) #kN
+        self.forces.summed_Fy = np.sum(self.forces.Fy, axis = 0) #kN
+        
         # Moment around the x axis and y-axis from the thrust load caused by the working chambers
         # Sign convention on force is backwards here (in this case, forces pointing down are positive
         self.forces.Mx = -(self.forces.cy - self.forces.ypin)*self.forces.Fz
@@ -1377,9 +1381,12 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.Mx += -self.forces.Fy*(self.mech.scroll_plate_thickness + self.geo.h/2) #If Fy is in the positive y direction, the moment is in the negative x direction
         self.forces.My += self.forces.Fx*(self.mech.scroll_plate_thickness + self.geo.h/2) #If Fx is in the positive x direction, the moment is in the positive y direction
         
-        # Sum the terms at each crank angle
-        self.forces.summed_Fx = np.sum(self.forces.Fx, axis = 0) #kN
-        self.forces.summed_Fy = np.sum(self.forces.Fy, axis = 0) #kN
+        # Moment around the x-axis and y-axis from the journal bearing applied forces on the orbiting scroll
+        self.forces.Fx_bearing_simple = -(np.cos(self.forces.THETA)*self.forces.inertial + self.forces.summed_Fx)
+        self.forces.Fy_bearing_simple = -(np.sin(self.forces.THETA)*self.forces.inertial + self.forces.summed_Fy)
+        self.forces.Mx += self.forces.Fx_bearing_simple*(self.mech.D_crank_bearing/2)
+        self.forces.My += -self.forces.Fy_bearing_simple*(self.mech.D_crank_bearing/2)
+        
         self.forces.summed_Mz = np.sum(self.forces.Mz, axis = 0) #kN-m
         self.forces.summed_Mx = np.sum(self.forces.Mx, axis = 0) #kN-m
         self.forces.summed_My = np.sum(self.forces.My, axis = 0) #kN-m
@@ -1420,8 +1427,8 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.Ft = -(x_dot*self.forces.Fx+y_dot*self.forces.Fy)
         
         #Remove all the NAN placeholders
-        self.forces.Fr[np.isnan(self.forces.Fr)]=0
-        self.forces.Ft[np.isnan(self.forces.Ft)]=0
+        self.forces.Fr[np.isnan(self.forces.Fr)] = 0
+        self.forces.Ft[np.isnan(self.forces.Ft)] = 0
         #Sum the terms at each crank angle
         self.forces.summed_Fr = np.sum(self.forces.Fr,axis = 0) #kN
         self.forces.summed_Ft = np.sum(self.forces.Ft,axis = 0) #kN
@@ -1616,16 +1623,10 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.Wdot_total_mean = np.trapz(self.forces.Wdot_total, theta)/(2*pi)
         print self.forces.Wdot_total_mean,'average mechanical losses'
             
-#        import matplotlib.pyplot as plt
-#            
+        import matplotlib.pyplot as plt
+            
 #        fig = plt.figure()
-#        fig.add_subplot(141)
-#        plt.plot(FBold,np.sqrt(Fbx**2+Fby**2))
-#        fig.add_subplot(142)
-#        plt.plot(theta, mOS*aOS_x/1000, theta, self.forces.summed_Fx, theta, -F4*np.cos(beta)+F3*np.cos(beta), theta, -mOS*self.geo.ro*self.omega**2*np.cos(THETA)/1000, theta, Fbx,':')
-#        fig.add_subplot(143)
-#        plt.plot(theta, Fby,':')
-#        fig.add_subplot(144)
+#        fig.add_subplot(111)
 #        plt.plot(theta,self.forces.Wdot_F1,label='F1')
 #        plt.plot(theta,self.forces.Wdot_F2,label='F2')
 #        plt.plot(theta,self.forces.Wdot_F3,label='F3')

@@ -2191,9 +2191,9 @@ class MotorCoeffsTable(wx.grid.Grid):
                 break
                 
             # Values
-            self.SetCellValue(i,0,str(tau))
-            self.SetCellValue(i,1,str(eff))
-            self.SetCellValue(i,2,str(speed))
+            self.SetCellValue(i, 0, str(tau))
+            self.SetCellValue(i, 1, str(eff))
+            self.SetCellValue(i, 2, str(speed))
                 
     def get_coeffs(self):
         """
@@ -2201,9 +2201,9 @@ class MotorCoeffsTable(wx.grid.Grid):
         """
         tau,eff,speed = [],[],[]
         for i in range(self.GetNumberRows()):
-            _tau = self.GetCellValue(i,0)
-            _eff = self.GetCellValue(i,1)
-            _speed = self.GetCellValue(i,2)
+            _tau = self.GetCellValue(i, 0)
+            _eff = self.GetCellValue(i, 1)
+            _speed = self.GetCellValue(i, 2)
             
             #Check if row is empty
             if not _tau and not _eff and not _speed:

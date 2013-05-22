@@ -870,6 +870,8 @@ class MainFrame(wx.Frame):
         
         #If configs folder doesn't exist, make it
         if not os.path.exists('configs'): os.mkdir('configs')
+        
+        self.Bind(wx.EVT_CLOSE, self.OnClose)
     
     def register_GUI_objects(self, annotated_GUI_objects):
         """
@@ -1327,6 +1329,14 @@ class MainFrame(wx.Frame):
     ################################
     #         Event handlers       #
     ################################
+    
+    def OnClose(self, event):
+        if hasattr(self,'WTM') and self.WTM is not None and self.WTM.isAlive():
+            dlg = wx.MessageDialog(None,"Simulations are running - can't quit")
+            dlg.ShowModal()
+            dlg.Destroy()
+        else:
+            event.Skip()
     
     def OnOpenConsole(self, event):
         frm = wx.Frame(None, size = (600,400))
