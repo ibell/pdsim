@@ -314,11 +314,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         frm.Show()
         
     def OnAnimate(self, event = None):
-        pd = dict(beta = self.main.get_GUI_object_value('oldham_rotation_beta'),
-                  oldham_ring_radius = self.main.get_GUI_object_value('oldham_ring_radius'),
-                  oldham_key_width = self.main.get_GUI_object_value('oldham_key_width'),
-                  )
-        SAF = ScrollAnimForm(self.Scroll.geo, size=(400,400), param_dict = pd)
+        SAF = ScrollAnimForm(self.Scroll.geo, size=(400,400), param_dict = self.main.get_GUI_object_value_dict())
         SAF.Show()
         
     def OnRefresh(self, event = None):
@@ -686,6 +682,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                     thrust_OD = ('Thrust bearing outer diameter [m]','m'),  
                     L_ratio_bearings = ('Ratio of lengths to the bearings [-]','-'),
                     scroll_plate_thickness = ('Thickness of the orbiting scroll plate [m]','m',0.002),
+                    scroll_plate_diameter = ('Effective diameter of the orbiting scroll plate [m]','m',0.014),
                     scroll_density = ('Orbiting scroll material density [kg/m\xb3]','kg/m^3',2700),
                     scroll_added_mass = ('Additional OS mass added at COM [kg]','kg',0.0),
                     oldham_ring_radius = ('Oldham ring radius [m]','m',0.06),
@@ -698,6 +695,10 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                     HTC = ('Heat transfer coefficient in the scrolls [kW/m\xb2/K]','kW/m^2/K'),
                     detailed_analysis = ('Use detailed analysis of the mechanical losses','',True),
                     suction_fraction = ('Fraction of motor losses to suction gas','',1.0),
+                    pin1_ybeta_offset = ('Offset of pin #1 in +y_beta direction [m]','m',0.0),
+                    pin2_ybeta_offset = ('Offset of pin #2 in +y_beta direction [m]','m',0.0),
+                    pin3_xbeta_offset = ('Offset of pin #3 in +x_beta direction [m]','m',0.0),
+                    pin4_xbeta_offset = ('Offset of pin #4 in +x_beta direction [m]','m',0.0),
                     )
     
     def __init__(self, parent, config, **kwargs):
@@ -802,7 +803,8 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
 
         keys = ['oldham_mass', 'oldham_thickness', 'oldham_key_height', 
                 'oldham_key_width', 'oldham_key_friction_coefficient',
-                'oldham_rotation_beta','oldham_ring_radius']
+                'oldham_rotation_beta','oldham_ring_radius','pin1_ybeta_offset',
+                'pin2_ybeta_offset','pin3_xbeta_offset','pin4_xbeta_offset']
         annotated_values = self.get_annotated_values(keys)
         
         # Build the items and return the list of annotated GUI objects, add to existing list
@@ -815,13 +817,18 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         sizer_for_orbiting_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
         
         # Loop over the inputs
-        keys = ['scroll_plate_thickness', 'scroll_density', 'scroll_added_mass']
+        keys = ['scroll_plate_thickness', 'scroll_plate_diameter','scroll_density', 'scroll_added_mass']
         annotated_values = self.get_annotated_values(keys)
             
         # Build the items and return the list of annotated GUI objects, add to existing list
         annotated_GUI_objects += self.construct_items(annotated_values,
                                                       sizer = sizer_for_orbiting_inputs,
                                                       parent = scrolled_panel)
+        
+        self.MassButton = wx.Button(scrolled_panel,label='Calculate')
+        sizer_for_orbiting_inputs.Add(wx.StaticText(scrolled_panel,label = 'Orbiting Scroll Mass [kg]'))
+        sizer_for_orbiting_inputs.Add(self.MassButton)
+        self.MassButton.Bind(wx.EVT_BUTTON,self.OnCalculateScrollMass)
         
         #----------------------------------------------------------------------
         # The sizer for all the thrust bearing terms
@@ -978,7 +985,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         for term in ['h_shell','A_shell','Tamb','HTC']:
             val = self.main.get_GUI_object_value(term)
             motor_chunk += 'sim.{name:s} = {value:s}\n'.format(name = term,
-                                                             value = str(val))
+                                                               value = str(val))
          
         #Terms that go in the mech struct
         for term in ['mu_oil','detailed_analysis','journal_tune_factor',
@@ -989,11 +996,13 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                 'L_ratio_bearings','scroll_plate_thickness',
                 'scroll_density','oldham_key_friction_coefficient', 
                 'oldham_ring_radius', 'oldham_key_width', 'oldham_mass', 
-                'oldham_thickness', 'oldham_key_height','oldham_rotation_beta'
+                'oldham_thickness', 'oldham_key_height','oldham_rotation_beta',
+                'scroll_plate_diameter','pin1_ybeta_offset',
+                'pin2_ybeta_offset','pin3_xbeta_offset','pin4_xbeta_offset'
                 ]:
             val = self.main.get_GUI_object_value(term)
             motor_chunk += 'sim.mech.{name:s} = {value:s}\n'.format(name = term,
-                                                             value = str(val)) 
+                                                                    value = str(val)) 
             
         # Handle the orbiting scroll mass
         orbiting_scroll_mass, orbiting_scroll_zcm = self.calculate_scroll_mass()
@@ -1005,23 +1014,41 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
     
     def OnViewCrossSection(self, event):
         
+        # Get the panel that has the geometry parameters 
         GeoPanel = self.main.get_GUI_object('Vratio').GUI_location.GetGrandParent()
         
         phiv, h, w = GeoPanel.get_wrap_crossection_involutes()
         frm = OSCrossSectionFrame(self.main.get_GUI_object_value_dict(), phiv, h, w)
         frm.Show()
         
+    def OnCalculateScrollMass(self, event):
+        mtotal,zcm = self.calculate_scroll_mass()
+        template = """Scroll Mass : {m:g} kg\nCentroid : {zcm:g} m (relative to the thrust surface)"""
+        dlg = wx.MessageDialog(None, template.format(m=mtotal, zcm = zcm))
+        dlg.ShowModal()
+        dlg.Destroy()
+        
     def calculate_scroll_mass(self):
+        """
+        Calculate the mass and centroid of the orbiting scroll
+        
+        Returns
+        -------
+        mtotal : float
+            Total mass of the orbiting scroll
+            
+        zcm__thrust_surface : float
+            The location of the centroid above the thrust surface. z = 0 is at the thrust surface, and positive z direction is towards the orbiting scroll 
+        """
         tplate = self.main.get_GUI_object_value('scroll_plate_thickness')
         rho = self.main.get_GUI_object_value('scroll_density')
         mplus = self.main.get_GUI_object_value('scroll_added_mass')
         Lbearing = self.main.get_GUI_object_value('L_crank_bearing')
         Dijournal = self.main.get_GUI_object_value('D_crank_bearing')
+        Dplate = self.main.get_GUI_object_value('scroll_plate_diameter')
         Dojournal = 1.5*Dijournal
         
         GeoPanel = self.main.get_GUI_object('Vratio').GUI_location.GetGrandParent()
-        
-        Dplate = GeoPanel.Scroll.geo.r_wall*2
         
         Vwrap,cx,cy = scroll_geo.scroll_wrap(GeoPanel.Scroll.geo)
         
@@ -1030,30 +1057,11 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         mjournal = rho * pi * Lbearing * (Dojournal**2-Dijournal**2)/4.0
         mtotal = mwrap + mplate + mjournal
         
-        zwrap = Lbearing+tplate+GeoPanel.Scroll.geo.h/2
-        zplate = Lbearing+tplate/2
-        zjournal = Lbearing/2
+        zwrap = GeoPanel.Scroll.geo.h/2
+        zplate = -tplate/2
+        zjournal = -tplate-Lbearing/2
         
-        zcm = (mwrap*zwrap + mjournal*zjournal + mplate*zplate)/mtotal
+        zcm__thrust_surface = (mwrap*zwrap + mjournal*zjournal + mplate*zplate)/mtotal
         
-#        print 'mwrap', mwrap
-#        print 'mplate', mplate
-#        print 'mjournal', mjournal
-#        print 'zcm', zcm
-#        print 'zarm',zcm-Lbearing/2
-#        print 'Marm',(zcm-Lbearing/2)*mtotal*0.004*377**2/1000
-        print 'orbiting_scroll_mass', mtotal
-        return mtotal,zcm
-        
-        
-#            
-#        
-#if __name__=='__main__':
-#    app = wx.App(False)
-#    
-#    frame = wx.Frame()
-#    frame.geo = GeometryPanel(frame,) 
-#    frame.Show(True) 
-#    
-#    app.MainLoop()
+        return mtotal, zcm__thrust_surface
         

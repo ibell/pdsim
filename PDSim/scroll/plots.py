@@ -1039,7 +1039,7 @@ class OSCrossSectionPanel(wx.Panel):
         # Get the axes
         ax = self.pltpanel.axes
          
-        D = 0.1
+        D = dictionary['scroll_plate_diameter']
         ro = dictionary['ro']
         tplate = dictionary['scroll_plate_thickness']
         thrust_ID = dictionary['thrust_ID']
@@ -1213,6 +1213,7 @@ class ScrollAnimForm(wx.Frame):
         rring = self.param_dict.get('oldham_ring_radius', 0.04)
         lkey = wkey = self.param_dict.get('oldham_key_width', 0.005)
         
+        
         if self.LayerOldham.IsChecked():
             
             om = self.geo.phi_ie-theta-pi/2.0
@@ -1220,15 +1221,16 @@ class ScrollAnimForm(wx.Frame):
             xo = self.geo.ro*cos(om)
             yo = self.geo.ro*sin(om)
             
-            OSkeys = [dict(r = rring, width = wkey, length = lkey),
-                      dict(r = rring, width = wkey, length = lkey, betaplus = pi)]
-            FSkeys = [dict(r = rring, width = wkey, length = lkey),
-                      dict(r = rring, width = wkey, length = lkey, betaplus = pi)]
+            OSkeys = [dict(r = rring, width = wkey, length = lkey, xbeta_offset = self.param_dict['pin3_xbeta_offset']),
+                      dict(r = rring, width = wkey, length = lkey, betaplus = pi, xbeta_offset = self.param_dict['pin4_xbeta_offset'])]
+            FSkeys = [dict(r = rring, width = wkey, length = lkey, ybeta_offset = self.param_dict['pin1_ybeta_offset']),
+                      dict(r = rring, width = wkey, length = lkey, betaplus = pi, ybeta_offset = self.param_dict['pin2_ybeta_offset'])]
             
             for key in OSkeys:
                 r = key['r']
                 width = key['width']
                 length = key['length']
+                xbeta_offset = key['xbeta_offset']
                 betaplus = key.get('betaplus',0)
                 
                 betakey = beta + betaplus + pi/2
@@ -1236,14 +1238,17 @@ class ScrollAnimForm(wx.Frame):
                 xo = self.geo.ro*cos(om)
                 yo = self.geo.ro*sin(om)
                 
-                xbeta = self.geo.ro*cos(om)*cos(beta)+self.geo.ro*sin(om)*sin(beta)
+                xbeta = self.geo.ro*cos(om)*cos(beta)+self.geo.ro*sin(om)*sin(beta) + xbeta_offset
                 ybeta = 0 
                 
                 xoffset = xbeta*cos(beta)+ybeta*sin(beta)
                 yoffset = xbeta*sin(beta)-ybeta*cos(beta)
                 
+                xoffset_slot = xbeta_offset*cos(beta) #ybeta_offset is zero
+                yoffset_slot = xbeta_offset*sin(beta)
+                
                 x,y = rotated_rectangle(r*cos(betakey),r*sin(betakey),length+3*self.geo.ro,width,beta+pi/2)
-                self.orbiting_layers.append(self.ax.fill(x+xo,y+yo,'green', alpha = 0.5)[0])
+                self.orbiting_layers.append(self.ax.fill(x+xo+xoffset_slot, y+yo+yoffset_slot, 'green', alpha = 0.5)[0])
                 x,y = rotated_rectangle(r*cos(betakey),r*sin(betakey),width,length,beta)
                 self.orbiting_layers.append(self.ax.fill(x+xoffset,y+yoffset,'k')[0])
                 
@@ -1252,18 +1257,25 @@ class ScrollAnimForm(wx.Frame):
                 r = key['r']
                 width = key['width']
                 length = key['length']
+                ybeta_offset = key['ybeta_offset']
                 betaplus = key.get('betaplus',0)
                 
                 betakey = beta + betaplus
                 
                 xbeta = self.geo.ro*cos(om)*cos(beta)+self.geo.ro*sin(om)*sin(beta)
-                ybeta = 0 
+                ybeta = ybeta_offset
                 
                 xoffset = xbeta*cos(beta)+ybeta*sin(beta)
                 yoffset = xbeta*sin(beta)-ybeta*cos(beta)
                 
+                xoffset_slot = ybeta_offset*sin(beta) # xbeta offset is zero
+                yoffset_slot = -ybeta_offset*cos(beta) # ybeta_offset is zero
+                
+                # The slot
                 x,y = rotated_rectangle(r*cos(betakey),r*sin(betakey),length+3*self.geo.ro,width,beta)
-                self.orbiting_layers.append(self.ax.fill(x, y, 'yellow', alpha = 0.5)[0])
+                self.orbiting_layers.append(self.ax.fill(x+xoffset_slot, y+yoffset_slot, 'yellow', alpha = 0.5)[0])
+                
+                # The key
                 x,y = rotated_rectangle(r*cos(betakey),r*sin(betakey),width,length,beta)
                 self.orbiting_layers.append(self.ax.fill(x+xoffset, y+yoffset, 'k')[0])
                 

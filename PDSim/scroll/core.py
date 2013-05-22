@@ -763,13 +763,21 @@ class Scroll(PDSimCore, _Scroll):
         self.losses.thrust_bearing_dict = TB
         return TB['Wdot_loss']/1000.0
     
-    def mechanical_losses(self, shell_pressure = 'low'):
+    def mechanical_losses(self, shell_pressure = 'low:shell'):
         """
         Calculate the mechanical losses in the bearings
         
         Parameters
         ----------
-            shell_pressure : string, 'low' or 'high'
+            shell_pressure : string, 'low', 'low:shell', 'mid', or 'high'
+            
+            low uses the upstream pressure of the machine,
+            
+            low:shell uses the pressure after the inlet tube
+            
+            mid uses the average of upstream and downstream pressures
+            
+            high uses the pressure downstream of the machine 
 
         """
         
@@ -777,16 +785,26 @@ class Scroll(PDSimCore, _Scroll):
         inlet_pressure = self.Tubes.Nodes[self.key_inlet].p
         outlet_pressure = self.Tubes.Nodes[self.key_outlet].p
         
+        # Find the tube with the inlet node
+        Tube = self.Tubes[self.key_inlet]
+        # Get the state that is not the inlet state
+        if Tube.key1 == 'self.key_inlet':
+            shell_pressure_val = Tube.State2.p
+        else:
+            shell_pressure_val = Tube.State1.p
+        
         # Get the shell pressure based on either the inlet or outlet pressure
         # based on whether it is a low-pressure or high-pressure shell
         if shell_pressure == 'low':
             back_pressure = min((inlet_pressure, outlet_pressure))
+        elif shell_pressure == 'low:shell':
+            back_pressure = min((shell_pressure_val, outlet_pressure))
         elif shell_pressure == 'high':
             back_pressure = max((inlet_pressure, outlet_pressure))
         elif shell_pressure == 'mid':
             back_pressure = (inlet_pressure + outlet_pressure)/2
         else:
-            raise KeyError("keyword argument shell_pressure must be one of 'low', 'mid' or 'high'")
+            raise KeyError("keyword argument shell_pressure must be one of 'low', 'low:shell', 'mid' or 'high'; received '"+str(shell_pressure)+"'")
         
         #Calculate the force terms: force profiles, mean values, etc. 
         self.calculate_force_terms(orbiting_back_pressure = back_pressure)
@@ -950,7 +968,7 @@ class Scroll(PDSimCore, _Scroll):
         Qnet -= sum([Tube.Q for Tube in self.Tubes])
         
         self.Qamb = self.ambient_heat_transfer(self.Tlumps[0])
-        self.mech.Wdot_losses = self.mechanical_losses('low') 
+        self.mech.Wdot_losses = self.mechanical_losses('low:shell') 
         
         # Heat transfer with the ambient; Qamb is positive if heat is being removed, thus flip the sign
         Qnet -= self.Qamb
@@ -1210,6 +1228,14 @@ class Scroll(PDSimCore, _Scroll):
         
         """
         
+        if not hasattr(self.mech,'scroll_plate_thickness'):
+            warnings.warn('"mech.scroll_plate_thickness" not found, using 2*scroll wrap thickness')
+            self.mech.scroll_plate_thickness = 2*self.geo.t
+        
+        if not hasattr(self.mech,'scroll_zcm__thrust_surface'):
+            warnings.warn('"mech.scroll_zcm__thrust_surface" not found, using 0')
+            self.mech.scroll_zcm__thrust_surface = 0
+        
         self.forces = struct()
         
         #Get the slice of indices that are in use.  At the end of the simulation
@@ -1218,6 +1244,13 @@ class Scroll(PDSimCore, _Scroll):
         _slice = range(self.Itheta+1)
         
         t = self.t[_slice]
+        
+        ####################################################
+        #############  Inertial force components ###########
+        ####################################################
+        
+        #: The magnitude of the inertial forces on the orbiting scroll [kN]
+        self.forces.inertial = self.mech.orbiting_scroll_mass * self.omega**2 * self.geo.ro / 1000
         
         ####################################################
         #############  Normal force components #############
@@ -1339,9 +1372,9 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.Mx = -(self.forces.cy - self.forces.ypin)*self.forces.Fz
         self.forces.My = +(self.forces.cx - self.forces.xpin)*self.forces.Fz
         
-        # TODO: add plate thickness
-        self.forces.Mx += -self.forces.Fy*(self.geo.h/2+self.mech.L_upper_bearing/2) #If Fy is in the positive y direction, the moment is in the negative x direction
-        self.forces.My += self.forces.Fx*(self.geo.h/2+self.mech.L_upper_bearing/2) #If Fx is in the positive x direction, the moment is in the positive y direction
+        # Moment around the x-axis and y-axis from the applied gas load on the orbiting scroll wrap relative to the thrust plane
+        self.forces.Mx += -self.forces.Fy*(self.mech.scroll_plate_thickness + self.geo.h/2) #If Fy is in the positive y direction, the moment is in the negative x direction
+        self.forces.My += self.forces.Fx*(self.mech.scroll_plate_thickness + self.geo.h/2) #If Fx is in the positive x direction, the moment is in the positive y direction
         
         # Sum the terms at each crank angle
         self.forces.summed_Fx = np.sum(self.forces.Fx, axis = 0) #kN
@@ -1358,6 +1391,22 @@ class Scroll(PDSimCore, _Scroll):
         # which is not the proper behavior
         self.forces.summed_Mx += -(-self.forces.ypin)*self.forces.summed_Fbackpressure
         self.forces.summed_My += +(-self.forces.xpin)*self.forces.summed_Fbackpressure
+        
+        # Moment around the x-axis and y-axis from the inertial force of the orbiting scroll
+        # They must be added on separately because otherwise they are added in NCV times,
+        # which is not the proper behavior
+        #
+        # Components of the inertial force in the x- and y-directions
+        Fcx = self.forces.inertial*np.cos(self.forces.THETA)
+        Fcy = self.forces.inertial*np.sin(self.forces.THETA)
+        # Inertial overturning moment acts through the center of mass of the orbiting scroll
+        self.forces.summed_Mx += -Fcy*(self.mech.scroll_zcm__thrust_surface) #If Fy is in the positive y direction, the moment is in the negative x direction
+        self.forces.summed_My += Fcx*(self.mech.scroll_zcm__thrust_surface) #If Fx is in the positive x direction, the moment is in the positive y direction
+        
+        # Center of reaction in the global coordinate system
+        self.forces.x_thrust_reaction = -self.forces.summed_My/self.forces.summed_Fz+self.forces.xpin #Fz is positive if pushing UP on the OS
+        self.forces.y_thrust_reaction = -self.forces.summed_Mx/self.forces.summed_Fz+self.forces.ypin #Fz is positive if pushing UP on the OS
+        self.forces.r_thrust_reaction = np.sqrt(self.forces.x_thrust_reaction**2+ self.forces.y_thrust_reaction**2)
         
         #Calculate the radial force on the crank pin at each crank angle
         #The radial component magnitude is just the projection of the force onto a vector going from origin to center of orbiting scroll
@@ -1386,9 +1435,6 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.mean_Ft = np.trapz(self.forces.summed_Ft, self.t[_slice])/(2*pi)
         self.forces.mean_tau = np.trapz(self.forces.tau, self.t[_slice])/(2*pi)
         self.forces.mean_Mz = np.trapz(self.forces.summed_Mz, self.t[_slice])/(2*pi)
-                
-        #: The inertial forces on the orbiting scroll [kN]
-        self.forces.inertial = self.mech.orbiting_scroll_mass * self.omega**2 * self.geo.ro / 1000
         
     def detailed_mechanical_analysis(self):
         """
@@ -1434,6 +1480,17 @@ class Scroll(PDSimCore, _Scroll):
         wOR = self.mech.oldham_thickness
         hkeyOR = self.mech.oldham_key_height
         
+        # Fill in terms if they are not provided for backwards compatability
+        for term in ['pin1_ybeta_offset','pin2_ybeta_offset','pin3_xbeta_offset','pin4_xbeta_offset']:
+            if not hasattr(self.mech, term):
+                warnings.warn('"mech.'+term+'" not found, using 0')
+                setattr(self.mech,term,0)
+
+        F1_ybeta_offset = self.mech.pin1_ybeta_offset
+        F2_ybeta_offset = self.mech.pin2_ybeta_offset
+        F3_xbeta_offset = self.mech.pin3_xbeta_offset
+        F4_xbeta_offset = self.mech.pin4_xbeta_offset
+        
         # Gravitional acceleration
         g = 9.80665 
         
@@ -1470,7 +1527,7 @@ class Scroll(PDSimCore, _Scroll):
         A[0,1,:] = -mu2*UPSILON
         A[0,2,:] = 1
         A[0,3,:] = -1
-        b[0,:] = mOR*aOR_xbeta/1000+mu5*UPSILON*mOR*g/1000
+        b[0,:] = mOR*aOR_xbeta/1000
         
         # Oldham ybeta direction
         A[1,0,:] = 1    
@@ -1480,17 +1537,17 @@ class Scroll(PDSimCore, _Scroll):
         b[1,:] = 0
             
         # Oldham moments around the central z-direction axis
-        A[2,0,:] = r1-mu1*UPSILON*w1-(wOR+hkeyOR)*mu5*UPSILON
-        A[2,1,:] = r2+mu2*UPSILON*w2+(wOR+hkeyOR)*mu5*UPSILON
-        A[2,2,:] = -r3+mu3*PSI*w3
-        A[2,3,:] = -r4-mu4*PSI*w4
+        A[2,0,:] = r1-mu1*UPSILON*(w1/2-F1_ybeta_offset)
+        A[2,1,:] = r2+mu2*UPSILON*(w2/2+F2_ybeta_offset)
+        A[2,2,:] = -r3+mu3*PSI*(w3/2-F3_xbeta_offset)
+        A[2,3,:] = -r4-mu4*PSI*(w4/2+F4_xbeta_offset)
         b[2,:] = 0
         
         # Orbiting scroll moments around the central axis
         A[3,0,:] = 0
         A[3,0,:] = 0
-        A[3,0,:] = r3-mu3*PSI*w3
-        A[3,0,:] = r4+mu4*PSI*w4
+        A[3,0,:] = r3-mu3*PSI*(w3/2-F3_xbeta_offset)
+        A[3,0,:] = r4+mu4*PSI*(w4/2+F4_xbeta_offset)
         
         # Use the initial guess for the bearing moments and applied force
         self.forces.M_B = self.forces.M_B0
