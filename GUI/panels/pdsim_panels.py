@@ -2166,8 +2166,6 @@ class MotorCoeffsTable(wx.grid.Grid):
             dlg = wx.MessageDialog(None, "Unable to paste from clipboard - bad format")
             dlg.ShowModal()
             dlg.Close()
-        
-        
     
     def update_from_configfile(self, values):
         """
@@ -2181,33 +2179,49 @@ class MotorCoeffsTable(wx.grid.Grid):
             
             The third entry is a list (or other iterable) of slip speed values
         """
+        for i in range(self.GetNumberRows()):
+            for j in range(self.GetNumberCols()):
+                self.SetCellValue(i,0,'')
+                
         for i,(tau,eff,speed) in enumerate(zip(*values)):
+            if i == self.GetNumberRows():
+                dlg  = wx.MessageDialog(None,"Sorry, too many values for the motor map table; truncating")
+                dlg.ShowModal()
+                dlg.Destroy()
+                break
+                
             # Values
             self.SetCellValue(i,0,str(tau))
             self.SetCellValue(i,1,str(eff))
             self.SetCellValue(i,2,str(speed))
-        
-    def string_for_configfile(self):
-        """
-        Build and return a string for writing to the config file
-        """
-            
-        tau_list = self.values[0]
-        tau_string = 'tau_motor_coeffs = coeffs, '+'; '.join([str(tau) for tau in tau_list])
-        
-        eta_list = self.values[1]
-        eta_string = 'eta_motor_coeffs = coeffs, '+'; '.join([str(eta) for eta in eta_list])
-        
-        omega_list = self.values[2]
-        omega_string = 'omega_motor_coeffs = coeffs, '+'; '.join([str(omega) for omega in omega_list])
-            
-        return tau_string + '\n' + eta_string + '\n' + omega_string + '\n'
                 
     def get_coeffs(self):
         """
         Get the list of lists of values that are used in the table
         """
-        return self.values
+        tau,eff,speed = [],[],[]
+        for i in range(self.GetNumberRows()):
+            _tau = self.GetCellValue(i,0)
+            _eff = self.GetCellValue(i,1)
+            _speed = self.GetCellValue(i,2)
+            
+            #Check if row is empty
+            if not _tau and not _eff and not _speed:
+                continue
+            
+            #Convert to floating point if possible
+            try:
+                _tau = float(_tau)
+                _eff = float(_eff)
+                _speed = float(_speed)
+            except ValueError:
+                continue
+            
+            # Collect the values
+            tau.append(_tau)
+            eff.append(_eff)
+            speed.append(_speed)
+        return tau, eff, speed
         
 class MotorChoices(wx.Choicebook):
     def __init__(self, parent):
