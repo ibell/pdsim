@@ -2100,7 +2100,7 @@ class StateInputsPanel(PDPanel):
         else:
             raise NotImplementedException('This combination of coupled inlet state values is not supported')
     
-class MotorCoeffsTable(wx.ListCtrl, TextEditMixin):
+class MotorCoeffsTable(wx.grid.Grid):
     
     def __init__(self, parent, values = None):
         """
@@ -2108,73 +2108,66 @@ class MotorCoeffsTable(wx.ListCtrl, TextEditMixin):
         ----------
         parent : wx.window
             The parent of this checklist
-        values : A 3-element list of lists for all the coeff
+        values : A 3-element list of lists for all the coeff (tau, eta, speed)
         """
-        wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT)
-        TextEditMixin.__init__(self)
+        wx.grid.Grid.__init__(self, parent)
         
-        #Build the headers
-        self.InsertColumn(0,'Motor Torque [N-m]')
-        self.InsertColumn(1,'Efficiency [-]')
-        self.InsertColumn(2,'Slip speed [rad/s]')
+        # Make the grid the same shape as the data
+        self.CreateGrid(20, 3) #Nrows, Ncolumns
         
-        #: The values stored as a list of lists in floating form
-        self.values = values
+        # Build the headers
+        self.SetColLabelValue(0, 'Torque [N-m]')
+        self.SetColLabelValue(1, 'Efficiency [-]')
+        self.SetColLabelValue(2, 'Speed [rad/s]')
         
-        #Reset the values
-        self.refresh_table()
+        # Set the entries in the grid
+        self.update_from_configfile(values)
+    
+        # Bind the events
+        self.Bind(wx.grid.EVT_GRID_CELL_RIGHT_CLICK, self.OnCellRightClick)
         
-        #Set the column widths    
-        for i in range(3):
-            self.SetColumnWidth(i,wx.LIST_AUTOSIZE_USEHEADER)
+    def OnCellRightClick(self, evt):
         
-        # Turn on callback to write values back into internal data structure when
-        # a cell is edited
-        self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.OnCellEdited)
+        # Make a menu
+        menu = wx.Menu()
         
-        #Required width for the table
-        min_width = sum([self.GetColumnWidth(i) for i in range(self.GetColumnCount())])
+        #Build the entries
+        menuitem1 = wx.MenuItem(menu, -1, 'Paste from clipboard (Excel format)')
+        self.Bind(wx.EVT_MENU, self.OnPaste, menuitem1)
+        menu.AppendItem(menuitem1)
         
-        #No required height (+30 for buffer to account for vertical scroll bar)
-        self.SetMinSize((min_width + 30,-1))
+        if menu.GetMenuItems():
+            # Popup the menu.  If an item is selected then its handler
+            # will be called before PopupMenu returns.
+            self.PopupMenu(menu)
+        
+        menu.Destroy()
+        
+    def OnPaste(self, event):
+        """
+        Paste into the cells in the table
+        """
+        
+        do = wx.TextDataObject()
+        if wx.TheClipboard.Open():
+            success = wx.TheClipboard.GetData(do)
+            wx.TheClipboard.Close()
 
-    def OnCellEdited(self, event):
-        """
-        Once the cell is edited, write its value back into the data matrix
-        """
-        row_index = event.m_itemIndex
-        col_index = event.Column
-        val = float(event.Text)
-        self.data[row_index][col_index-1] = val
-    
-    def GetStringCell(self,Irow,Icol):
-        """ Returns a string representation of the cell """
-        return self.data[Irow][Icol]
-    
-    def GetFloatCell(self,Irow,Icol):
-        """ Returns a float representation of the cell """
-        return float(self.data[Irow][Icol])
-    
-    def AddRow(self):
+        data = do.GetText()
+        rows = data.strip().replace('\r','').split('\n')
+        rows = [row.split('\t') for row in rows]
         
-        row = [0]*self.GetColumnCount()
+        try:
+            for row in rows:
+                for el in row:
+                    float(el)
+            self.update_from_configfile(zip(*rows))
+        except ValueError:
+            dlg = wx.MessageDialog(None, "Unable to paste from clipboard - bad format")
+            dlg.ShowModal()
+            dlg.Close()
         
-        i = len(self.data)-1
-        self.InsertStringItem(i,'')
-        for j,val in enumerate(row):
-            self.SetStringItem(i,j+1,str(val))
-        self.CheckItem(i)
         
-        self.data.append(row)
-        
-    def RemoveRow(self, i = 0):
-        self.data.pop(i)
-        self.DeleteItem(i)
-        
-    def RemoveLastRow(self):
-        i = len(self.data)-1
-        self.data.pop(i)
-        self.DeleteItem(i)
     
     def update_from_configfile(self, values):
         """
@@ -2188,8 +2181,11 @@ class MotorCoeffsTable(wx.ListCtrl, TextEditMixin):
             
             The third entry is a list (or other iterable) of slip speed values
         """
-        self.values = values
-        self.refresh_table()
+        for i,(tau,eff,speed) in enumerate(zip(*values)):
+            # Values
+            self.SetCellValue(i,0,str(tau))
+            self.SetCellValue(i,1,str(eff))
+            self.SetCellValue(i,2,str(speed))
         
     def string_for_configfile(self):
         """
@@ -2206,27 +2202,6 @@ class MotorCoeffsTable(wx.ListCtrl, TextEditMixin):
         omega_string = 'omega_motor_coeffs = coeffs, '+'; '.join([str(omega) for omega in omega_list])
             
         return tau_string + '\n' + eta_string + '\n' + omega_string + '\n'
-        
-        
-    def refresh_table(self):
-        """
-        Take the values from self.values and write them to the table
-        """
-        #Remove all the values in the table
-        for i in reversed(range(self.GetItemCount())):
-            self.DeleteItem(i)
-            
-        if self.values is None:
-            #Add a few rows
-            for i in range(10):
-                self.InsertStringItem(i,str(i))
-        else:
-            #They all need to be the same length
-            assert len(self.values[0]) == len(self.values[1]) == len(self.values[2])
-            for i in range(len(self.values[0])):
-                self.InsertStringItem(i,str(self.values[0][i]))
-                self.SetStringItem(i,1,str(self.values[1][i]))
-                self.SetStringItem(i,2,str(self.values[2][i]))
                 
     def get_coeffs(self):
         """
@@ -2249,8 +2224,8 @@ class MotorChoices(wx.Choicebook):
         
         self.pagemotormap=wx.Panel(self)
         self.AddPage(self.pagemotormap,'Motor map')
-        self.MCT = MotorCoeffsTable(self.pagemotormap,values = [[1,2,3],[0.9,0.9,0.9],[307,307,307]])
-        sizer=wx.FlexGridSizer(cols = 2, hgap = 3, vgap = 3)
+        self.MCT = MotorCoeffsTable(self.pagemotormap, values = [[1,2,3],[0.9,0.9,0.9],[307,307,307]])
+        sizer = wx.FlexGridSizer(cols = 2, hgap = 3, vgap = 3)
         sizer.Add(self.MCT, 1, wx.EXPAND)
         self.pagemotormap.SetSizer(sizer)
         sizer.Layout()
