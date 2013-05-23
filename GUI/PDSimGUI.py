@@ -868,9 +868,6 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_TIMER, self.OnIdle, self.timer)
         self.timer.Start(1000) #1000 ms between checking the queue
         
-        #If configs folder doesn't exist, make it
-        if not os.path.exists('configs'): os.mkdir('configs')
-        
         self.Bind(wx.EVT_CLOSE, self.OnClose)
     
     def register_GUI_objects(self, annotated_GUI_objects):

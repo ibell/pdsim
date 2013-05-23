@@ -88,6 +88,8 @@ setup(
 # actions.
 
 if sys.platform.startswith('win'):
+    if not os.path.exists(os.path.join('PDSimGUI','configs')):
+        os.mkdir(os.path.join('PDSimGUI','configs'))
     shutil.copy2('C:\\Python27\\Lib\\site-packages\\h5py\\zlib1.dll','PDSimGUI\\zlib1.dll')
     #Further windows packaging things
     import subprocess
