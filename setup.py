@@ -37,7 +37,7 @@ for line in lines:
 fp.close()
 
 if len(sys.argv) == 1:
-#    sys.argv += ['build_ext','--inplace']
+#    sys.argv += ['build_ext','--inplace','install']
 #    sys.argv += ['build','build_ext','install']
     sys.argv += ['build','install']
 #    sys.argv += ['clean','build','install']
@@ -81,10 +81,10 @@ def clean():
             
 # Try to remove the generated files in the source tree 
 # if you are doing an install to the normal location
-if '--inplace' not in sys.argv or '--clean' in sys.argv:
-    clean()
-    if '--clean' in sys.argv:
-        sys.argv.remove('--clean')
+#if '--inplace' not in sys.argv or '--clean' in sys.argv:
+#    clean()
+#    if '--clean' in sys.argv:
+#        sys.argv.remove('--clean')
 
 pxd_files = []
 

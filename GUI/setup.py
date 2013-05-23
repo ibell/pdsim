@@ -8,11 +8,10 @@
 # Let's start with some default (for me) imports...
 
 from cx_Freeze import setup, Executable
-import sys, os
+import sys, os, shutil
 
 if len(sys.argv)==1:
     sys.argv+=['build','--build-exe=PDSimGUI']
-
 
 # Process the includes, excludes and packages first
 
@@ -89,6 +88,7 @@ setup(
 # actions.
 
 if sys.platform.startswith('win'):
+    shutil.copy2('C:\\Python27\\Lib\\site-packages\\h5py\\zlib1.dll','PDSimGUI\\zlib1.dll')
     #Further windows packaging things
     import subprocess
     #Compress the files if UPX is found on the system path
