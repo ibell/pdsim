@@ -99,7 +99,6 @@ class InjectionPortPanel(wx.Panel):
             If ``'i'``, phi is along the inner involute of the fixed scroll
             If ``'o'``, phi is along the outer involute of the fixed scroll
         check_valve : boolean
-            If lower-case value is ``true``, check valves are being used for this port
         symmetric : string
             If 'None', no symmetric link for this port, otherwise it is the string
             representation of an integer with the 1-based index of the port
@@ -114,7 +113,7 @@ class InjectionPortPanel(wx.Panel):
             raise ValueError
         self.SymmTarget.SetStringSelection(str(symmetric))
         if not symmetric == 'None':
-            self.OnMakeSymmetric() 
+            self.OnMakeSymmetric()
     
     def get_values(self):
         """
@@ -483,47 +482,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         pylab.yticks(range(1,Iport+1))
         pylab.show()
     
-    def post_prep_for_configfile(self):
-        """
-        
-        Returns
-        -------
-        a \n delimited string to be written to file
-        """
-        
-        s = []
-        s += ['Nlines = '+str(self.Nterms)]
-        for i in range(self.Nterms):
-            #: a string representation of the index
-            I = str(i+1)
-            
-            #These things are for the line
-            s += ['Lline_'+I+' = '+str(self.Lines[i].Lval.GetValue())]
-            s += ['IDline_'+I+' = '+str(self.Lines[i].IDval.GetValue())]
-            State = self.Lines[i].state.GetState()
-            s += ['State_'+I+' = '+State.Fluid+','+str(State.T)+','+str(State.rho)]
-            
-            #Then the things related to the ports for this line
-            s += ['Nports_'+I+' = '+str(len(self.Lines[i].ports_list))]
-            for j in range(self.Lines[i].Nports):
-                J = str(j+1)
-                #Get the port itself for code compactness
-                port = self.Lines[i].ports_list[j]
-                
-                #The things that are for the port
-                s += ['phi_'+I+'_'+J+' = '+str(port.phi_inj_port.GetValue())]
-                inv = port.involute.GetStringSelection()
-                if inv == 'Inner involute':
-                    s += ['involute_'+I+'_'+J+' = i']
-                elif inv == 'Outer involute':
-                    s += ['involute_'+I+'_'+J+' = o']
-                else:
-                    raise ValueError
-                
-                s += ['check_'+I+'_'+J+' = '+str(port.check_valve.IsChecked())]
-                s += ['symmetric_'+I+'_'+J+' = '+str(port.SymmTarget.GetStringSelection())]
-            
-        return '\n'.join(s)+'\n'
+    
         
     def build_from_configfile(self, config):
         """
@@ -754,18 +713,58 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
 #            return False
 #        else:
         return True
+    
+    def get_config_chunk(self):
+        """
+        The chunk for the configuration file
+        """
+         
         
-    def build_from_configfile_items(self, configfile_items):
+        chunk = []
+        for line in self.injection_panel.Lines:
+            l = {}
+            l['Length'] = float(line.Lval.GetValue())
+            l['ID'] = float(line.IDval.GetValue())
+            State = line.state.GetState()
+            l['inletState'] = dict(T = State.T, rho = State.rho, Fluid = State.Fluid)
+            
+            #Then the things related to the ports for this line
+            l['ports'] = []
+            for portpanel in line.ports_list:
+
+                port = {}
+                
+                #The things that are for the port
+                port['phi'] = float(portpanel.phi_inj_port.GetValue())
+                inv = portpanel.involute.GetStringSelection()
+                if inv == 'Inner involute':
+                    port['inner_outer'] = 'i'
+                elif inv == 'Outer involute':
+                    port['inner_outer'] = 'o'
+                else:
+                    raise ValueError
+                
+                port['check_valve'] = portpanel.check_valve.IsChecked()
+                port['symmetric'] = portpanel.SymmTarget.GetStringSelection()
+                
+                l['ports'].append(port)
+            
+            chunk.append(l)
+        
+        top_level_dict = {'Plugin:ScrollInjectionPlugin':chunk}
+        return top_level_dict
+        
+    def build_from_configfile(self, config):
         """
         Take in the dictionary of items from the configfile and pass
         them along to the injection_panel
          
         Parameters
         ----------
-        configfile_items : dict
+        config : dict
         
         """
-        self.injection_panel.build_from_configfile_items(configfile_items)
+        self.injection_panel.build_from_configfile(config)
         
     def activate(self, event = None, config = ''):
         """

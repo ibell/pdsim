@@ -1400,11 +1400,10 @@ class MainFrame(wx.Frame):
                 if hasattr(TB, 'get_config_chunks'):
                     string_list.append(yaml.dump(TB.get_config_chunks()))
             
-#            for plugin in self.plugins_list:
-#                pass
-##                if plugin.is_activated():
-##                    if hasattr(plugin, ''):
-##                        pass
+            for plugin in self.plugins_list:
+                if plugin.is_activated():
+                    if hasattr(plugin, 'get_config_chunk'):
+                        string_list.append(yaml.dump(plugin.get_config_chunk()))
                     
             fp = codecs.open(file_path,'w',encoding = 'latin-1')
             fp.write(u'\n'.join(string_list))
