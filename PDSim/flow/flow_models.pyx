@@ -56,12 +56,12 @@ cdef class PyFlowFunctionWrapper(FlowFunction):
         self.Function = Function
         self.kwargs = kwargs
         
-    cpdef double call(self,FlowPath FP):
+    cpdef double call(self,FlowPath FP) except *:
         cdef double val
         try:
             val = self.Function(FP, **self.kwargs)
         except ValueError:
-            raise ValueError("Wrapped function in PyFlowFunctionWrapper did not return a floating point value")
+            raise ValueError("Wrapped function in PyFlowFunctionWrapper did not return a floating point value; returned "+str(val))
         return val
     
     def __reduce__(self):
@@ -652,3 +652,5 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
     mdot=mdot/mdot_ratio
     
     return mdot
+
+

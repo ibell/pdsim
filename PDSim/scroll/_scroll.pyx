@@ -37,9 +37,17 @@ cdef class _Scroll(object):
         FP.A=pi*0.03**2/4.0
         return flow_models.IsentropicNozzle(FP.A,FP.State_up,FP.State_down)
         
-    cpdef double RadialLeakage(self, FlowPath FP):
+    cpdef double RadialLeakage(self, FlowPath FP, double t = -1):
         """
         Calculate the radial leakage flow rate
+        
+        Parameters
+        ----------
+        FP : FlowPath
+            
+        t : float,optional
+            The thickness of the wrap to be used.  If not provided, the scroll
+            wrap thickness
         """
         #Calculate the area
         #Arc length of the upstream part of the flow path
@@ -52,16 +60,22 @@ cdef class _Scroll(object):
         if FP.A == 0.0:
             return 0.0
         
+        # Allow you to change the length for the radial leakage path
+        # by passing in a length other than the thickness of the scroll wrap
+        # 
+        if t <= 0:
+            t = self.geo.t
+        
         return flow_models.FrictionCorrectedIsentropicNozzle(FP.A, 
                                                              FP.State_up, 
                                                              FP.State_down, 
                                                              self.geo.delta_radial, 
                                                              TYPE_RADIAL, 
-                                                             self.geo.t)
+                                                             t)
         
     cpdef double FlankLeakage(self,FlowPath FP):
         """
-        Calculate the flank leakge flow rate
+        Calculate the flank leakage flow rate
         """
         cdef double t = -1.0 #Default (not-provided) value
         #Calculate the area

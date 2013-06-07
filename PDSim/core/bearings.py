@@ -158,8 +158,12 @@ def journal_bearing(**kwargs):
         
     else: #Weighted average of the two to calculate the shear force
         epsilon = calculate_epsilon_long(np.log(Wr_long),epsilon0_long)
+        if not (epsilon >= 0 and epsilon <= 1):
+            print 'Wr_long,epsilon,W',Wr_long,epsilon0_long,W
+            raise ValueError('epsilon [{epsilon:g}] is not between 0 and 1 for W of [{W:g}] N'.format(epsilon = epsilon, W = W))
         Fshear_long = pi/np.sqrt(1-epsilon**2)*(5*epsilon**2+4)/(epsilon**2+2)*eta_0*omega*r_b*L*(r_b/c)
         epsilon = calculate_epsilon_short(np.log(Wr_short),epsilon0_short)
+        assert epsilon >= 0 and epsilon <= 1
         Fshear_short = 2*pi/np.sqrt(1-epsilon**2)*((L/r_b)**2*epsilon**2/(16*(1-epsilon**2)) +1)*eta_0*omega*r_b*L*(r_b/c)
         Fshear = (Fshear_long-Fshear_short)/1.5*(L/(2*r_b)-0.5) + Fshear_short
     

@@ -30,12 +30,11 @@ cdef class Polygon(object):
             area += self.x[i]*self.y[i+1] - self.y[i]*self.x[i+1]
         return area/2.0
 
-    def plot(self, ax):
-        ax.plot(self.x,self.y)
+    def plot(self, ax, **kwargs):
+        ax.plot(self.x, self.y, **kwargs)
     
-    def fill(self, ax):
-        ax.fill(self.x,self.y,alpha = 0.5)
-        
+    def fill(self, ax, **kwargs):
+        ax.fill(self.x, self.y, alpha = 0.5, **kwargs)
     
 cdef class LineSegment(object):
     """ A line segment with two nodes """

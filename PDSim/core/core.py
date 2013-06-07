@@ -607,7 +607,7 @@ class PDSimCore(_PDSimCore):
         self.Ntheta = N+1
         self.post_cycle()
         
-    def cycle_Heun(self,N,x_state, tmin=0,tmax=2*pi):
+    def cycle_Heun(self, N, x_state, tmin = 0, tmax = 2*pi):
         """
         Use the Heun method (modified Euler method)
         

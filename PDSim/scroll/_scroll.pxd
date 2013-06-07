@@ -16,7 +16,7 @@ cdef class _Scroll(object):
     cpdef double SA_S(self, FlowPath FP)
     cpdef double Discharge(self,FlowPath FP)
     cpdef double Inlet_sa(self, FlowPath FP)
-    cpdef double RadialLeakage(self, FlowPath FP)
+    cpdef double RadialLeakage(self, FlowPath FP, double t = *)
     cpdef double FlankLeakage(self, FlowPath FP)
     
     cpdef double calcHT(self, double theta, bytes key, double HTC_tune, double dT_dphi, double phim)

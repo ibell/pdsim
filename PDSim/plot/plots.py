@@ -340,7 +340,7 @@ class PlotNotebook(wx.Panel):
             Fx = self.Sim.get('/forces/Fx').value.T
         else:
             theta = self.Sim.t
-            Fx = self.Sim.Fx.T
+            Fx = self.Sim.forces.Fx.T
             
         Fx[np.abs(Fx)<1e-12]=np.nan
         axes.plot(theta,Fx, lw = 1.5)
@@ -361,7 +361,7 @@ class PlotNotebook(wx.Panel):
             Fy = self.Sim.get('/forces/Fy').value.T
         else:
             theta = self.Sim.t
-            Fy = self.Sim.Fy.T
+            Fy = self.Sim.forces.Fy.T
             
         Fy[np.abs(Fy)<1e-12]=np.nan
         axes.plot(theta,Fy, lw = 1.5)
@@ -381,8 +381,8 @@ class PlotNotebook(wx.Panel):
             Fx = self.Sim.get('/forces/Fx').value.T
             Fy = self.Sim.get('/forces/Fy').value.T
         else:
-            Fx = self.Sim.Fx.T
-            Fy = self.Sim.Fy.T
+            Fx = self.Sim.forces.Fx.T
+            Fy = self.Sim.forces.Fy.T
         axes.plot(Fx,Fy, lw = 1.5)
         axes.set_ylabel(r'$F_x$ [kN]')
         axes.set_xlabel(r'$F_y$ [kN]')            
@@ -396,8 +396,8 @@ class PlotNotebook(wx.Panel):
             Fx = self.Sim.get('/forces/summed_Fx').value.T
             Fy = self.Sim.get('/forces/summed_Fy').value.T
         else:
-            Fx = self.Sim.summed_Fx.T
-            Fy = self.Sim.summed_Fy.T
+            Fx = self.Sim.forces.summed_Fx.T
+            Fy = self.Sim.forces.summed_Fy.T
             
         Fx[np.abs(Fx)<1e-12]=np.nan
         Fy[np.abs(Fy)<1e-12]=np.nan
@@ -415,7 +415,7 @@ class PlotNotebook(wx.Panel):
             Fm = self.Sim.get('/forces/Fm').value.T
         else:
             theta = self.Sim.t
-            Fm = self.Sim.Fm.T
+            Fm = self.Sim.forces.Fm.T
             
         Fm[np.abs(Fm)<1e-12] = np.nan
         axes.plot(theta, Fm, lw = 1.5)

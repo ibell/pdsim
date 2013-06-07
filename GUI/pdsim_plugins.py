@@ -21,22 +21,38 @@ class PDSimPlugin(object):
         return True
     
     @abc.abstractmethod
-    def apply(self, sim, **kwargs):
+    def apply(self, **kwargs):
         """
-        Apply the plugin's code - it can do whatever it wants to the simulation 
+        Apply the plugin's code - it can do whatever it wants to the GUI 
         """
         raise NotImplementedError("Subclasses of PDSimPlugin must provide the apply() function")
         
 
+    def _check_script_chunks(self):
+        """ Check whether the script chunks are valid """
+        
+        allowed = ['post_imports','pre_build','post_build']
+        return all([key in allowed for key in chunks.keys()])
+    
     def get_script_chunks(self):
-        return ''
+        """
+        Get the chunks for the script from the plugin
+        
+        Return a dictionary of chunks (strings) for the script, the keys that are allowed are:
+        
+        * ``post_imports`` (goes after all the standard imports)
+        * ``pre_build`` (goes at the beginning of the build function)
+        * ``post_build`` (goes at the end of the build function)
+        
+        """
+        return {}
 
     def set_GUI(self, Main):
         self.GUI = Main
         
     def activate(self, event):
         """
-        Activate the plugin
+        Function to activate the plugin
         """
         self._activated = not self._activated
         

@@ -997,18 +997,15 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                 'scroll_density','oldham_key_friction_coefficient', 
                 'oldham_ring_radius', 'oldham_key_width', 'oldham_mass', 
                 'oldham_thickness', 'oldham_key_height','oldham_rotation_beta',
-                'scroll_plate_diameter','pin1_ybeta_offset',
+                'scroll_plate_diameter','scroll_added_mass','pin1_ybeta_offset',
                 'pin2_ybeta_offset','pin3_xbeta_offset','pin4_xbeta_offset'
                 ]:
             val = self.main.get_GUI_object_value(term)
             motor_chunk += 'sim.mech.{name:s} = {value:s}\n'.format(name = term,
                                                                     value = str(val)) 
             
-        # Handle the orbiting scroll mass
-        orbiting_scroll_mass, orbiting_scroll_zcm = self.calculate_scroll_mass()
-        orbiting_scroll_mass += self.main.get_GUI_object_value('scroll_added_mass') #add additional mass
-        motor_chunk += 'sim.mech.orbiting_scroll_mass = {value:s}\n'.format(name = term,
-                                                                            value = str(orbiting_scroll_mass)) 
+        # Handle the orbiting scroll mass plus any additional mass
+        motor_chunk += 'm, zcm = sim.calculate_scroll_mass()\nsim.mech.orbiting_scroll_mass = m\nsim.mech.scroll_zcm__thrust_surface = zcm\n'
         
         return motor_chunk
     
@@ -1022,46 +1019,10 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         frm.Show()
         
     def OnCalculateScrollMass(self, event):
-        mtotal,zcm = self.calculate_scroll_mass()
-        template = """Scroll Mass : {m:g} kg\nCentroid : {zcm:g} m (relative to the thrust surface)"""
-        dlg = wx.MessageDialog(None, template.format(m=mtotal, zcm = zcm))
+        #mtotal,zcm = self.calculate_scroll_mass()
+        #template = """Scroll Mass : {m:g} kg\nCentroid : {zcm:g} m (relative to the thrust surface)"""
+        #dlg = wx.MessageDialog(None, template.format(m=mtotal, zcm = zcm))
+        dlg = wx.MessageDialog(None, 'Temporarily disabled - sorry')
         dlg.ShowModal()
         dlg.Destroy()
-        
-    def calculate_scroll_mass(self):
-        """
-        Calculate the mass and centroid of the orbiting scroll
-        
-        Returns
-        -------
-        mtotal : float
-            Total mass of the orbiting scroll
-            
-        zcm__thrust_surface : float
-            The location of the centroid above the thrust surface. z = 0 is at the thrust surface, and positive z direction is towards the orbiting scroll 
-        """
-        tplate = self.main.get_GUI_object_value('scroll_plate_thickness')
-        rho = self.main.get_GUI_object_value('scroll_density')
-        mplus = self.main.get_GUI_object_value('scroll_added_mass')
-        Lbearing = self.main.get_GUI_object_value('L_crank_bearing')
-        Dijournal = self.main.get_GUI_object_value('D_crank_bearing')
-        Dplate = self.main.get_GUI_object_value('scroll_plate_diameter')
-        Dojournal = 1.5*Dijournal
-        
-        GeoPanel = self.main.get_GUI_object('Vratio').GUI_location.GetGrandParent()
-        
-        Vwrap,cx,cy = scroll_geo.scroll_wrap(GeoPanel.Scroll.geo)
-        
-        mwrap = rho * Vwrap
-        mplate = rho * pi * tplate * Dplate**2/4.0
-        mjournal = rho * pi * Lbearing * (Dojournal**2-Dijournal**2)/4.0
-        mtotal = mwrap + mplate + mjournal
-        
-        zwrap = GeoPanel.Scroll.geo.h/2
-        zplate = -tplate/2
-        zjournal = -tplate-Lbearing/2
-        
-        zcm__thrust_surface = (mwrap*zwrap + mjournal*zjournal + mplate*zplate)/mtotal
-        
-        return mtotal, zcm__thrust_surface
         

@@ -120,6 +120,9 @@ SolverInputsPanel:
   integrator_options: {epsRK45 : 1e-7}
   eps_cycle : 0.001 # Cycle-Cycle convergence tolerance (RSSE) [-]
 
+Plugin:ScrollInjectionPlugin:
+    L = 1
+
 """
 )
 

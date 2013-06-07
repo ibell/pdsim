@@ -1073,7 +1073,7 @@ class MainFrame(wx.Frame):
         
         self.worker=None
         
-#        self.load_plugins(self.PluginsMenu)
+        self.load_plugins(self.PluginsMenu, self.config)
 #        #After loading plugins, try to set the parameters in the parametric table
 #        self.MTB.SolverTB.flush_parametric_terms()
 #        self.MTB.SolverTB.set_parametric_terms()
@@ -1163,7 +1163,7 @@ class MainFrame(wx.Frame):
             self.results_list.put(hdf5_path)
             wx.CallAfter(self.MTB.RunTB.main_log_ctrl.WriteText,'Result queued\n')
      
-    def load_plugins(self, PluginsMenu):
+    def load_plugins(self, PluginsMenu, config):
         """
         Load any plugins into the GUI that are found in plugins folder
         
@@ -1172,8 +1172,10 @@ class MainFrame(wx.Frame):
         """
         import glob
         self.plugins_list = []
-        #Look at each .py file in plugins folder
-        for py_file in glob.glob(os.path.join('plugins','*.py')):
+        warnings.warn('Add user plugin folder')
+        #Look at each .py file in plugins folder, or any file in user-plugins folder
+        user_plugins_folder = []
+        for py_file in glob.glob(os.path.join('plugins','*.py')) + user_plugins_folder:
             #Get the root filename (/path/to/AAA.py --> AAA)
             fname = py_file.split(os.path.sep,1)[1].split('.')[0]
             
@@ -1186,47 +1188,36 @@ class MainFrame(wx.Frame):
                     #If it is a plugin class
                     if issubclass(thing, pdsim_plugins.PDSimPlugin):
                         
-                        #Instantiate the plugin
+                        # Instantiate the plugin
                         plugin = thing()
                         
-                        #Give the plugin a link to the main wx.Frame
+                        # Give the plugin a link to the main wx.Frame
                         plugin.set_GUI(self)
                         
-                        #Check if it should be enabled, if not, go to the next plugin
+                        # Check if it should be enabled, if not, go to the next plugin
                         if not plugin.should_enable():
                             del plugin
                             continue
                                                 
-                        #Append an instance of the plugin to the list of plugins
+                        # Append an instance of the plugin to the list of plugins
                         self.plugins_list.append(plugin)
                         
-                        #Create a menu item for the plugin
-                        menuItem = wx.MenuItem(self.Type, -1, thing.short_description, "", wx.ITEM_CHECK)
+                        # Create a menu item for the plugin
+                        menuItem = wx.MenuItem(PluginsMenu, -1, thing.short_description, "", wx.ITEM_CHECK)
                         PluginsMenu.AppendItem(menuItem)
-                        #Bind the event to activate the plugin
+                        # Bind the event to activate the plugin
                         self.Bind(wx.EVT_MENU, plugin.activate, menuItem)
                                                 
                         # Check if this type of plugin is included in the config
                         # file
-                        for section in self.config_parser.sections():
-                            if (section.startswith('Plugin')
-                                and section.split(':')[1] ==  term):
-                                # If it is, activate it and check the element
-                                # in the menu
-                                plugin.activate()
-                                menuItem.Check(True)
-                                
-                                # Pass the section along to the plugin
-                                items = self.config_parser.items(section)
-                                plugin.build_from_configfile_items(items)
+                        if 'Plugin:'+term in config:
+                            # If it is, activate it and check the element
+                            # in the menu
+                            plugin.activate(config = config['Plugin:'+term])
+                            menuItem.Check(True)
                         
                 except TypeError:
                     pass
-        
-        # Update the parametric terms in the parametric tables because the 
-        # plugins might have added terms if they are activated from the config
-        # file
-        self.update_parametric_terms()
    
     def load_families(self, FamiliesMenu):
         """

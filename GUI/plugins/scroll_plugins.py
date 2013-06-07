@@ -12,6 +12,7 @@ import wx
 from wx.lib.scrolledpanel import ScrolledPanel
 from PDSim.scroll.plots import plotScrollSet, ScrollAnimForm
 import types
+import warnings
 
 LabeledItem = pdsim_panels.LabeledItem
 
@@ -24,7 +25,6 @@ class InjectionPortPanel(wx.Panel):
     """
     def __init__(self, parent, index):
         wx.Panel.__init__(self,parent)
-        
         
         #: The index of the panel
         self.index = index
@@ -97,23 +97,22 @@ class InjectionPortPanel(wx.Panel):
         phi : float
         inner_outer : string
             If ``'i'``, phi is along the inner involute of the fixed scroll
-            
             If ``'o'``, phi is along the outer involute of the fixed scroll
-        check_valve : string
+        check_valve : boolean
             If lower-case value is ``true``, check valves are being used for this port
         symmetric : string
             If 'None', no symmetric link for this port, otherwise it is the string
             representation of an integer with the 1-based index of the port
         """
         self.phi_inj_port.SetValue(str(phi))
-        self.check_valve.SetValue(check_valve.lower()=='true')
+        self.check_valve.SetValue(check_valve)
         if inner_outer == 'i':
             self.involute.SetStringSelection('Inner involute')
         elif inner_outer == 'o':
             self.involute.SetStringSelection('Outer involute')
         else:
             raise ValueError
-        self.SymmTarget.SetStringSelection(symmetric)
+        self.SymmTarget.SetStringSelection(str(symmetric))
         if not symmetric == 'None':
             self.OnMakeSymmetric() 
     
@@ -181,16 +180,16 @@ class InjectionElementPanel(wx.Panel):
         
         #Inputs Toolbook
         ITB = self.GetTopLevelParent().MTB.InputsTB
-        Fluid = None
+        CPState = None
         for panel in ITB.panels:
             if panel.Name == 'StatePanel':
-                Fluid = panel.SuctionState.GetState().Fluid
+                CPState = panel.SuctionStatePanel.GetState()
                 break
-        if Fluid is None:
+        if CPState is None:
             raise ValueError('StatePanel not found in Inputs Toolbook')
         
         #You can only inject the same refrigerant as at the suction so fix the fluid
-        self.state = pdsim_panels.StatePanel(self, Fluid=Fluid, Fluid_fixed = True)
+        self.state = pdsim_panels.StatePanel(self, CPState=CPState, Fluid_fixed = True)
         
         self.Llabel,self.Lval = LabeledItem(self, label='Length of injection line',value='1.0')
         self.IDlabel,self.IDval = LabeledItem(self, label='Inner diameter of injection line',value='0.01')
@@ -294,11 +293,12 @@ class InjectionElementPanel(wx.Panel):
                     port.SymmTarget.SetStringSelection(str(partner.index))
                 else:
                     port.SymmTarget.SetStringSelection('None')
+                    
+            return True
+        else:
+            return False
         
-        #Update the elements in the parametric table
-        Main = self.GetTopLevelParent()
-        items = Main.collect_parametric_terms()
-        Main.MTB.SolverTB.update_parametric_terms(items)
+        self.Parent.FitInside()
         
     def OnAddPort(self, event = None):
         IPP = InjectionPortPanel(self, index = len(self.ports_list)+1)
@@ -307,8 +307,9 @@ class InjectionElementPanel(wx.Panel):
         self.SBSSizer.Layout()
         self.Nports += 1
         self.GetSizer().Layout()
-        self.Refresh()
         self.Fit()
+        self.Refresh()
+        
         # When you add a port, it cannot be a partner of any other chamber at
         # instantiation
         Nports = len(self.ports_list)
@@ -332,10 +333,7 @@ class InjectionElementPanel(wx.Panel):
             else:
                 port.SymmTarget.SetStringSelection('None')
         
-        #Update the elements in the parametric table
-        Main = self.GetTopLevelParent()
-        items = Main.collect_parametric_terms()
-        Main.MTB.SolverTB.update_parametric_terms(items)
+        self.Parent.FitInside()
         
 class InjectionInputsPanel(pdsim_panels.PDPanel):
     """
@@ -395,12 +393,11 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         self.Lines.append(IE)
         self.Nterms += 1
         
-        #Update the elements in the parametric table
-        Main = self.GetTopLevelParent()
-        items = Main.collect_parametric_terms()
-        Main.MTB.SolverTB.update_parametric_terms(items)
-        
         self.Refresh()
+    
+    def remove_all(self):
+        while self.Lines:
+            self.RemoveInjection(self.Lines[0])
         
     def RemoveInjection(self, injection):
         """
@@ -419,11 +416,6 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         self.scrolled_panel.FitInside()
         self.Refresh()
         
-        #Update the elements in the parametric table
-        Main = self.GetTopLevelParent()
-        items = Main.collect_parametric_terms()
-        Main.MTB.SolverTB.update_parametric_terms(items)
-        
     def OnView(self, event):
         
         geo = self.GetTopLevelParent().MTB.InputsTB.panels[0].Scroll.geo
@@ -433,7 +425,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         IEPs = [child for child in self.scrolled_panel.Children if isinstance(child,InjectionElementPanel)]
         for IEP in IEPs:
             for child in IEP.Children:
-                if isinstance(child,InjectionPortPanel):
+                if isinstance(child, InjectionPortPanel):
                     #Get the values from the panel
                     phi,inner_outer,check_valve = child.get_values()
                     #Overlay the port on the scroll wrap plot
@@ -443,6 +435,10 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         SAF.Show()
         
     def OnPlotExistence(self, event = None):
+        """
+        Plot a 2D line plot showing which control volume is connected to 
+        each injection port as a function of the crank angle
+        """
         import pylab
         import numpy as np
         
@@ -479,7 +475,6 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
                     
                     #Increase the counter
                     Iport += 1
-                    
         
         pylab.xticks([0,pi/2,pi,3*pi/2,2*pi],
                      [0,r'$\pi/2$',r'$\pi$',r'$3\pi/2$',r'$2\pi$'])
@@ -530,62 +525,37 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
             
         return '\n'.join(s)+'\n'
         
-    def build_from_configfile_items(self, configfile_items):
+    def build_from_configfile(self, config):
         """
         Get parameters from the configfile section for this plugin
         
         Parameters
         ----------
-        configfile_items : list of 2-element tuples, first element is key, second is value as a string
+        config : yaml configuration section for the plugin
         
         """
-        #Convert List of tuples to dict
-        configfile_dict = {param:val for param,val in configfile_items}
-        
-        if u'Nlines' in configfile_dict:
-            N = int(configfile_dict.pop(u'Nlines'))
-            for i in range(N):
-                I = str(i+1)
+
+        if config:
+            self.remove_all()
+            for line in config:
+                # Add an injection line panel
                 self.OnAddInjection()
                 #Get a pointer to the last IEP (the one just added)
                 IEP = self.Lines[-1]
-                #Set the line length in the GUI
-                Lline = float(configfile_dict.pop(u'Lline_'+I))
-                IEP.Lval.SetValue(str(Lline))
+                #Set the line length in the GUI [m]
+                IEP.Lval.SetValue(str(line['Length']))
                 #Set the line ID in the GUI
-                IDline = float(configfile_dict.pop(u'IDline_'+I))
-                IEP.IDval.SetValue(str(IDline))
+                IEP.IDval.SetValue(str(line['ID']))
                 #Set the State in the GUI
-                State_string = configfile_dict.pop(u'State_'+I)
-                Fluid,T,rho = State_string.split(',')
-                IEP.state.set_state(str(Fluid), T = float(T), D = float(rho))
-                #Get the number of ports for this line
-                Nports = int(configfile_dict.pop(u'Nports_'+I))
-                for j in range(Nports):
-                    J = str(j+1)
-                    if j>0:
-                        IEP.OnAddPort()
-                    #Get a pointer to the port panel
-                    port = IEP.ports_list[-1]
-                    
-                    #Get the angle
-                    phi = configfile_dict.pop(u'phi_'+I+'_'+J)
-                    
-                    #Get the neighboring involute
-                    inner_outer = configfile_dict.pop(u'involute_'+I+'_'+J)
-                    
-                    #Get the checkvalve flag
-                    check_valve = configfile_dict.pop(u'check_'+I+'_'+J)
-                    
-                    #Get the checkvalve flag
-                    symmetric = configfile_dict.pop(u'symmetric_'+I+'_'+J)
-                    
-                    #Set the values in the panel
-                    port.set_values(phi, inner_outer, check_valve, symmetric)
-                
-            #Check if any terms are left, if so raise ValueError
-            if configfile_dict:
-                raise ValueError('Unmatched term in configfile_items remaining:'+str(configfile_dict))
+                State = line['inletState']
+                IEP.state.set_state(State['Fluid'], T = State['T'], D = State['rho'])
+                if 'ports' in line and line['ports']:
+                    for i,port in enumerate(line['ports']):
+                        if i > 0: IEP.OnAddPort()
+                        # Get a pointer to the port panel
+                        portpanel = IEP.ports_list[-1]
+                        # Set the values in the panel
+                        portpanel.set_values(port['phi'], port['inner_outer'], port['check_valve'], port['symmetric'])
     
     def get_additional_parametric_terms(self):
         
@@ -779,10 +749,11 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
         """
         Only enable if it is a scroll type compressor
         """
-        if not self.GUI.SimType.lower() == 'scroll':
-            return False
-        else:
-            return True
+        warnings.warn('Always enabling injection')
+#        if not self.GUI.family.lower() == 'scroll':
+#            return False
+#        else:
+        return True
         
     def build_from_configfile_items(self, configfile_items):
         """
@@ -796,7 +767,10 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
         """
         self.injection_panel.build_from_configfile_items(configfile_items)
         
-    def activate(self, event = None):
+    def activate(self, event = None, config = ''):
+        """
+        Called to activate or deactivate the injection plugin
+        """
         #: The inputs toolbook that contains all the input panels
         ITB = self.GUI.MTB.InputsTB
         
@@ -814,6 +788,9 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
             self.injection_panel.Destroy()
             del self.injection_panel
             self._activated = False
+            
+        self.injection_panel.build_from_configfile(config)
+        
             
     def apply(self, ScrollComp, **kwargs):
         """
@@ -928,63 +905,6 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                 
         #Save a local copy of a pointer to the simulation
         self.simulation = sim
-    
-    def collect_output_terms(self):
-        """
-        Return terms for the output panel in the GUI
-        
-        Happens after even the post-processing
-        """
-        _T = []
-        
-        #These parameters pertain to each of the injection lines
-        for i in self.simulation.injection.massflow:
-            _T.append(dict(attr = "injection.massflow["+str(i)+"]",
-                           text = "Injection line #"+str(i)+" mass flow [kg/s]",
-                           parent = self
-                           )
-                      )
-            _T.append(dict(attr = "injection.flow_ratio["+str(i)+"]",
-                           text = "Injection line #"+str(i)+" flow ratio to suction flow [-]",
-                           parent = self
-                           )
-                      )
-            _T.append(dict(attr = "injection.pressure["+str(i)+"]",
-                           text = "Injection line #"+str(i)+" pressure [kPa]",
-                           parent = self
-                           )
-                      )
-            _T.append(dict(attr = "injection.temperature["+str(i)+"]",
-                           text = "Injection line #"+str(i)+" temperature [K]",
-                           parent = self
-                           )
-                      )
-        
-        #These are defined for each port
-        for _i_j in self.simulation.injection.phi:
-            
-            #Split the key back into its integer components (still as strings)
-            _i,_j = _i_j.split(':')
-            
-            #Add the output things for the ports
-            _T.append(dict(attr = "injection.phi['"+_i+":"+_j+"']",
-                           text = "Injection inv. angle #" + _i + ":" + _j + " [rad]",
-                           parent = self
-                           )
-                      )
-            _T.append(dict(attr = "injection.inner_outer['"+_i+":"+_j+"']",
-                           text = "Injection involute" + _i + ":" + _j + " [-]",
-                           parent = self
-                           )
-                      )
-            
-            _T.append(dict(attr = "injection.check_valve['"+_i+":"+_j+"']",
-                           text = "Injection check valve #" + _i + ":" + _j + " [-]",
-                           parent = self
-                           )
-                      )
-        
-        return _T
         
         
         

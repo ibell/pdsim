@@ -123,6 +123,25 @@ SolverInputsPanel:
   cycle_integrator: RK45
   integrator_options: {epsRK45 : 1e-7}
   eps_cycle : 0.001 # Cycle-Cycle convergence tolerance (RSSE) [-]
+  
+Plugin:ScrollInjectionPlugin:
+    - Length : 1.1
+      ID : 0.0000001
+      inletState: 
+          Fluid : R410A
+          T : 283.15 #[K]
+          rho : 5.75 #[kg/m^3]
+      ports:
+      - phi : 7.2
+        D : 0.0025
+        check_valve : True
+        inner_outer : 'i'
+        symmetric : None
+      - phi : 10.1
+        D : 0.0025
+        check_valve : True
+        inner_outer : 'o'
+        symmetric : 1
 
 """
 )

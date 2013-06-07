@@ -1792,7 +1792,7 @@ class StatePanel(wx.Panel):
     Fluid, temperature and density by selecting the desired set of inputs in a
     dialog which can be Tsat and DTsh or T & p.
     """
-    def __init__(self, parent, id=-1, CPState = None, Fluid_fixed = False):
+    def __init__(self, parent, id = -1, CPState = None, Fluid_fixed = False):
         wx.Panel.__init__(self, parent, id)
         
         # If the fluid is not allowed to be changed Fluid_fixed is true

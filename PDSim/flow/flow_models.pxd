@@ -46,7 +46,7 @@ cdef class PyFlowFunctionWrapper(FlowFunction):
     cdef dict kwargs
     cdef public object Function
     
-    cpdef double call(self, FlowPath FP)
+    cpdef double call(self, FlowPath FP) except *
     
 cdef class IsentropicNozzleWrapper(FlowFunction):
     cpdef double call(self, FlowPath FP)

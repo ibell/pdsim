@@ -381,7 +381,7 @@ class Scroll(PDSimCore, _Scroll):
                                       discharge_becomes=disc_becomes_c2,
                                       becomes=becomes_c2))
     
-    def auto_add_leakage(self,flankFunc,radialFunc):
+    def auto_add_leakage(self,flankFunc,radialFunc, radialFunc_kwargs = {}):
         """
         Add all the leakage terms for the compressor
         
@@ -391,14 +391,17 @@ class Scroll(PDSimCore, _Scroll):
             The function to be used for the flank leakage path
         radialFunc : function
             The function to be used for the radial leakage path
+        radialFunc_kwargs : dict
+            Dictionary of terms to be passed to the radial leakage function
+            
         """
         
         #Do the flank leakages
         self.auto_add_flank_leakage(flankFunc)
         #Do the radial leakages
-        self.auto_add_radial_leakage(radialFunc)
+        self.auto_add_radial_leakage(radialFunc, radialFunc_kwargs)
         
-    def auto_add_radial_leakage(self, radialFunc):
+    def auto_add_radial_leakage(self, radialFunc, radialFunc_kwargs):
         """
         A function to add all the radial leakage terms
         
@@ -406,6 +409,8 @@ class Scroll(PDSimCore, _Scroll):
         ----------
         radialFunc : function
             The function that will be called for each radial leakage
+        radialFunc_kwargs : dict
+            Dictionary of terms to be passed to the radial leakage function
         """
         #Get all the radial leakage pairs
         pairs = scroll_geo.radial_leakage_pairs(self.geo)
@@ -414,7 +419,8 @@ class Scroll(PDSimCore, _Scroll):
         for pair in pairs:
             self.add_flow(FlowPath(key1=pair[0],
                                    key2=pair[1],
-                                   MdotFcn=radialFunc
+                                   MdotFcn=radialFunc,
+                                   MdotFcn_kwargs = radialFunc_kwargs
                                    )
                           )
         
@@ -463,6 +469,41 @@ class Scroll(PDSimCore, _Scroll):
                 self.add_flow(FlowPath(key1=keyc1,key2='ddd',MdotFcn=flankFunc))
                 self.add_flow(FlowPath(key1=keyc2,key2='ddd',MdotFcn=flankFunc))
     
+    def calculate_scroll_mass(self):
+        """
+        Calculate the mass and centroid of the orbiting scroll
+        
+        Returns
+        -------
+        mtotal : float
+            Total mass of the orbiting scroll (including any additional mass added at centroid)
+            
+        zcm__thrust_surface : float
+            The location of the centroid above the thrust surface. z = 0 is at the thrust surface, and positive z direction is towards the orbiting scroll 
+        """
+        tplate = getattr(self.mech,'scroll_plate_thickness')
+        rho = getattr(self.mech,'scroll_density')
+        mplus = getattr(self.mech,'scroll_added_mass')
+        Lbearing = getattr(self.mech,'L_crank_bearing')
+        Dijournal = getattr(self.mech,'D_crank_bearing')
+        Dplate = getattr(self.mech,'scroll_plate_diameter')
+        Dojournal = 1.5*Dijournal
+        
+        Vwrap,cx,cy = scroll_geo.scroll_wrap(self.geo)
+        
+        mwrap = rho * Vwrap
+        mplate = rho * pi * tplate * Dplate**2/4.0
+        mjournal = rho * pi * Lbearing * (Dojournal**2-Dijournal**2)/4.0
+        mtotal = mwrap + mplate + mjournal + mplus
+        
+        zwrap = tplate + self.geo.h/2
+        zplate = tplate/2
+        zjournal = -Lbearing/2
+        
+        zcm__thrust_surface = (mwrap*zwrap + mjournal*zjournal + mplate*zplate)/mtotal
+        
+        return mtotal, zcm__thrust_surface
+
     def heat_transfer_coefficient(self, key):
         
 #        Pr=Pr_mix(Ref,Liq,T_avg,p_avg,xL_avg); //[-]
@@ -570,7 +611,7 @@ class Scroll(PDSimCore, _Scroll):
             # and the comment of user tk
             return (angle1-angle2+pi)%(2*pi)-pi
         
-        def IsAtMerge(eps = 0.001, eps_d1_higher=0.002,eps_dd_higher=0.00001):
+        def IsAtMerge(eps = 0.001, eps_d1_higher=0.01,eps_dd_higher=0.00001):
             pressures = [self.CVs['d1'].State.p,
                          self.CVs['d2'].State.p,
                          self.CVs['dd'].State.p]
@@ -595,7 +636,7 @@ class Scroll(PDSimCore, _Scroll):
             self.__before_discharge2__=True
         elif self.__before_discharge2__==True:
             #At the discharge angle
-            print 'At the discharge angle'
+            #print 'At the discharge angle'
             ########################
             #Reassign chambers
             ########################
@@ -635,6 +676,8 @@ class Scroll(PDSimCore, _Scroll):
             
             #Build the volume vector using the old set of control volumes (pre-merge)
             V,dV=self.CVs.volumes(t)
+            
+            print 'merging'
             
             if self.__hasLiquid__==False:
 
@@ -813,20 +856,29 @@ class Scroll(PDSimCore, _Scroll):
             self.losses = struct()
             
         if not hasattr(self.mech,'journal_tune_factor'):
+            warnings.warn('mech.journal_tune_factor not provided; using 1.0')
             self.mech.journal_tune_factor = 1.0
             
         if hasattr(self.mech,'detailed_analysis') and self.mech.detailed_analysis == True:
             self.detailed_mechanical_analysis()
             return self.forces.Wdot_total_mean
         else:
-            #Conduct the calculations for the bearings
+            #Conduct the calculations for the bearings [N]
             W_OSB = np.sqrt((self.forces.summed_Fr + self.forces.inertial)**2+self.forces.summed_Ft**2)*1000
-            self.losses.crank_bearing = self.crank_bearing(W = W_OSB)*self.mech.journal_tune_factor
-            self.losses.upper_bearing = self.upper_bearing(W = W_OSB*(1+1/self.mech.L_ratio_bearings))*self.mech.journal_tune_factor
-            self.losses.lower_bearing = self.lower_bearing(W = W_OSB/self.mech.L_ratio_bearings)*self.mech.journal_tune_factor
-            self.losses.thrust_bearing = self.thrust_bearing()
             
             _slice = range(self.Itheta+1)
+            
+            self.losses.crank_bearing = np.zeros_like(W_OSB)
+            self.losses.upper_bearing = np.zeros_like(W_OSB)
+            self.losses.lower_bearing = np.zeros_like(W_OSB)
+            
+            for i in _slice:
+                self.losses.crank_bearing[i] = self.crank_bearing(W_OSB[i])
+                self.losses.upper_bearing[i] = self.upper_bearing(W_OSB[i]*(1+1/self.mech.L_ratio_bearings))
+                self.losses.lower_bearing[i] = self.lower_bearing(W_OSB[i]/self.mech.L_ratio_bearings)
+                
+            self.losses.thrust_bearing = self.thrust_bearing()
+            
             theta = self.t[_slice]
             theta_range = theta[-1]-theta[0]
             
@@ -1000,7 +1052,7 @@ class Scroll(PDSimCore, _Scroll):
             self.eta_motor = eta
             self.omega = omega
         else:
-            raise AttributeError
+            raise AttributeError('motor.type must be one of "const_eta_motor" or "motor_map"')
 
 #        print 'mean_Q', self.HTProcessed.mean_Q
 #        print 'self.forces.mean_Fm', self.forces.mean_Fm
@@ -1025,10 +1077,12 @@ class Scroll(PDSimCore, _Scroll):
 #        self.suction_heating()
         
         print 'At this iteration'
-        print '    Electrical power:', self.Wdot_electrical
-        print '    Mass flow rate:', self.mdot
+        print '    Electrical power:', self.Wdot_electrical,'kW'
+        print '    Mass flow rate:', self.mdot,'kg/s'
         if hasattr(self,'Wdot_i'):
-            print '    Over. isentropic:', self.eta_oi
+            print '    Over. isentropic:', self.eta_oi,'-'
+        if hasattr(self,'eta_v'):
+            print '    Volumetric:', self.eta_v,'-'
         
         #Want to return a list
         return [Qnet]
