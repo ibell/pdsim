@@ -158,7 +158,11 @@ cdef class WrappedStepCallback(StepCallback):
         """ 
         This function returns the values from the wrapped function
         """
-        self.disable_adaptive,h = self.func(t,h,i)
+        vals = self.func(t,h,i)
+        try:
+            self.disable_adaptive,h = vals
+        except TypeError:
+            raise TypeError('step_callback must return a bool,float pair, returned the values:'+str(vals))
         return h
     
 cdef class CallbackContainer(object):

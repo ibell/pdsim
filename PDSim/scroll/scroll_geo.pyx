@@ -2271,7 +2271,7 @@ cpdef double phi_d_dd(double theta, geoVals geo):
         if (iter==2): x2=geo.phi_is+0.1; phi=x2;
         if (iter>2): phi=x2;
 
-        f=1+cos(phi-phi_os)-(phi_os-phi_o0)*sin(phi-phi_os)+alpha*sin(phi-phi_ie+theta);
+        f=1+cos(phi-phi_os)-(phi_os-phi_o0)*sin(phi-phi_os)+alpha*sin(phi-phi_ie+theta)
 
         if (iter==1): y1=f;
         if (iter==2): y2=f;
@@ -2287,8 +2287,13 @@ cpdef double phi_d_dd(double theta, geoVals geo):
         if (iter>20 and x3<geo.phi_is):
             return geo.phi_is;
 
-    if (x3>geo.phi_is): return x3;
-    else: return geo.phi_is;
+    if (x3>geo.phi_is + 2*pi):
+        # Bad solution obtained, we are going to use phi_is
+        return geo.phi_is
+    elif (x3 > geo.phi_is):
+        return x3
+    else: 
+        return geo.phi_is
 
 cpdef double Area_d_dd(double theta, geoVals geo):
     x_fis,y_fis=coords_inv(phi_d_dd(theta,geo),geo,theta,"fi")

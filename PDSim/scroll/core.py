@@ -958,15 +958,63 @@ class Scroll(PDSimCore, _Scroll):
         calls the base class function
         """
         
-        #Get an initial guess before running at all for the motor losses.
+        # Get an initial guess before running at all for the motor losses.
         self.initial_motor_losses() #set the parameter self.motor.losses
         
-        #Run the suction heating code
+        # Run the suction heating code
         self.suction_heating()
         
-        #Call the base class function        
+        # Calculate the dischare port free area
+        #self.cache_discharge_port_blockage()
+        
+        # Call the base class function        
         PDSimCore.pre_run(self)
         
+    def cache_discharge_port_blockage(self, xport = None, yport = None):
+        """
+        Precalculate the discharge port blockage using the polygon math module
+        
+        This is computationally quite expensive, which is why it is done only once
+        and then interpolated within.
+        """
+        
+        import matplotlib.pyplot as plt
+        from PDSim.misc.polymath import Polygon, PolygonOperator
+        
+        if xport is None and yport is None:
+            xport = self.geo.xa_arc1 + 0.9*self.geo.ra_arc1*np.cos(np.linspace(0,2*pi,100))
+            yport = self.geo.ya_arc1 + 0.9*self.geo.ra_arc1*np.sin(np.linspace(0,2*pi,100))
+        
+        pport = Polygon(xport,yport)
+        
+        xinvi, yinvi = scroll_geo.coords_inv(np.linspace(self.geo.phi_is+pi/2,self.geo.phi_is,25), self.geo, 0, flag="fi")
+        xarc1 = self.geo.xa_arc1 + self.geo.ra_arc1*np.cos(np.linspace(self.geo.t2_arc1,self.geo.t1_arc1,75))
+        yarc1 = self.geo.ya_arc1 + self.geo.ra_arc1*np.sin(np.linspace(self.geo.t2_arc1,self.geo.t1_arc1,75))
+        xinvo, yinvo = scroll_geo.coords_inv(np.linspace(self.geo.phi_os,self.geo.phi_os+3*pi/2,25), self.geo, 0, flag="fo")
+        
+        # TODO: Add line and arc2 if they exist
+        t,A=[],[]
+        for theta in np.linspace(0,2*pi,100):
+            
+            THETA = self.geo.phi_ie-pi/2.0-theta
+        
+            xscroll = -np.r_[xinvi,xarc1,xinvo]+self.geo.ro*np.cos(THETA)
+            yscroll = -np.r_[yinvi,yarc1,yinvo]+self.geo.ro*np.sin(THETA)
+            
+            pscroll = Polygon(xscroll, yscroll)
+            
+#            plt.plot(xport, yport)
+#            plt.plot(xscroll,yscroll)
+#            
+            s = 0
+            for poly in PolygonOperator(pport, pscroll).Only1():
+                s += poly.area()
+                
+            t.append(theta)
+            A.append(s)
+            
+        plt.plot(t,A)
+        plt.show()
         
     def guess_lump_temps(self, T0):
         """

@@ -9,11 +9,10 @@ import array
 
 cdef class LineSegment:
     cdef double x0,x1,y0,y1,y2,y3,x_i,y_i
-    
     cpdef bint intersects(self, LineSegment LS2)
     
 cdef class Polygon:
-    cdef public np.ndarray x, y
+    cdef public double[:] x, y
     cdef public list xy
     
     cpdef bint inpoly(self, double x, double y)
@@ -27,6 +26,8 @@ cdef class PolygonOperator:
     cpdef list AND(self)
     cpdef list OR(self)
     cpdef list XOR(self)
+    cpdef list Only1(self)
+    cpdef list Only2(self)
     cpdef intersect(self)
     cpdef make_parts(self, Polygon poly, list sorted)
     cpdef attach_nodes(self)
@@ -41,7 +42,7 @@ cdef class Node:
     cdef public list children
     
 cdef class PolyPart:
-    cdef public np.ndarray x,y
+    cdef public double[:] x,y
     cdef public Polygon parent
     cdef public tuple nodes
     

@@ -24,9 +24,9 @@ cdef class Polygon(object):
         return pnpoly(testx, testy, self.xy)
         
     cpdef double area(self):
-        cdef long I
+        cdef long i
         cdef double area = 0.0
-        for i in range(len(self.x)):
+        for i in range(len(self.x)-1):
             area += self.x[i]*self.y[i+1] - self.y[i]*self.x[i+1]
         return area/2.0
 
@@ -136,14 +136,28 @@ cdef class PolygonOperator(object):
         polys = self.intersect()
         return [poly for poly in polys if poly in self.in1 and not poly in self.in2 or poly not in self.in1 and poly in self.in2]
     
+    cpdef list Only1(self):
+        """
+        Return all the new polygons that are only within polygon 1 and not within polygon 2 
+        """
+        polys = self.intersect()
+        return [poly for poly in polys if poly in self.in1 and not poly in self.in2]
+    
+    cpdef list Only2(self):
+        """
+        Return all the new polygons that are only within polygon 2 and not within polygon 1 
+        """
+        polys = self.intersect()
+        return [poly for poly in polys if poly in self.in2 and not poly in self.in1]
+    
     cpdef intersect(self):
         """
         
         """
-        #Make local variables do they can be optimized in cython code
-        cdef np.ndarray[np.double_t, ndim = 1] x = self.poly2.x
-        cdef np.ndarray[np.double_t, ndim = 1] y = self.poly2.y
         cdef list intersections = []
+        cdef long i2
+        cdef double xp, yp
+        cdef Polygon poly
         
         cython.declare(i = cython.long,
                        j = cython.long 
@@ -153,7 +167,7 @@ cdef class PolygonOperator(object):
         for i in range(len(self.poly1.x)-1):
             LS1 = LineSegment(self.poly1.x[i], self.poly1.y[i], self.poly1.x[i+1], self.poly1.y[i+1]) 
             for j in range(len(self.poly2.x)-1):
-                LS2 = LineSegment(x[j], y[j], x[j+1], y[j+1])
+                LS2 = LineSegment(self.poly2.x[j], self.poly2.y[j], self.poly2.x[j+1], self.poly2.y[j+1])
                 if LS1.intersects(LS2):
                     intersections.append((LS1.x_i,LS1.y_i,i,j))
         
@@ -169,14 +183,14 @@ cdef class PolygonOperator(object):
         intersections = [(i,j,_Node) for (x_i,y_i,i,j),_Node in zip(intersections,self.Nodes)]
         
         import operator
-        # Sort the insertions for poly1 so the indices are increasing
+        # Sort the insertions by the index for poly1
         sorted1 = sorted(intersections, key=operator.itemgetter(0))
-        # Sort the insertions for poly2 so the indices are increasing
+        # Sort the insertions by the index for poly2
         sorted2 = sorted(intersections, key=operator.itemgetter(1))
         
-        #For the first polygon
+        # For the first polygon, split it into parts (lines)
         self.make_parts(self.poly1, sorted1)
-        #For the second polygon
+        # For the second polygon, split it into parts (lines)
         self.make_parts(self.poly2, sorted2)
         
         #Attach each line segment to a node
@@ -188,16 +202,20 @@ cdef class PolygonOperator(object):
         #Figure out which new polygons are in which old polygon
         for poly in self.new_poly.values():
             #Get a point that is hopefully in the new polygon
-            xp = (poly.x[0]+poly.x[2])/2.0
-            yp = (poly.y[0]+poly.y[2])/2.0
+            i2 = 0
+            xp = (poly.x[0]+poly.x[i2])/2.0
+            yp = (poly.y[0]+poly.y[i2])/2.0
+            while not poly.inpoly(xp, yp):
+                i2 += 1
+                xp = (poly.x[0]+poly.x[i2])/2.0
+                yp = (poly.y[0]+poly.y[i2])/2.0
+                if i2 == len(poly.x)-1:
+                    raise ValueError('could not obtain a point in the polygon')
             
-            if poly.inpoly(xp,yp):
-                if self.poly1.inpoly(xp,yp):
-                    self.in1.append(poly)
-                if self.poly2.inpoly(xp,yp):
-                    self.in2.append(poly)
-            else:
-                raise ValueError('guessed point not in polygon')
+            if self.poly1.inpoly(xp, yp):
+                self.in1.append(poly)
+            if self.poly2.inpoly(xp, yp):
+                self.in2.append(poly)
         
         return self.new_poly.values()
         
@@ -370,11 +388,14 @@ cdef class PolygonOperator(object):
         self.Parts.append( PolyPart(xx, yy, nodes = (Node1,Node2), parent = poly) )
         
 cdef class Node(object):
+    """
+    An intersection point between two lines
+    """
     
-    def __init__(self,x,y,I):
+    def __init__(self, x, y, I):
         self.x = x
         self.y = y
-        self.I = I 
+        self.I = I
         self.children = []
     
     def plot(self, ax): 

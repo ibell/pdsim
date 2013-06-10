@@ -561,7 +561,8 @@ class PDSimCore(_PDSimCore):
                   
             #Call the step callback if provided
             if self.callbacks.step_callback is not None:
-                disable, h = self.callbacks.step_callback(t0, h, Itheta)
+                h = self.callbacks.step_callback(t0, h, Itheta)
+                disable = self.callbacks.step_callback.disable_adaptive
                 if disable:
                     print 'CV have changed'
                     xold = self._get_from_matrices(Itheta)
