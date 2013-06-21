@@ -1049,6 +1049,10 @@ class PDSimCore(_PDSimCore):
         if self.pipe_abort.poll() and self.pipe_abort.recv():
             print 'received an abort request'
             self._want_abort = True
+        
+        if clock() - self.start_time > self.timeout:
+            print 'run timed out'
+            self._want_abort = True
             
         return self._want_abort
         
@@ -1236,6 +1240,7 @@ class PDSimCore(_PDSimCore):
               x0 = None,
               reset_initial_state = False,
               LS_start = 18,
+              timeout = 3600,
               **kwargs):
         """
         This is the driving function for the PDSim model.  It can be extended through the 
@@ -1272,6 +1277,8 @@ class PDSimCore(_PDSimCore):
             If ``True``, use the stored initial state from the previous call to ``solve`` as the starting value for the thermodynamic values for the control volumes
         LS_start : int
             Number of conventional steps to be taken when not using newton-raphson prior to entering into a line search
+        timeout : float
+            Number of seconds before the run times out
             
         step_callback : function
             DEPRECATED! Should be passed to the connect_callbacks() function before running precond_solve() or solve()
@@ -1286,6 +1293,9 @@ class PDSimCore(_PDSimCore):
         """
         if any(cb in kwargs for cb in ['step_callback','endcycle_callback','heat_transfer_callback','lump_energy_balance_callback','valves_callback']):
             raise NotImplementedError('callback functions are no longer passed to solve() function, rather they are passed to connect_callbacks() function prior to calling solve()')
+        
+        self.start_time = clock()
+        self.timeout = timeout
         
         #Connect functions that have been serialized by saving the function name as a string
         self.connect_flow_functions()
