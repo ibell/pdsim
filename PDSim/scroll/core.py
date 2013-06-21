@@ -381,7 +381,7 @@ class Scroll(PDSimCore, _Scroll):
                                       discharge_becomes=disc_becomes_c2,
                                       becomes=becomes_c2))
     
-    def auto_add_leakage(self,flankFunc,radialFunc, radialFunc_kwargs = {}):
+    def auto_add_leakage(self, flankFunc = None, radialFunc = None, radialFunc_kwargs = {}, flankFunc_kwargs = {}):
         """
         Add all the leakage terms for the compressor
         
@@ -389,6 +389,8 @@ class Scroll(PDSimCore, _Scroll):
         ----------
         flankFunc : function
             The function to be used for the flank leakage path
+        flankFunc_kwargs : function
+            Dictionary of terms to be passed to the flank leakage function
         radialFunc : function
             The function to be used for the radial leakage path
         radialFunc_kwargs : dict
@@ -396,10 +398,13 @@ class Scroll(PDSimCore, _Scroll):
             
         """
         
-        #Do the flank leakages
-        self.auto_add_flank_leakage(flankFunc)
-        #Do the radial leakages
-        self.auto_add_radial_leakage(radialFunc, radialFunc_kwargs)
+        if flankFunc is not None:
+            #Do the flank leakages
+            self.auto_add_flank_leakage(flankFunc, flankFunc_kwargs)
+            
+        if radialFunc is not None:
+            #Do the radial leakages
+            self.auto_add_radial_leakage(radialFunc, radialFunc_kwargs)
         
     def auto_add_radial_leakage(self, radialFunc, radialFunc_kwargs):
         """
@@ -424,7 +429,7 @@ class Scroll(PDSimCore, _Scroll):
                                    )
                           )
         
-    def auto_add_flank_leakage(self, flankFunc):
+    def auto_add_flank_leakage(self, flankFunc, flankFunc_kwargs = {}):
         """
         A function to add all the flank leakage terms
         
@@ -432,17 +437,19 @@ class Scroll(PDSimCore, _Scroll):
         ----------
         flankFunc : function
             The function that will be called for each flank leakage
+        flankFunc_kwargs : function
+            Dictionary of terms to be passed to the flank leakage function
         """
         
         # Always a s1-c1 leakage and s2-c2 leakage
-        self.add_flow(FlowPath(key1='s1',key2='c1.1',MdotFcn=flankFunc))
-        self.add_flow(FlowPath(key1='s2',key2='c2.1',MdotFcn=flankFunc))
+        self.add_flow(FlowPath(key1='s1',key2='c1.1',MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
+        self.add_flow(FlowPath(key1='s2',key2='c2.1',MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
         
         # Only add the DDD-S1 and DDD-S2 flow path if there is one set of
         # compression chambers.   
         if scroll_geo.nC_Max(self.geo) == 1:
-            self.add_flow(FlowPath(key1='s1',key2='ddd',MdotFcn=self.DDD_to_S))
-            self.add_flow(FlowPath(key1='s2',key2='ddd',MdotFcn=self.DDD_to_S))
+            self.add_flow(FlowPath(key1 = 's1', key2 = 'ddd',MdotFcn = self.DDD_to_S, MdotFcn_kwargs = flankFunc_kwargs))
+            self.add_flow(FlowPath(key1 = 's2', key2 = 'ddd',MdotFcn = self.DDD_to_S, MdotFcn_kwargs = flankFunc_kwargs))
         
         #Add each pair of compression chambers
         nCmax = scroll_geo.nC_Max(self.geo)
@@ -450,24 +457,25 @@ class Scroll(PDSimCore, _Scroll):
         # Must have at least one pair
         assert (nCmax>=1)
         
-        
         for alpha in range(1,nCmax+1):
             keyc1 = 'c1.'+str(alpha)
             keyc2 = 'c2.'+str(alpha)
             
             if alpha < nCmax - 1:
                 #Leakage between compression chambers along a path
-                self.add_flow(FlowPath(key1=keyc1,
-                                       key2='c1.'+str(alpha+1),
-                                       MdotFcn=flankFunc))
-                self.add_flow(FlowPath(key1=keyc2,
-                                       key2='c2.'+str(alpha+1),
-                                       MdotFcn=flankFunc))
+                self.add_flow(FlowPath(key1 = keyc1,
+                                       key2 = 'c1.'+str(alpha+1),
+                                       MdotFcn = flankFunc,
+                                       MdotFcn_kwargs = flankFunc_kwargs))
+                self.add_flow(FlowPath(key1 = keyc2,
+                                       key2 = 'c2.'+str(alpha+1),
+                                       MdotFcn = flankFunc, 
+                                       MdotFcn_kwargs = flankFunc_kwargs))
                 
             elif alpha==nCmax:
                 #Leakage between the discharge region and the innermost chamber
-                self.add_flow(FlowPath(key1=keyc1,key2='ddd',MdotFcn=flankFunc))
-                self.add_flow(FlowPath(key1=keyc2,key2='ddd',MdotFcn=flankFunc))
+                self.add_flow(FlowPath(key1=keyc1,key2='ddd',MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
+                self.add_flow(FlowPath(key1=keyc2,key2='ddd',MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
     
     def calculate_scroll_mass(self):
         """
@@ -1793,7 +1801,8 @@ class Scroll(PDSimCore, _Scroll):
     def scroll_involute_axial_force(self, theta, p_backpressure = 0):
         """
         Calculate the axial force generated by the pressure distribution 
-        along the top of the scroll wrap 
+        along the top of the scroll wrap.  The force profile returned is the NET 
+        force obtained by subtracting the back pressure from the applied force
         
         Pressure along inner and outer walls is considered to act over one-half 
         of the thickness of the scroll wrap.

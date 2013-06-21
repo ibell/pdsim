@@ -1,4 +1,3 @@
-
 from __future__ import division
 
 import numpy as np
@@ -6,7 +5,12 @@ import cython
 
 import matplotlib.pyplot as plt
 from PDSim.scroll.plots import plotScrollSet
- 
+
+cdef enum sides:
+    UP
+    DOWN
+    MID
+    
 # A container for the values for the heat transfer angles
 cdef class HTAnglesClass(object):
     def __init__(self):
@@ -541,7 +545,7 @@ cpdef double min2(double a, double b):
 cpdef double max2(double a, double b):
     return a if a>b else b
         
-cpdef double radial_leakage_area(double theta, geoVals geo, bytes key1, bytes key2, location = str('up')) except *:
+cpdef double radial_leakage_area(double theta, geoVals geo, bytes key1, bytes key2, int location = UP) except *:
     """
     Get the flow area of the flow path for a given radial flow pair
     
@@ -552,7 +556,7 @@ cpdef double radial_leakage_area(double theta, geoVals geo, bytes key1, bytes ke
     geo : geoVals instance
     key1 : string
     key2 : string
-    location : string, one of ['up','mid','down'], optional
+    location : integer, one of UP,DOWN,MID, optional
         What part of the wrap is used to determine the area.
     
     Returns
@@ -564,14 +568,14 @@ cpdef double radial_leakage_area(double theta, geoVals geo, bytes key1, bytes ke
                    phi_max = cython.double)
     #Get the bounding angles
     phi_min,phi_max = radial_leakage_angles(theta,geo,key1,key2)
-    if location =='up':
+    if location == UP:
         phi_0 = geo.phi_i0
-    elif location == 'down':
+    elif location == DOWN:
         phi_0 = geo.phi_o0
-    elif location == 'mid':
+    elif location == MID:
         phi_0 = (geo.phi_i0+geo.phi_o0)/2
     else:
-        raise KeyError
+        raise ValueError
     A = geo.delta_radial*geo.rb*((phi_max**2-phi_min**2)/2-phi_0*(phi_max-phi_min))
     return A
     
@@ -586,8 +590,6 @@ cpdef tuple radial_leakage_angles(double theta, geoVals geo, bytes key1, bytes k
     geo : geoVals instance
     key1 : string
     key2 : string
-    location : string, one of ['up','mid','down'], optional
-        What part of the wrap is used to determine the area.
     
     Returns
     -------

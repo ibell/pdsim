@@ -1,5 +1,3 @@
-#cython: embedsignature=True
-
 from __future__ import division
 
 import cython
@@ -57,10 +55,11 @@ cdef class PyFlowFunctionWrapper(FlowFunction):
         self.kwargs = kwargs
         
     cpdef double call(self, FlowPath FP) except *:
-        cdef double val
+        cdef double dval
         try:
             val = self.Function(FP, **self.kwargs)
-            return val
+            dval = <double?> val
+            return dval
         except ValueError:
             raise ValueError("Wrapped function in PyFlowFunctionWrapper did not return a floating point value; returned "+str(val))
     

@@ -14,7 +14,7 @@ cpdef double p_pstar(double Ma, double gamma):
     
     .. math::
     
-        \frac{p}{p^*} = \frac{1}{Ma}\left( \frac{(gamma+1)}{2} \right)^{1/2}*\left(1+\frac{(gamma-1)}{2}Ma^2\right)^{-1/2}
+        \frac{p}{p^*} = \frac{1}{Ma}\left( \frac{(\gamma+1)}{2} \right)^{1/2}*\left(1+\frac{(\gamma-1)}{2}Ma^2\right)^{-1/2}
     """
     return 1/Ma*((gamma+1)/2)**0.5*(1+(gamma-1)/2*Ma**2)**(-0.5)
 

@@ -1,3 +1,4 @@
+# cython: profile=True
 from PDSim.flow import flow_models
 from PDSim.flow cimport flow_models
 

@@ -40,7 +40,7 @@ if len(sys.argv) == 1:
 #    sys.argv += ['build_ext','--inplace','install']
 #    sys.argv += ['build','build_ext','install']
 #    sys.argv += ['build','install']
-    sys.argv += ['clean','build','install']
+    sys.argv += ['clean','build','--force','install']
 
 import Cython
 
@@ -101,7 +101,13 @@ for pyx_file in pyx_list:
     #Build an extension with the sources
     ext_name = pyx_file.rsplit('.',1)[0].replace('/','.')
 
-    ext_module_list.append(CyExtension(ext_name,sources,language='c++'))
+    ext_module_list.append(CyExtension(ext_name,
+                                       sources,
+                                       language='c++',
+                                       cython_directives=dict(profile = True,
+                                                              embed_signature = True)
+                                       )
+                           )
 
 setup(
   name = 'PDSim',
