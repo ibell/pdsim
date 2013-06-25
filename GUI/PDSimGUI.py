@@ -510,7 +510,6 @@ class RunToolBook(wx.Panel):
         """
         self.GetTopLevelParent().MTB.SetSelection(1)
         self.GetTopLevelParent().MTB.SolverTB.SetSelection(1)
-        
 
 class FileOutputDialog(wx.Dialog):
     def __init__(self,Simulations, table_string):
@@ -527,7 +526,6 @@ class FileOutputDialog(wx.Dialog):
         self.cmdDirSelect = wx.Button(self,label="Select...")
         self.cmdDirSelect.Bind(wx.EVT_BUTTON,self.OnDirSelect)
         hsizer.Add(self.cmdDirSelect)
-        
         
         #The CSV selections
         file_list = ['Temperature', 'Pressure', 'Volume', 'Density','Mass']
@@ -1172,47 +1170,56 @@ class MainFrame(wx.Frame):
         """
         import glob
         self.plugins_list = []
-        warnings.warn('Add user plugin folder')
-        #Look at each .py file in plugins folder, or any file in user-plugins folder
-        user_plugins_folder = []
-        for py_file in glob.glob(os.path.join('plugins','*.py')) + user_plugins_folder:
-            #Get the root filename (/path/to/AAA.py --> AAA)
+        
+        #  Collect all the .py files in the plugins folder (for standard plugins)
+        #  as well as the user-specified plugin folders 
+        py_files = []
+        for file in glob.glob(os.path.join('plugins','*.py')):
+            py_files.append(file)
+        
+        for directory in GUIconfig.get('plugin_dirs', default = []):
+            for file in glob.glob(directory):
+                py_files.append(file)
+                
+        #  Look at each .py file
+        for py_file in py_files:
+            #  Get the root filename (/path/to/AAA.py --> AAA)
             fname = py_file.split(os.path.sep,1)[1].split('.')[0]
             
             mods = __import__('plugins.'+fname)
-            #Try to import the file as a module
+            #  Try to import the file as a module
             mod = getattr(mods,fname)
             for term in dir(mod):
                 thing = getattr(mod,term)
                 try:
-                    #If it is a plugin class
+                    #  If it is a plugin class
                     if issubclass(thing, pdsim_plugins.PDSimPlugin):
                         
-                        # Instantiate the plugin
+                        #  Instantiate the plugin
                         plugin = thing()
                         
-                        # Give the plugin a link to the main wx.Frame
+                        #  Give the plugin a link to the main wx.Frame
                         plugin.set_GUI(self)
                         
-                        # Check if it should be enabled, if not, go to the next plugin
+                        #  Check if it should be enabled, if not, go to the next plugin
                         if not plugin.should_enable():
                             del plugin
                             continue
                                                 
-                        # Append an instance of the plugin to the list of plugins
+                        #  Append an instance of the plugin to the list of plugins
                         self.plugins_list.append(plugin)
                         
-                        # Create a menu item for the plugin
+                        #  Create a menu item for the plugin
                         menuItem = wx.MenuItem(PluginsMenu, -1, thing.short_description, "", wx.ITEM_CHECK)
                         PluginsMenu.AppendItem(menuItem)
-                        # Bind the event to activate the plugin
+                        #  Bind the event to activate the plugin
                         self.Bind(wx.EVT_MENU, plugin.activate, menuItem)
                                                 
-                        # Check if this type of plugin is included in the config
-                        # file
+                        #  Check if this type of plugin is included in the config
+                        #  file
                         if 'Plugin:'+term in config:
-                            # If it is, activate it and check the element
-                            # in the menu
+                            #  If it is, activate it and check the element
+                            #  in the menu
                             plugin.activate(config = config['Plugin:'+term])
                             menuItem.Check(True)
                         
@@ -1295,6 +1302,10 @@ class MainFrame(wx.Frame):
         self.PluginsMenu = wx.Menu()
         #self.load_plugins(self.PluginsMenu)
         self.MenuBar.Append(self.PluginsMenu, "Plugins")
+        self.menuPluginsManage = wx.MenuItem(self.File, -1, "Manage plugin folders...", "", wx.ITEM_NORMAL)
+        self.PluginsMenu.AppendItem(self.menuPluginsManage)
+        self.Bind(wx.EVT_MENU,self.OnManagePluginFolders,self.menuPluginsManage)
+        self.PluginsMenu.AppendSeparator()
         
         self.Solve = wx.Menu()
         self.SolveSolve = wx.MenuItem(self.Solve, -1, "Solve\tF5", "", wx.ITEM_NORMAL)
@@ -1318,6 +1329,88 @@ class MainFrame(wx.Frame):
     #         Event handlers       #
     ################################
     
+    def OnManagePluginFolders(self, event):
+        plugin_dirs = GUIconfig.get('plugin_dirs', default = [])
+        
+        class DLG(wx.Dialog):
+            def __init__(self,parent,plugin_dirs = [],*args,**kwargs):
+                wx.Dialog.__init__(self,parent,size = (510, 400),*args,**kwargs)
+        
+                #  Build the dialog
+                #  Build the dialog
+                #  Build the dialog
+                
+                sizer = wx.BoxSizer(wx.VERTICAL)
+                
+                sizer.Add(wx.StaticText(self, label='Directories to be searched for plugins'))
+                
+                self.List = wx.ListBox(self)
+                self.List.AppendItems(plugin_dirs)
+                self.List.SetMinSize((500,100))
+                sizer.Add(self.List)
+                
+                rsizer = wx.BoxSizer(wx.HORIZONTAL)
+                
+                self.path_selected = wx.StaticText(self, label = ' Click the select button --------->')
+                self.path_selected.SetMinSize((300,-1))
+                rsizer.Add(self.path_selected, 0, wx.EXPAND)
+                
+                self.select_button = wx.Button(self,label='Select...')
+                rsizer.Add(self.select_button, 0, wx.EXPAND)
+                self.select_button.Bind(wx.EVT_BUTTON,self.OnSelect)
+                
+                self.add_button = wx.Button(self,label='Add')
+                rsizer.Add(self.add_button, 0, wx.EXPAND)
+                self.add_button.Bind(wx.EVT_BUTTON,self.OnAdd)
+                
+                self.remove_button = wx.Button(self,label='Remove Sel.')
+                rsizer.Add(self.remove_button, 0, wx.EXPAND)
+                self.remove_button.Bind(wx.EVT_BUTTON,self.OnRemoveSelected)
+                
+                self.ok_button = wx.Button(self,label='Accept')
+                rsizer.Add(self.ok_button, 0, wx.EXPAND)
+                self.ok_button.Bind(wx.EVT_BUTTON,self.OnAccept)
+                
+                sizer.Add(rsizer,1)
+                
+                self.SetSizer(sizer)
+                sizer.Layout()
+                self.Fit()
+                
+            def OnAccept(self, event):
+                self.EndModal(wx.ID_OK)
+            
+            def OnSelect(self, event):
+                dlg = wx.DirDialog(self, "Choose a directory:",
+                          style=wx.DD_DEFAULT_STYLE|wx.DD_DIR_MUST_EXIST,
+                           #| wx.DD_CHANGE_DIR
+                           defaultPath = os.path.abspath(os.curdir)
+                           )
+
+                if dlg.ShowModal() == wx.ID_OK:
+                    self.path_selected.SetLabel(dlg.GetPath())
+                
+            def OnAdd(self, event):
+                pth = self.path_selected.GetLabel()
+                if os.path.exists(pth) and pth not in self.List.GetStrings():
+                    self.List.Append(pth)
+            
+            def OnRemoveSelected(self, event):
+                sels = self.List.GetSelections()
+                for i in reversed(sorted(sels)):
+                    self.List.Delete(i)
+        
+        dlg = DLG(None, plugin_dirs = plugin_dirs)
+        
+        if dlg.ShowModal() == wx.ID_OK:
+            plugin_dirs = dlg.List.GetStrings()
+        
+            GUIconfig.set('plugin_dirs', plugin_dirs)
+        else:
+            print 'closed'
+            
+        dlg.Destroy()
+        
     def OnClose(self, event):
         if hasattr(self,'WTM') and self.WTM is not None and self.WTM.isAlive():
             dlg = wx.MessageDialog(None,"Simulations are running - can't quit")

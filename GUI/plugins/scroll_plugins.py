@@ -695,7 +695,6 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
     
         return attrs,vals
         
-        
 class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
     """
     A plugin that adds the injection ports for the scroll compressor
@@ -789,7 +788,6 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
             self._activated = False
             
         self.injection_panel.build_from_configfile(config)
-        
             
     def apply(self, ScrollComp, **kwargs):
         """
