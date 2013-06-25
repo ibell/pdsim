@@ -54,9 +54,9 @@ cdef class _Scroll(object):
         #Arc length of the upstream part of the flow path
         
         FP.A = scroll_geo.radial_leakage_area(self.theta,
-                                               self.geo,
-                                               FP.key1,
-                                               FP.key2)
+                                              self.geo,
+                                              FP.key1Index,
+                                              FP.key2Index)
         
         if FP.A == 0.0:
             return 0.0

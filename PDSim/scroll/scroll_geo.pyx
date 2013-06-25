@@ -11,6 +11,124 @@ cdef enum sides:
     DOWN
     MID
     
+cdef enum compressor_CV_indices:
+    keyIsa, keyIs1, keyIs2, keyId1, keyId2, keyIdd, keyIddd
+    keyIc1_1, keyIc2_1, keyIc1_2, keyIc2_2,
+    keyIc1_3, keyIc2_3, keyIc1_4, keyIc2_4,
+    keyIc1_5, keyIc2_5, keyIc1_6, keyIc2_6,
+    keyIc1_7, keyIc2_7, keyIc1_8, keyIc2_8,
+    keyIc1_9, keyIc2_9, keyIc1_10,  keyIc2_10
+    
+cpdef long get_compressor_CV_index(str key) except *:
+    """
+    Returns the index defined in the ``compressor_CV_indices`` enum. 
+    """
+    
+    if key == 'sa':
+        return keyIsa
+    elif key == 's1':
+        return keyIs1
+    elif key == 's2':
+        return keyIs2
+    elif key == 'd1':
+        return keyId1
+    elif key == 'd2':
+        return keyId2
+    elif key == 'dd':
+        return keyIdd
+    elif key == 'ddd':
+        return keyIddd
+    elif key == 'c1.1':
+        return keyIc1_1
+    elif key == 'c2.1':
+        return keyIc2_1
+    elif key == 'c1.2':
+        return keyIc1_2
+    elif key == 'c2.2':
+        return keyIc2_2
+    elif key == 'c1.3':
+        return keyIc1_3
+    elif key == 'c2.3':
+        return keyIc2_3
+    elif key == 'c1.1':
+        return keyIc1_4
+    elif key == 'c2.4':
+        return keyIc2_4
+    elif key == 'c1.5':
+        return keyIc1_5
+    elif key == 'c2.5':
+        return keyIc2_5
+    elif key == 'c1.6':
+        return keyIc1_6
+    elif key == 'c2.6':
+        return keyIc2_6
+    elif key == 'c1.7':
+        return keyIc1_7
+    elif key == 'c2.7':
+        return keyIc2_7
+    elif key == 'c1.8':
+        return keyIc1_8
+    elif key == 'c2.8':
+        return keyIc2_8
+    elif key == 'c1.9':
+        return keyIc1_9
+    elif key == 'c2.9':
+        return keyIc2_9
+    elif key == 'c1.10':
+        return keyIc1_10
+    elif key == 'c2.10':
+        return keyIc2_10
+    else:
+        return -1
+    
+cpdef long get_compression_chamber_index(long path, long alpha):
+    """
+    Return the index for the compression chamber with integers
+    
+    """
+    if path == 1:
+        if alpha == 1:
+            return keyIc1_1
+        elif alpha == 2:
+            return keyIc1_2
+        elif alpha == 3:
+            return keyIc1_3
+        elif alpha == 4:
+            return keyIc1_4
+        elif alpha == 5:
+            return keyIc1_5
+        elif alpha == 6:
+            return keyIc1_6
+        elif alpha == 7:
+            return keyIc1_7
+        elif alpha == 8:
+            return keyIc1_8
+        elif alpha == 9:
+            return keyIc1_9
+        elif alpha == 10:
+            return keyIc1_10
+    elif path == 2:
+        if alpha == 1:
+            return keyIc2_1
+        elif alpha == 2:
+            return keyIc2_2
+        elif alpha == 3:
+            return keyIc2_3
+        elif alpha == 4:
+            return keyIc2_4
+        elif alpha == 5:
+            return keyIc2_5
+        elif alpha == 6:
+            return keyIc2_6
+        elif alpha == 7:
+            return keyIc2_7
+        elif alpha == 8:
+            return keyIc2_8
+        elif alpha == 9:
+            return keyIc2_9
+        elif alpha == 10:
+            return keyIc2_10
+    
 # A container for the values for the heat transfer angles
 cdef class HTAnglesClass(object):
     def __init__(self):
@@ -539,13 +657,13 @@ def plot_injection_ports(theta, geo, phi, ax, inner_outer):
     #Plot the port
     overlay_injection_port(theta, geo, phi, ax, inner_outer)
 
-cpdef double min2(double a, double b):
+cpdef inline double min2(double a, double b):
     return a if a<b else b
 
-cpdef double max2(double a, double b):
+cpdef inline double max2(double a, double b):
     return a if a>b else b
         
-cpdef double radial_leakage_area(double theta, geoVals geo, bytes key1, bytes key2, int location = UP) except *:
+cpdef double radial_leakage_area(double theta, geoVals geo, long key1Index, long key2Index, int location = UP) except *:
     """
     Get the flow area of the flow path for a given radial flow pair
     
@@ -554,8 +672,8 @@ cpdef double radial_leakage_area(double theta, geoVals geo, bytes key1, bytes ke
     theta : float
         crank angle in the range [0, :math:`2\pi`] 
     geo : geoVals instance
-    key1 : string
-    key2 : string
+    key1Index : integer
+    key2Index : integer
     location : integer, one of UP,DOWN,MID, optional
         What part of the wrap is used to determine the area.
     
@@ -564,10 +682,9 @@ cpdef double radial_leakage_area(double theta, geoVals geo, bytes key1, bytes ke
     Area in [\ :math:`m^2`\ ]
     
     """
-    cython.declare(phi_min = cython.double, 
-                   phi_max = cython.double)
+    cdef double phi_min, phi_max
     #Get the bounding angles
-    phi_min,phi_max = radial_leakage_angles(theta,geo,key1,key2)
+    radial_leakage_angles(theta,geo,key1Index,key2Index,&phi_min,&phi_max)
     if location == UP:
         phi_0 = geo.phi_i0
     elif location == DOWN:
@@ -579,7 +696,10 @@ cpdef double radial_leakage_area(double theta, geoVals geo, bytes key1, bytes ke
     A = geo.delta_radial*geo.rb*((phi_max**2-phi_min**2)/2-phi_0*(phi_max-phi_min))
     return A
     
-cpdef tuple radial_leakage_angles(double theta, geoVals geo, bytes key1, bytes key2):
+cdef inline bint matchpair(long key1, long key2, long target1, long target2):
+    return (key1 == target1 and key2 == target2) or (key2 == target1 and key1 == target2)
+ 
+cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, double *angle_min, double *angle_max):
     """
     Get the angles for a given radial flow pair
     
@@ -590,33 +710,26 @@ cpdef tuple radial_leakage_angles(double theta, geoVals geo, bytes key1, bytes k
     geo : geoVals instance
     key1 : string
     key2 : string
-    
-    Returns
-    -------
-    tuple of values with (``phi_min``, ``phi_max``)
+    angle_min : pointer to a double
+    angle_max : pointer to a double
     
     Raises
     ------
     ``KeyError`` if keys are invalid or undefined at the given crank angle 
     
     """
-    cython.declare(phi_min = cython.double, 
-                   phi_max = cython.double, 
-                   sort = cython.tuple,
-                   alpha = cython.long,
-                   Nc = cython.long)
+    cdef double phi_min,phi_max
+    cdef long alpha,Nc
     phi_min = 9e99
     phi_max = 9e99
     Nc = getNc(theta,geo)
     
-    sort = tuple(sorted((key1,key2)))
-    
     #These are always in existence
-    if sort == ('s2','sa') or sort == ('s1','sa'):
+    if matchpair(key1,key2,keyIs2,keyIsa) or matchpair(key1,key2,keyIs1,keyIsa):
             phi_max = geo.phi_ie
             phi_min = max2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0)
     #suction chambers only in contact with each other beyond theta = pi
-    elif sort == ('s1','s2'):
+    elif matchpair(key1,key2,keyIs1,keyIs2):
         if theta > pi:
             phi_max = phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0
             phi_min = geo.phi_ie - theta
@@ -628,29 +741,29 @@ cpdef tuple radial_leakage_angles(double theta, geoVals geo, bytes key1, bytes k
             phi_min = geo.phi_ie - theta
     
     elif Nc == 0 and phi_max>1e90:
-        if sort == ('d2','s1') or sort == ('d1','s2'):
+        if matchpair(key1,key2,keyId2,keyIs1) or matchpair(key1,key2,keyId1,keyIs2):
                 phi_max = geo.phi_ie - theta
                 phi_min = geo.phi_ie - theta - pi
-        elif sort == ('d1','d2'):
+        elif matchpair(key1, key2, keyId1, keyId2):
                 phi_max = geo.phi_ie - theta - pi
                 phi_min = geo.phi_is
         elif theta > theta_d(geo):
             print 'theta = ', theta,theta_d(geo)
             print 'Nc: {Nc:d}'.format(Nc=Nc)
-            raise KeyError('Nc: {Nc:d} sort {sort:s}'.format(Nc=Nc, sort = str(sort)))
+            raise KeyError('Nc: {Nc:d} sort {sort:s}'.format(Nc=Nc, sort = str(tuple(key1,key2))))
     
     if Nc >= 1 and phi_max > 1e90:
-        if sort == ('c2.1','sa') or sort == ('c1.1','sa'):
+        if matchpair(key1,key2,get_compression_chamber_index(2,1),keyIsa) or matchpair(key1,key2,get_compression_chamber_index(1,1),keyIsa):
                 phi_max = max2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
                 phi_min = min2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
-        elif sort == ('c2.1','s1') or sort == ('c1.1','s2'):
+        elif matchpair(key1,key2,get_compression_chamber_index(2,1),keyIs1) or matchpair(key1,key2,get_compression_chamber_index(1,1),keyIs2):
                 #TODO: this could be improved to take into account the non-perfect separation between s-sa and phi_ie
                 phi_max = geo.phi_ie - theta #this is where the change needs to be made
                 phi_min = geo.phi_ie - theta - pi
-        elif sort == ('c1.1','c2.1'):
+        elif matchpair(key1,key2,get_compression_chamber_index(1,1),get_compression_chamber_index(2,1)):
                 phi_max = geo.phi_ie - theta - pi
                 phi_min = geo.phi_ie - theta - 2*pi
-        elif Nc == 1 and (sort == ('c2.1','d1') or sort == ('c1.1','d2')):
+        elif Nc == 1 and (matchpair(key1,key2,get_compression_chamber_index(2,1),keyId1) or matchpair(key1,key2,get_compression_chamber_index(1,1),keyId2)):
                 phi_max = geo.phi_ie - theta - 2*pi
                 phi_min = geo.phi_is
         elif Nc == 1 and theta > theta_d(geo):
@@ -660,25 +773,25 @@ cpdef tuple radial_leakage_angles(double theta, geoVals geo, bytes key1, bytes k
     #Nc > 1
     if Nc > 1 and phi_max > 1e90: 
         for alpha in range(2, Nc+1):
-            if (sort == sorted(('c2.'+str(alpha),'c1.'+str(alpha-1))) or
-                sort == sorted(('c1.'+str(alpha),'c2.'+str(alpha-1)))):
+            if (matchpair(key1,key2,get_compression_chamber_index(2,alpha),get_compression_chamber_index(1,alpha-1)) or
+                matchpair(key1,key2,get_compression_chamber_index(1,alpha),get_compression_chamber_index(2,alpha-1))):
                 phi_max = geo.phi_ie - theta - 2*pi*(alpha-1)
                 phi_min = geo.phi_ie - theta - 2*pi*(alpha-1) - pi
                 break
-            elif sort == sorted(('c2.'+str(alpha),'c1.'+str(alpha))):
+            elif matchpair(key1,key2,get_compression_chamber_index(2,alpha),get_compression_chamber_index(1,alpha)):
                 phi_max = geo.phi_ie - theta - 2*pi*(alpha-1) - pi
                 phi_min = geo.phi_ie - theta - 2*pi*(alpha)
                 break
         if phi_max > 1e90:
-            if sort == ('c2.'+str(Nc),'d1') or sort == ('c1.'+str(Nc),'d2'):
+            if matchpair(key1,key2,get_compression_chamber_index(2,Nc),keyId1) or matchpair(key1,key2,get_compression_chamber_index(1,Nc),keyId2):
                 phi_max = geo.phi_ie - theta - 2*pi*Nc
                 phi_min = geo.phi_is
-    
-    if phi_max is None or phi_min is None:
-        raise KeyError ('For the pair ('+key1+','+key2+') there were no angles found')
+
     if phi_min > phi_max:
         raise ValueError ('For the keys ('+key1+','+key2+') @theta = '+str(theta)+' max < min (error because '+str(phi_max)+' < '+str(phi_min)+')')
-    return (phi_min, phi_max)
+    
+    angle_min[0] = phi_min
+    angle_max[0] = phi_max
 
 def radial_leakage_pairs(geo):
     """

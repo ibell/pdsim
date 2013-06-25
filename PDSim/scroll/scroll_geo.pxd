@@ -32,8 +32,8 @@ cpdef tuple coords_inv(phi_vec,geoVals geo, double theta, flag = *)
 cpdef tuple _coords_inv_np(np.ndarray[np.float_t] phi, geoVals geo, double theta, flag = *)
 cpdef tuple _coords_inv_d(double phi, geoVals geo, double theta, flag = *)
 
-cpdef double radial_leakage_area(double theta, geoVals geo, bytes key1, bytes key2, int location = *) except *
-cpdef tuple radial_leakage_angles(double theta, geoVals geo, bytes key1, bytes key2)
+cpdef double radial_leakage_area(double theta, geoVals geo, long key1, long key2, int location = *) except *
+cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, double *angle_min, double *angle_max)
 
 cpdef tuple scroll_wrap(geoVals geo)
 

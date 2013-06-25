@@ -29,6 +29,7 @@ cdef class FlowPathCollection(list):
 cdef class FlowPath(object):
     cdef public bint exists, key1_exists, key2_exists, key_up_exists, key_down_exists
     cdef public bytes key_up, key_down, key1, key2, Gas
+    cdef public long key1Index, key2Index
     cdef int ikey1, ikey2, ikey_up, ikey_down
     cdef public double mdot, h_up, T_up, p_up, p_down, A
     cdef public FlowFunction MdotFcn

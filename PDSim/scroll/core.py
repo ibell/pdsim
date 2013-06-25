@@ -966,14 +966,19 @@ class Scroll(PDSimCore, _Scroll):
         calls the base class function
         """
         
-        # Get an initial guess before running at all for the motor losses.
+        #  Get an initial guess before running at all for the motor losses.
         self.initial_motor_losses() #set the parameter self.motor.losses
         
-        # Run the suction heating code
+        #  Run the suction heating code
         self.suction_heating()
         
-        # Calculate the dischare port free area
+        #  Calculate the dischare port free area
         #self.cache_discharge_port_blockage()
+        
+        #  Set the index for each control volume 
+        for FP in self.Flows:
+            FP.key1Index = scroll_geo.get_compressor_CV_index(FP.key1)
+            FP.key2Index = scroll_geo.get_compressor_CV_index(FP.key2) 
         
         # Call the base class function        
         PDSimCore.pre_run(self)

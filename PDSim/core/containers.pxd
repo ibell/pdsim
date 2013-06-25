@@ -28,6 +28,7 @@ cdef class Tube(object):
     cdef public int i1,i2
     
 cdef class ControlVolume(object):
+    cdef public long keyIndex
     cdef public bytes key, discharge_becomes
     cdef public object becomes
     cdef public object V_dV

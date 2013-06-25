@@ -1294,6 +1294,8 @@ class PDSimCore(_PDSimCore):
         if any(cb in kwargs for cb in ['step_callback','endcycle_callback','heat_transfer_callback','lump_energy_balance_callback','valves_callback']):
             raise NotImplementedError('callback functions are no longer passed to solve() function, rather they are passed to connect_callbacks() function prior to calling solve()')
         
+        from time import clock
+        
         self.start_time = clock()
         self.timeout = timeout
         
@@ -1851,6 +1853,9 @@ class PDSimCore(_PDSimCore):
             Iold = self.CVs.index(key)
 
             for newkey in becomes:
+                #  If newkey is 'none', the control volume will die at the end
+                #  of the cycle, so just keep going
+                if newkey == 'none': continue
                 Inew = self.CVs.index(newkey)
                 newCV = self.CVs[newkey]
                 # There can't be any overlap between keys
