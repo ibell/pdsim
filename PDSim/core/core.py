@@ -305,6 +305,7 @@ class PDSimCore(_PDSimCore):
         #Get the mean heat transfer rate
         self.HTProcessed.mean_Q = trapz(self.HTProcessed.summed_Q[r], self.t[r])/(self.t[self.Ntheta-1]-self.t[0])
     
+    
     def guess_outlet_temp(self, inletState, p_outlet, eta_a = 0.7):
         """ 
         Function to guess outlet temperature
@@ -1470,6 +1471,8 @@ class PDSimCore(_PDSimCore):
                 if self.x_state[0] is None:
                     return None
             else:
+                x_collector = []
+                error_collector = []
                 diff_old = None
                 x_state_prior = None
                 
@@ -1481,6 +1484,16 @@ class PDSimCore(_PDSimCore):
                     if x_state_prior is None or init_state_counter < LS_start:
                         x_state_prior = self.x_state.copy()
                         errors = OBJECTIVE_CYCLE(x_state_prior)
+                        x_collector.append(x_state_prior)
+                        error_collector.append(errors)
+                        
+#                         if init_state_counter > 5:
+#                             for x,error in zip(x_collector,error_collector):
+#                                 plt.plot(x[1],error[1],'o')
+#                                 plt.plot(x[7],error[7],'^')
+#                                 plt.plot(x[9],error[9],'<')
+#                             plt.show()
+                            
                         if errors is None:
                             break
                         else:

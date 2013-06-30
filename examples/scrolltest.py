@@ -223,19 +223,39 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
                                  )
                         )
     
-    FP = FlowPath(key1='outlet.1', 
-                  key2='dd', 
-                  MdotFcn=IsentropicNozzleWrapper(),
-                  )
-    FP.A = pi*0.006**2/4
-    ScrollComp.add_flow(FP)
-    
-    FP = FlowPath(key1='outlet.1', 
-                  key2='ddd', 
-                  MdotFcn=IsentropicNozzleWrapper(),
-                  )
-    FP.A = pi*0.006**2/4
-    ScrollComp.add_flow(FP)
+    ScrollComp.add_flow(FlowPath(key1 = 'outlet.1',
+                                 key2 = 'dd',
+                                 MdotFcn = ScrollComp.DISC_DD,
+                                 MdotFcn_kwargs = dict(X_d = 0.7)
+                                 )
+                        )
+     
+    ScrollComp.add_flow(FlowPath(key1 = 'outlet.1',
+                                 key2 = 'ddd',
+                                 MdotFcn = ScrollComp.DISC_DD,
+                                 MdotFcn_kwargs = dict(X_d = 0.7)
+                                 )
+                        )
+#     ScrollComp.add_flow(FlowPath(key1 = 'outlet.1',
+#                                  key2 = 'd1',
+#                                  MdotFcn = ScrollComp.DISC_D1,
+#                                  MdotFcn_kwargs = dict(X_d = 0.7)
+#                                  )
+#                         )
+#     
+#     FP = FlowPath(key1='outlet.1', 
+#                   key2='dd', 
+#                   MdotFcn=IsentropicNozzleWrapper(),
+#                   )
+#     FP.A = pi*0.006**2/4
+#     ScrollComp.add_flow(FP)
+#     
+#     FP = FlowPath(key1='outlet.1', 
+#                   key2='ddd', 
+#                   MdotFcn=IsentropicNozzleWrapper(),
+#                   )
+#     FP.A = pi*0.006**2/4
+#     ScrollComp.add_flow(FP)
     
     ScrollComp.add_flow(FlowPath(key1='d1',
                                  key2='dd',

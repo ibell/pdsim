@@ -28,11 +28,13 @@ class PDSimPlugin(object):
         raise NotImplementedError("Subclasses of PDSimPlugin must provide the apply() function")
         
 
-    def _check_script_chunks(self):
+    def _check_plugin_chunks(self, chunks):
         """ Check whether the script chunks are valid """
         
-        allowed = ['post_imports','pre_build','post_build']
-        return all([key in allowed for key in chunks.keys()])
+        allowed = ['pre_import','post_import','pre_build','pre_build_instantiation','post_build_instantiation','post_build','pre_run','post_run']
+        if not all([key in allowed for key in chunks.keys()]):
+            raise ValueError
+        
     
     def get_script_chunks(self):
         """
@@ -40,9 +42,17 @@ class PDSimPlugin(object):
         
         Return a dictionary of chunks (strings) for the script, the keys that are allowed are:
         
-        * ``post_imports`` (goes after all the standard imports)
-        * ``pre_build`` (goes at the beginning of the build function)
-        * ``post_build`` (goes at the end of the build function)
+        * ``pre_import`` (goes before all the standard imports)
+        * ``post_import`` (goes after all the standard imports)
+                
+        * ``pre_build`` (goes at the very beginning of the build function)
+        * ``pre_build_instantiation`` (goes right before instantiation of the PDSimCore subclass)
+        * ``post_build_instatciation`` (goes right before instantiation of the PDSimCore subclass)
+        * ``post_build`` (goes at the very end of the build function)
+        
+        
+        * ``pre_run`` (goes at the beginning of the run function)
+        * ``post_run`` (goes at the end of the run function)
         
         """
         return {}

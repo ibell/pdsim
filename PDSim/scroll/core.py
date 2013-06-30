@@ -19,6 +19,7 @@ from math import pi,cos
 import numpy as np
 import copy
 import types
+import scipy.interpolate
 
 class struct(object):
     pass
@@ -65,6 +66,155 @@ class Scroll(PDSimCore, _Scroll):
         for k,v in d.iteritems():
             setattr(self,k,v)
         
+    def cache_discharge_port_blockage(self, xport = None, yport = None, plot = False):
+        """
+        Precalculate the discharge port blockage using the clipper polygon math module
+        
+        This is computationally quite expensive, which is why it is done only once
+        and then interpolated within.
+        
+        The port position defaults to be equal to the center of arc1 in the discharge 
+        region with 90% the radius of arc1
+        
+        Parameters
+        ----------
+        xport : list or 1D numpy array of x coordinates, optional
+            The x coordinates for the port
+        yport : list or 1D numpy array of x coordinates, optional
+            The y coordinates for the port
+        plot  : bool, optional
+            Whether or not to generate plots for each crank angle
+        """
+        
+        import matplotlib.pyplot as plt
+        from PDSim.misc.clipper import pyclipper
+        
+        scale_factor = 1000000000
+        
+        if xport is None and yport is None:
+            xport = self.geo.xa_arc1 + 0.9*self.geo.ra_arc1*np.cos(np.linspace(0,2*pi,100))
+            yport = self.geo.ya_arc1 + 0.9*self.geo.ra_arc1*np.sin(np.linspace(0,2*pi,100))
+        
+        # Scale the floating points to long integers
+        scaled_xport = xport*scale_factor
+        scaled_yport = yport*scale_factor
+        
+        xinvi, yinvi = scroll_geo.coords_inv(np.linspace(self.geo.phi_is+pi/2,self.geo.phi_is,75), self.geo, 0, flag="fi")
+        xarc1 = self.geo.xa_arc1 + self.geo.ra_arc1*np.cos(np.linspace(self.geo.t2_arc1,self.geo.t1_arc1,75))
+        yarc1 = self.geo.ya_arc1 + self.geo.ra_arc1*np.sin(np.linspace(self.geo.t2_arc1,self.geo.t1_arc1,75))
+        xinvo, yinvo = scroll_geo.coords_inv(np.linspace(self.geo.phi_os,self.geo.phi_os+3*pi/2,75), self.geo, 0, flag="fo")
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+
+        t,A,Add,Ad1=[],[],[],[]
+        for i,theta in enumerate(np.linspace(0,2*pi,100)):
+            
+            THETA = self.geo.phi_ie-pi/2.0-theta
+            
+            def DD_coords():
+                # The coordinates of the dd chamber at the center of the compressor
+                t = np.linspace(self.geo.t1_arc1, self.geo.t2_arc1, 300)
+                x_farc1 = self.geo.xa_arc1+self.geo.ra_arc1*np.cos(t)
+                y_farc1 = self.geo.ya_arc1+self.geo.ra_arc1*np.sin(t)
+                x_oarc1 = -x_farc1 + self.geo.ro*np.cos(THETA)
+                y_oarc1 = -y_farc1 + self.geo.ro*np.sin(THETA)
+                
+                t = np.linspace(self.geo.t1_arc2, self.geo.t2_arc2, 300)
+                x_farc2 = self.geo.xa_arc2+self.geo.ra_arc2*np.cos(t)
+                y_farc2 = self.geo.ya_arc2+self.geo.ra_arc2*np.sin(t)
+                x_oarc2 = -x_farc2 + self.geo.ro*np.cos(THETA)
+                y_oarc2 = -y_farc2 + self.geo.ro*np.sin(THETA)
+                
+                phi = np.linspace(self.geo.phi_is, self.geo.phi_os+pi, 300)
+                (x_finv,y_finv) = scroll_geo.coords_inv(phi,self.geo,theta,'fi')
+                (x_oinv,y_oinv) = scroll_geo.coords_inv(phi,self.geo,theta,'oi')
+                
+                xdd=np.r_[x_farc2[::-1],x_farc1,x_finv,x_oarc2[::-1],x_oarc1,x_oinv,x_farc2[-1]]
+                ydd=np.r_[y_farc2[::-1],y_farc1,y_finv,y_oarc2[::-1],y_oarc1,y_oinv,y_farc2[-1]]
+                
+                return xdd, ydd
+            
+            xdd, ydd = DD_coords()
+            scaled_xdd = xdd*scale_factor
+            scaled_ydd = ydd*scale_factor
+            
+            ax.cla()
+        
+            xscroll = -np.r_[xinvi,xarc1,xinvo,xinvi[0]]+self.geo.ro*np.cos(THETA)
+            yscroll = -np.r_[yinvi,yarc1,yinvo,yinvi[0]]+self.geo.ro*np.sin(THETA)
+            
+            xscroll = xscroll[::-1]
+            yscroll = yscroll[::-1]
+            
+            scaled_xscroll = xscroll*scale_factor
+            scaled_yscroll = yscroll*scale_factor
+            
+            clip = pyclipper.Pyclipper()
+            clip.subject_polygon([pair for pair in zip(scaled_xport, scaled_yport)])
+            clip.clip_polygon([pair for pair in zip(scaled_xscroll, scaled_yscroll)])
+            soln = clip.execute(pyclipper.DIFFERENCE)
+            
+            if plot:
+                ax.plot(scaled_xport, scaled_yport)
+                ax.plot(scaled_xscroll, scaled_yscroll)
+                ax.fill(scaled_xdd, scaled_ydd, alpha = 0.2)
+                
+            for loop in soln:
+                scaled_x, scaled_y = zip(*loop)
+                x = [_/scale_factor for _ in scaled_x]
+                y = [_/scale_factor for _ in scaled_y]
+                if plot:
+                    ax.fill(scaled_x, scaled_y)
+            
+            #  The total flow area unblocked by the scroll wrap    
+            Atotal = sum([pyclipper.area(loop) for loop in soln])/scale_factor**2
+            
+            A_dd = 0
+            for loop in soln:
+                
+                scaled_x, scaled_y = zip(*loop)
+                x = [_/scale_factor for _ in scaled_x]
+                y = [_/scale_factor for _ in scaled_y]
+                if plot:
+                    ax.fill(scaled_x, scaled_y)
+                
+                #  Now see if it has overlap with the DD chamber    
+                clip = pyclipper.Pyclipper()
+                clip.subject_polygon([pair for pair in zip(scaled_x, scaled_y)])
+                clip.clip_polygon([pair for pair in zip(scaled_xdd, scaled_ydd)])
+                soln_dd = clip.execute(pyclipper.INTERSECTION)
+                
+                #  Get the area of overlap with the DD chamber
+                A_dd += sum([pyclipper.area(loop_dd) for loop_dd in soln_dd])/scale_factor**2
+            
+            t.append(theta)
+            A.append(Atotal)
+            Add.append(A_dd)
+            Ad1.append(Atotal-A_dd)
+            
+            if plot:
+                ax.set_xlim(-0.025*scale_factor,0.025*scale_factor)
+                ax.set_ylim(-0.025*scale_factor,0.025*scale_factor)
+                ax.set_aspect(1.0)
+                fig.savefig('disc_'+str(i)+'.png')
+        
+        if plot:
+            fig = plt.figure()  
+            ax = fig.add_subplot(111)
+            ax.plot(t, A, label='A')
+            ax.plot(t, Add, label='Add')
+            ax.plot(t, Ad1, label='Ad1')
+            plt.legend()
+            fig.savefig('A_v_t.png')
+            plt.show()
+            
+        # Create a spline interpolator object for the area between DD and port
+        self.spline_Adisc_DD = scipy.interpolate.splrep(t, Add, k = 2, s = 0)
+        
+        # Create a spline interpolator object for the area between D1 and port
+        self.spline_Adisc_D1 = scipy.interpolate.splrep(t, Ad1, k = 2, s = 0)
+            
     @property
     def theta_d(self):
         return scroll_geo.theta_d(self.geo)
@@ -973,61 +1123,15 @@ class Scroll(PDSimCore, _Scroll):
         self.suction_heating()
         
         #  Calculate the dischare port free area
-        #self.cache_discharge_port_blockage()
+        self.cache_discharge_port_blockage()
         
         #  Set the index for each control volume 
         for FP in self.Flows:
             FP.key1Index = scroll_geo.get_compressor_CV_index(FP.key1)
             FP.key2Index = scroll_geo.get_compressor_CV_index(FP.key2) 
         
-        # Call the base class function        
+        #  Call the base class function        
         PDSimCore.pre_run(self)
-        
-    def cache_discharge_port_blockage(self, xport = None, yport = None):
-        """
-        Precalculate the discharge port blockage using the polygon math module
-        
-        This is computationally quite expensive, which is why it is done only once
-        and then interpolated within.
-        """
-        
-        import matplotlib.pyplot as plt
-        from PDSim.misc.polymath import Polygon, PolygonOperator
-        
-        if xport is None and yport is None:
-            xport = self.geo.xa_arc1 + 0.9*self.geo.ra_arc1*np.cos(np.linspace(0,2*pi,100))
-            yport = self.geo.ya_arc1 + 0.9*self.geo.ra_arc1*np.sin(np.linspace(0,2*pi,100))
-        
-        pport = Polygon(xport,yport)
-        
-        xinvi, yinvi = scroll_geo.coords_inv(np.linspace(self.geo.phi_is+pi/2,self.geo.phi_is,25), self.geo, 0, flag="fi")
-        xarc1 = self.geo.xa_arc1 + self.geo.ra_arc1*np.cos(np.linspace(self.geo.t2_arc1,self.geo.t1_arc1,75))
-        yarc1 = self.geo.ya_arc1 + self.geo.ra_arc1*np.sin(np.linspace(self.geo.t2_arc1,self.geo.t1_arc1,75))
-        xinvo, yinvo = scroll_geo.coords_inv(np.linspace(self.geo.phi_os,self.geo.phi_os+3*pi/2,25), self.geo, 0, flag="fo")
-        
-        # TODO: Add line and arc2 if they exist
-        t,A=[],[]
-        for theta in np.linspace(0,2*pi,100):
-            
-            THETA = self.geo.phi_ie-pi/2.0-theta
-        
-            xscroll = -np.r_[xinvi,xarc1,xinvo]+self.geo.ro*np.cos(THETA)
-            yscroll = -np.r_[yinvi,yarc1,yinvo]+self.geo.ro*np.sin(THETA)
-            
-            pscroll = Polygon(xscroll, yscroll)
-            
-#            plt.plot(xport, yport)
-#            plt.plot(xscroll,yscroll)
-#            
-            s = 0
-            for poly in PolygonOperator(pport, pscroll).Only1():
-                s += poly.area()
-                
-            t.append(theta)
-            A.append(s)
-            
-        plt.plot(t,A)
-        plt.show()
         
     def guess_lump_temps(self, T0):
         """
@@ -1172,7 +1276,7 @@ class Scroll(PDSimCore, _Scroll):
         else:
             return flankFunc(FlowPath)
             
-    def D_to_DD(self,FlowPath,**kwargs):
+    def D_to_DD(self,FlowPath,X_d =1.0,**kwargs):
         if self.__before_discharge1__:
             FlowPath.A = 0.0
         else:
@@ -1180,7 +1284,29 @@ class Scroll(PDSimCore, _Scroll):
         try:
             return flow_models.IsentropicNozzle(FlowPath.A,
                                                 FlowPath.State_up,
-                                                FlowPath.State_down)
+                                                FlowPath.State_down)*X_d
+        except ZeroDivisionError:
+            return 0.0
+        
+    def DISC_DD(self, FP, X_d = 1.0):
+        """
+        The flow path function for the flow between discharge port and the DD chamber
+        """
+        
+        FP.A = scipy.interpolate.splev(self.theta, self.spline_Adisc_DD)
+        try:
+            return flow_models.IsentropicNozzle(FP.A, FP.State_up, FP.State_down) * X_d
+        except ZeroDivisionError:
+            return 0.0
+        
+    def DISC_D1(self, FP, X_d = 1.0):
+        """
+        The flow path function for the flow between discharge port and the D1 chamber
+        """
+        
+        FP.A = scipy.interpolate.splev(self.theta, self.spline_Adisc_D1)
+        try:
+            return flow_models.IsentropicNozzle(FP.A, FP.State_up, FP.State_down) * X_d
         except ZeroDivisionError:
             return 0.0
      

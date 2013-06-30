@@ -19,9 +19,11 @@ cdef class _Scroll(object):
         return dict(theta = self.theta, 
                     geo = self.geo,
                     HTC = self.HTC)
+        
+    
     
     cpdef double SA_S(self, FlowPath FP):
-        FP.A=scroll_geo.Area_s_sa(self.theta,self.geo)
+        FP.A = scroll_geo.Area_s_sa(self.theta, self.geo)
         try:
             return flow_models.IsentropicNozzle(FP.A,FP.State_up,FP.State_down)
         except ZeroDivisionError:

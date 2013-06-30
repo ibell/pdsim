@@ -1,5 +1,9 @@
 # -*- coding: latin-1 -*-
 
+import sys,os
+sys.path.append(os.path.abspath('panels'))
+sys.path.append(os.path.abspath('plugins'))
+
 #Imports from wx package
 import wx
 from wx.lib.mixins.listctrl import CheckListCtrlMixin, ColumnSorterMixin, ListCtrlAutoWidthMixin
@@ -8,7 +12,6 @@ from wx.lib.wordwrap import wordwrap
 wx.SetDefaultPyEncoding('latin-1')
 
 #Provided by python
-import os, sys
 import codecs
 from operator import itemgetter
 from math import pi
@@ -965,31 +968,6 @@ class MainFrame(wx.Frame):
         Return a list of the wx.TextCtrl targets for the logs for each thread
         """
         return self.MTB.RunTB.log_ctrls
-    
-    def update_parametric_terms(self):
-        """
-        Actually update the parametric terms in the parametric table options
-        """
-        para_terms = self.collect_parametric_terms()
-        self.MTB.SolverTB.update_parametric_terms(para_terms)
-        
-    def collect_parametric_terms(self):
-        """
-        This function is called to find all the parametric terms that are
-        required.
-        
-        They can be recursively found in:
-        - self.items in PDPanel instances
-        - collect_parametric_terms in PDPanel instances
-        - 
-        
-        """
-        terms = []
-        #Loop over the toolbooks and allow them to collect their own terms
-        for child in self.MTB.Children:
-            if isinstance(child,wx.Toolbook) and hasattr(child,'collect_parametric_terms'):
-                terms += child.collect_parametric_terms()
-        return terms
         
     def rebuild(self, configfile):
         """
@@ -1031,6 +1009,15 @@ class MainFrame(wx.Frame):
             # rather than 0
             from __future__ import division
             
+            """.format(coolprop_version = coolprop_version,
+                       pdsim_version = pdsim_version,
+                       time_generation = time_generation)
+            )
+        
+    def script_default_imports(self):
+        
+        return textwrap.dedent(
+            """
             # General python imports
             import time, sys, os
             
@@ -1051,10 +1038,7 @@ class MainFrame(wx.Frame):
             from CoolProp import State
             from CoolProp import CoolProp as CP
             
-            
-            """.format(coolprop_version = coolprop_version,
-                       pdsim_version = pdsim_version,
-                       time_generation = time_generation)
+            """
             )
         
     def build(self):
@@ -1072,9 +1056,6 @@ class MainFrame(wx.Frame):
         self.worker=None
         
         self.load_plugins(self.PluginsMenu, self.config)
-#        #After loading plugins, try to set the parameters in the parametric table
-#        self.MTB.SolverTB.flush_parametric_terms()
-#        self.MTB.SolverTB.set_parametric_terms()
     
     def build_simulation_script(self, run_index = 1):
         """
@@ -1087,9 +1068,6 @@ class MainFrame(wx.Frame):
         """
         self.script_chunks = []
         
-        #Get the header for the script
-        self.script_chunks.append(self.script_header())
-        
         def indent_chunk(chunks, N):
             lines = '\n'.join(chunks)
             lines = lines.split('\n')
@@ -1099,23 +1077,54 @@ class MainFrame(wx.Frame):
                 new_lines.append('    '*N+line)
             return '\n'.join(new_lines)+'\n'
         
-#        #Apply any plugins in use - this is the last step in the building process
-#        if hasattr(self,'plugins_list'):
-#            for plugin in self.plugins_list:
-#                if plugin.is_activated():
-#                    raise NotImplementedError
-#                    plugin.get_script_chunks()
+        plugin_chunks = dict(pre_import = '',
+                             post_import = '',
+                             pre_build = '',
+                             post_build = '',
+                             pre_build_instantiation = '',
+                             post_build_instantiation = '',
+                             pre_run = '',
+                             post_run = '',
+                             )
+        
+        #Apply any plugins in use - this is the last step in the building process
+        if hasattr(self,'plugins_list'):
+            for plugin in self.plugins_list:
+                if plugin.is_activated():
+                    # Get the chunks for this plugin
+                    chunks = plugin.get_script_chunks()
+                    
+                    # Check no non-allowed chunks were returned
+                    plugin._check_plugin_chunks(chunks)
+                    
+                    # Append the keys
+                    for key in plugin_chunks.keys():
+                        if key in chunks:
+                            plugin_chunks[key] += chunks[key]
             
+        #Get the header for the script
+        self.script_chunks.append(self.script_header())
+        self.script_chunks.append('####### BEGIN PLUGIN INJECTED CODE ############### \n'+plugin_chunks['pre_import']+'################ END PLUGIN INJECTED CODE ############### \n')
+        self.script_chunks.append(self.script_default_imports())
+        self.script_chunks.append('####### BEGIN PLUGIN INJECTED CODE ############### \n'+plugin_chunks['post_import']+'################ END PLUGIN INJECTED CODE ############### \n')
+        
         self.script_chunks.extend(['def build():\n'])
-        self.script_chunks.extend(['    from PDSim.scroll.core import Scroll\n    sim = Scroll()\n'])
+        self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE ############### \n'+indent_chunk([plugin_chunks['pre_build']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
+        self.script_chunks.extend(['    from PDSim.scroll.core import Scroll\n'])
+        self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE ############### \n'+indent_chunk([plugin_chunks['pre_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
+        self.script_chunks.extend(['    sim = Scroll()\n'])
         self.script_chunks.extend(['    sim.run_index = {run_index:s}\n'.format(run_index = str(run_index))])
+        self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE ############### \n'+indent_chunk([plugin_chunks['post_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
         inputs_chunks = self.MTB.InputsTB.get_script_chunks()
         self.script_chunks.extend(indent_chunk(inputs_chunks,1))
+        self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE ############### \n'+indent_chunk([plugin_chunks['post_build']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
         self.script_chunks.extend(['    return sim\n\n'])
 
         self.script_chunks.extend(['def run(sim, pipe_abort = None):\n'])
+        self.script_chunks.extend(indent_chunk([plugin_chunks['pre_run']],1))
         solver_chunks = self.MTB.SolverTB.get_script_chunks()
         self.script_chunks.extend(indent_chunk(solver_chunks,1))
+        self.script_chunks.extend(indent_chunk([plugin_chunks['post_run']],1))
         
         self.script_chunks.extend(["if __name__ == '__main__':\n    sim = build()\n    run(sim)"])
         
@@ -1178,17 +1187,28 @@ class MainFrame(wx.Frame):
             py_files.append(file)
         
         for directory in GUIconfig.get('plugin_dirs', default = []):
-            for file in glob.glob(directory):
+            for file in glob.glob(os.path.join(directory,'*.py')):
                 py_files.append(file)
-                
+            
+        # Hold an old copy of sys.path
+        import copy
+        old_sys_path = copy.copy(sys.path)
         #  Look at each .py file
         for py_file in py_files:
             #  Get the root filename (/path/to/AAA.py --> AAA)
-            fname = py_file.split(os.path.sep,1)[1].split('.')[0]
+            path, fname = os.path.split(py_file)
+            root, ext = os.path.splitext(fname)
             
-            mods = __import__('plugins.'+fname)
-            #  Try to import the file as a module
-            mod = getattr(mods,fname)
+            # Hack the path to include the directory
+            sys.path = [path]
+            
+            try:
+                #  Try to import the file as a module
+                mod = __import__(root)
+            except IOError:
+                print 'could not import module', root
+                continue
+            
             for term in dir(mod):
                 thing = getattr(mod,term)
                 try:
@@ -1225,6 +1245,9 @@ class MainFrame(wx.Frame):
                         
                 except TypeError:
                     pass
+        
+        # Restore system python path
+        sys.path = old_sys_path
    
     def load_families(self, FamiliesMenu):
         """
@@ -1378,6 +1401,10 @@ class MainFrame(wx.Frame):
                 self.Fit()
                 
             def OnAccept(self, event):
+                dlg = wx.MessageDialog(None,'Folders to be searched for plugins will be applied at the next startup')
+                dlg.ShowModal()
+                dlg.Destroy()
+                
                 self.EndModal(wx.ID_OK)
             
             def OnSelect(self, event):

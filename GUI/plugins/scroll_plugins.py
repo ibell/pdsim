@@ -707,17 +707,16 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
         """
         Only enable if it is a scroll type compressor
         """
-        warnings.warn('Always enabling injection')
+        warnings.warn('Never enabling injection')
 #        if not self.GUI.family.lower() == 'scroll':
 #            return False
 #        else:
-        return True
+        return False
     
     def get_config_chunk(self):
         """
         The chunk for the configuration file
         """
-         
         
         chunk = []
         for line in self.injection_panel.Lines:

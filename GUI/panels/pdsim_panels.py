@@ -293,6 +293,30 @@ class PDPanel(wx.Panel):
                     return item
         raise ValueError('_get_item_by_attr failed')
         
+        
+    def get_annotated_values(self, keys):
+        
+        annotated_values = []
+        for key in keys:
+            mapped_val = self.desc_map[key]
+            if len(mapped_val) == 2:
+                # Get the annotation and the units for the term (no default provided)
+                annotation, units = mapped_val 
+                # Add the annotated object to the list of objects
+                annotated_values.append(AnnotatedValue(key, self.config[key], annotation, units))
+            elif len(mapped_val) == 3:
+                # Get the annotation and the units for the term 
+                annotation, units, default = mapped_val 
+                if hasattr(self,'config') and key in self.config:
+                    # Add the annotated object to the list of objects
+                    annotated_values.append(AnnotatedValue(key, self.config[key], annotation, units))
+                else:
+                    # Add the annotated object to the list of objects
+                    annotated_values.append(AnnotatedValue(key, default, annotation, units))
+                    
+            self.keys_for_config.append(key)
+        return annotated_values
+    
     def _get_value(self,thing):
         #This first should work for wx.TextCtrl
         if hasattr(thing,'GetValue'):

@@ -65,6 +65,7 @@ pyx_list = [
             "PDSim/misc/polymath.pyx",
             "PDSim/misc/stl_utilities.pyx",
             "PDSim/misc/datatypes.pyx",
+            "PDSim/misc/clipper/pyclipper.pyx",
             "PDSim/recip/_recip.pyx",
             "PDSim/scroll/_scroll.pyx"
             ]
@@ -98,6 +99,10 @@ for pyx_file in pyx_list:
         sources+=[pxd_file]
     pxd_files.append(pxd_file)
     
+    # Add sources for clipper module
+    if pyx_file.find('pyclipper') > -1:
+        sources += [os.path.join('PDSim','misc','clipper','clipper.cpp')]
+    
     #Build an extension with the sources
     ext_name = pyx_file.rsplit('.',1)[0].replace('/','.')
 
@@ -116,7 +121,7 @@ setup(
   author_email='ian.h.bell@gmail.com',
   url='http://pdsim.sourceforge.net',
   description = """A flexible open-source framework for the quasi-steady-state simulation of positive displacement machines including compressors and expanders""",
-  packages = ['PDSim','PDSim.core','PDSim.flow','PDSim.plot','PDSim.scroll','PDSim.misc','PDSim.recip'],
+  packages = ['PDSim','PDSim.core','PDSim.flow','PDSim.plot','PDSim.scroll','PDSim.misc','PDSim.recip','PDSim.misc.clipper'],
   cmdclass={'build_ext': build_ext},
   ext_modules = ext_module_list,
   package_data = {'PDSim':pxd_files,'PDSim.include':glob.glob(os.path.join('CoolProp','*.h'))},
