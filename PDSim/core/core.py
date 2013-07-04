@@ -285,6 +285,36 @@ class PDSimCore(_PDSimCore):
             Tube.mdot = max(abs(mdot1), abs(mdot2))
             
         self.mdot = self.FlowsProcessed.mean_mdot[self.key_inlet]
+        
+        self.FlowsProcessed.collected_data = []
+                
+        MdotMat = np.zeros((len(self.FlowStorage[-1]),len(self.FlowStorage)))
+        EdotMat = np.zeros_like(MdotMat)
+        
+        #  Collect matrices of the mass flow and irreversibility for each flow path
+        for j,FlowGroup in enumerate(self.FlowStorage):
+            for i, Flow in enumerate(FlowGroup):
+                
+                MdotMat[i,j] = Flow.mdot
+                if Flow.exists and Flow.State_up is not None and Flow.State_down is not None:    
+                    #  Change in specific irreversibility [kJ/kg]
+                    deltae = (Flow.State_up.h-Flow.State_down.h)-298.15*(Flow.State_up.s-Flow.State_down.s)
+                    #  Irreversibility generation rate [kW]
+                    EdotMat[i,j] = Flow.mdot*deltae
+                
+        for i, Flow in enumerate(self.Flows):
+            
+            data = dict(key1 = Flow.key1,
+                        key2 = Flow.key2,
+                        fcn = str(Flow.MdotFcn),
+                        mdot = MdotMat[i,:],
+                        edot = EdotMat[i,:]
+                        )
+            
+            self.FlowsProcessed.collected_data.append(data)
+            
+        plt.plot(self.t[0:self.Ntheta], MdotMat.T)
+        plt.show()
             
     def _postprocess_HT(self):
         """
@@ -1484,15 +1514,61 @@ class PDSimCore(_PDSimCore):
                     if x_state_prior is None or init_state_counter < LS_start:
                         x_state_prior = self.x_state.copy()
                         errors = OBJECTIVE_CYCLE(x_state_prior)
-                        x_collector.append(x_state_prior)
-                        error_collector.append(errors)
                         
-#                         if init_state_counter > 5:
-#                             for x,error in zip(x_collector,error_collector):
-#                                 plt.plot(x[1],error[1],'o')
-#                                 plt.plot(x[7],error[7],'^')
-#                                 plt.plot(x[9],error[9],'<')
+#                         if init_state_counter > 6 and init_state_counter % 3 == 0:
+#                             Ts1 = [x[1] for x in x_collector]
+#                             eTs1 = [x[1] for x in error_collector]
+#                             
+#                             Tddd = [x[5] for x in x_collector]
+#                             eTddd = [x[5] for x in error_collector]
+#                             
+#                             Tc12 = [x[6] for x in x_collector]
+#                             eTc12 = [x[6] for x in error_collector]
+#                             
+#                             Tc11 = [x[8] for x in x_collector]
+#                             eTc11 = [x[8] for x in error_collector]
+#                             
+#                             
+#                             
+#                             Ds1 = [x[11] for x in x_collector]
+#                             eDs1 = [x[11] for x in error_collector]
+#                             
+#                             Dddd = [x[15] for x in x_collector]
+#                             eDddd = [x[15] for x in error_collector]
+#                             
+#                             Dc12 = [x[16] for x in x_collector]
+#                             eDc12 = [x[16] for x in error_collector]
+#                             
+#                             Dc11 = [x[18] for x in x_collector]
+#                             eDc11 = [x[18] for x in error_collector]
+#                             
+#                             plt.plot(Ts1,eTs1,'o-')
+#                             plt.plot(Tc11,eTc11,'^-')
+#                             plt.plot(Tc12,eTc12,'<-')
+#                             plt.plot(Tddd,eTddd,'<-')
+#                             
+#                             plt.plot(Ds1,eDs1,'o-',mfc='none')
+#                             plt.plot(Dc11,eDc11,'^-',mfc='none')
+#                             plt.plot(Dc12,eDc12,'<-',mfc='none')
+#                             plt.plot(Dddd,eDddd,'<-',mfc='none')
+#                             
 #                             plt.show()
+# 
+#                             derror_dx = (error_collector[-1]-error_collector[-2])/(x_collector[-1]-x_collector[-2])
+#                             dx = -error_collector[-1]/derror_dx
+#                             
+#                             self.x_state = dx + self.x_state
+#                             x_collector, error_collector = [], []
+#                             x_state_new = self.x_state.copy()
+#                             
+#                             print 'old', self.x_state
+#                             print 'new', dx + self.x_state
+#                         else:
+#                             x_collector.append(np.array(x_state_prior))
+#                             error_collector.append(np.array(errors))
+#                             print 'old', self.x_state
+                            
+                            #error = derror_dx*(x-x0)+error0
                             
                         if errors is None:
                             break

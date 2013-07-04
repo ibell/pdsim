@@ -66,7 +66,7 @@ class Scroll(PDSimCore, _Scroll):
         for k,v in d.iteritems():
             setattr(self,k,v)
         
-    def cache_discharge_port_blockage(self, xport = None, yport = None, plot = False):
+    def cache_discharge_port_blockage(self, xport = None, yport = None, plot = False ):
         """
         Precalculate the discharge port blockage using the clipper polygon math module
         

@@ -7,11 +7,6 @@ from flow_models import PyFlowFunctionWrapper
 from CoolProp.State import State as StateClass
 from CoolProp.State cimport State as StateClass
 
-from PDSim.core.containers import TubeCollection
-from PDSim.core.containers cimport TubeCollection
-
-from libc.stdlib cimport malloc, free, calloc
-
 import cython
 
 cpdef tuple sumterms_given_CV(bytes key, list Flows):
@@ -258,6 +253,9 @@ cdef class FlowPath(object):
         FP.A = self.A
         FP.key1_exists = self.key1_exists
         FP.key2_exists = self.key2_exists
+        if self.exists:
+            FP.State_up = self.State_up.copy()#StateClass(self.State_up.Fluid,dict(T=self.State_up.T,D=self.State_up.rho))
+            FP.State_down = self.State_down.copy()#StateClass(self.State_down.Fluid,dict(T=self.State_down.T,D=self.State_down.rho))
         return FP
         
     cpdef calculate(self, arraym harray):

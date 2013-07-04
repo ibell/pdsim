@@ -279,7 +279,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
                                  key_outlet='outlet.2',
                                  solver_method='RK45',
                                  UseNR = False, #If True, use Newton-Raphson ND solver to determine the initial state
-                                 OneCycle = OneCycle,
+                                 OneCycle = True,
                                  plot_every_cycle= False,
                                  hmin = 1e-8
                                  )
