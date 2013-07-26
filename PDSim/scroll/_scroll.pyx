@@ -12,6 +12,7 @@ from libc.math cimport M_PI as pi
 
 cdef int TYPE_RADIAL = flow_models.TYPE_RADIAL
 cdef int TYPE_FLANK = flow_models.TYPE_FLANK
+cdef int TYPE_DISABLED = flow_models.TYPE_DISABLED
 
 cdef class _Scroll(object):
     
@@ -19,8 +20,6 @@ cdef class _Scroll(object):
         return dict(theta = self.theta, 
                     geo = self.geo,
                     HTC = self.HTC)
-        
-    
     
     cpdef double SA_S(self, FlowPath FP):
         FP.A = scroll_geo.Area_s_sa(self.theta, self.geo)
@@ -76,22 +75,43 @@ cdef class _Scroll(object):
                                                              TYPE_RADIAL, 
                                                              t)
         
-    cpdef double FlankLeakage(self,FlowPath FP):
+    cpdef double FlankLeakage(self, FlowPath FP, int Ncv_check = -1):
         """
         Calculate the flank leakage flow rate
+        
+        Parameters
+        ----------
+        FP : FlowPath
+        Ncv_check : int,optional
+            If ``Ncv_check`` is greater than -1, this flow path will only be evaluated
+            when the number of pairs of compression chambers is equal to this value
         """
+        cdef bint _evaluate = False
         cdef double t = -1.0 #Default (not-provided) value
-        #Calculate the area
-        FP.A = self.geo.h*self.geo.delta_flank
-        return flow_models.FrictionCorrectedIsentropicNozzle(
-                             FP.A,
-                             FP.State_up,
-                             FP.State_down,
-                             self.geo.delta_flank,
-                             TYPE_FLANK,
-                             t,
-                             self.geo.ro
-                             )
+        
+        if Ncv_check > -1:
+            if Ncv_check == scroll_geo.getNc(self.theta, self.geo):
+                _evaluate = True
+            else:
+                _evaluate = False
+        else:
+            _evaluate = True
+        
+        if _evaluate:
+            #Calculate the area
+            FP.A = self.geo.h*self.geo.delta_flank
+            return flow_models.FrictionCorrectedIsentropicNozzle(
+                                 FP.A,
+                                 FP.State_up,
+                                 FP.State_down,
+                                 self.geo.delta_flank,
+                                 TYPE_FLANK,
+                                 t,
+                                 self.geo.ro
+                                 )
+        else:
+            return 0.0
+            
         
     cpdef double calcHT(self, double theta, bytes key, double HTC_tune, double dT_dphi, double phim):
         cdef scroll_geo.HTAnglesClass angles

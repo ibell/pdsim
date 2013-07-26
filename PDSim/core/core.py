@@ -257,10 +257,10 @@ class PDSimCore(_PDSimCore):
             trange = self.t[self.Ntheta-1]-self.t[0]
             # integrated_mdoth has units of kJ/rev * f [Hz] --> kJ/s or kW
             self.FlowsProcessed.integrated_mdoth[key]=trapz(self.FlowsProcessed.summed_mdoth[key], 
-                                                            self.t[0:self.Ntheta]/self.omega)*self.omega/(2*pi)
+                                                            self.t[0:self.Ntheta]/self.omega)*self.omega/trange
             # integrated_mdot has units of kg/rev * f [Hz] --> kg/s
             self.FlowsProcessed.integrated_mdot[key]=trapz(self.FlowsProcessed.summed_mdot[key], 
-                                                           self.t[0:self.Ntheta]/self.omega)*self.omega/(2*pi)
+                                                           self.t[0:self.Ntheta]/self.omega)*self.omega/trange
             self.FlowsProcessed.mean_mdot[key]=np.mean(self.FlowsProcessed.integrated_mdot[key])
             
         # Special-case the tubes.  Only one of the nodes can have flow.  
@@ -273,12 +273,12 @@ class PDSimCore(_PDSimCore):
             mdoth_i1 = self.FlowsProcessed.integrated_mdoth[Tube.key1]
             mdoth_i2 = self.FlowsProcessed.integrated_mdoth[Tube.key2]
             #Swap the sign so the sum of the mass flow rates is zero
-            self.FlowsProcessed.mean_mdot[Tube.key1]-=mdot2
-            self.FlowsProcessed.mean_mdot[Tube.key2]-=mdot1
-            self.FlowsProcessed.integrated_mdot[Tube.key1]-=mdot_i2
-            self.FlowsProcessed.integrated_mdot[Tube.key2]-=mdot_i1
-            self.FlowsProcessed.integrated_mdoth[Tube.key1]-=mdoth_i2
-            self.FlowsProcessed.integrated_mdoth[Tube.key2]-=mdoth_i1
+            self.FlowsProcessed.mean_mdot[Tube.key1] -= mdot2
+            self.FlowsProcessed.mean_mdot[Tube.key2] -= mdot1
+            self.FlowsProcessed.integrated_mdot[Tube.key1] -= mdot_i2
+            self.FlowsProcessed.integrated_mdot[Tube.key2] -= mdot_i1
+            self.FlowsProcessed.integrated_mdoth[Tube.key1] -= mdoth_i2
+            self.FlowsProcessed.integrated_mdoth[Tube.key2] -= mdoth_i1
             
             #For each tube, update the flow going through it
             #Tube.mdot is always a positive value
@@ -288,33 +288,35 @@ class PDSimCore(_PDSimCore):
         
         self.FlowsProcessed.collected_data = []
                 
-        MdotMat = np.zeros((len(self.FlowStorage[-1]),len(self.FlowStorage)))
-        EdotMat = np.zeros_like(MdotMat)
-        
-        #  Collect matrices of the mass flow and irreversibility for each flow path
-        for j,FlowGroup in enumerate(self.FlowStorage):
-            for i, Flow in enumerate(FlowGroup):
-                
-                MdotMat[i,j] = Flow.mdot
-                if Flow.exists and Flow.State_up is not None and Flow.State_down is not None:    
-                    #  Change in specific irreversibility [kJ/kg]
-                    deltae = (Flow.State_up.h-Flow.State_down.h)-298.15*(Flow.State_up.s-Flow.State_down.s)
-                    #  Irreversibility generation rate [kW]
-                    EdotMat[i,j] = Flow.mdot*deltae
+#         MdotMat = np.zeros((len(self.FlowStorage[-1]),len(self.FlowStorage)))
+#         EdotMat = np.zeros_like(MdotMat)
+#         
+#         #  Collect matrices of the mass flow and irreversibility for each flow path
+#         for j, FlowGroup in enumerate(self.FlowStorage):
+#             for i, Flow in enumerate(FlowGroup):
+#                 
+#                 MdotMat[i,j] = Flow.mdot
+#                 if Flow.exists and Flow.State_up is not None and Flow.State_down is not None:    
+#                     #  Change in specific availability (exergy) [kJ/kg]
+#                     deltae = (Flow.State_up.h-Flow.State_down.h)-298.15*(Flow.State_up.s-Flow.State_down.s)
+#                     #  Irreversibility generation rate [kW]
+#                     EdotMat[i,j] = Flow.mdot*deltae
                 
         for i, Flow in enumerate(self.Flows):
+             
+            mdot = np.array([Flows[i].mdot for Flows in self.FlowStorage])
+            edot = np.array([Flows[i].edot for Flows in self.FlowStorage])
             
             data = dict(key1 = Flow.key1,
                         key2 = Flow.key2,
-                        fcn = str(Flow.MdotFcn),
-                        mdot = MdotMat[i,:],
-                        edot = EdotMat[i,:]
+                        fcn = Flow.MdotFcn_str,
+                        mdot = mdot,
+                        edot = edot,
+                        mdot_average = np.trapz(mdot, self.t[0:self.Ntheta])/(self.t[self.Ntheta-1]-self.t[0]),
+                        Edot_average = np.trapz(edot, self.t[0:self.Ntheta])/(self.t[self.Ntheta-1]-self.t[0]) 
                         )
-            
+                 
             self.FlowsProcessed.collected_data.append(data)
-            
-        plt.plot(self.t[0:self.Ntheta], MdotMat.T)
-        plt.show()
             
     def _postprocess_HT(self):
         """
@@ -1076,11 +1078,13 @@ class PDSimCore(_PDSimCore):
         Once self._want_abort is ``True``, it will stay latched True until the 
         run is terminated
         """
-        #If you received an abort request, set a flag in the simulation
+        
+        #  If you received an abort request, set a flag in the simulation
         if self.pipe_abort.poll() and self.pipe_abort.recv():
             print 'received an abort request'
             self._want_abort = True
         
+        #  If the run has timed out, quit
         if clock() - self.start_time > self.timeout:
             print 'run timed out'
             self._want_abort = True
@@ -1107,28 +1111,28 @@ class PDSimCore(_PDSimCore):
         kwargs['OneCycle'] = True
         solve_output = self.solve(**kwargs)
         
-        #If abort has already been called, stop and don't keep going
+        #  If abort has already been called, stop and don't keep going
         if not self._want_abort:
             
-            #Iterate over the tubes in order to find the inlet and outlet states
+            #  Iterate over the tubes in order to find the inlet and outlet states
             for key, State in self.Tubes.Nodes.iteritems():
                 if key == self.key_inlet:
                      IS = State
                 if key == self.key_outlet:
                      OS = State
                      
-            # Using Wdot_pv (boundary work), calculate a good guess for the 
-            # outlet enthalpy by assuming the compressor is adiabatic
+            #  Using Wdot_pv (boundary work), calculate a good guess for the 
+            #  outlet enthalpy by assuming the compressor is adiabatic
             h2 = IS.h + self.Wdot_pv/self.mdot
             
-            # Find temperature as a function of enthalpy
+            #  Find temperature as a function of enthalpy
             T2 = Props('T','H',h2,'P',OS.p,OS.Fluid)
             
-            # Now run using the old value of OldCycle if OneCycle was 
-            # not equal to True originally
+            #  Now run using the old value of OldCycle if OneCycle was 
+            #  not equal to True originally
             if not OneCycle_oldval:
                 kwargs['OneCycle'] = OneCycle_oldval
-                kwargs['x0']  = [T2, 0.5*T2+0.5*self.Tamb] #guesses for temperatures of discharge and lump
+                kwargs['x0']  = [T2, 0.5*T2+0.5*self.Tamb] # Guesses for temperatures of discharge and lump
                 kwargs['reset_initial_state'] = True
                 self.solve(**kwargs)
        
@@ -1437,9 +1441,10 @@ class PDSimCore(_PDSimCore):
                         aborted = self.cycle_RK45(x_state,eps_allowed = eps_allowed)
                     else:
                         raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
-                except ValueError:
-                    debug_plots(self)
+                except ValueError as VE:
+                    # debug_plots(self)
                     raise
+                    
                 
                 t2 = clock()
                 print 'Elapsed time for cycle is {0:g} s'.format(t2-t1)

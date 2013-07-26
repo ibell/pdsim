@@ -9,8 +9,6 @@ from libc.stdlib cimport calloc, free, realloc
 from libc.string cimport memcpy
 from cpython cimport bool
 
-cimport cython
-
 cdef class AnnotatedValue(object):
     """
     An annotated value is a structured datatype that is used to hold a python 

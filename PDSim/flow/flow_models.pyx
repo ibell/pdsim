@@ -13,6 +13,7 @@ This is the module that contains all the flow models
 cdef public enum:
     TYPE_RADIAL
     TYPE_FLANK
+    TYPE_DISABLED
     
 cdef public enum:
     OUTPUT_VELOCITY
@@ -229,6 +230,8 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
         G=mdot/InnerFlowArea
         dp_dz=-f/rho*G**2/(2*ID)
         DELTAP=dp_dz*L
+        
+        print 'DELTAP is',DELTAP,'Pa'
 
         if fixed==1:
             # The outlet temperature considering just the wall heat transfer 
@@ -620,13 +623,13 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
     
     if abs(mdot) < 1e-12:
         return mdot
-    # Hydraulic diameter
-    Dh=2 * delta
+    #  Hydraulic diameter
+    Dh = 2 * delta
     
-    # Viscosity for Re
-    mu = State_up.get_visc()  
+    #  Viscosity for Re
+    mu = State_up.get_visc()
     rho_up = State_up.get_rho()
-    # Reynolds number
+    #  Reynolds number
     v = mdot/rho_up/A
     Re=rho_up*v*Dh/mu
 
@@ -646,10 +649,11 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
         Lstar=ro/0.005
         delta_star=delta/10e-6
         mdot_ratio=af_0*pow(Lstar,af_1)/(af_2*delta_star+af_3)*(xi*(af_4*pow(Re,af_5)+af_6)+(1-xi)*(af_7*pow(Re,af_8)+af_9))+af_10
+    elif (Type == <int>TYPE_DISABLED and Re > 1e-12):
+        mdot_ratio = 1.0
     else:
-        mdot_ratio=1.0
-    mdot=mdot/mdot_ratio
-    
+        mdot_ratio = 1.0
+    mdot = mdot/mdot_ratio
     return mdot
 
 

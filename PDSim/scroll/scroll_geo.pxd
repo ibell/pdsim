@@ -23,6 +23,7 @@ cdef class geoVals:
     cdef public double phi_ie_offset, delta_suction_offset
     cdef public double cx_scroll, cy_scroll, V_scroll
     cdef public double Vremove
+    cdef public np.ndarray xvec_disc_port, yvec_disc_port
     
 cpdef double fxA(double rb, double phi, double phi0)
 cpdef double fyA(double rb, double phi, double phi0)

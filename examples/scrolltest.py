@@ -73,9 +73,9 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     ScrollComp.mech.L_ratio_bearings = 3
     ScrollComp.mech.mu_oil = 0.008
     
-    ScrollComp.h_shell = 10
+    ScrollComp.h_shell = 0.02
     ScrollComp.A_shell = 0.05
-    ScrollComp.HTC = 0.0
+    ScrollComp.HTC = 1.0
     
     ScrollComp.motor = Motor()
     ScrollComp.motor.set_eta(0.9)
@@ -213,27 +213,27 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     ScrollComp.add_flow(FlowPath(key1='sa', 
                                  key2='s1',
                                  MdotFcn=ScrollComp.SA_S1,
-                                 MdotFcn_kwargs = dict(X_d = 0.5)
+                                 MdotFcn_kwargs = dict(X_d = 0.7)
                                  )
                         )
     ScrollComp.add_flow(FlowPath(key1 = 'sa',
                                  key2 = 's2',
                                  MdotFcn = ScrollComp.SA_S2,
-                                 MdotFcn_kwargs = dict(X_d = 0.5)
+                                 MdotFcn_kwargs = dict(X_d = 0.7)
                                  )
                         )
     
     ScrollComp.add_flow(FlowPath(key1 = 'outlet.1',
                                  key2 = 'dd',
                                  MdotFcn = ScrollComp.DISC_DD,
-                                 MdotFcn_kwargs = dict(X_d = 0.7)
+                                 MdotFcn_kwargs = dict(X_d = 0.1)
                                  )
                         )
-     
+       
     ScrollComp.add_flow(FlowPath(key1 = 'outlet.1',
                                  key2 = 'ddd',
                                  MdotFcn = ScrollComp.DISC_DD,
-                                 MdotFcn_kwargs = dict(X_d = 0.7)
+                                 MdotFcn_kwargs = dict(X_d = 0.1)
                                  )
                         )
 #     ScrollComp.add_flow(FlowPath(key1 = 'outlet.1',
@@ -249,7 +249,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
 #                   )
 #     FP.A = pi*0.006**2/4
 #     ScrollComp.add_flow(FP)
-#     
+#       
 #     FP = FlowPath(key1='outlet.1', 
 #                   key2='ddd', 
 #                   MdotFcn=IsentropicNozzleWrapper(),
@@ -299,6 +299,13 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
     
 #    debug_plots(ScrollComp)
+
+    Edot_flow = sum([FP['Edot_average'] for FP in ScrollComp.FlowsProcessed.collected_data])
+    print 'Total Losses', ScrollComp.Wdot_electrical-ScrollComp.Wdot_i, 'kW'
+    print 'Motor Losses', ScrollComp.motor.losses, 'kW'
+    print 'Mech. Losses', ScrollComp.losses.bearings, 'kW'
+    print 'Flow Losses', Edot_flow, 'kW'
+    print 'Added Losses (should equal total losses)', Edot_flow+ScrollComp.motor.losses+ScrollComp.losses.bearings,'kW'
     
     del ScrollComp.FlowStorage
     from PDSim.misc.hdf5 import HDF5Writer

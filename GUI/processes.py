@@ -178,7 +178,7 @@ class WorkerThreadManager(Thread):
                 t.daemon = True
                 t.start()
                 self.threadsList.append(t)
-                wx.CallAfter(self.main_stdout.AppendText, 'Adding thread;' + str(len(self.threadsList)) + ' threads active\n') 
+                wx.CallAfter(self.main_stdout.AppendText, 'Adding thread;' + str(len(self.threadsList)) + ' threads active; ' + str(len(self.simulations)) +' remaining \n') 
             
             for _thread in reversed(self.threadsList):
                 if not _thread.is_alive():
@@ -186,7 +186,7 @@ class WorkerThreadManager(Thread):
                     self.threadsList.remove(_thread)
                     #Reclaim the stdout TextCtrl for the next run
                     self.stdout_list.prepend(_thread.stdout_target)
-                    wx.CallAfter(self.main_stdout.AppendText, 'Thread finished; now '+str(len(self.threadsList))+ ' threads active\n')
+                    wx.CallAfter(self.main_stdout.AppendText, 'Thread finished; now '+str(len(self.threadsList))+ ' threads active; ' + str(len(self.simulations)) +' remaining \n')
             
             #Only check every two seconds in order to keep the GUI responsive and not lock up one core
             time.sleep(2.0)

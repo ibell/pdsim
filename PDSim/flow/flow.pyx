@@ -133,6 +133,9 @@ cdef class FlowPathCollection(list):
             FP = self[i]
             if FP.exists:
                 FP.calculate(harray)
+                FP.edot = FP.mdot*((FP.State_up.h-FP.State_down.h)-298.15*(FP.State_up.s-FP.State_down.s))
+            else:
+                FP.edot = 0.0
         
     @cython.cdivision(True)
     cpdef sumterms(self, arraym summerdT, arraym summerdm):
@@ -215,6 +218,8 @@ cdef class FlowPath(object):
             # Add the bound method in a wrapper - this will keep the calls at
             # the Python level which will make them nice to deal with but slow
             self.MdotFcn = PyFlowFunctionWrapper(MdotFcn, MdotFcn_kwargs)
+        
+        self.MdotFcn_str = str(MdotFcn)
             
     cpdef dict __cdict__(self, AddStates=False):
         """
@@ -238,10 +243,11 @@ cdef class FlowPath(object):
         return d
     
     cpdef FlowPath get_deepcopy(self):
-        cdef FlowPath FP = FlowPath()
+        cdef FlowPath FP = FlowPath.__new__(FlowPath)
         FP.Gas = self.Gas
         FP.exists = self.exists
         FP.mdot = self.mdot
+        FP.edot = self.edot
         FP.h_up = self.h_up
         FP.T_up = self.T_up
         FP.p_up = self.p_up
@@ -253,9 +259,9 @@ cdef class FlowPath(object):
         FP.A = self.A
         FP.key1_exists = self.key1_exists
         FP.key2_exists = self.key2_exists
-        if self.exists:
-            FP.State_up = self.State_up.copy()#StateClass(self.State_up.Fluid,dict(T=self.State_up.T,D=self.State_up.rho))
-            FP.State_down = self.State_down.copy()#StateClass(self.State_down.Fluid,dict(T=self.State_down.T,D=self.State_down.rho))
+#         if self.exists:
+#             FP.State_up = self.State_up.copy()
+#             FP.State_down = self.State_down.copy()
         return FP
         
     cpdef calculate(self, arraym harray):

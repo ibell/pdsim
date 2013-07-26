@@ -62,7 +62,6 @@ pyx_list = [
             "PDSim/flow/flow.pyx",
             "PDSim/flow/fanno.pyx",
             "PDSim/scroll/scroll_geo.pyx",
-            "PDSim/misc/polymath.pyx",
             "PDSim/misc/stl_utilities.pyx",
             "PDSim/misc/datatypes.pyx",
             "PDSim/misc/clipper/pyclipper.pyx",

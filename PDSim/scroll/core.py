@@ -66,7 +66,7 @@ class Scroll(PDSimCore, _Scroll):
         for k,v in d.iteritems():
             setattr(self,k,v)
         
-    def cache_discharge_port_blockage(self, xport = None, yport = None, plot = False ):
+    def cache_discharge_port_blockage(self, xport = None, yport = None, plot = False):
         """
         Precalculate the discharge port blockage using the clipper polygon math module
         
@@ -80,7 +80,7 @@ class Scroll(PDSimCore, _Scroll):
         ----------
         xport : list or 1D numpy array of x coordinates, optional
             The x coordinates for the port
-        yport : list or 1D numpy array of x coordinates, optional
+        yport : list or 1D numpy array of y coordinates, optional
             The y coordinates for the port
         plot  : bool, optional
             Whether or not to generate plots for each crank angle
@@ -92,6 +92,7 @@ class Scroll(PDSimCore, _Scroll):
         scale_factor = 1000000000
         
         if xport is None and yport is None:
+            warnings.warn('xport and yport not provided, defaulting back to circular discharge port')
             xport = self.geo.xa_arc1 + 0.9*self.geo.ra_arc1*np.cos(np.linspace(0,2*pi,100))
             yport = self.geo.ya_arc1 + 0.9*self.geo.ra_arc1*np.sin(np.linspace(0,2*pi,100))
         
@@ -108,7 +109,7 @@ class Scroll(PDSimCore, _Scroll):
         ax = fig.add_subplot(111)
 
         t,A,Add,Ad1=[],[],[],[]
-        for i,theta in enumerate(np.linspace(0,2*pi,100)):
+        for i,theta in enumerate(np.linspace(0,2*pi,200)):
             
             THETA = self.geo.phi_ie-pi/2.0-theta
             
@@ -209,10 +210,14 @@ class Scroll(PDSimCore, _Scroll):
             fig.savefig('A_v_t.png')
             plt.show()
             
-        # Create a spline interpolator object for the area between DD and port
+        #  Save these values
+        self.Adisc_dd = Add
+        self.Adisc_d1 = Ad1
+        
+        #  Create a spline interpolator object for the area between DD and port
         self.spline_Adisc_DD = scipy.interpolate.splrep(t, Add, k = 2, s = 0)
         
-        # Create a spline interpolator object for the area between D1 and port
+        #  Create a spline interpolator object for the area between D1 and port
         self.spline_Adisc_D1 = scipy.interpolate.splrep(t, Ad1, k = 2, s = 0)
             
     @property
@@ -571,7 +576,10 @@ class Scroll(PDSimCore, _Scroll):
         pairs = scroll_geo.radial_leakage_pairs(self.geo)
         
         #Loop over all the radial leakage pairs possible for the given geometry
+        warnings.warn('radial s1-c1 disabled')
         for pair in pairs:
+            if 'sa' in pair or 's1' in pair or 's2' in pair:
+                continue
             self.add_flow(FlowPath(key1=pair[0],
                                    key2=pair[1],
                                    MdotFcn=radialFunc,
@@ -594,6 +602,7 @@ class Scroll(PDSimCore, _Scroll):
         # Always a s1-c1 leakage and s2-c2 leakage
         self.add_flow(FlowPath(key1='s1',key2='c1.1',MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
         self.add_flow(FlowPath(key1='s2',key2='c2.1',MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
+        #warnings.warn('flank s1-c1 disabled')
         
         # Only add the DDD-S1 and DDD-S2 flow path if there is one set of
         # compression chambers.   
@@ -607,11 +616,11 @@ class Scroll(PDSimCore, _Scroll):
         # Must have at least one pair
         assert (nCmax>=1)
         
-        for alpha in range(1,nCmax+1):
+        for alpha in range(1, nCmax+1):
             keyc1 = 'c1.'+str(alpha)
             keyc2 = 'c2.'+str(alpha)
             
-            if alpha < nCmax - 1:
+            if alpha <= nCmax - 1:
                 #Leakage between compression chambers along a path
                 self.add_flow(FlowPath(key1 = keyc1,
                                        key2 = 'c1.'+str(alpha+1),
@@ -624,8 +633,18 @@ class Scroll(PDSimCore, _Scroll):
                 
             elif alpha==nCmax:
                 #Leakage between the discharge region and the innermost chamber
-                self.add_flow(FlowPath(key1=keyc1,key2='ddd',MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
-                self.add_flow(FlowPath(key1=keyc2,key2='ddd',MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
+                self.add_flow(FlowPath(key1 = keyc1, key2='ddd', MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
+                self.add_flow(FlowPath(key1 = keyc2, key2='ddd', MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
+            
+            # Update the flag so that this term will only be evaluated when the number of pairs of 
+            # compression chambers in existence will be equal to     
+            flankFunc_kwargs['Ncv_check'] = nCmax - 1
+            
+            if alpha == nCmax - 1:
+                # Leakage between the discharge region and the next-most inner chamber when the innermost chambers
+                # have been swallowed into the discharge region
+                self.add_flow(FlowPath(key1 = keyc1, key2 = 'ddd', MdotFcn = flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
+                self.add_flow(FlowPath(key1 = keyc2, key2 = 'ddd', MdotFcn = flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
     
     def calculate_scroll_mass(self):
         """
@@ -1059,7 +1078,7 @@ class Scroll(PDSimCore, _Scroll):
         
     def ambient_heat_transfer(self, Tshell):
         """
-        The amount of heat transfer from the compressor to the ambient
+        The amount of heat transfer from the compressor to the ambient [kW]
         """
         return self.h_shell*self.A_shell*(Tshell-self.Tamb)
     
@@ -1123,7 +1142,8 @@ class Scroll(PDSimCore, _Scroll):
         self.suction_heating()
         
         #  Calculate the dischare port free area
-        self.cache_discharge_port_blockage()
+        self.cache_discharge_port_blockage(xport = self.geo.xvec_disc_port, 
+                                           yport = self.geo.yvec_disc_port)
         
         #  Set the index for each control volume 
         for FP in self.Flows:
