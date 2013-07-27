@@ -86,7 +86,7 @@ cdef class arraym(object):
         cdef int i
         cdef double el
         cdef np.ndarray[np.float_t, ndim = 1] npdata
-        
+
         if data is not None:
             if isinstance(data,(float,int)):
                 #It is a single value, wrap it in a list
@@ -159,11 +159,7 @@ cdef class arraym(object):
             self.N = 0
     
     def __dealloc__(self):
-        #Clean up the memory we allocated
-        if not self.data == NULL:
-            free(self.data)
-            self.data = NULL
-            self.N = 0
+        self.dealloc()
           
     def __add__(x, y):
         cdef int i, N
@@ -440,8 +436,6 @@ cdef class arraym(object):
             new_data = <double*>realloc(self.data, N*sizeof(double))
             #Copy into the new array
             memcpy(new_data+self.N, array2.data, array2.N*sizeof(double))
-            #Free the old array
-            free(self.data)
             #Make self.data point to the newly allocated array
             self.data = new_data
             #Set the length
