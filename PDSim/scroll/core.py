@@ -575,10 +575,10 @@ class Scroll(PDSimCore, _Scroll):
         #Get all the radial leakage pairs
         pairs = scroll_geo.radial_leakage_pairs(self.geo)
         
-        #Loop over all the radial leakage pairs possible for the given geometry
-        warnings.warn('radial s1-c1 disabled')
+        # Loop over all the radial leakage pairs possible for the given geometry
         for pair in pairs:
-            if 'sa' in pair or 's1' in pair or 's2' in pair:
+            if ('sa' in pair or 's1' in pair or 's2' in pair) and hasattr(self,'disable_radial_suction') and self.disable_radial_suction:
+                warnings.warn('radial s1-c1 disabled')
                 continue
             self.add_flow(FlowPath(key1=pair[0],
                                    key2=pair[1],
@@ -645,6 +645,8 @@ class Scroll(PDSimCore, _Scroll):
                 # have been swallowed into the discharge region
                 self.add_flow(FlowPath(key1 = keyc1, key2 = 'ddd', MdotFcn = flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
                 self.add_flow(FlowPath(key1 = keyc2, key2 = 'ddd', MdotFcn = flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
+                self.add_flow(FlowPath(key1 = keyc1, key2 = 'd1', MdotFcn = flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
+                self.add_flow(FlowPath(key1 = keyc2, key2 = 'd2', MdotFcn = flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
     
     def calculate_scroll_mass(self):
         """

@@ -50,7 +50,7 @@ cpdef long get_compressor_CV_index(str key) except *:
         return keyIc1_3
     elif key == 'c2.3':
         return keyIc2_3
-    elif key == 'c1.1':
+    elif key == 'c1.4':
         return keyIc1_4
     elif key == 'c2.4':
         return keyIc2_4
@@ -708,8 +708,8 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
     theta : float
         crank angle in the range [0, :math:`2\pi`] 
     geo : geoVals instance
-    key1 : string
-    key2 : string
+    key1 : int
+    key2 : int
     angle_min : pointer to a double
     angle_max : pointer to a double
     
@@ -754,8 +754,12 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
     
     if Nc >= 1 and phi_max > 1e90:
         if matchpair(key1,key2,get_compression_chamber_index(2,1),keyIsa) or matchpair(key1,key2,get_compression_chamber_index(1,1),keyIsa):
-                phi_max = max2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
-                phi_min = min2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
+                if theta >= pi:
+                    phi_min = 0
+                    phi_max = 0
+                else:
+                    phi_max = max2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
+                    phi_min = min2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
         elif matchpair(key1,key2,get_compression_chamber_index(2,1),keyIs1) or matchpair(key1,key2,get_compression_chamber_index(1,1),keyIs2):
                 #TODO: this could be improved to take into account the non-perfect separation between s-sa and phi_ie
                 phi_max = geo.phi_ie - theta #this is where the change needs to be made
