@@ -145,9 +145,7 @@ class DiscCurvesPanel(pdsim_panels.PDPanel):
         else:
             type = '2Arc'
             r2 = 0.0
-        
-        print type, config
-        #raise ValueError
+
         self.type = wx.Choice(self)
         self.type.AppendItems(['2 Arcs','Arc-Line-Arc'])
         if type == '2Arc':

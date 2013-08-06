@@ -1017,7 +1017,7 @@ class MainFrame(wx.Frame):
                        time_generation = time_generation)
             )
         
-    def script_default_imports(self):
+    def script_default_imports(self, plugin_paths):
         
         return textwrap.dedent(
             """
@@ -1041,7 +1041,10 @@ class MainFrame(wx.Frame):
             from CoolProp import State
             from CoolProp import CoolProp as CP
             
-            """
+            # Add the paths for any additional plugin folders (hard-coded absolute paths)
+            sys.path.extend({plugin_paths:s})
+            
+            """.format(plugin_paths = plugin_paths)
             )
         
     def build(self):
@@ -1104,29 +1107,32 @@ class MainFrame(wx.Frame):
                     for key in plugin_chunks.keys():
                         if key in chunks:
                             plugin_chunks[key] += chunks[key]
+                            
+        #  Get the paths for all the plugin folders
+        plugin_paths = str(GUIconfig.get('plugin_dirs', default = []))
             
         #Get the header for the script
         self.script_chunks.append(self.script_header())
         if plugin_chunks['pre_import']:
-            self.script_chunks.append('####### BEGIN PLUGIN INJECTED CODE ############### \n'+plugin_chunks['pre_import']+'################ END PLUGIN INJECTED CODE ############### \n')
-        self.script_chunks.append(self.script_default_imports())
+            self.script_chunks.append('####### BEGIN PLUGIN INJECTED CODE (pre-import) ############### \n'+plugin_chunks['pre_import']+'################ END PLUGIN INJECTED CODE ############### \n')
+        self.script_chunks.append(self.script_default_imports(plugin_paths))
         if plugin_chunks['post_import']:
-            self.script_chunks.append('####### BEGIN PLUGIN INJECTED CODE ############### \n'+plugin_chunks['post_import']+'################ END PLUGIN INJECTED CODE ############### \n')
+            self.script_chunks.append('####### BEGIN PLUGIN INJECTED CODE (post-import) ############### \n'+plugin_chunks['post_import']+'################ END PLUGIN INJECTED CODE ############### \n')
         
         self.script_chunks.extend(['def build():\n'])
         if plugin_chunks['pre_build']:
-            self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE ############### \n'+indent_chunk([plugin_chunks['pre_build']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
+            self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE (pre-build) ############### \n'+indent_chunk([plugin_chunks['pre_build']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
         self.script_chunks.extend(['    from PDSim.scroll.core import Scroll\n'])
         if plugin_chunks['pre_build_instantiation']:
-            self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE ############### \n'+indent_chunk([plugin_chunks['pre_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
+            self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE (pre-build-instantiation) ############### \n'+indent_chunk([plugin_chunks['pre_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
         self.script_chunks.extend(['    sim = Scroll()\n'])
         self.script_chunks.extend(['    sim.run_index = {run_index:s}\n'.format(run_index = str(run_index))])
         if plugin_chunks['post_build_instantiation']:
-            self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE ############### \n'+indent_chunk([plugin_chunks['post_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
+            self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE (post-build-instantiation) ############### \n'+indent_chunk([plugin_chunks['post_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
         inputs_chunks = self.MTB.InputsTB.get_script_chunks()
         self.script_chunks.extend(indent_chunk(inputs_chunks,1))
         if plugin_chunks['post_build']:
-            self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE ############### \n'+indent_chunk([plugin_chunks['post_build']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
+            self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE (post-build) ############### \n'+indent_chunk([plugin_chunks['post_build']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
         self.script_chunks.extend(['    return sim\n\n'])
 
         self.script_chunks.extend(['def run(sim, pipe_abort = None):\n'])
@@ -1574,7 +1580,8 @@ class MainFrame(wx.Frame):
             self.WTM.abort()
         
     def OnQuit(self, event):
-        self.Close()
+        self.Destroy()
+        wx.Exit()
         
     def OnIdle(self, event):
         """
