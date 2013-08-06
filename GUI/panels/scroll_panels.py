@@ -474,15 +474,19 @@ class MassFlowPanel(pdsim_panels.PDPanel):
     def __init__(self, parent, configdict, **kwargs):
     
         pdsim_panels.PDPanel.__init__(self, parent, **kwargs)
-        
-        for flow in ['sa-s1', 'sa-s2', 'inlet.2-sa']:
-            model = configdict[flow]['model']
-            options = configdict[flow]['options']
+        options = {}
+        for flow in ['sa-s1', 'sa-s2', 'inlet.2-sa','d1-dd','d2-dd']:
+            if flow not in configdict:
+                options[flow] = dict(model = 'IsentropicNozzle', options = dict(Xd = 0.7))
+            else:
+                options[flow] = dict(model = configdict[flow]['model'], options = configdict[flow]['options'])
             
         sizer = wx.BoxSizer(wx.VERTICAL)
-        self.flow1 = FlowOptions(self, 'sa-s1', [configdict['sa-s1']])
-        self.flow2 = FlowOptions(self, 'sa-s2', [configdict['sa-s2']])
-        self.flow3 = FlowOptions(self, 'inlet.2-sa', [configdict['inlet.2-sa']])
+        self.flow1 = FlowOptions(self, 'sa-s1', [options['sa-s1']])
+        self.flow2 = FlowOptions(self, 'sa-s2', [options['sa-s2']])
+        self.flow3 = FlowOptions(self, 'inlet.2-sa', [options['inlet.2-sa']])
+        self.flow4 = FlowOptions(self, 'd1-dd', [options['d1-dd']])
+        self.flow5 = FlowOptions(self, 'd2-dd', [options['d2-dd']])
         
         sizer.Add(pdsim_panels.HeaderStaticText(self,'Flow model parameters') , 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(10)
@@ -494,6 +498,12 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         sizer.AddSpacer(5)
         sizer.Add(wx.StaticText(self,label='inlet.2-sa'), 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.Add(self.flow3, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(wx.StaticText(self,label='d1-dd'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(self.flow4, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(wx.StaticText(self,label='d2-dd'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(self.flow5, 0, wx.ALIGN_CENTER_HORIZONTAL)
         
         self.SetSizer(sizer)
         sizer.Layout()
@@ -521,6 +531,8 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         Xd_sa_s1 = self.main.get_GUI_object_value('flow pathsa-s1|Xd')
         Xd_sa_s2 = self.main.get_GUI_object_value('flow pathsa-s2|Xd')
         Xd_inlet = self.main.get_GUI_object_value('flow pathinlet.2-sa|Xd')
+        Xd_d1_dd = self.main.get_GUI_object_value('flow pathd1-dd|Xd')
+        Xd_d2_dd = self.main.get_GUI_object_value('flow pathd2-dd|Xd')
                        
         configdict = {}
         configdict['sa-s1'] = dict(options = dict(Xd = Xd_sa_s1), 
@@ -529,6 +541,11 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                                    model='IsentropicNozzle')
         configdict['inlet.2-sa'] = dict(options = dict(Xd = Xd_inlet), 
                                         model='IsentropicNozzle')
+        configdict['d1-dd'] = dict(options = dict(Xd = Xd_inlet), 
+                                        model='IsentropicNozzle')
+        configdict['d2-dd'] = dict(options = dict(Xd = Xd_inlet), 
+                                        model='IsentropicNozzle')
+        
         return configdict
         
     def get_script_chunks(self):
@@ -536,6 +553,8 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         Xd_dict = dict(Xd_sa_s1 = str(self.main.get_GUI_object_value('flow pathsa-s1|Xd')),
                        Xd_sa_s2 = str(self.main.get_GUI_object_value('flow pathsa-s2|Xd')),
                        Xd_inlet = str(self.main.get_GUI_object_value('flow pathinlet.2-sa|Xd')),
+                       Xd_d1_dd = str(self.main.get_GUI_object_value('flow pathd1-dd|Xd')),
+                       Xd_d2_dd = str(self.main.get_GUI_object_value('flow pathd2-dd|Xd')),
                        inlet_tube_length = str(self.main.get_GUI_object_value('inlet_tube_length')),
                        outlet_tube_length = str(self.main.get_GUI_object_value('outlet_tube_length')),
                        inlet_tube_ID = str(self.main.get_GUI_object_value('inlet_tube_ID')),
@@ -610,10 +629,16 @@ class MassFlowPanel(pdsim_panels.PDPanel):
             
             sim.add_flow(FlowPath(key1='d1',
                                   key2='dd',
-                                  MdotFcn=sim.D_to_DD))
+                                  MdotFcn=sim.D_to_DD,
+                                  MdotFcn_kwargs = dict(X_d = {Xd_d1_dd:s})
+                                  )
+                              )
             sim.add_flow(FlowPath(key1='d2',
                                   key2='dd',
-                                  MdotFcn=sim.D_to_DD))
+                                  MdotFcn=sim.D_to_DD,
+                                  MdotFcn_kwargs = dict(X_d = {Xd_d2_dd:s})
+                                  )
+                        )
             """.format(**Xd_dict)
             )
         

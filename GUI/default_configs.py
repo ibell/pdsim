@@ -83,6 +83,12 @@ MassFlowPanel:
   inlet.2-sa:
       model : IsentropicNozzle
       options : {Xd : 0.8}
+  d1-dd:
+      model : IsentropicNozzle
+      options : {Xd : 0.8}
+  d2-dd:
+      model : IsentropicNozzle
+      options : {Xd : 0.8}      
 
 MechanicalLossesPanel:
   eta_motor : 0.95 # Motor efficiency [-]

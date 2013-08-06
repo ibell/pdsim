@@ -930,6 +930,8 @@ class ParaSelectDialog(wx.Dialog):
 
 
 class ParametricOption(wx.Panel):
+    
+    
     def __init__(self, parent, GUI_objects):
         wx.Panel.__init__(self, parent)
         
@@ -1129,7 +1131,7 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
         
         row = [0]*(self.GetColumnCount()-1)
         
-        i = len(self.data)-1
+        i = len(self.data)
         self.InsertStringItem(i,'')
         for j,val in enumerate(row):
             self.SetStringItem(i,j+1,str(val))
@@ -1167,6 +1169,9 @@ class HackedButton(wx.Button):
         self.SetEvtHandlerEnabled(False)
          
 class ParametricPanel(PDPanel):
+    """
+    The top-level panel to contain all the things for the parametric table
+    """
     def __init__(self, parent, configdict, **kwargs):
         PDPanel.__init__(self, parent, **kwargs)
         
@@ -1318,7 +1323,7 @@ class ParametricPanel(PDPanel):
             h = self.RowCountSpinnerText.GetSize().height
             w = self.RowCountSpinnerText.GetSize().width + self.RowCountSpinnerText.GetPosition().x + 2
             self.RowCountSpinner = wx.SpinButton(self, wx.ID_ANY, (w,50), (h*2/3,h), style = wx.SP_VERTICAL)
-            self.RowCountSpinner.SetRange(1, 100)
+            self.RowCountSpinner.SetRange(1, 1000)
             self.RowCountSpinner.SetValue(1)
             self.RowCountSpinner.Bind(wx.EVT_SPIN_UP, self.OnSpinUp)
             self.RowCountSpinner.Bind(wx.EVT_SPIN_DOWN, self.OnSpinDown)
@@ -1399,24 +1404,27 @@ class ParametricPanel(PDPanel):
         Fires when the spinner is used to decrease the number of rows
         """
         
-        if event.GetPosition()>=1:
+        #  Remove the last row
+        self.ParaList.RemoveLastRow()
             
-            # Set the textbox value
-            self.RowCountSpinnerText.SetValue(str(event.GetPosition()))
-        
-            #Remove the last row
-            self.ParaList.RemoveLastRow()
+        #  Set the textbox value
+        self.RowCountSpinner.SetValue(self.ParaList.GetItemCount())
+        self.RowCountSpinnerText.SetValue(str(self.ParaList.GetItemCount()))
         
         
     def OnSpinUp(self, event):
         """ 
         Fires when the spinner is used to increase the number of rows
         """
-        #Set the textbox value
-        self.RowCountSpinnerText.SetValue(str(event.GetPosition()))
         
-        #Add a row
+        #  Add a row
         self.ParaList.AddRow()
+        
+        #  Set the textbox value
+        self.RowCountSpinner.SetValue(self.ParaList.GetItemCount())
+        self.RowCountSpinnerText.SetValue(str(self.ParaList.GetItemCount()))
+        
+        
         
     def build_all_scripts(self):
         sims = []
@@ -1581,6 +1589,8 @@ class ParametricPanel(PDPanel):
         if 'terms' not in configdict:
             return
         
+        print configdict['terms']
+        
         for term in configdict['terms']:
             option = self.OnAddTerm()
             option.set_values(term['key'], term['vals'])
@@ -1594,10 +1604,14 @@ class ParametricPanel(PDPanel):
                 for i,v in enumerate(configdict['terms'][0]['vals']):
                     if i > 0:
                         self.ParaList.AddRow()
+                        self.NTerms += 1
             
             for i,term in enumerate(configdict['terms']):
                 for j,v in enumerate(term['vals']):
                     self.ParaList.SetCellValue(j,i,str(v))
+                    
+            self.RowCountSpinner.SetValue(self.ParaList.GetItemCount())
+            self.RowCountSpinnerText.SetValue(str(self.ParaList.GetItemCount()))
         
     def get_config_chunk(self):
         
