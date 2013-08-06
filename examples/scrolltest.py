@@ -37,6 +37,9 @@ import time
 Injection = False
 check_valve = False
 
+## CP.enable_TTSE_LUT('Propane')
+## CP.set_TTSE_mode('Propane',"BICUBIC")
+
 def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     if TTSE:
         CP.set_TTSESinglePhase_LUT_size("Propane", 500, 500)
@@ -279,7 +282,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
                                  key_outlet='outlet.2',
                                  solver_method='RK45',
                                  UseNR = False, #If True, use Newton-Raphson ND solver to determine the initial state
-                                 OneCycle = True,
+                                 OneCycle = False,
                                  plot_every_cycle= False,
                                  hmin = 1e-8
                                  )

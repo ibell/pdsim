@@ -1387,19 +1387,28 @@ class ParametricPanel(PDPanel):
         rows = [row.split('\t') for row in rows]
         #Check that the dimensions of pasted section and table are the same
         if not self.ParaList.GetItemCount() == len(rows):
-            msg = 'There are '+str(len(rows))+' rows in your pasted table, but '+str(self.ParaList.GetItemCount())+' rows in the table'
+            msg = 'There are '+str(len(rows))+' rows in your pasted table, but '+str(self.ParaList.GetItemCount())+' rows in the table.  Resize table to fit?'
             dlg = wx.MessageDialog(None, msg)
-            dlg.ShowModal()
-            dlg.Destroy()
-            return
-        else:
-            #Right number of rows, set the values
-            for i,row in enumerate(rows): 
-                for j,item in enumerate(row): 
-                    self.ParaList.SetStringItem(i,j+1,item)
-                    self.ParaList.data[i][j] = item
+            if dlg.ShowModal() == wx.ID_OK:
+                #  Resize table to fit
+                if len(rows) < self.ParaList.GetItemCount():
+                    while self.ParaList.GetItemCount() > len(rows):
+                        self.OnSpinDown()
+                if len(rows) > self.ParaList.GetItemCount():
+                    while self.ParaList.GetItemCount() < len(rows):
+                        self.OnSpinUp()
+                dlg.Destroy()
+            else:
+                dlg.Destroy()
+                return
+            
+        #Right number of rows, set the values
+        for i,row in enumerate(rows): 
+            for j,item in enumerate(row): 
+                self.ParaList.SetStringItem(i,j+1,item)
+                self.ParaList.data[i][j] = item
         
-    def OnSpinDown(self, event):
+    def OnSpinDown(self, event = None):
         """ 
         Fires when the spinner is used to decrease the number of rows
         """
@@ -1412,7 +1421,7 @@ class ParametricPanel(PDPanel):
         self.RowCountSpinnerText.SetValue(str(self.ParaList.GetItemCount()))
         
         
-    def OnSpinUp(self, event):
+    def OnSpinUp(self, event = None):
         """ 
         Fires when the spinner is used to increase the number of rows
         """
@@ -1423,8 +1432,6 @@ class ParametricPanel(PDPanel):
         #  Set the textbox value
         self.RowCountSpinner.SetValue(self.ParaList.GetItemCount())
         self.RowCountSpinnerText.SetValue(str(self.ParaList.GetItemCount()))
-        
-        
         
     def build_all_scripts(self):
         sims = []
