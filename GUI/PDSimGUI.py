@@ -979,8 +979,11 @@ class MainFrame(wx.Frame):
         # the frame
         position = self.GetPosition()
         size = self.GetSize()
-        frame = MainFrame(configfile, position=position, size=size)
-        frame.Show()
+        try:
+            frame = MainFrame(configfile, position=position, size=size)
+            frame.Show()
+        except:
+            pass
         
         #Destroy the current MainFrame
         self.Destroy()

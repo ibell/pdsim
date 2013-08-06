@@ -125,6 +125,52 @@ class ScrollWrapAnglesFrame(wx.Frame):
         main_sizer.Layout()
         self.SetClientSize(main_sizer.GetMinSize())
     
+class DiscCurvesPanel(pdsim_panels.PDPanel):
+    
+    def __init__(self, parent, config):
+        pdsim_panels.PDPanel.__init__(self, parent)
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer2 = wx.BoxSizer(wx.HORIZONTAL)
+        
+        if 'disc_curves' in config:
+            if 'type' in config['disc_curves']:
+                type = config['disc_curves']['type']
+            else:
+                type = '2Arc'
+            if 'r2' in config['disc_curves']:
+                r2 = config['disc_curves']['r2']
+            else:
+                r2 = 0.0
+        else:
+            type = '2Arc'
+            r2 = 0.0
+        
+        print type, config
+        #raise ValueError
+        self.type = wx.Choice(self)
+        self.type.AppendItems(['2 Arcs','Arc-Line-Arc'])
+        if type == '2Arc':
+            self.type.SetSelection(0)
+        elif type == 'ArcLineArc':
+            self.type.SetSelection(1)
+        else:
+            raise ValueError
+        sizer.Add(self.type)
+        
+        sizer2.Add(wx.StaticText(self,label='Radius of arc 2'))
+        self.r2 = wx.TextCtrl(self, value=str(r2))
+        sizer2.Add(self.r2)
+        sizer.Add(sizer2)
+        
+        self.SetSizer(sizer)
+        sizer.Layout()
+        
+        #  Link callback for refresh of this panel with changing any input
+        #  parameter 
+        for o in [self.type, self.r2]:
+            o.Bind(wx.EVT_KILL_FOCUS, self.GetGrandParent().OnRefresh)
+        
 class GeometryPanel(pdsim_panels.PDPanel):
     """
     The geometry panel of the scroll compressor
@@ -191,6 +237,15 @@ class GeometryPanel(pdsim_panels.PDPanel):
         annotated_GUI_objects = self.construct_items(annotated_values, 
                                                      sizer = sizer_for_wrap_inputs, 
                                                      parent = scrolled_panel)
+        
+        
+        #----------------------------------------------------------------------
+        # The sizer for the discharge curves data
+        sizer_for_discharge_curves_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+        
+        self.disc_curves = DiscCurvesPanel(scrolled_panel, config)
+        
+        sizer_for_discharge_curves_inputs.Add(self.disc_curves)
         
         #----------------------------------------------------------------------
         # The sizer for all the discharge objects
@@ -260,6 +315,8 @@ class GeometryPanel(pdsim_panels.PDPanel):
         sizer.Add(sizer_for_wrap_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
         sizer.Add(HeaderStaticText(scrolled_panel, 'Discharge Region Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_discharge_curves_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
         sizer.Add(sizer_for_discharge_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
@@ -333,7 +390,22 @@ class GeometryPanel(pdsim_panels.PDPanel):
                                    phi_os = get('phi_fos'),
                                    phi_is = get('phi_fis')
                                    )
-        self.Scroll.set_disc_geo('2Arc', r2 = 0)
+        
+        if self.disc_curves.type.GetStringSelection() == '2 Arcs':
+            disc_curves_type = '2Arc'
+        elif self.disc_curves.type.GetStringSelection() == 'Arc-Line-Arc':
+            disc_curves_type = 'ArcLineArc'
+        else:
+            raise ValueError
+        
+        #  Get r2 as a string, convert to a floating point value if possible
+        r2 = self.disc_curves.r2.GetValue()
+        try:
+            r2 = float(r2)
+        except ValueError:
+            pass 
+        
+        self.Scroll.set_disc_geo(disc_curves_type, r2 = r2)
         
         if get('use_offset'):
             self.Scroll.geo.phi_ie_offset = pi
@@ -365,13 +437,27 @@ class GeometryPanel(pdsim_panels.PDPanel):
         
     def get_config_chunk(self):
         
+        #  All the conventional terms
         keys = ['Vdisp','Vratio','t','ro','phi_fi0','phi_fis','phi_fos',
                 'use_offset','delta_offset','delta_flank','delta_radial',
                 'd_discharge','inlet_tube_length', 'inlet_tube_ID', 
                 'outlet_tube_length', 'outlet_tube_ID']
         
-        #Dictionary of the values
-        return {key:self.main.get_GUI_object_value(key) for key in keys}
+        #  Dictionary of the values
+        d = {key:self.main.get_GUI_object_value(key) for key in keys}
+        
+        #  Added values for the discharge curves
+        disc_type = self.disc_curves.type.GetStringSelection()
+        if disc_type == '2 Arcs':
+            disc_type = '2Arc'
+        elif disc_type == 'Arc-Line-Arc':
+            disc_type = 'ArcLineArc'
+        else:
+            raise ValueError
+        disc_r2 = self.disc_curves.r2.GetValue()
+        d.update(dict(disc_curves = dict(type = disc_type, r2 = disc_r2)))
+        
+        return d
         
     def get_script_chunks(self):
         
@@ -384,6 +470,23 @@ class GeometryPanel(pdsim_panels.PDPanel):
         else:
             phi_ie_offset = str(0)
             
+        if self.disc_curves.type.GetStringSelection() == '2 Arcs':
+            disc_curves_type = '2Arc'
+        elif self.disc_curves.type.GetStringSelection() == 'Arc-Line-Arc':
+            disc_curves_type = 'ArcLineArc'
+        else:
+            raise ValueError
+        
+        #  Get r2 as a string, convert to a floating point value if possible
+        r2 = self.disc_curves.r2.GetValue()
+        try:
+            #  If this works, r2 is a floating point expressed as a string,
+            #  leave it alone
+            float(r2)
+        except ValueError:
+            #  r2 is PMP, wrap it in quotes
+            r2 = '"' + r2 + '"'
+        
         #Parameters to be set in the string:
         str_params = dict(Vdisp = get('Vdisp'),
                           Vratio = get('Vratio'),
@@ -395,6 +498,8 @@ class GeometryPanel(pdsim_panels.PDPanel):
                           delta_flank = get('delta_flank'),
                           delta_radial = get('delta_radial'),
                           d_discharge = get('d_discharge'),
+                          disc_curves_type = disc_curves_type,
+                          disc_curves_r2 = r2,
                           phi_ie_offset = phi_ie_offset)
 
         return textwrap.dedent(
@@ -416,7 +521,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
                                phi_i0 = phi_i0, # [rad]
                                phi_os = phi_os, # [rad]
                                phi_is = phi_is) # [rad]
-            sim.set_disc_geo('2Arc', r2 = 0) #hard-coded
+            sim.set_disc_geo("{disc_curves_type:s}", r2 = {disc_curves_r2:s})
             sim.d_discharge = {d_discharge:s}
             
             sim.geo.delta_flank = {delta_flank:s} # [m]

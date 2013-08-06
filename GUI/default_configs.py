@@ -72,6 +72,9 @@ GeometryPanel:
   inlet_tube_ID : 0.02 # Inlet tube inner diameter [m]
   outlet_tube_length : 0.3 # Outlet tube length [m]
   outlet_tube_ID : 0.02 # Outlet tube inner diameter [m]
+  disc_curves:
+      type : 2Arc
+      r2 : 0
 
 MassFlowPanel:
   sa-s1:

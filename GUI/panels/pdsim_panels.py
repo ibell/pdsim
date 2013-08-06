@@ -1556,7 +1556,7 @@ class ParametricPanel(PDPanel):
             sim = mod.build()
             mod.run(sim)
             
-            #Remove FlowsStorage as it is enormous
+            #  Remove FlowsStorage as it is enormous
             del sim.FlowStorage
             
             H.write_to_file(sim,root+'.h5')
@@ -1595,8 +1595,6 @@ class ParametricPanel(PDPanel):
         """
         if 'terms' not in configdict:
             return
-        
-        print configdict['terms']
         
         for term in configdict['terms']:
             option = self.OnAddTerm()
