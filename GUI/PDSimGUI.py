@@ -152,7 +152,8 @@ class IntegratorChoices(wx.Choicebook):
         
 class SolverInputsPanel(pdsim_panels.PDPanel):
     
-    desc_map = {'eps_cycle' : ('Cycle-cycle convergence criterion','-')
+    desc_map = {'eps_cycle' : ('Cycle-cycle convergence criterion','-',0.003),
+                'eps_energy_balance' : ('Energy balance convergence criterion','kW',0.01)
                 }
     
     def __init__(self, parent, configdict,**kwargs):
@@ -160,15 +161,13 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
     
         self.IC = IntegratorChoices(self)
         
-        sizer_for_solver_inputs = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_for_solver_inputs = wx.FlexGridSizer(cols = 2)
         
         annotated_values = []
-        # Loop over the first group of inputs
-        for key in ['eps_cycle']:
-            # Get the annotation and the units for the term 
-            annotation, units = self.desc_map[key]
-            # Add the annotated object to the list of objects
-            annotated_values.append(datatypes.AnnotatedValue(key, configdict[key], annotation, units))
+        self.keys_for_config = []
+        
+        keys = ['eps_cycle', 'eps_energy_balance']
+        annotated_values = self.get_annotated_values(keys, config = configdict)
         
         # Build the items and return the list of annotated GUI objects
         annotated_GUI_objects = self.construct_items(annotated_values, 
@@ -177,7 +176,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         
         # ---------------------------------------------------------------------
         # Register terms in the GUI database
-        self.main.register_GUI_objects([annotated_GUI_objects])
+        self.main.register_GUI_objects(annotated_GUI_objects)
 
         from multiprocessing import cpu_count
         
@@ -222,6 +221,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
     def get_config_chunk(self):
   
         configdict = dict(eps_cycle = self.main.get_GUI_object_value('eps_cycle'),
+                          eps_energy_balance = self.main.get_GUI_object_value('eps_energy_balance'),
                           cycle_integrator = 'RK45',
                           integrator_options = dict(RK_eps = float(self.IC.RK45_eps.GetValue())),
                           Ncore_max = self.Ncore_max.GetValue()
@@ -231,6 +231,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
     def get_script_chunks(self):
         
         eps_cycle = self.main.get_GUI_object('eps_cycle').GetValue()
+        eps_energy_balance = self.main.get_GUI_object('eps_energy_balance').GetValue()
         
         return textwrap.dedent(
             """
@@ -241,18 +242,21 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
                                   heat_transfer_callback = sim.heat_transfer_callback,
                                   lumps_energy_balance_callback = sim.lump_energy_balance_callback
                                   )
-            sim.precond_solve(key_inlet='inlet.1',
-                              key_outlet='outlet.2',
+            sim.precond_solve(key_inlet = 'inlet.1',
+                              key_outlet = 'outlet.2',
                               pipe_abort = pipe_abort,
                               solver_method = 'RK45',
                               UseNR = False, #Don't use Newton-Raphson ND solver to determine the initial state
                               OneCycle = {OneCycle:s},
                               plot_every_cycle = {plot_every_cycle:s},
-                              hmin = 1e-8 # hard-coded
+                              hmin = 1e-8, # hard-coded
+                              eps_energy_balance = {eps_energy_balance:s},
+                              eps_cycle = {eps_cycle:s},
                               )
             print 'time taken',time.clock()-t1
             """.format(RK_eps = self.IC.RK45_eps.GetValue(),
                        eps_cycle = str(eps_cycle),
+                       eps_energy_balance = str(eps_energy_balance),
                        OneCycle = str(self.OneCycle.GetValue()),
                        plot_every_cycle = str(self.plot_every_cycle.GetValue())
                        )
@@ -983,10 +987,10 @@ class MainFrame(wx.Frame):
             frame = MainFrame(configfile, position=position, size=size)
             frame.Show()
         except:
-            pass
-        
-        #Destroy the current MainFrame
-        self.Destroy()
+            raise
+        else:
+            #Destroy the current MainFrame
+            self.Destroy()
         
     def script_header(self):
         import CoolProp, PDSim
@@ -1478,9 +1482,12 @@ class MainFrame(wx.Frame):
                            "Load Configuration file",
                            defaultDir=default_dir,
                            style=wx.FD_OPEN)
+        
         if wx.ID_OK==FD.ShowModal():
+            
             file_path = FD.GetPath()
             configdict = yaml.load(open(file_path,'r'))
+            
             #Now rebuild the GUI using the desired configuration file
             self.rebuild(configdict)
             

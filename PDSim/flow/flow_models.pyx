@@ -230,8 +230,6 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
         G=mdot/InnerFlowArea
         dp_dz=-f/rho*G**2/(2*ID)
         DELTAP=dp_dz*L
-        
-        print 'DELTAP is',DELTAP,'Pa'
 
         if fixed==1:
             # The outlet temperature considering just the wall heat transfer 

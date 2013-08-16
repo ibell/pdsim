@@ -1269,13 +1269,15 @@ class PDSimCore(_PDSimCore):
               OneCycle = False,
               Abort = None,
               pipe_abort = None,
-              UseNR = True,
+              UseNR = False,
               alpha = 0.5,
               plot_every_cycle = False,
               x0 = None,
               reset_initial_state = False,
               LS_start = 18,
               timeout = 3600,
+              eps_cycle = 0.001,
+              eps_energy_balance = 0.01,
               **kwargs):
         """
         This is the driving function for the PDSim model.  It can be extended through the 
@@ -1314,6 +1316,10 @@ class PDSimCore(_PDSimCore):
             Number of conventional steps to be taken when not using newton-raphson prior to entering into a line search
         timeout : float
             Number of seconds before the run times out
+        eps_cycle : float
+            Cycle-cycle convergence criterion
+        eps_energy_balance : float
+            Energy balance convergence criterion
             
         step_callback : function
             DEPRECATED! Should be passed to the connect_callbacks() function before running precond_solve() or solve()
@@ -1444,11 +1450,11 @@ class PDSimCore(_PDSimCore):
                 except ValueError as VE:
                     # debug_plots(self)
                     raise
-                    
                 
                 t2 = clock()
                 print 'Elapsed time for cycle is {0:g} s'.format(t2-t1)
                 
+                print 'finished OBJECTIVE_CYCLE'
                 #Quit if you have aborted in one of the cycle solvers
                 if aborted == 'abort':
                     return None
@@ -1485,6 +1491,7 @@ class PDSimCore(_PDSimCore):
                     return None #Stop
                         
                 if self.callbacks.endcycle_callback is None:
+                    print 'endcycle_callback is None'
                     return None #Stop
                 else:
                     #endcycle_callback returns the errors and new initial state for the solver
@@ -1492,6 +1499,7 @@ class PDSimCore(_PDSimCore):
                     self.x_state = x_state_new.copy() #Make a copy
                     return errors
                 
+                    
                 ##################################
                 ## End OBJECTIVE_CYCLE function ##
                 ##################################
@@ -1505,10 +1513,11 @@ class PDSimCore(_PDSimCore):
                                        ytol = 1e-4)
                 if self.x_state[0] is None:
                     return None
+                
             else:
-                x_collector = []
-                error_collector = []
-                diff_old = None
+#                 x_collector = []
+#                 error_collector = []
+#                 diff_old = None
                 x_state_prior = None
                 
                 init_state_counter = 0
@@ -1659,20 +1668,20 @@ class PDSimCore(_PDSimCore):
             ## End OBJECTIVE_ENERGY_BALANCE ##
             ##################################
         
-        x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,x0, dx=1.0, ytol=0.01, itermax=30)
+        x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,x0, dx=1.0, ytol=eps_energy_balance, itermax=30)
         print 'Solution is', x_soln,'Td, Tlumps'
         
         if not self.Abort(): 
             self.post_solve()
             
-        if hasattr(self,'resid_Td') and hasattr(self,'x_state'):
-            del self.resid_Td, self.x_state
+        if hasattr(self,'resid_Td'):
+            del self.resid_Td
         
-        # Save copies of the inlet and outlet states at the root of the HDF5 file
+        #  Save copies of the inlet and outlet states at the root of the HDF5 file
         self.inlet_state = self.Tubes.Nodes[key_inlet]    
         self.outlet_state = self.Tubes.Nodes[key_outlet]
             
-        #Save the elapsed time for simulation
+        #  Save the elapsed time for simulation
         self.elapsed_time = clock()-t1
         
     def get_prune_keys(self):

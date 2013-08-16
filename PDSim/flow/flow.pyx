@@ -133,7 +133,7 @@ cdef class FlowPathCollection(list):
             FP = self[i]
             if FP.exists:
                 FP.calculate(harray)
-                FP.edot = FP.mdot*((FP.State_up.h-FP.State_down.h)-298.15*(FP.State_up.s-FP.State_down.s))
+                FP.edot = abs(FP.mdot*((FP.State_up.get_h()-FP.State_down.get_h()))-298.15*(FP.State_up.get_s()-FP.State_down.get_s()))
             else:
                 FP.edot = 0.0
         

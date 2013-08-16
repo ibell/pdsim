@@ -20,7 +20,7 @@ includes = ['numpy','scipy.sparse.csgraph._validation']
 excludes = ['_gtkagg', '_tkagg', 'bsddb', 'curses', 'email', 'PyQt4',
             'pywin.debugger', 'pywin.debugger.dbgcon', 'pywin.dialogs',
             'tcl', 'Tkconstants', 'Tkinter']
-packages = ['h5py','CoolProp','scipy']
+packages = ['h5py','CoolProp','scipy','PDSim']
 path = []
 
 # This is a place where the user custom code may go. You can do almost

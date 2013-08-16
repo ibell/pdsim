@@ -131,7 +131,8 @@ ParametricPanel:
 SolverInputsPanel:
   cycle_integrator: RK45
   integrator_options: {epsRK45 : 1e-7}
-  eps_cycle : 0.001 # Cycle-Cycle convergence tolerance (RSSE) [-]
+  eps_cycle : 0.002 # Cycle-Cycle convergence tolerance (RSSE) [-]
+  eps_energy_balance : 0.05 # Energy balance convergence tolerance (RSSE) [-]
   
 Plugin:ScrollInjectionPlugin:
     - Length : 1.1

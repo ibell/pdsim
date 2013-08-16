@@ -13,7 +13,7 @@ from math import pi
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
 # PDSim should also be built using a command like python build_ext --inplace to keep all the extension modules next to the .pyx files
-#sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
@@ -276,15 +276,15 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     
     from time import clock
     t1=clock()
-    ScrollComp.eps_cycle = 0.003
+    ScrollComp.RK45_eps = 1e-8
     try:
         ScrollComp.precond_solve(key_inlet='inlet.1',
                                  key_outlet='outlet.2',
                                  solver_method='RK45',
-                                 UseNR = False, #If True, use Newton-Raphson ND solver to determine the initial state
-                                 OneCycle = False,
+                                 OneCycle = OneCycle,
                                  plot_every_cycle= False,
-                                 hmin = 1e-8
+                                 #hmin = 1e-3
+                                 #eps_cycle = 1e9
                                  )
     except:
         #debug_plots(ScrollComp)
@@ -301,7 +301,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
         ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
     
-#    debug_plots(ScrollComp)
+    #debug_plots(ScrollComp)
 
     Edot_flow = sum([FP['Edot_average'] for FP in ScrollComp.FlowsProcessed.collected_data])
     print 'Total Losses', ScrollComp.Wdot_electrical-ScrollComp.Wdot_i, 'kW'
@@ -310,10 +310,10 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     print 'Flow Losses', Edot_flow, 'kW'
     print 'Added Losses (should equal total losses)', Edot_flow+ScrollComp.motor.losses+ScrollComp.losses.bearings,'kW'
     
-    del ScrollComp.FlowStorage
-    from PDSim.misc.hdf5 import HDF5Writer
-    h5 = HDF5Writer()
-    h5.write_to_file(ScrollComp, 'Simulation.h5')
+#     del ScrollComp.FlowStorage
+#     from PDSim.misc.hdf5 import HDF5Writer
+#     h5 = HDF5Writer()
+#     h5.write_to_file(ScrollComp, 'Simulation.h5')
     
     return ScrollComp
     

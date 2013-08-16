@@ -1084,7 +1084,7 @@ class OSCrossSectionPanel(wx.Panel):
 class ScrollAnimForm(wx.Frame):
  
     #----------------------------------------------------------------------
-    def __init__(self, geo = None, start = True, size = (400, 400), param_dict = {}):
+    def __init__(self, geo = None, start = True, size = (400, 400), param_dict = {}, disc_xy_coords = None):
         wx.Frame.__init__(self, None, wx.ID_ANY, "Scroll Model GUI")
  
         # Add a panel so it looks the correct on all platforms
@@ -1138,6 +1138,9 @@ class ScrollAnimForm(wx.Frame):
                                 offsetScroll = self.geo.phi_ie_offset>0)
         
         self.ax = self.pltpanel.axes
+        
+        if disc_xy_coords is not None:
+            self.ax.plot(disc_xy_coords[0], disc_xy_coords[1])
         
         sizer.Layout()
         

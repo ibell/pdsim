@@ -24,7 +24,7 @@ from Cython.Distutils import build_ext
 from Cython.Distutils.extension import Extension as CyExtension
 import sys, shutil, os, glob
 
-version = '2.0pre'
+version = '2.1'
 
 #Modify the __init__ file with this version string
 fName = os.path.join('PDSim','__init__.py')
@@ -37,10 +37,10 @@ for line in lines:
 fp.close()
 
 if len(sys.argv) == 1:
-#    sys.argv += ['build_ext','--inplace','install']
+    sys.argv += ['build_ext','--inplace','install']
 #    sys.argv += ['build','build_ext','install']
 #    sys.argv += ['build','install']
-    sys.argv += ['clean','build','install']
+#     sys.argv += ['--clean','build','install']
 
 import Cython
 
@@ -82,10 +82,10 @@ def clean():
             
 # Try to remove the generated files in the source tree 
 # if you are doing an install to the normal location
-#if '--inplace' not in sys.argv or '--clean' in sys.argv:
-#    clean()
-#    if '--clean' in sys.argv:
-#        sys.argv.remove('--clean')
+if '--inplace' not in sys.argv or '--clean' in sys.argv:
+    clean()
+    if '--clean' in sys.argv:
+        sys.argv.remove('--clean')
 
 pxd_files = []
 

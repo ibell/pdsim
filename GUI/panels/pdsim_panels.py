@@ -294,7 +294,13 @@ class PDPanel(wx.Panel):
         raise ValueError('_get_item_by_attr failed')
         
         
-    def get_annotated_values(self, keys):
+    def get_annotated_values(self, keys, config = None):
+        
+        if config is None:
+            if hasattr(self,'config'):
+                config = self.config
+            else:
+                config = dict()
         
         annotated_values = []
         for key in keys:
@@ -303,13 +309,13 @@ class PDPanel(wx.Panel):
                 # Get the annotation and the units for the term (no default provided)
                 annotation, units = mapped_val 
                 # Add the annotated object to the list of objects
-                annotated_values.append(AnnotatedValue(key, self.config[key], annotation, units))
+                annotated_values.append(AnnotatedValue(key, config[key], annotation, units))
             elif len(mapped_val) == 3:
                 # Get the annotation and the units for the term 
                 annotation, units, default = mapped_val 
-                if hasattr(self,'config') and key in self.config:
+                if key in config:
                     # Add the annotated object to the list of objects
-                    annotated_values.append(AnnotatedValue(key, self.config[key], annotation, units))
+                    annotated_values.append(AnnotatedValue(key, config[key], annotation, units))
                 else:
                     # Add the annotated object to the list of objects
                     annotated_values.append(AnnotatedValue(key, default, annotation, units))

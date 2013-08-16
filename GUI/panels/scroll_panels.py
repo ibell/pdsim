@@ -4,6 +4,7 @@ from math import pi, cos, sin
 import textwrap
 
 import wx
+import wx.grid
 from wx.lib.mixins.listctrl import TextEditMixin
 from wx.lib.scrolledpanel import ScrolledPanel
 
@@ -125,6 +126,132 @@ class ScrollWrapAnglesFrame(wx.Frame):
         main_sizer.Layout()
         self.SetClientSize(main_sizer.GetMinSize())
     
+class DischargePortCoordinatesTable(wx.grid.Grid):
+    
+    def __init__(self, parent, values = None):
+        """
+        Parameters
+        ----------
+        parent : wx.window
+        values : A 2-element list of lists for all the coordinates (x, y)
+        """
+        wx.grid.Grid.__init__(self, parent)
+        
+        #  Make the grid the same shape as the data
+        self.CreateGrid(100, 2) # Nrows, Ncolumns
+        
+        #  Build the headers
+        self.SetColLabelValue(0, 'x [m]')
+        self.SetColLabelValue(1, 'y [m]')
+        
+        #  Set the entries in the grid
+        if values is not None:
+            self.update_from_configfile(values)
+    
+        #  Bind the events
+        self.Bind(wx.grid.EVT_GRID_CELL_RIGHT_CLICK, self.OnCellRightClick)
+        
+    def OnCellRightClick(self, evt):
+        
+        # Make a menu
+        menu = wx.Menu()
+        
+        #Build the entries
+        menuitem1 = wx.MenuItem(menu, -1, 'Paste from clipboard (Excel format)')
+        self.Bind(wx.EVT_MENU, self.OnPaste, menuitem1)
+        menu.AppendItem(menuitem1)
+        
+        if menu.GetMenuItems():
+            # Popup the menu.  If an item is selected then its handler
+            # will be called before PopupMenu returns.
+            self.PopupMenu(menu)
+        
+        menu.Destroy()
+        
+    def OnPaste(self, event):
+        """
+        Paste into the cells in the table
+        """
+        
+        do = wx.TextDataObject()
+        if wx.TheClipboard.Open():
+            success = wx.TheClipboard.GetData(do)
+            wx.TheClipboard.Close()
+
+        data = do.GetText()
+        rows = data.strip().replace('\r','').split('\n')
+        rows = [row.split('\t') for row in rows]
+        
+        try:
+            for row in rows:
+                for el in row:
+                    float(el)
+            self.update_from_configfile(zip(*rows))
+        except ValueError:
+            dlg = wx.MessageDialog(None, "Unable to paste from clipboard - bad format")
+            dlg.ShowModal()
+            dlg.Close()
+    
+    def ResizeGrid(self, nrows):
+        """ Resize the grid to be the right number of rows """
+        assert nrows >= 1
+        
+        if self.GetNumberRows() > nrows:
+            while self.GetNumberRows() > nrows:
+                self.DeleteRows()
+        if self.GetNumberRows() < nrows:
+            while self.GetNumberRows() < nrows:
+                self.AppendRows()
+        
+    def update_from_configfile(self, values):
+        """
+        
+        Parameters
+        ----------
+        values : list of lists, with entries as floating point values
+            The first entry is a list (or other iterable) of x values
+            
+            The second entry is a list (or other iterable) of y values
+        """
+        self.ResizeGrid(len(values[0]))
+                
+        for i,(x,y) in enumerate(zip(*values)):
+                
+            # Values
+            self.SetCellValue(i, 0, str(x))
+            self.SetCellValue(i, 1, str(y))
+                
+    def get_coords(self):
+        """
+        Get the list of lists of values that are used in the table
+        """
+        x, y = [], []
+        for i in range(self.GetNumberRows()):
+            x.append(float(self.GetCellValue(i, 0)))
+            y.append(float(self.GetCellValue(i, 1)))
+        return x, y
+    
+class DischargePortCoordinatesDialog(wx.Dialog):
+    """ A wx.Dialog to hold the grid with the x,y coords """
+    def __init__(self, parent):
+        wx.Dialog.__init__(self, parent, title = 'Discharge port coordinates')
+        
+        self.OKButton = wx.Button(self,label='OK')
+        self.OKButton.Bind(wx.EVT_BUTTON, lambda event: self.EndModal(wx.ID_OK))
+        self.xy_coords = DischargePortCoordinatesTable(self)
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.OKButton, proportion = 0, flag=wx.EXPAND)
+        sizer.Add(self.xy_coords, proportion = 1, flag=wx.EXPAND)
+        self.SetSizer(sizer)
+        sizer.Layout()
+        
+        w,h = self.GetEffectiveMinSize()
+        self.SetSizeWH(w+40,w)
+        
+        self.xy_coords.ForceRefresh()
+        self.Refresh()
+        
 class DiscCurvesPanel(pdsim_panels.PDPanel):
     
     def __init__(self, parent, config):
@@ -241,9 +368,19 @@ class GeometryPanel(pdsim_panels.PDPanel):
         # The sizer for the discharge curves data
         sizer_for_discharge_curves_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
         
+        if 'disc_xy_coords' in config:
+            self.disc_xy_coords = config['disc_xy_coords']
+            
         self.disc_curves = DiscCurvesPanel(scrolled_panel, config)
         
+        self.DiscCoordsButton = wx.Button(scrolled_panel, label = 'Set Port Coordinates')
+        self.DiscCoordsButton.Bind(wx.EVT_BUTTON,self.OnSetDiscPortCoords) 
+        
+        
         sizer_for_discharge_curves_inputs.Add(self.disc_curves)
+        sizer_for_discharge_curves_inputs.AddSpacer(5)
+        sizer_for_discharge_curves_inputs.Add(self.DiscCoordsButton)
+        sizer_for_discharge_curves_inputs.AddSpacer(5)
         
         #----------------------------------------------------------------------
         # The sizer for all the discharge objects
@@ -362,6 +499,15 @@ class GeometryPanel(pdsim_panels.PDPanel):
         
         return phiv, self.Scroll.geo.h, self.Scroll.geo.t
         
+    def OnSetDiscPortCoords(self, event = None):
+        
+        dlg = DischargePortCoordinatesDialog(None)
+        if dlg.ShowModal() == wx.ID_OK:
+            x,y = dlg.xy_coords.get_coords()
+            self.disc_xy_coords = x,y
+            self.OnRefresh()
+        dlg.Destroy()
+        
     def OnShowWrapGeo(self, event = None):
         if event is not None: event.Skip()
         
@@ -369,7 +515,13 @@ class GeometryPanel(pdsim_panels.PDPanel):
         frm.Show()
         
     def OnAnimate(self, event = None):
-        SAF = ScrollAnimForm(self.Scroll.geo, size=(400,400), param_dict = self.main.get_GUI_object_value_dict())
+        
+        if hasattr(self,'disc_xy_coords'):
+            disc_xy_coords = self.disc_xy_coords
+        else:
+            disc_xy_coords = None 
+            
+        SAF = ScrollAnimForm(self.Scroll.geo, size=(400,400), param_dict = self.main.get_GUI_object_value_dict(), disc_xy_coords = disc_xy_coords)
         SAF.Show()
         
     def OnRefresh(self, event = None):
@@ -424,12 +576,16 @@ class GeometryPanel(pdsim_panels.PDPanel):
         # Plot the discharge port if the variable _d_discharge has been set
         try:
             d_discharge = get('d_discharge')
-            t = np.linspace(0, 2*np.pi)
-            x = self.Scroll.geo.xa_arc1 + d_discharge/2*np.cos(t)
-            y = self.Scroll.geo.ya_arc1 + d_discharge/2*np.sin(t)
-            self.ax.plot(x,y,'--')
+            if not hasattr(self,'disc_xy_coords'):
+                t = np.linspace(0, 2*np.pi)
+                x = self.Scroll.geo.xa_arc1 + d_discharge/2*np.cos(t)
+                y = self.Scroll.geo.ya_arc1 + d_discharge/2*np.sin(t)
+                self.ax.plot(x,y,'--')
         except KeyError:
             pass
+        
+        if hasattr(self,'disc_xy_coords'):
+            self.ax.plot(self.disc_xy_coords[0],self.disc_xy_coords[1]) 
             
         self.PP.canvas.draw()
         
@@ -455,6 +611,9 @@ class GeometryPanel(pdsim_panels.PDPanel):
         disc_r2 = self.disc_curves.r2.GetValue()
         d.update(dict(disc_curves = dict(type = disc_type, r2 = disc_r2)))
         
+        #  Added values for the discharge port curves
+        if hasattr(self,'disc_xy_coords'):
+            d.update(dict(disc_xy_coords = self.disc_xy_coords))
         return d
         
     def get_script_chunks(self):
@@ -467,6 +626,14 @@ class GeometryPanel(pdsim_panels.PDPanel):
             phi_ie_offset = str(pi)
         else:
             phi_ie_offset = str(0)
+            
+        template = "sim.geo.xvec_disc_port = np.array({x:s})\nsim.geo.yvec_disc_port = np.array({y:s})"
+        if hasattr(self, 'disc_xy_coords'): 
+            disc_xy_coords_string = textwrap.dedent(template.format(x = str(self.disc_xy_coords[0]),
+                                                                    y = str(self.disc_xy_coords[1]))
+                                                    )
+        else:
+            disc_xy_coords_string = ''
             
         if self.disc_curves.type.GetStringSelection() == '2 Arcs':
             disc_curves_type = '2Arc'
@@ -498,35 +665,38 @@ class GeometryPanel(pdsim_panels.PDPanel):
                           d_discharge = get('d_discharge'),
                           disc_curves_type = disc_curves_type,
                           disc_curves_r2 = r2,
-                          phi_ie_offset = phi_ie_offset)
+                          phi_ie_offset = phi_ie_offset,
+                          disc_xy_coords_string = disc_xy_coords_string
+                          )
 
         return textwrap.dedent(
-            """
-            #Parameters from the GUI
-            Vdisp = {Vdisp:s} #[m^3/rev]
-            Vratio = {Vratio:s} #[-] 
-            t = {t:s} #[m]
-            ro = {ro:s} #[m]
-            phi_i0 = {phi_i0:s} #[rad]
-            phi_is = {phi_is:s} #[rad]
-            phi_os = {phi_os:s} #[rad]
-            
-            #Set the scroll wrap geometry
-            sim.set_scroll_geo(Vdisp, # Vdisp [m^3/rev]
-                               Vratio, # Vratio [-]
-                               t, # Thickness [m]
-                               ro, # Orbiting radius [m]
-                               phi_i0 = phi_i0, # [rad]
-                               phi_os = phi_os, # [rad]
-                               phi_is = phi_is) # [rad]
-            sim.set_disc_geo("{disc_curves_type:s}", r2 = {disc_curves_r2:s})
-            sim.d_discharge = {d_discharge:s}
-            
-            sim.geo.delta_flank = {delta_flank:s} # [m]
-            sim.geo.delta_radial = {delta_radial:s} # [m]
-            
-            sim.geo.phi_ie_offset = {phi_ie_offset:s}  
-            """.format(**str_params))
+"""
+#  Parameters from the GUI
+Vdisp = {Vdisp:s} #[m^3/rev]
+Vratio = {Vratio:s} #[-] 
+t = {t:s} #[m]
+ro = {ro:s} #[m]
+phi_i0 = {phi_i0:s} #[rad]
+phi_is = {phi_is:s} #[rad]
+phi_os = {phi_os:s} #[rad]
+
+#  Set the scroll wrap geometry
+sim.set_scroll_geo(Vdisp, # Vdisp [m^3/rev]
+                   Vratio, # Vratio [-]
+                   t, # Thickness [m]
+                   ro, # Orbiting radius [m]
+                   phi_i0 = phi_i0, # [rad]
+                   phi_os = phi_os, # [rad]
+                   phi_is = phi_is) # [rad]
+sim.set_disc_geo("{disc_curves_type:s}", r2 = {disc_curves_r2:s})
+sim.d_discharge = {d_discharge:s}
+{disc_xy_coords_string:s}
+sim.geo.delta_flank = {delta_flank:s} # [m]
+sim.geo.delta_radial = {delta_radial:s} # [m]
+
+sim.geo.phi_ie_offset = {phi_ie_offset:s}
+
+""".format(**str_params))
         
 class FlowOptions(pdsim_panels.PDPanel):
     """
@@ -644,9 +814,9 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                                    model='IsentropicNozzle')
         configdict['inlet.2-sa'] = dict(options = dict(Xd = Xd_inlet), 
                                         model='IsentropicNozzle')
-        configdict['d1-dd'] = dict(options = dict(Xd = Xd_inlet), 
+        configdict['d1-dd'] = dict(options = dict(Xd = Xd_d1_dd), 
                                         model='IsentropicNozzle')
-        configdict['d2-dd'] = dict(options = dict(Xd = Xd_inlet), 
+        configdict['d2-dd'] = dict(options = dict(Xd = Xd_d2_dd), 
                                         model='IsentropicNozzle')
         
         return configdict
@@ -715,20 +885,32 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                                   MdotFcn_kwargs = dict(X_d = {Xd_sa_s2:s})
                                   )
                         )
-            
-            FP = FlowPath(key1='outlet.1',
-                          key2='dd',
-                          MdotFcn=IsentropicNozzleWrapper(),
-                          )
-            FP.A = pi*sim.d_discharge**2/4
-            sim.add_flow(FP)
-            
-            FP = FlowPath(key1='outlet.1', 
-                          key2='ddd', 
-                          MdotFcn=IsentropicNozzleWrapper(),
-                          )
-            FP.A = pi*sim.d_discharge**2/4
-            sim.add_flow(FP)
+                        
+            sim.add_flow(FlowPath(key1 = 'outlet.1',
+                                 key2 = 'dd',
+                                 MdotFcn = sim.DISC_DD,
+                                 MdotFcn_kwargs = dict(X_d = 0.7)
+                                 )
+                        )
+        
+            sim.add_flow(FlowPath(key1 = 'outlet.1',
+                                 key2 = 'ddd',
+                                 MdotFcn = sim.DISC_DD,
+                                 MdotFcn_kwargs = dict(X_d = 0.7)
+                               )
+                        )
+            sim.add_flow(FlowPath(key1 = 'outlet.1',
+                                 key2 = 'd1',
+                                 MdotFcn = sim.DISC_D1,
+                                 MdotFcn_kwargs = dict(X_d = 0.7)
+                                 )
+                        )
+            sim.add_flow(FlowPath(key1 = 'outlet.1',
+                                 key2 = 'ddd',
+                                 MdotFcn = sim.DISC_D1,
+                                 MdotFcn_kwargs = dict(X_d = 0.7)
+                                 )
+                        )
             
             sim.add_flow(FlowPath(key1='d1',
                                   key2='dd',
