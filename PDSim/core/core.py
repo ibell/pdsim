@@ -1263,8 +1263,9 @@ class PDSimCore(_PDSimCore):
         
         self.callbacks.endcycle_callback = endcycle_callback
     
-    def one_cycle(self, y, 
-                   solver_method = 'RK45'):
+    def one_cycle(self, 
+                  X, 
+                  solver_method = 'RK45'):
         """
         Only run one cycle
         
@@ -1273,7 +1274,7 @@ class PDSimCore(_PDSimCore):
         solver_method : string
             One of 'RK45','Euler','Heun'
         """
-        y = arraym(y)
+        X = arraym(X)
                 
         # (1). First, run all the tubes
         for tube in self.Tubes:
@@ -1287,15 +1288,15 @@ class PDSimCore(_PDSimCore):
             if solver_method == 'Euler':
                 # Default to 7000 steps if not provided
                 N = getattr(self,'EulerN', 7000)
-                aborted = self.cycle_SimpleEuler(N,y)
+                aborted = self.cycle_SimpleEuler(N,X)
             elif solver_method == 'Heun':
                 # Default to 7000 steps if not provided
                 N = getattr(self,'HeunN', 7000)
-                aborted = self.cycle_Heun(N,y)
+                aborted = self.cycle_Heun(N,X)
             elif solver_method == 'RK45':
                 # Default to tolerance of 1e-8 if not provided
                 eps_allowed = getattr(self,'RK45_eps', 1e-8)
-                aborted = self.cycle_RK45(y,eps_allowed = eps_allowed)
+                aborted = self.cycle_RK45(X,eps_allowed = eps_allowed)
             else:
                 raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
         except ValueError as VE:
@@ -1332,11 +1333,10 @@ class PDSimCore(_PDSimCore):
         
         print 'finished one_cycle'
         
-    def OBJECTIVE_CYCLE(self, 
-                        X, 
-                        OneCycle = False, 
-                        plot_every_cycle = False):
+    def OBJECTIVE_CYCLE(self, X):
         """
+        The Objective function for the energy balance solver
+        
         X: :class:`<PDSim.misc.datatypes.arraym> arraym` instance
             Contains the state variables for all the control volumes in existence, as well as any other integration variables
         """
@@ -1350,11 +1350,8 @@ class PDSimCore(_PDSimCore):
         # Actually run the cycle
         self.one_cycle(X)
         
-        if plot_every_cycle:
-            debug_plots(self)
-        
         #If the abort function returns true, quit this loop
-        if self.Abort() or OneCycle:
+        if self.Abort():
             print 'Quitting OBJECTIVE_CYCLE loop in core.solve'
             return None #Stop
                 
