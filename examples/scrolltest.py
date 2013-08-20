@@ -13,7 +13,7 @@ from math import pi
 # of PDSim.  This is handy for debugging purposes.  Generally you want this line 
 # commented out
 # PDSim should also be built using a command like python build_ext --inplace to keep all the extension modules next to the .pyx files
-sys.path.insert(0, os.path.abspath('..'))
+# sys.path.insert(0, os.path.abspath('..'))
 
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
@@ -203,8 +203,8 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     
     ScrollComp.auto_add_CVs(inletState, outletState)
     
-    ScrollComp.auto_add_leakage(flankFunc = ScrollComp.FlankLeakage, 
-                                radialFunc = ScrollComp.RadialLeakage)
+#      ScrollComp.auto_add_leakage(flankFunc = ScrollComp.FlankLeakage, 
+#                                  radialFunc = ScrollComp.RadialLeakage)
     
     FP = FlowPath(key1='inlet.2', 
                   key2='sa', 
@@ -277,6 +277,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     from time import clock
     t1=clock()
     ScrollComp.RK45_eps = 1e-8
+    ScrollComp.eps_cycle = 3e-3
     try:
         ScrollComp.precond_solve(key_inlet='inlet.1',
                                  key_outlet='outlet.2',
@@ -284,7 +285,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
                                  OneCycle = OneCycle,
                                  plot_every_cycle= False,
                                  #hmin = 1e-3
-                                 #eps_cycle = 1e9
+                                 eps_cycle = 3e-3
                                  )
     except:
         #debug_plots(ScrollComp)
@@ -315,6 +316,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
 #     h5 = HDF5Writer()
 #     h5.write_to_file(ScrollComp, 'Simulation.h5')
     
+    print ScrollComp.EB_History
     return ScrollComp
     
 if __name__=='__main__':

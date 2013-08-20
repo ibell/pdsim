@@ -37,10 +37,10 @@ for line in lines:
 fp.close()
 
 if len(sys.argv) == 1:
-    sys.argv += ['build_ext','--inplace','install']
+#      sys.argv += ['build_ext','--inplace','install']
 #    sys.argv += ['build','build_ext','install']
 #    sys.argv += ['build','install']
-#     sys.argv += ['--clean','build','install']
+    sys.argv += ['build','install']
 
 import Cython
 

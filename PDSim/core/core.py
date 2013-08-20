@@ -1134,6 +1134,8 @@ class PDSimCore(_PDSimCore):
                 kwargs['x0']  = [T2, 0.5*T2+0.5*self.Tamb] # Guesses for temperatures of discharge and lump
                 kwargs['reset_initial_state'] = True
                 self.solve(**kwargs)
+                
+    
        
     def connect_callbacks(self,
                           step_callback = None,
@@ -1260,7 +1262,71 @@ class PDSimCore(_PDSimCore):
                 raise ValueError("lump_energy_balance_callback is not possible to be wrapped - neither a subclass of LumpsEnergyBalanceCallback nor an acceptable function")
         
         self.callbacks.endcycle_callback = endcycle_callback
+    
+    def one_cycle(self, y, solver_method = 'RK45'):
+        """
+        Only run one cycle
         
+        """
+        y = arraym(y)
+                
+        # (1). First, run all the tubes
+        for tube in self.Tubes:
+            tube.TubeFcn(tube)
+            
+        # Call update_existence to save the enthalpies for the tubes 
+        self.update_existence()
+        
+        try:
+            t1 = clock()
+            if solver_method == 'Euler':
+                # Default to 7000 steps if not provided
+                N = getattr(self,'EulerN', 7000)
+                aborted = self.cycle_SimpleEuler(N,y)
+            elif solver_method == 'Heun':
+                # Default to 7000 steps if not provided
+                N = getattr(self,'HeunN', 7000)
+                aborted = self.cycle_Heun(N,y)
+            elif solver_method == 'RK45':
+                # Default to tolerance of 1e-8 if not provided
+                eps_allowed = getattr(self,'RK45_eps', 1e-8)
+                aborted = self.cycle_RK45(y,eps_allowed = eps_allowed)
+            else:
+                raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
+        except ValueError as VE:
+            # debug_plots(self)
+            raise
+        
+        #  Quit if you have aborted in one of the cycle solvers
+        if aborted == 'abort':
+            return None
+        
+        t2 = clock()
+        print 'Elapsed time for cycle is {0:g} s'.format(t2-t1)
+        
+        mdot_out = self.FlowsProcessed.mean_mdot[self.key_outlet]
+        mdot_in = self.FlowsProcessed.mean_mdot[self.key_inlet]
+        print 'Mass flow difference',(mdot_out+mdot_in)/mdot_out*100,' %'
+        
+        # We need to find the key at the inlet to the outlet tube.
+        Tube = self.Tubes[self.key_outlet]
+        if Tube.key1 == self.key_outlet:
+            key_outtube_inlet = Tube.key2
+        elif Tube.key2 == self.key_outlet:
+            key_outtube_inlet = Tube.key1
+            
+        # This is the so-called hd' state at the outlet of the pump set
+        h_outlet = (self.FlowsProcessed.integrated_mdoth[key_outtube_inlet]
+                    /self.FlowsProcessed.integrated_mdot[key_outtube_inlet])
+        # It should be equal to the enthalpy of the fluid at the inlet
+        # to the outlet tube at the current Td value
+        h_outlet_Tube = self.Tubes.Nodes[key_outtube_inlet].h
+        # Residual is the difference of these two terms
+        # We put it in kW by multiplying by flow rate
+        self.resid_Td = mdot_out * (h_outlet_Tube - h_outlet)
+        
+        print 'finished one_cycle'
+            
     def solve(self,
               key_inlet = None,
               key_outlet = None,
@@ -1416,70 +1482,15 @@ class PDSimCore(_PDSimCore):
                 x_state: arraym instance
                     Contains the state variables for all the control volumes in existence, as well as the valve values
                 """
-                x_state = arraym(x_state)
                 
-                # (1). First, run all the tubes
-                for tube in self.Tubes:
-                    tube.TubeFcn(tube)
-                    
-                # Call update_existence to save the enthalpies for the tubes 
-                self.update_existence()
-                
-                #The first time this function is run, save the initial state
+                # The first time this function is run, save the initial state
                 # and the existence of the CV, as well as the valve positions
                 if self.xstate_init is None:
                     self.xstate_init = x_state
                     self.exists_CV_init = self.CVs.exists_keys
-                try:
-                    t1 = clock()
-                    if solver_method == 'Euler':
-                        #Default to 7000 steps if not provided
-                        N = getattr(self,'EulerN', 7000)
-                        aborted = self.cycle_SimpleEuler(N,x_state)
-                    elif solver_method == 'Heun':
-                        #Default to 7000 steps if not provided
-                        N = getattr(self,'HeunN', 7000)
-                        aborted = self.cycle_Heun(N,x_state)
-                    elif solver_method == 'RK45':
-                        #Default to tolerance of 1e-8 if not provided
-                        eps_allowed = getattr(self,'RK45_eps', 1e-8)
-                        aborted = self.cycle_RK45(x_state,eps_allowed = eps_allowed)
-                    else:
-                        raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
-                except ValueError as VE:
-                    # debug_plots(self)
-                    raise
                 
-                t2 = clock()
-                print 'Elapsed time for cycle is {0:g} s'.format(t2-t1)
-                
-                print 'finished OBJECTIVE_CYCLE'
-                #Quit if you have aborted in one of the cycle solvers
-                if aborted == 'abort':
-                    return None
-                    
-                mdot_out = self.FlowsProcessed.mean_mdot[key_outlet]
-                mdot_in = self.FlowsProcessed.mean_mdot[key_inlet]
-                print 'Mass flow difference',(mdot_out+mdot_in)/mdot_out*100,' %'
-                
-                # We need to find the key at the inlet to the outlet tube.
-                for Tube in self.Tubes:
-                    if Tube.key1 == key_outlet:
-                        key_outtube_inlet = Tube.key2
-                        break
-                    elif Tube.key2 == key_outlet:
-                        key_outtube_inlet = Tube.key1
-                        break
-                    
-                # This is the so-called hd' state at the outlet of the pump set
-                h_outlet = (self.FlowsProcessed.integrated_mdoth[key_outtube_inlet]
-                            /self.FlowsProcessed.integrated_mdot[key_outtube_inlet])
-                # It should be equal to the enthalpy of the fluid at the inlet
-                # to the outlet tube at the current Td value
-                h_outlet_Tube = self.Tubes.Nodes[key_outtube_inlet].h
-                # Residual is the difference of these two terms
-                # We put it in kW by multiplying by flow rate
-                self.resid_Td = mdot_out * (h_outlet_Tube - h_outlet)
+                # Actually run the cycle
+                self.one_cycle(x_state)
                 
                 if plot_every_cycle:
                     debug_plots(self)
