@@ -1092,50 +1092,13 @@ class PDSimCore(_PDSimCore):
         
     def precond_solve(self,**kwargs):
         """
-        A preconditioned solve
-        
-        What happens in this function is that one cycle is run using the very 
-        rough first estimate of outlet state.  This cycle is then used to update
-        the guess value for the outlet state.
-        
-        All keyword arguments are passed on to the PDSimCore.solve
-        function
+        This function is deprecated and will be removed in a future version
         """
-        
-        # We are going to over-write OldCycle in the preconditioner
-        # so we cache its current value.  If not provided, use False
-        OneCycle_oldval = kwargs.get('OneCycle', False)
-        
-        #Run solve with OneCycle turned on
-        kwargs['OneCycle'] = True
-        solve_output = self.solve(**kwargs)
-        
-        #  If abort has already been called, stop and don't keep going
-        if not self._want_abort:
             
-            #  Iterate over the tubes in order to find the inlet and outlet states
-            for key, State in self.Tubes.Nodes.iteritems():
-                if key == self.key_inlet:
-                     IS = State
-                if key == self.key_outlet:
-                     OS = State
-                     
-            #  Using Wdot_pv (boundary work), calculate a good guess for the 
-            #  outlet enthalpy by assuming the compressor is adiabatic
-            h2 = IS.h + self.Wdot_pv/self.mdot
-            
-            #  Find temperature as a function of enthalpy
-            T2 = Props('T','H',h2,'P',OS.p,OS.Fluid)
-            
-            #  Now run using the old value of OldCycle if OneCycle was 
-            #  not equal to True originally
-            if not OneCycle_oldval:
-                kwargs['OneCycle'] = OneCycle_oldval
-                kwargs['x0']  = [T2, 0.5*T2+0.5*self.Tamb] # Guesses for temperatures of discharge and lump
-                kwargs['reset_initial_state'] = True
-                self.solve(**kwargs)
-                
-    
+        import warnings
+        msg = 'precond_solve is deprecated and will be removed in a future version'
+        warnings.warn(msg, DeprecationWarning)
+        self.solve(**kwargs)
        
     def connect_callbacks(self,
                           step_callback = None,
@@ -1265,13 +1228,13 @@ class PDSimCore(_PDSimCore):
     
     def one_cycle(self, 
                   X, 
-                  solver_method = 'RK45'):
+                  cycle_integrator = 'RK45'):
         """
         Only run one cycle
         
         Parameters
         ----------
-        solver_method : string
+        cycle_integrator : string
             One of 'RK45','Euler','Heun'
         """
         X = arraym(X)
@@ -1285,15 +1248,15 @@ class PDSimCore(_PDSimCore):
         
         try:
             t1 = clock()
-            if solver_method == 'Euler':
+            if cycle_integrator == 'Euler':
                 # Default to 7000 steps if not provided
                 N = getattr(self,'EulerN', 7000)
                 aborted = self.cycle_SimpleEuler(N,X)
-            elif solver_method == 'Heun':
+            elif cycle_integrator == 'Heun':
                 # Default to 7000 steps if not provided
                 N = getattr(self,'HeunN', 7000)
                 aborted = self.cycle_Heun(N,X)
-            elif solver_method == 'RK45':
+            elif cycle_integrator == 'RK45':
                 # Default to tolerance of 1e-8 if not provided
                 eps_allowed = getattr(self,'RK45_eps', 1e-8)
                 aborted = self.cycle_RK45(X,eps_allowed = eps_allowed)
@@ -1333,17 +1296,22 @@ class PDSimCore(_PDSimCore):
         # We put it in kW by multiplying by flow rate
         self.resid_Td = mdot_out * (h_outlet_Tube - h_outlet)
         
-        print 'finished one_cycle'
-        
-    def OBJECTIVE_CYCLE(self, X, epsilon = 0.003):
+    def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45'):
         """
         The Objective function for the energy balance solver
         
+        Td_Tlumps0 : list
+            Discharge temperature and lump temperatures
         X: :class:`<PDSim.misc.datatypes.arraym> arraym` instance
             Contains the state variables for all the control volumes in existence, as well as any other integration variables
         epsilon : float
             Convergence criterion
         """
+        
+        # Consume the first element as the discharge temp 
+        self.Td = float(Td_Tlumps0.pop(0))
+        # The rest are the lumps in order
+        self.Tlumps = Td_Tlumps0   
         
         #  The first time this function is run, save the state variables
         if self.xstate_init is None:
@@ -1355,7 +1323,7 @@ class PDSimCore(_PDSimCore):
         while worst_error > epsilon:
             
             #  Actually run the cycle
-            self.one_cycle(X)
+            self.one_cycle(X, cycle_integrator = cycle_integrator)
             
             if self.callbacks.lumps_energy_balance_callback is not None:
                 resid_HT = self.callbacks.lumps_energy_balance_callback()
@@ -1401,14 +1369,16 @@ class PDSimCore(_PDSimCore):
             #  Reset the flag for the fixed side of the outlet tube
             outlet_tube.fixed = old_fixed
             
-            
             from PDSim.misc.error_bar import error_ascii_bar
             
-            print error_ascii_bar(abs(resid_HT[0]),epsilon), 'energy balance'
-            print error_ascii_bar(abs(self.resid_Td),epsilon), 'discharge state'
-            print error_ascii_bar(np.sqrt(np.sum(np.power(errors, 2))),epsilon), 'cycle-cycle'
+            print '==========='
+            print '|| # {i:03d} ||'.format(i=i)
+            print '==========='
+            print error_ascii_bar(abs(resid_HT[0]),epsilon), 'energy balance ', resid_HT[0]
+            print error_ascii_bar(abs(self.resid_Td),epsilon), 'discharge state', self.resid_Td
+            print error_ascii_bar(np.sqrt(np.sum(np.power(errors, 2))),epsilon), 'cycle-cycle    ',np.sqrt(np.sum(np.power(errors, 2)))
             
-            print '#', i, resid_HT[0], self.resid_Td, np.sqrt(np.sum(np.power(errors, 2))), self.Tubes.Nodes[self.key_outlet].get_T()
+            
             
             worst_error = max(abs(resid_HT[0]), abs(self.resid_Td), np.sqrt(np.sum(np.power(errors, 2))))
             i += 1
@@ -1417,15 +1387,6 @@ class PDSimCore(_PDSimCore):
         if self.Abort():
             print 'Quitting OBJECTIVE_CYCLE loop in core.solve'
             return None #  Stop
-                
-        if self.callbacks.endcycle_callback is None:
-            print 'endcycle_callback is None'
-            return None #  Stop
-        else:
-            #endcycle_callback returns the errors and new initial state for the solver
-            errors, X_new = self.callbacks.endcycle_callback()
-            self.x_state = X.copy() #  Make a copy
-            return errors
             
     def solve(self,
               key_inlet = None,
@@ -1556,197 +1517,10 @@ class PDSimCore(_PDSimCore):
         
         if x0 is None:
             x0 = [self.Tubes.Nodes[key_outlet].T, self.Tubes.Nodes[key_outlet].T]
-                
-        def OBJECTIVE_ENERGY_BALANCE(Td_Tlumps):
-            """
-            Td_Tlumps: arraym instance
-                Contains the discharge temperature followed by the temperatures of each lumped mass
-            """
-            print Td_Tlumps,'Td, Tlumps inputs'
-            # Td_Tlumps is a list (or or np.ndarray)
-            Td_Tlumps = list(Td_Tlumps)
-            # Consume the first element as the discharge temp 
-            self.Td = float(Td_Tlumps.pop(0))
-            # The rest are the lumps in order
-            self.Tlumps = Td_Tlumps
-            
-            # (0). Update the discharge temperature
-            p = self.Tubes.Nodes[key_outlet].p
-            self.Tubes.Nodes[key_outlet].update({'T':self.Td,'P':p})
-            
-            if UseNR:
-                self.x_state = Broyden(self.OBJECTIVE_CYCLE,
-                                       self.x_state, 
-                                       Nfd = 1, 
-                                       dx = 0.01*arraym(self.x_state), 
-                                       itermax = 50, 
-                                       ytol = 1e-4)
-                if self.x_state[0] is None:
-                    return None
-                
-            else:
-#                 x_collector = []
-#                 error_collector = []
-#                 diff_old = None
-                x_state_prior = None
-                
-                init_state_counter = 0
-                while True:
-                    # This block runs the first time through 
-                    # (when old state is not defined)
-                    # This means taking a full step
-                    if x_state_prior is None or init_state_counter < LS_start:
-                        x_state_prior = self.x_state.copy()
-                        errors = self.OBJECTIVE_CYCLE(x_state_prior)
-                        
-#                         if init_state_counter > 6 and init_state_counter % 3 == 0:
-#                             Ts1 = [x[1] for x in x_collector]
-#                             eTs1 = [x[1] for x in error_collector]
-#                             
-#                             Tddd = [x[5] for x in x_collector]
-#                             eTddd = [x[5] for x in error_collector]
-#                             
-#                             Tc12 = [x[6] for x in x_collector]
-#                             eTc12 = [x[6] for x in error_collector]
-#                             
-#                             Tc11 = [x[8] for x in x_collector]
-#                             eTc11 = [x[8] for x in error_collector]
-#                             
-#                             
-#                             
-#                             Ds1 = [x[11] for x in x_collector]
-#                             eDs1 = [x[11] for x in error_collector]
-#                             
-#                             Dddd = [x[15] for x in x_collector]
-#                             eDddd = [x[15] for x in error_collector]
-#                             
-#                             Dc12 = [x[16] for x in x_collector]
-#                             eDc12 = [x[16] for x in error_collector]
-#                             
-#                             Dc11 = [x[18] for x in x_collector]
-#                             eDc11 = [x[18] for x in error_collector]
-#                             
-#                             plt.plot(Ts1,eTs1,'o-')
-#                             plt.plot(Tc11,eTc11,'^-')
-#                             plt.plot(Tc12,eTc12,'<-')
-#                             plt.plot(Tddd,eTddd,'<-')
-#                             
-#                             plt.plot(Ds1,eDs1,'o-',mfc='none')
-#                             plt.plot(Dc11,eDc11,'^-',mfc='none')
-#                             plt.plot(Dc12,eDc12,'<-',mfc='none')
-#                             plt.plot(Dddd,eDddd,'<-',mfc='none')
-#                             
-#                             plt.show()
-# 
-#                             derror_dx = (error_collector[-1]-error_collector[-2])/(x_collector[-1]-x_collector[-2])
-#                             dx = -error_collector[-1]/derror_dx
-#                             
-#                             self.x_state = dx + self.x_state
-#                             x_collector, error_collector = [], []
-#                             x_state_new = self.x_state.copy()
-#                             
-#                             print 'old', self.x_state
-#                             print 'new', dx + self.x_state
-#                         else:
-#                             x_collector.append(np.array(x_state_prior))
-#                             error_collector.append(np.array(errors))
-#                             print 'old', self.x_state
-                            
-                            #error = derror_dx*(x-x0)+error0
-                            
-                        if errors is None:
-                            break
-                        else:
-                            errors *= 100
-                            x_state_new = self.x_state.copy()
-                            RSSE_prior = np.sqrt(np.sum(np.power(errors, 2)))
-                    try:  
-                        
-                        if init_state_counter >= LS_start:
-                            dx = x_state_new - x_state_prior
-                            print textwrap.dedent(
-                            """
-                            ****************************
-                            Starting a rough line search
-                            ****************************
-                            """
-                            )
-                            # If you are not getting good convergence, 
-                            # use a rough linear search
-                            _w, _error = [0.0], [RSSE_prior]
-                            for w in [0.5, 1.0, 1.5, 2.0, 2.5]:
-                                x = x_state_prior + w*dx
-                                errors  = OBJECTIVE_CYCLE(x)*100
-                                RSSE = np.sqrt(np.sum(np.power(errors, 2)))
-                                _w.append(w)
-                                _error.append(RSSE)
-                                print 'w',w,'RSSE',RSSE
-#                            f = plt.figure()
-#                            ax=f.add_axes((0.15,0.15,0.8,0.8))
-#                            ax.plot(_w, _error)
-#                            plt.show()
-                            i = _error.index(min(_error))
-                            x_state_new = x_state_prior + _w[i]*dx
-                            init_state_counter = 0
-                            
-                        else:
-                            if errors is not None:
-                                if not len(x_state_new) == len(x_state_prior):
-                                    raise IndexError
-                                diff = (x_state_prior - x_state_new) / x_state_prior * 100
-                                diff_abs = [abs(dx) for dx in diff]
-                                RSSE = np.sqrt(np.sum(np.power(errors, 2)))
-                                print 'Cycle #',init_state_counter,'RSSE',RSSE
 
-                    except IndexError:
-                        # You will get an IndexError if the length of the x_state
-                        # list changes due to different CV being in existence at
-                        # the beginning and end of the rotation.  Can be caused
-                        # by a volume ratio that puts the discharge angle right
-                        # before the end of the rotation
-                        continue
-
-                    # If the attribute eps_cycle is set, use that to determine 
-                    # the convergence criterion, otherwise, use the default
-                    if RSSE < getattr(self,'eps_cycle',1e-3):
-                        break
-                    else:
-                        self.x_state = x_state_new
-                    
-                    #Increment the counter for the inner loop
-                    init_state_counter += 1
-            
-            #If the abort function returns true, quit this loop
-            if self.Abort() or OneCycle:
-                print 'Quitting OBJECTIVE function in core.solve'
-#                if self.callbacks.lumps_energy_balance_callback is not None:
-#                    self.callbacks.lumps_energy_balance_callback()
-                return None
-                    
-            # (3) After convergence of the inner loop, check the energy balance on the lumps
-            if self.callbacks.lumps_energy_balance_callback is not None:
-                resid_HT = self.callbacks.lumps_energy_balance_callback()
-                if not isinstance(resid_HT,arraym):
-                    resid_HT = arraym(resid_HT)
+        #  Actually run the solver
+        self.OBJECTIVE_CYCLE(x0, self.x_state, cycle_integrator = solver_method)
                 
-            resids = [self.resid_Td]
-            resids.extend(resid_HT) #Need to extend because resid_HT is an arraym
-            print resids,'resids'
-            
-            if not hasattr(self, 'EB_History'):
-                self.EB_History = [(Td_Tlumps, resids)]
-            else:
-                self.EB_History.append = [(Td_Tlumps, resids)]
-                
-            return resids
-        
-            ##################################
-            ## End OBJECTIVE_ENERGY_BALANCE ##
-            ##################################
-        
-        x_soln = Broyden(OBJECTIVE_ENERGY_BALANCE,x0, dx=1.0, ytol=eps_energy_balance, itermax=30)
-        print 'Solution is', x_soln,'Td, Tlumps'
-        
         if not self.Abort(): 
             self.post_solve()
             
@@ -1754,11 +1528,12 @@ class PDSimCore(_PDSimCore):
             del self.resid_Td
         
         #  Save copies of the inlet and outlet states at the root of the HDF5 file
-        self.inlet_state = self.Tubes.Nodes[key_inlet]    
+        #  for ease of retrieval
+        self.inlet_state = self.Tubes.Nodes[key_inlet] 
         self.outlet_state = self.Tubes.Nodes[key_outlet]
             
         #  Save the elapsed time for simulation
-        self.elapsed_time = clock()-t1
+        self.elapsed_time = clock() - t1
         
     def get_prune_keys(self):
         """
@@ -1859,8 +1634,6 @@ class PDSimCore(_PDSimCore):
         self.h = self.p[:,0:self.Ntheta]
         self.xL = self.p[:,0:self.Ntheta]
         self.xValves = self.xValves[:,0:self.Ntheta]
-        
-        
         
         print 'mdot*(h2-h1),P-v,Qamb', self.Wdot, self.Wdot_pv, self.Qamb
         print 'Mass flow rate is',self.mdot*1000,'g/s'

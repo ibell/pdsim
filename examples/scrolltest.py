@@ -50,8 +50,8 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     
     ScrollComp.set_scroll_geo(83e-6, 3.3, 0.005, 0.006) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2=0)
-    ScrollComp.geo.delta_flank = 30e-6
-    ScrollComp.geo.delta_radial = 30e-6
+    ScrollComp.geo.delta_flank = 10e-6
+    ScrollComp.geo.delta_radial = 10e-6
     
     ScrollComp.geo.delta_suction_offset = 0.0e-3
     ScrollComp.geo.phi_ie_offset = 0.0
@@ -316,7 +316,6 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
 #     h5 = HDF5Writer()
 #     h5.write_to_file(ScrollComp, 'Simulation.h5')
     
-    print ScrollComp.EB_History
     return ScrollComp
     
 if __name__=='__main__':

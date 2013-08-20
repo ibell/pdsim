@@ -196,7 +196,7 @@ def Compressor():
                 key_outlet='outlet.2',
                 solver_method = 'Euler',
                 OneCycle = False,
-                UseNR = True
+                UseNR = False
                 )
     print 'time taken',clock()-t1,'s'
     
