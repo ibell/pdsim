@@ -50,8 +50,8 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     
     ScrollComp.set_scroll_geo(83e-6, 3.3, 0.005, 0.006) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2=0)
-    ScrollComp.geo.delta_flank = 15e-6
-    ScrollComp.geo.delta_radial = 15e-6
+    ScrollComp.geo.delta_flank = 30e-6
+    ScrollComp.geo.delta_radial = 30e-6
     
     ScrollComp.geo.delta_suction_offset = 0.0e-3
     ScrollComp.geo.phi_ie_offset = 0.0
@@ -151,7 +151,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     Ref='Propane'
     
     Te = -10 + 273.15
-    Tc = 40 + 273.15
+    Tc = 70 + 273.15
     Tin = Te + 11.1
     DT_sc = 7
     pe = CP.Props('P','T',Te,'Q',1.0,Ref)
@@ -178,7 +178,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
                              TubeFcn=ScrollComp.TubeCode))
     ScrollComp.add_tube(Tube(key1='outlet.1',
                              key2='outlet.2',
-                             L=0.3,
+                             L=1e-10,
                              ID=0.02,
                              mdot=mdot_guess, 
                              State2=outletState.copy(),
@@ -203,8 +203,8 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     
     ScrollComp.auto_add_CVs(inletState, outletState)
     
-#      ScrollComp.auto_add_leakage(flankFunc = ScrollComp.FlankLeakage, 
-#                                  radialFunc = ScrollComp.RadialLeakage)
+    ScrollComp.auto_add_leakage(flankFunc = ScrollComp.FlankLeakage, 
+                                radialFunc = ScrollComp.RadialLeakage)
     
     FP = FlowPath(key1='inlet.2', 
                   key2='sa', 

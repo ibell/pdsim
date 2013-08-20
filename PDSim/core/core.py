@@ -1324,6 +1324,8 @@ class PDSimCore(_PDSimCore):
         # This is the so-called hd' state at the outlet of the pump set
         h_outlet = (self.FlowsProcessed.integrated_mdoth[key_outtube_inlet]
                     /self.FlowsProcessed.integrated_mdot[key_outtube_inlet])
+        
+        self.h_outlet_pump_set = h_outlet
         # It should be equal to the enthalpy of the fluid at the inlet
         # to the outlet tube at the current Td value
         h_outlet_Tube = self.Tubes.Nodes[key_outtube_inlet].h
@@ -1333,35 +1335,96 @@ class PDSimCore(_PDSimCore):
         
         print 'finished one_cycle'
         
-    def OBJECTIVE_CYCLE(self, X):
+    def OBJECTIVE_CYCLE(self, X, epsilon = 0.003):
         """
         The Objective function for the energy balance solver
         
         X: :class:`<PDSim.misc.datatypes.arraym> arraym` instance
             Contains the state variables for all the control volumes in existence, as well as any other integration variables
+        epsilon : float
+            Convergence criterion
         """
         
-        # The first time this function is run, save the initial state
-        # and the existence of the CV, as well as the valve positions
+        #  The first time this function is run, save the state variables
         if self.xstate_init is None:
             self.xstate_init = X
             self.exists_CV_init = self.CVs.exists_keys
         
-        # Actually run the cycle
-        self.one_cycle(X)
+        i = 0
+        worst_error = 1000
+        while worst_error > epsilon:
+            
+            #  Actually run the cycle
+            self.one_cycle(X)
+            
+            if self.callbacks.lumps_energy_balance_callback is not None:
+                resid_HT = self.callbacks.lumps_energy_balance_callback()
+                if not isinstance(resid_HT, arraym):
+                    resid_HT = arraym(resid_HT)
+            
+            lump_thermal_inertia = 1.0/(2*np.pi)/3.0
+            
+            self.Tlumps = [self.Tlumps[0] + resid_HT[0]/lump_thermal_inertia]
+            
+            errors, X = self.callbacks.endcycle_callback()
+            
+            #  The outlet tube
+            outlet_tube = self.Tubes[self.key_outlet]
+            
+            #  Save the old state of the outlet tube
+            old_fixed = outlet_tube.fixed
+            
+            outlet_tube.fixed = 1
+            
+            if outlet_tube.key1 == self.key_outlet:
+                key_outtube_inlet = outlet_tube.key2
+                key_outtube_outlet = outlet_tube.key1
+            elif outlet_tube.key2 == self.key_outlet:
+                key_outtube_inlet = outlet_tube.key1
+                key_outtube_outlet = outlet_tube.key2
+            
+            #  Update the inlet state of the outlet tube based on the output of
+            #  the pump set
+            self.Tubes.Nodes[key_outtube_inlet].update({'H' : self.h_outlet_pump_set,
+                                                        'P' : self.Tubes.Nodes[self.key_outlet].p})
+            
+            #  Run the outlet tube
+            outlet_tube.TubeFcn(outlet_tube)
+            
+            #  Calculate the outlet enthalpy
+            h_outlet = self.Tubes[self.key_outlet].State2.get_h()
+            
+            #  Reset the outlet enthalpy of the outlet tube
+            self.Tubes.Nodes[self.key_outlet].update({'H' : h_outlet,
+                                                      'P' : self.Tubes.Nodes[self.key_outlet].p})
+            
+            #  Reset the flag for the fixed side of the outlet tube
+            outlet_tube.fixed = old_fixed
+            
+            
+            from PDSim.misc.error_bar import error_ascii_bar
+            
+            print error_ascii_bar(abs(resid_HT[0]),epsilon), 'energy balance'
+            print error_ascii_bar(abs(self.resid_Td),epsilon), 'discharge state'
+            print error_ascii_bar(np.sqrt(np.sum(np.power(errors, 2))),epsilon), 'cycle-cycle'
+            
+            print '#', i, resid_HT[0], self.resid_Td, np.sqrt(np.sum(np.power(errors, 2))), self.Tubes.Nodes[self.key_outlet].get_T()
+            
+            worst_error = max(abs(resid_HT[0]), abs(self.resid_Td), np.sqrt(np.sum(np.power(errors, 2))))
+            i += 1
         
-        #If the abort function returns true, quit this loop
+        #  If the abort function returns true, quit this loop
         if self.Abort():
             print 'Quitting OBJECTIVE_CYCLE loop in core.solve'
-            return None #Stop
+            return None #  Stop
                 
         if self.callbacks.endcycle_callback is None:
             print 'endcycle_callback is None'
-            return None #Stop
+            return None #  Stop
         else:
             #endcycle_callback returns the errors and new initial state for the solver
             errors, X_new = self.callbacks.endcycle_callback()
-            self.x_state = X.copy() #Make a copy
+            self.x_state = X.copy() #  Make a copy
             return errors
             
     def solve(self,
@@ -1422,17 +1485,14 @@ class PDSimCore(_PDSimCore):
             Cycle-cycle convergence criterion
         eps_energy_balance : float
             Energy balance convergence criterion
-            
-        step_callback : function
-            DEPRECATED! Should be passed to the connect_callbacks() function before running precond_solve() or solve()
-        endcycle_callback : function
-            DEPRECATED! Should be passed to the connect_callbacks() function before running precond_solve() or solve()
-        heat_transfer_callback : function
-            DEPRECATED! Should be passed to the connect_callbacks() function before running precond_solve() or solve()
-        lump_energy_balance_callback : function
-            DEPRECATED! Should be passed to the connect_callbacks() function before running precond_solve() or solve()
-        valves_callback : function
-            DEPRECATED! Should be passed to the connect_callbacks() function before running precond_solve() or solve()
+        
+        Notes
+        -----
+        The callbacks ``step_callback`` and ``endcycle_callback`` and 
+        ``heat_transfer_callback`` and ``lump_energy_balance_callback`` and 
+        ``valves_callback`` should now be passed to the connect_callbacks() 
+        function before running precond_solve() or solve()
+        
         """
         if any(cb in kwargs for cb in ['step_callback','endcycle_callback','heat_transfer_callback','lump_energy_balance_callback','valves_callback']):
             raise NotImplementedError('callback functions are no longer passed to solve() function, rather they are passed to connect_callbacks() function prior to calling solve()')
