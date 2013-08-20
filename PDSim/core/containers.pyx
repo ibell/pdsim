@@ -90,6 +90,22 @@ cdef class TubeCollection(list):
         by the number of control volumes in existence
         """
         return self.harray
+    
+    cpdef arraym get_p(self):
+        """
+        Get an arraym instance with the pressures of each node in the Tubes
+        collection.  In the same order as the indices of the pressures, but offset 
+        by the number of control volumes in existence
+        """
+        return self.parray
+    
+    cpdef arraym get_T(self):
+        """
+        Get an arraym instance with the enthalpies of each node in the Tubes
+        collection.  In the same order as the indices of the enthalpies, but offset 
+        by the number of control volumes in existence
+        """
+        return self.Tarray
         
     cpdef update_existence(self, int NCV):
         """
@@ -98,14 +114,20 @@ cdef class TubeCollection(list):
         First index is equal to NCV since python (& c++) are 0-based indexing
         """
         cdef int i = NCV
-        h = []
+        h,p,T = [],[],[]
         for Tube in self:
             h.append(Tube.State1.h)
             h.append(Tube.State2.h)
+            p.append(Tube.State1.p)
+            p.append(Tube.State2.p)
+            T.append(Tube.State1.T)
+            T.append(Tube.State2.T)
             Tube.i1 = i
             Tube.i2 = i+1 
             i += 2
         self.harray = arraym(h)
+        self.parray = arraym(p)
+        self.Tarray = arraym(T)
         
     property Nodes:
         def __get__(self):
@@ -137,6 +159,7 @@ cdef class CVArrays(object):
                            'dpdT_constV','Q','xL','dudxL','drhodtheta', 
                            'dTdtheta', 'dmdtheta', 'dxLdtheta', 'summerdm', 
                            'summerdT', 'summerdxL', 'property_derivs']
+        
         self.build_all(N)
         
     cdef build_all(self, int N):
@@ -171,8 +194,8 @@ cdef class CVArrays(object):
         theta : double
             Crank angle [radians]
         """
-        
-        cdef int N = len(CVs)
+
+        cdef int N = len(CVs), iCV
         
         for iCV in range(N):
             # Early-bind the control volume for speed
@@ -208,6 +231,7 @@ cdef class CVArrays(object):
         # Split the state variable array into chunks
         for i in range(N):
             self.T.data[i] = x.data[i]
+            
         if state_vars == STATE_VARS_TM:
             i = 0
             for j in xrange(N, 2*N):
@@ -242,7 +266,7 @@ cdef class CVArrays(object):
         self.N = N
         self.state_vars = state_vars
     
-    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray):
+    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, arraym parray, arraym Tarray):
         """
         Calculate the flows between tubes and control volumes and sum up the 
         flow-related terms
@@ -268,36 +292,25 @@ cdef class CVArrays(object):
         ----------
         Flows : :class:`FlowPathCollection <PDSim.flow.flow.FlowPathCollection>` instance
         harray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
+        parray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
+        Tarray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
         """
         
-        Flows.calculate(harray)
+        Flows.calculate(harray, parray, Tarray)
         Flows.sumterms(self.summerdT, self.summerdm)
     
     @cython.cdivision(True)
     cpdef calculate_derivs(self, double omega, bint has_liquid):
         
         cdef double m,T,cv,xL,dV,V,v,summerdxL,summerdm,summerdT
+        cdef int i
         
         self.omega = omega
         
-        #Set some variables for the oil-flooded case which is not yet supported
-        self.xL = arraym()
-        self.xL.set_size(self.N)
-        self.dudxL = arraym()
-        self.dudxL.set_size(self.N)
-        self.summerdxL = arraym()
-        self.summerdxL.set_size(self.N)
-        
-        #The derivative arrays
-        self.dxLdtheta = arraym()
-        self.dxLdtheta.set_size(self.N)
-        self.dTdtheta = arraym()
-        self.dTdtheta.set_size(self.N)
-        self.drhodtheta = arraym()
-        self.drhodtheta.set_size(self.N)
-        
         #Actually calculate the derivatives
         self.dmdtheta = self.summerdm
+        self.property_derivs = arraym()
+        self.property_derivs.set_size(self.N*2)
         
         #Loop over the control volumes
         for i in range(self.N):
@@ -320,16 +333,19 @@ cdef class CVArrays(object):
             summerdT = self.summerdT.data[i]
             dmdtheta = self.dmdtheta.data[i]
             
-            self.dxLdtheta.data[i] = 1.0/m*(summerdxL-xL*dmdtheta);    dxLdtheta = self.dxLdtheta.data[i]            
+            self.dxLdtheta.data[i] = 1.0/m*(summerdxL-xL*dmdtheta)    
+            dxLdtheta = self.dxLdtheta.data[i]            
             self.dTdtheta.data[i] = 1.0/(m*cv)*(-1.0*T*dpdT*(dV-v*dmdtheta)-m*dudxL*dxLdtheta-h*dmdtheta+Q/omega+summerdT)
             self.drhodtheta.data[i] = 1.0/V*(dmdtheta-rho*dV)
         
-        # Create the array of output values
-        self.property_derivs = self.dTdtheta.copy()
-        if self.state_vars == STATE_VARS_TM:
-            self.property_derivs.extend(self.dmdtheta)
-        elif self.state_vars == STATE_VARS_TD:
-            self.property_derivs.extend(self.drhodtheta)
+        #  Create the array of output values
+        for i in range(self.N):
+            self.property_derivs.set_index(i, self.dTdtheta.data[i])
+            
+            if self.state_vars == STATE_VARS_TM:
+                self.property_derivs.set_index(i + self.N, self.dmdtheta.data[i])
+            elif self.state_vars == STATE_VARS_TD:
+                self.property_derivs.set_index(i + self.N, self.drhodtheta.data[i])
             
     cpdef copy(self):
         CVA = CVArrays(self.T.N)

@@ -105,8 +105,9 @@ class Scroll(PDSimCore, _Scroll):
         yarc1 = self.geo.ya_arc1 + self.geo.ra_arc1*np.sin(np.linspace(self.geo.t2_arc1,self.geo.t1_arc1,75))
         xinvo, yinvo = scroll_geo.coords_inv(np.linspace(self.geo.phi_os,self.geo.phi_os+3*pi/2,75), self.geo, 0, flag="fo")
         
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
+        if plot:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
 
         t,A,Add,Ad1=[],[],[],[]
         for i,theta in enumerate(np.linspace(0,2*pi,200)):
@@ -140,7 +141,8 @@ class Scroll(PDSimCore, _Scroll):
             scaled_xdd = xdd*scale_factor
             scaled_ydd = ydd*scale_factor
             
-            ax.cla()
+            if plot:
+                ax.cla()
         
             xscroll = -np.r_[xinvi,xarc1,xinvo,xinvi[0]]+self.geo.ro*np.cos(THETA)
             yscroll = -np.r_[yinvi,yarc1,yinvo,yinvi[0]]+self.geo.ro*np.sin(THETA)

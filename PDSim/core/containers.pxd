@@ -11,10 +11,12 @@ from PDSim.misc.datatypes import arraym
     
 cdef class TubeCollection(list):
     cdef dict _Nodes
-    cdef arraym harray
+    cdef arraym harray, parray, Tarray
     
     cpdef update_existence(self, int NCV)
     cpdef arraym get_h(self)
+    cpdef arraym get_p(self)
+    cpdef arraym get_T(self)
     cpdef dict get_Nodes(self)
     cpdef update(self)
     
@@ -67,6 +69,6 @@ cdef class CVArrays(object):
     
     cpdef just_volumes(self, list CVs, double theta)
     cpdef properties_and_volumes(self, list CVs, double theta, int state_vars, arraym x)
-    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray)
+    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, arraym parray, arraym Tarray)
     cpdef calculate_derivs(self, double omega, bint has_liquid)
     

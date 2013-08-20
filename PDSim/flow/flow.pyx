@@ -117,7 +117,7 @@ cdef class FlowPathCollection(list):
             #Made it this far, so both states exist
             FP.exists = True
     
-    cpdef calculate(self, arraym harray):
+    cpdef calculate(self, arraym harray, arraym parray, arraym Tarray):
         """
         Run the code for each flow path to calculate the flow rates
         
@@ -125,6 +125,10 @@ cdef class FlowPathCollection(list):
         ----------
         harray : :class:`arraym <PDSim.misc.datatypes.arraym>' instance
             arraym that maps index to enthalpy - CVs+Tubes
+        parray : :class:`arraym <PDSim.misc.datatypes.arraym>' instance
+            arraym that maps index to pressure - CVs+Tubes
+        Tarray : :class:`arraym <PDSim.misc.datatypes.arraym>' instance
+            arraym that maps index to temperature - CVs+Tubes
         """
         cdef FlowPath FP
         cdef int i
@@ -132,7 +136,7 @@ cdef class FlowPathCollection(list):
         for i in range(self.N):
             FP = self[i]
             if FP.exists:
-                FP.calculate(harray)
+                FP.calculate(harray, parray, Tarray)
             else:
                 FP.edot = 0.0
         
@@ -263,48 +267,51 @@ cdef class FlowPath(object):
 #             FP.State_down = self.State_down.copy()
         return FP
         
-    cpdef calculate(self, arraym harray):
+    cpdef calculate(self, arraym harray, arraym parray, arraym Tarray):
         """
-        calculate
+        Calculate all of the flow paths
+        
+        Parameters
+        ----------
+        harray : :class:`arraym <PDSim.misc.datatypes.arraym>' instance of enthalpies of CV+Tubes
+        parray : :class:`arraym <PDSim.misc.datatypes.arraym>' instance of pressures of CV+Tubes
+        Tarray : :class:`arraym <PDSim.misc.datatypes.arraym>' instance of temperatures of CV+Tubes
         """
-        cdef double p1, p2
         cdef FlowFunction FF
-        #The states of the chambers
-        p1=self.State1.get_p()
-        p2=self.State2.get_p()
+        cdef double p1 = parray.data[self.ikey1], p2 = parray.data[self.ikey2]
         
         if p1 > p2:
             # The pressure in chamber 1 is higher than chamber 2
             # and thus the flow is from chamber 1 to 2
-            self.key_up=self.key1
-            self.key_down=self.key2
-            self.State_up=self.State1
-            self.State_down=self.State2
-            self.T_up=self.State1.get_T()
+            self.key_up = self.key1
+            self.key_down = self.key2
+            self.State_up = self.State1
+            self.State_down = self.State2
+            self.T_up = Tarray.data[self.ikey1]
             self.h_up = harray.data[self.ikey1]
             self.h_down = harray.data[self.ikey2]
-            self.p_up=p1
-            self.p_down=p2
+            self.p_up = p1
+            self.p_down = p2
             self.key_up_exists = self.key1_exists
             self.key_down_exists = self.key2_exists
             self.ikey_up = self.ikey1
             self.ikey_down = self.ikey2
-            self.Gas=self.State1.Fluid
+            self.Gas = self.State1.Fluid
         else:
-            self.key_up=self.key2
-            self.key_down=self.key1
-            self.State_up=self.State2
-            self.State_down=self.State1
-            self.T_up=self.State2.get_T()
+            self.key_up = self.key2
+            self.key_down = self.key1
+            self.State_up = self.State2
+            self.State_down = self.State1
+            self.T_up = Tarray.data[self.ikey2]
             self.h_up = harray.data[self.ikey2]
             self.h_down = harray.data[self.ikey1]                  
-            self.p_up=p2
-            self.p_down=p1
+            self.p_up = p2
+            self.p_down = p1
             self.key_up_exists = self.key2_exists
             self.key_down_exists = self.key1_exists
             self.ikey_up = self.ikey2
             self.ikey_down = self.ikey1
-            self.Gas=self.State2.Fluid
+            self.Gas = self.State2.Fluid
             
         FF = self.MdotFcn
         self.mdot = FF.call(self)

@@ -226,12 +226,11 @@ class PDSimCore(_PDSimCore):
                     keys.append(Flow.key2)
             return keys
         
-        
-        #Get all the nodes that can exist for tubes and CVs
+        #  Get all the nodes that can exist for tubes and CVs
         keys=collect_keys(self.Tubes,self.Flows)
         
-        #Get the instantaneous net flow through each node
-        #   and the averaged mass flow rate through each node
+        #  Get the instantaneous net flow through each node
+        #  and the averaged mass flow rate through each node
         self.FlowsProcessed=struct()
         self.FlowsProcessed.summed_mdot={}
         self.FlowsProcessed.summed_mdoth={}
@@ -1400,7 +1399,7 @@ class PDSimCore(_PDSimCore):
             Td_Tlumps: arraym instance
                 Contains the discharge temperature followed by the temperatures of each lumped mass
             """
-            print Td_Tlumps,'Td,Tlumps inputs'
+            print Td_Tlumps,'Td, Tlumps inputs'
             # Td_Tlumps is a list (or or np.ndarray)
             Td_Tlumps = list(Td_Tlumps)
             # Consume the first element as the discharge temp 
@@ -1662,6 +1661,12 @@ class PDSimCore(_PDSimCore):
             resids = [self.resid_Td]
             resids.extend(resid_HT) #Need to extend because resid_HT is an arraym
             print resids,'resids'
+            
+            if not hasattr(self, 'EB_History'):
+                self.EB_History = [(Td_Tlumps, resids)]
+            else:
+                self.EB_History.append = [(Td_Tlumps, resids)]
+                
             return resids
         
             ##################################
@@ -1814,12 +1819,17 @@ class PDSimCore(_PDSimCore):
         # Updates the state, calculates the volumes, prepares all the things needed for derivatives
         self.core.properties_and_volumes(self.CVs.exists_CV, theta, STATE_VARS_TM, x)
         
-        #Join the enthalpies of the CV in existence and the tubes
+        #  Join the enthalpies of the CV in existence and the tubes
         harray = self.core.h.copy()
         harray.extend(self.Tubes.get_h())
-        
+        #  Join the pressures of the CV in existence and the tubes
+        parray = self.core.p.copy()
+        parray.extend(self.Tubes.get_p())
+        #  Join the pressures of the CV in existence and the tubes
+        Tarray = self.core.T.copy()
+        Tarray.extend(self.Tubes.get_T())
         # Calculate the flows and sum up all the terms
-        self.core.calculate_flows(self.Flows, harray)
+        self.core.calculate_flows(self.Flows, harray, parray, Tarray)
         
         # Calculate the heat transfer terms if provided
         if self.callbacks.heat_transfer_callback is not None:

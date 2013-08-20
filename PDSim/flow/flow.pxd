@@ -18,7 +18,7 @@ cdef class FlowPathCollection(list):
     cdef int N, Nexists
     cdef double omega
     cpdef update_existence(self, Core)
-    cpdef calculate(self, arraym harray)
+    cpdef calculate(self, arraym harray, arraym parray, arraym Tarray)
     cpdef get_deepcopy(self)
     cpdef sumterms(self, arraym summerdT, arraym summerdm)
     cpdef list flow_paths
@@ -38,4 +38,4 @@ cdef class FlowPath(object):
     
     cpdef dict __cdict__(self, AddStates = *)
     cpdef FlowPath get_deepcopy(self)
-    cpdef calculate(self, arraym harray)
+    cpdef calculate(self, arraym harray, arraym parray, arraym Tarray)
