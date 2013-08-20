@@ -133,7 +133,6 @@ cdef class FlowPathCollection(list):
             FP = self[i]
             if FP.exists:
                 FP.calculate(harray)
-                FP.edot = abs(FP.mdot*((FP.State_up.get_h()-FP.State_down.get_h()))-298.15*(FP.State_up.get_s()-FP.State_down.get_s()))
             else:
                 FP.edot = 0.0
         
@@ -231,7 +230,7 @@ cdef class FlowPath(object):
         cdef dict d={}
         cdef bytes item
         
-        items=['mdot','h_up','T_up','p_up','p_down','key_up','key_down','key1','key2','Gas','exists']
+        items=['mdot','h_up','h_down','T_up','p_up','p_down','key_up','key_down','key1','key2','Gas','exists']
         for item in items:
             d[item]=getattr(self,item)
         
@@ -283,6 +282,7 @@ cdef class FlowPath(object):
             self.State_down=self.State2
             self.T_up=self.State1.get_T()
             self.h_up = harray.data[self.ikey1]
+            self.h_down = harray.data[self.ikey2]
             self.p_up=p1
             self.p_down=p2
             self.key_up_exists = self.key1_exists
@@ -296,7 +296,8 @@ cdef class FlowPath(object):
             self.State_up=self.State2
             self.State_down=self.State1
             self.T_up=self.State2.get_T()
-            self.h_up = harray.data[self.ikey2]                    
+            self.h_up = harray.data[self.ikey2]
+            self.h_down = harray.data[self.ikey1]                  
             self.p_up=p2
             self.p_down=p1
             self.key_up_exists = self.key2_exists
@@ -307,6 +308,8 @@ cdef class FlowPath(object):
             
         FF = self.MdotFcn
         self.mdot = FF.call(self)
+        
+        self.edot = abs(self.mdot*((self.h_up - self.h_down)-298.15*(self.State_up.get_s()-self.State_down.get_s())  ))
         
     def __reduce__(self):
         return rebuildFlowPath,(self.__getstate__(),)
