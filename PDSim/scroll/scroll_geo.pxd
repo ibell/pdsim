@@ -69,6 +69,8 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=*)
 cpdef tuple DDD(double theta, geoVals geo, bint poly=*) 
 cpdef dict DDD_forces(double theta, geoVals geo, bint poly=*) 
 
+cpdef CVcoords(CVkey, geoVals geo, double theta)
+
 cpdef double min2(double, double)
 cpdef double max2(double, double)
 cpdef double phi_s_sa(double theta, geoVals geo)

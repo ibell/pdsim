@@ -167,6 +167,53 @@ cdef class geoVals:
             s+=atr+': '+str(getattr(self,atr))+'\n'
         return s
         
+cpdef CVcoords(CVkey, geoVals geo, double theta):
+    """ 
+    Return a tuple of numpy arrays for x,y coordinates for the lines which determine the 
+    boundary of the control volume
+    
+    Returns
+    -------
+    x : numpy array
+        X-coordinates of the outline of the control volume
+    y : numpy array 
+        Y-coordinates of the outline of the control volume
+    """
+    om = geo.phi_ie-pi/2-theta
+    
+    if CVkey == 's1':
+        phi1 = np.linspace(geo.phi_ie, geo.phi_ie-theta) #fi
+        phi2 = np.linspace(geo.phi_ie-pi, geo.phi_ie-pi-theta) #oo
+        x1, y1 = coords_inv(phi1, geo, theta, 'fi')
+        x2, y2 = coords_inv(phi2, geo, theta, 'oo')
+        return np.r_[x1,x2[::-1]],np.r_[y1,y2[::-1]]
+    
+    elif CVkey == 's2':
+        #  Get the coordinates from the s1 CV
+        x, y = CVcoords('s1', geo, theta)
+        #  Return the coordinates for the s2 CV
+        return -x + geo.ro*np.cos(om), -y + geo.ro*np.sin(om)
+    
+    elif CVkey.startswith('c1'):
+        #  Go from c1.1 to 1
+        alpha = int(CVkey.split('.')[1])
+        phi = np.linspace(geo.phi_ie - theta - 2*pi*alpha, geo.phi_ie-theta-2*pi*(alpha-1), 1000)
+        (xi, yi) = coords_inv(phi, geo, theta, 'fi')
+        phi = np.linspace(geo.phi_ie - theta - 2*pi*(alpha-1)-pi, geo.phi_ie-theta-2*pi*alpha-pi, 1000)
+        (xo, yo) = coords_inv(phi, geo, theta, 'oo')
+        return np.r_[xi,xo], np.r_[yi,yo]
+    
+    elif CVkey.startswith('c2'):
+        #  Go from c2.1 to 1
+        alpha = int(CVkey.split('.')[1])
+        #  Get the coordinates from the c1.x CV
+        x, y = CVcoords('c1.'+str(alpha), geo, theta)
+        #  Return the coordinates for the c2.x CV
+        return -x + geo.ro*np.cos(om), -y + geo.ro*np.sin(om)
+    
+    else:
+        raise KeyError('{k:s} is an invalid key for CVCoords'.format(k=CVkey))
+        
 cpdef double fxA(double rb, double phi, double phi0):
     return rb**3/3.0*(4.0*((phi-phi0)**2-2.0)*sin(phi)+(phi0-phi)*((phi-phi0)**2-8.0)*cos(phi))
 

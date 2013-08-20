@@ -413,6 +413,100 @@ class Scroll(PDSimCore, _Scroll):
         self.__Setscroll_geo__=True
         self.__SetDiscGeo__=False     
     
+    def poly_intersection_with_cvs(self, x, y, N, multiple_solns = 'sum'):
+        """
+        For a given polygon, determine the intersection area between a polygon
+        and each of the control volumes in the compressor.  This can be useful
+        to calculate the port open area for the discharge port, injection ports,
+        pressure measurement taps, etc.
+        
+        Parameters
+        ----------
+        x : numpy-array-like
+            X coordinates of the points
+        y : numpy-array-like
+            Y coordinates of the points
+        N : int
+            Number of elements in the crank angle array
+        multiple_solns : str, optional, one of 'sum','error','warning', default is sum
+            What to do when there are multiple intersection polygons
+            
+        Returns
+        ------
+        theta : numpy aray
+            Crank angle array
+        area_dict : dictionary
+            Dictionary with keys of keys of control volumes that have some 
+            intersection, values are areas at each crank angle in ``theta`` 
+            
+        """
+        
+        #  The dictionary to store the overlap data
+        area_dict = {}
+        
+        #  The crank angle array
+        thetav = np.linspace(0, 2*np.pi, N)
+        
+        #  The clipper library operates on integers, so we need to take our 
+        #  floating point values and convert it to a large integer
+        scale_factor = 1000000000
+        
+        # Scale to integers
+        scaled_xpoly = x*scale_factor
+        scaled_ypoly = y*scale_factor
+        
+        #  Find all the CVs that do have some overlap with this port
+        for CVkey in self.CVs.keys:
+            
+            #  Just try once to see if the key is acceptable
+            try:
+                xcv, ycv = scroll_geo.CVcoords(CVkey, self.geo, 0)
+            except KeyError:
+                #  Not acceptable, skip this control volume
+                continue
+            
+            Av = np.zeros_like(thetav)
+            
+            for i, theta in enumerate(thetav):
+                
+                #  Calculate the port free area between the port and the chamber
+                xcv, ycv = scroll_geo.CVcoords(CVkey, self.geo, theta)
+                
+                scaled_xcv = xcv*scale_factor
+                scaled_ycv = ycv*scale_factor
+                
+                from PDSim.misc.clipper import pyclipper
+                clip = pyclipper.Pyclipper()
+                clip.subject_polygon([pair for pair in zip(scaled_xpoly, scaled_ypoly)])
+                clip.clip_polygon([pair for pair in zip(scaled_xcv, scaled_ycv)])
+                
+                #  Actually do the intersection
+                soln = clip.execute(pyclipper.INTERSECTION)
+                
+                #  Check the number of regions returned
+                if len(soln) > 1:
+                    if multiple_solns == 'error':
+                        raise ValueError('More than one intersection region obtained in poly_intersection_with_cvs')
+                    else:
+                        msg = 'More than one intersection region obtained in poly_intersection_with_cvs'
+                        warnings.warn(msg, warnings.RuntimeWarning)
+                
+                #  Sum up the solution regions
+                A = 0
+                for loop in soln:
+                    scaled_x, scaled_y = zip(*loop)
+                    x = [_/scale_factor for _ in scaled_x]
+                    y = [_/scale_factor for _ in scaled_y]
+                    A += scroll_geo.polyarea(x, y)
+                    
+                Av[i] = A
+            
+            #  If at least one value is non-zero, save an entry in the dictionary
+            if np.sum(Av) > 0:
+                area_dict[CVkey] = Av
+        
+        return thetav, area_dict
+                    
     def set_disc_geo(self,Type,r2=0.0):
         """
         Set the discharge geometry for the scrolls

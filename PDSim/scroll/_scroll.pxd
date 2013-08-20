@@ -1,3 +1,10 @@
+
+from PDSim.flow import flow_models
+from PDSim.flow cimport flow_models
+
+from PDSim.flow.flow_models import FlowFunction
+from PDSim.flow.flow_models cimport FlowFunction
+
 from PDSim.flow.flow import FlowPath
 from PDSim.flow.flow cimport FlowPath
 
