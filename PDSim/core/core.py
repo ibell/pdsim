@@ -1263,10 +1263,15 @@ class PDSimCore(_PDSimCore):
         
         self.callbacks.endcycle_callback = endcycle_callback
     
-    def one_cycle(self, y, solver_method = 'RK45'):
+    def one_cycle(self, y, 
+                   solver_method = 'RK45'):
         """
         Only run one cycle
         
+        Parameters
+        ----------
+        solver_method : string
+            One of 'RK45','Euler','Heun'
         """
         y = arraym(y)
                 
@@ -1326,6 +1331,41 @@ class PDSimCore(_PDSimCore):
         self.resid_Td = mdot_out * (h_outlet_Tube - h_outlet)
         
         print 'finished one_cycle'
+        
+    def OBJECTIVE_CYCLE(self, 
+                        X, 
+                        OneCycle = False, 
+                        plot_every_cycle = False):
+        """
+        X: :class:`<PDSim.misc.datatypes.arraym> arraym` instance
+            Contains the state variables for all the control volumes in existence, as well as any other integration variables
+        """
+        
+        # The first time this function is run, save the initial state
+        # and the existence of the CV, as well as the valve positions
+        if self.xstate_init is None:
+            self.xstate_init = X
+            self.exists_CV_init = self.CVs.exists_keys
+        
+        # Actually run the cycle
+        self.one_cycle(X)
+        
+        if plot_every_cycle:
+            debug_plots(self)
+        
+        #If the abort function returns true, quit this loop
+        if self.Abort() or OneCycle:
+            print 'Quitting OBJECTIVE_CYCLE loop in core.solve'
+            return None #Stop
+                
+        if self.callbacks.endcycle_callback is None:
+            print 'endcycle_callback is None'
+            return None #Stop
+        else:
+            #endcycle_callback returns the errors and new initial state for the solver
+            errors, X_new = self.callbacks.endcycle_callback()
+            self.x_state = X.copy() #Make a copy
+            return errors
             
     def solve(self,
               key_inlet = None,
@@ -1477,45 +1517,8 @@ class PDSimCore(_PDSimCore):
             p = self.Tubes.Nodes[key_outlet].p
             self.Tubes.Nodes[key_outlet].update({'T':self.Td,'P':p})
             
-            def OBJECTIVE_CYCLE(x_state):
-                """
-                x_state: arraym instance
-                    Contains the state variables for all the control volumes in existence, as well as the valve values
-                """
-                
-                # The first time this function is run, save the initial state
-                # and the existence of the CV, as well as the valve positions
-                if self.xstate_init is None:
-                    self.xstate_init = x_state
-                    self.exists_CV_init = self.CVs.exists_keys
-                
-                # Actually run the cycle
-                self.one_cycle(x_state)
-                
-                if plot_every_cycle:
-                    debug_plots(self)
-                
-                #If the abort function returns true, quit this loop
-                if self.Abort() or OneCycle:
-                    print 'Quitting OBJECTIVE_CYCLE loop in core.solve'
-                    return None #Stop
-                        
-                if self.callbacks.endcycle_callback is None:
-                    print 'endcycle_callback is None'
-                    return None #Stop
-                else:
-                    #endcycle_callback returns the errors and new initial state for the solver
-                    errors, x_state_new = self.callbacks.endcycle_callback()
-                    self.x_state = x_state_new.copy() #Make a copy
-                    return errors
-                
-                    
-                ##################################
-                ## End OBJECTIVE_CYCLE function ##
-                ##################################
-            
             if UseNR:
-                self.x_state = Broyden(OBJECTIVE_CYCLE,
+                self.x_state = Broyden(self.OBJECTIVE_CYCLE,
                                        self.x_state, 
                                        Nfd = 1, 
                                        dx = 0.01*arraym(self.x_state), 
@@ -1537,7 +1540,7 @@ class PDSimCore(_PDSimCore):
                     # This means taking a full step
                     if x_state_prior is None or init_state_counter < LS_start:
                         x_state_prior = self.x_state.copy()
-                        errors = OBJECTIVE_CYCLE(x_state_prior)
+                        errors = self.OBJECTIVE_CYCLE(x_state_prior)
                         
 #                         if init_state_counter > 6 and init_state_counter % 3 == 0:
 #                             Ts1 = [x[1] for x in x_collector]
