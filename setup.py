@@ -24,7 +24,7 @@ from Cython.Distutils import build_ext
 from Cython.Distutils.extension import Extension as CyExtension
 import sys, shutil, os, glob
 
-version = '2.1'
+version = '2.2'
 
 #Modify the __init__ file with this version string
 fName = os.path.join('PDSim','__init__.py')

@@ -46,12 +46,12 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
         CP.enable_TTSE_LUT('Propane')
     global Injection
     ScrollComp=Scroll()
-    #This runs if the module code is run directly
+    #This runs if the module code is run directly 
     
     ScrollComp.set_scroll_geo(83e-6, 3.3, 0.005, 0.006) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2=0)
-    ScrollComp.geo.delta_flank = 10e-6
-    ScrollComp.geo.delta_radial = 10e-6
+    ScrollComp.geo.delta_flank = 40e-6
+    ScrollComp.geo.delta_radial = 40e-6
     
     ScrollComp.geo.delta_suction_offset = 0.0e-3
     ScrollComp.geo.phi_ie_offset = 0.0
@@ -150,8 +150,8 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
         
     Ref='Propane'
     
-    Te = -10 + 273.15
-    Tc = 70 + 273.15
+    Te = -20 + 273.15
+    Tc = 20 + 273.15
     Tin = Te + 11.1
     DT_sc = 7
     pe = CP.Props('P','T',Te,'Q',1.0,Ref)
@@ -178,7 +178,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
                              TubeFcn=ScrollComp.TubeCode))
     ScrollComp.add_tube(Tube(key1='outlet.1',
                              key2='outlet.2',
-                             L=1e-10,
+                             L=0.3,
                              ID=0.02,
                              mdot=mdot_guess, 
                              State2=outletState.copy(),
@@ -276,7 +276,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     
     from time import clock
     t1=clock()
-    ScrollComp.RK45_eps = 1e-8
+    ScrollComp.RK45_eps = 1e-9
     ScrollComp.eps_cycle = 3e-3
     try:
         ScrollComp.precond_solve(key_inlet='inlet.1',

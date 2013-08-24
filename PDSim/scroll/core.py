@@ -886,7 +886,7 @@ class Scroll(PDSimCore, _Scroll):
             # and the comment of user tk
             return (angle1-angle2+pi)%(2*pi)-pi
         
-        def IsAtMerge(eps = 0.001, eps_d1_higher=0.01,eps_dd_higher=0.00001):
+        def IsAtMerge(eps = 0.001, eps_d1_higher=0.003,eps_dd_higher=0.00001):
             pressures = [self.CVs['d1'].State.p,
                          self.CVs['d2'].State.p,
                          self.CVs['dd'].State.p]

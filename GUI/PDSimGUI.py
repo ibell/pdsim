@@ -996,7 +996,7 @@ class MainFrame(wx.Frame):
         import CoolProp, PDSim
         time_generation = time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime())
         pdsim_version = PDSim.__version__
-        coolprop_version = CoolProp.__version__+ ' svn revision: '+str(CoolProp.__svnrevision__)
+        coolprop_version = CoolProp.__version__+ ' git revision: '+str(CoolProp.__gitrevision__)
         
         return textwrap.dedent(
             """
