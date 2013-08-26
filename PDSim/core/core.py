@@ -1302,7 +1302,7 @@ class PDSimCore(_PDSimCore):
         # We put it in kW by multiplying by flow rate
         self.resid_Td = mdot_out * (h_outlet_Tube - h_outlet)
         
-    def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45'):
+    def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45', OneCycle = False):
         """
         The Objective function for the energy balance solver
         
@@ -1311,7 +1311,11 @@ class PDSimCore(_PDSimCore):
         X: :class:`<PDSim.misc.datatypes.arraym> arraym` instance
             Contains the state variables for all the control volumes in existence, as well as any other integration variables
         epsilon : float
-            Convergence criterion
+            Convergence criterion applied to all of the solvers
+        cycle_integrator : string, one of 'RK45','Euler','Heun'
+            Which solver is to be used to integrate the steps
+        OneCycle : boolean
+            If ``True``, stop after one cycle
         """
         
         # Consume the first element as the discharge temp 
@@ -1336,6 +1340,10 @@ class PDSimCore(_PDSimCore):
                 if not isinstance(resid_HT, arraym):
                     resid_HT = arraym(resid_HT)
             
+            
+            ###  -----------------------------------
+            ###         The lump temperatures
+            ###  -----------------------------------
             self.solvers.lump_eb_history.append([self.Tlumps, resid_HT])
             
             if len(self.solvers.lump_eb_history) == 1:
@@ -1366,6 +1374,11 @@ class PDSimCore(_PDSimCore):
             
                 #  Update the lump temperatures    
                 self.Tlumps = Tnew.tolist()
+            
+            
+            ###  -----------------------------------
+            ###        The discharge enthalpy
+            ###  -----------------------------------
             
             errors, X = self.callbacks.endcycle_callback()
             
@@ -1407,8 +1420,6 @@ class PDSimCore(_PDSimCore):
                 
             else:
                 
-                print self.solvers.hdisc_history
-                
                 #  Calculate the outlet enthalpy
                 h_outlet = self.Tubes[self.key_outlet].State2.get_h()
                 
@@ -1424,11 +1435,13 @@ class PDSimCore(_PDSimCore):
                 self.Tubes.Nodes[self.key_outlet].update({'H' : hdnew,
                                                           'P' : self.Tubes.Nodes[self.key_outlet].p})
                 
-                print hdn1, hdnew
+            if OneCycle:
+                print 'Quitting due to OneCycle being set to True'
+                return
             
-            hd,EB = zip(*self.solvers.hdisc_history)
-            plt.plot(hd,EB,'o-')
-            plt.savefig('errs.pdf')
+            if self.Abort():
+                print 'Quitting because Abort flag hit'
+                return
             
             #  Reset the flag for the fixed side of the outlet tube
             outlet_tube.fixed = old_fixed
@@ -1581,7 +1594,7 @@ class PDSimCore(_PDSimCore):
             x0 = [self.Tubes.Nodes[key_outlet].T, self.Tubes.Nodes[key_outlet].T]
 
         #  Actually run the solver
-        self.OBJECTIVE_CYCLE(x0, self.x_state, cycle_integrator = solver_method)
+        self.OBJECTIVE_CYCLE(x0, self.x_state, cycle_integrator = solver_method, OneCycle = OneCycle)
                 
         if not self.Abort(): 
             self.post_solve()
@@ -1835,7 +1848,6 @@ class PDSimCore(_PDSimCore):
                                                     FlowPath.State_down)
                 return mdot
             else:
-                
                 return 0.0
         except ZeroDivisionError:
             return 0.0
