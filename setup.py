@@ -5,6 +5,10 @@ except:
 
 try:
     import CoolProp
+    CoolProp_gitrev = CoolProp.__gitrevision__
+    fp = open('.CoolProp_gitrev','w')
+    print >> fp, 'CoolProp git revision used to build PDSim is: ', CoolProp_gitrev
+    fp.close()
 except ImportError:
     raise ImportError('The required python package CoolProp was not found.  Please go to coolprop.sf.net to obtain a copy')
     

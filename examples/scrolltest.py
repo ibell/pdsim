@@ -229,14 +229,14 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     ScrollComp.add_flow(FlowPath(key1 = 'outlet.1',
                                  key2 = 'dd',
                                  MdotFcn = ScrollComp.DISC_DD,
-                                 MdotFcn_kwargs = dict(X_d = 0.1)
+                                 MdotFcn_kwargs = dict(X_d = 0.7)
                                  )
                         )
        
     ScrollComp.add_flow(FlowPath(key1 = 'outlet.1',
                                  key2 = 'ddd',
                                  MdotFcn = ScrollComp.DISC_DD,
-                                 MdotFcn_kwargs = dict(X_d = 0.1)
+                                 MdotFcn_kwargs = dict(X_d = 0.7)
                                  )
                         )
 #     ScrollComp.add_flow(FlowPath(key1 = 'outlet.1',
