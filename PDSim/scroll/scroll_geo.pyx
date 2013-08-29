@@ -460,7 +460,7 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         elif geo.phi_os==geo.phi_is-pi:
             r2max=-c/b
         else:
-            raise ValueError('Error, must enforce phi_os > phi_is-pi to avoid scroll crashing :: phi_os %.16f phi_os %.16f, phi_is-pi %.16f' %(geo.phi_os,geo.phi_is-pi))
+            raise ValueError('Error, must enforce phi_os > phi_is-pi to avoid scroll crashing :: phi_os %.16f, phi_is-pi %.16f' %(geo.phi_os,geo.phi_is-pi))
             
         if type(r2) is not float and r2=='PMP':
             r2=r2max
