@@ -8,7 +8,7 @@ Step-By-Step on Windows
 
 #. Install the most recent version of MSYSGit from `full MSYSGit installs <http://code.google.com/p/msysgit/downloads/list?can=2&q=%22Full+installer+for+official+Git+for+Windows%22>`_.  Accept all the defaults.
 
-#. Install TortoseGit from `TortoiseGit installs <http://code.google.com/p/tortoisegit/wiki/Download>`_ (pick the right version for your operating system)
+#. Install TortoiseGit from `TortoiseGit installs <http://code.google.com/p/tortoisegit/wiki/Download>`_ (pick the right version for your operating system)
 
 #. Install python using Python (x,y) python installer.  Download the full installer from `Python(x,y) <https://code.google.com/p/pythonxy/wiki/Downloads?tm=2>`_ website.  In the installer, make sure to check Cython in the python section
 
@@ -23,56 +23,98 @@ Step-By-Step on Windows
     >>>
 
 #. Ok, python has been successfully installed.
-
-#. Install the remaining dependencies of PDSim using the command::
-
-    pip install -U 
     
-You have two steps remaining, building 
+#. Now we are going to collect the source code for PDSim and CoolProp.  In Windows Explorer, go to a folder where you want to put the source code for PDSim and CoolProp.  Right-click and select "Git Clone..."
 
+#. Use the URL ``https://github.com/ibell/pdsim``, and select the recursive option (which will force it to also install CoolProp as a submodule of the PDSim repository)
 
+#. Go into the folder you just created.  Run the script setup_coolprop.py (double-click on it, or at the command prompt::
 
-Get PDSim
-===========
-
-The git repo can be cloned by running a command like::
-
-    git clone git://git.code.sf.net/p/pdsim/git pdsim-git
+    python setup_coolprop.py
     
-Or if you have read/write abilities::
-
-    git clone ssh://ibell@git.code.sf.net/p/pdsim/git pdsim-git
-    
-where you should replace ``ibell`` with your sourceforge username.
-
-.. _install-PDSim:
-
-Install PDSim
-===============
-
-For Windows development, the use of the `Python(x,y) <http://www.pythonxy.com/>`_ distribution is highly recommended.  It includes the following packages that are required for the use of ``PDSim``::
-
-    Packages:
-        cython
-        scipy
-        numpy
-        matplotlib
-        nose
-    Other packages:
-        swig
-        mingw
-    
-A final pre-requisite for the use of ``PDSim`` is `CoolProp <http://coolprop.sf.net>`_.  Development of CoolProp is also ongoing, so the releases of CoolProp are likely not recent enough for the use of ``PDSim``.  
-
-If you are on windows and are using 32-bit python 2.7, you can use nightly CoolProp executables from `nightly CoolProp build <https://sourceforge.net/projects/coolprop/files/CoolProp/Nightly/>`_.  Beware, these are development builds, but are likely stable enough.
-
-Failing that, you will have to build from source.  This is pretty easy.  Use TortoiseSVN to checkout the Coolprop sources, or at the command line::
-
-    svn co https://coolprop.svn.sourceforge.net/svnroot/coolprop coolprop
-    
-Then ``cd`` into the folder and run::
+#. Install PDSim using
 
     python setup.py install
+
+#. Now go into the examples folder, and try to run the file PURecip.py, you should get output like::
+
+    C:\Users\Belli\Documents\Code\pdsim-git\examples>python PUrecip.py
+    Number of steps taken 7000
+    Elapsed time for cycle is 0.4413 s
+    Mass flow difference 2.03524833559  %
+    ===========
+    || # 000 ||
+    ===========
+    ||................|......@..........................|| energy balance  -0.0313473302944 [399.876899321797]
+    ||................|.....@...........................|| discharge state 0.0225653554386 445.300857982
+    ||................|...........@.....................|| cycle-cycle     0.145381939657
+    Number of steps taken 7000
+    Elapsed time for cycle is 0.437784 s
+    Mass flow difference 0.324805392183  %
+    ===========
+    || # 001 ||
+    ===========
+    ||................|......@..........................|| energy balance  -0.0312974294669 [361.27298241958306]
+    ||................|@................................|| discharge state 0.00386685157006 453.064795878
+    ||................|......@..........................|| cycle-cycle     0.024111213808
+    Number of steps taken 7000
+    Elapsed time for cycle is 0.439191 s
+    Mass flow difference -0.0570907915056  %
+    ===========
+    || # 002 ||
+    ===========
+    ||................|....@............................|| energy balance  -0.0156487147334 [341.97102396847896]
+    ||............@...|.................................|| discharge state -0.000716737604005 451.684013021
+    ||................|@................................|| cycle-cycle     0.00426059998124
+    Number of steps taken 7000
+    Elapsed time for cycle is 0.499563 s
+    Mass flow difference -0.0664255877057  %
+    ===========
+    || # 003 ||
+    ===========
+    ||................|..@..............................|| energy balance  -0.00782435736672 [332.3200447429269]
+    ||............@...|.................................|| discharge state -0.000807748849267 450.151035073
+    ||................|.@...............................|| cycle-cycle     0.0048139260336
+    Number of steps taken 7000
+    Elapsed time for cycle is 0.52113 s
+    Mass flow difference -0.0374442760086  %
+    ===========
+    || # 004 ||
+    ===========
+    ||................|@................................|| energy balance  -0.00391217868336 [327.49455513015084]
+    ||...........@....|.................................|| discharge state -0.000497721396576 449.251208618
+    ||................@.................................|| cycle-cycle     0.00279279716226
+    Number of steps taken 7000
+    Elapsed time for cycle is 0.49191 s
+    Mass flow difference -0.0184814204442  %
+    ===========
+    || # 005 ||
+    ===========
+    ||...............@|.................................|| energy balance  -0.00195608934168 [325.08181032376285]
+    ||.........@......|.................................|| discharge state -0.000286132835949 448.779806416
+    ||..............@.|.................................|| cycle-cycle     0.0014388268967
+    Ntheta is 7001
+    mdot*(h2-h1),P-v,Qamb 0.0874497858735 0.07491487626 -0.0119560893417
+    Mass flow rate is 0.503773487596 g/s
+    Volumetric efficiency is 88.6166506787 %
+
+#. Ok good, PDSim is working!
+
+#. Now we will install pre-requisites for the graphical interface.  Install a dependency of PDSim GUI using the command::
+
+    pip install -U quantities
+    
+#. Install PyYAML using the installer for win32-py2.7 at `PyYAML installers <http://pyyaml.org/wiki/PyYAML>`_
+    
+#. Go to the GUI folder from the root of the source.  Double-click on PDSimGUI.py to start
+
+#. Press F5 to run the default scroll compressor
+
+#. Wait about 80 seconds for it to finish
+
+Update source code
+===========
+When the code for PDSim is updated, all that you have to do to update the code is to go to the top-level folder where you installed PDSim, right-click and select "TortoiseGit->Pull..." and then OK
 
 Profiling
 ---------
