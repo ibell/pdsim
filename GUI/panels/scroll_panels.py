@@ -260,7 +260,7 @@ class DiscCurvesPanel(pdsim_panels.PDPanel):
     def __init__(self, parent, config):
         pdsim_panels.PDPanel.__init__(self, parent)
         
-        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
         sizer2 = wx.BoxSizer(wx.HORIZONTAL)
         
         if 'disc_curves' in config:
@@ -288,7 +288,10 @@ class DiscCurvesPanel(pdsim_panels.PDPanel):
         
         sizer2.Add(wx.StaticText(self,label='Radius of arc 2'))
         self.r2 = wx.TextCtrl(self, value=str(r2))
+        self.r2.SetToolTipString('This can either be the string \"PMP\" for a perfect-meshing profile,\n or alternatively, the second radius r2 in m')
+        
         sizer2.Add(self.r2)
+        sizer.AddSpacer(3)        
         sizer.Add(sizer2)
         
         self.SetSizer(sizer)
@@ -365,30 +368,23 @@ class GeometryPanel(pdsim_panels.PDPanel):
         annotated_GUI_objects = self.construct_items(annotated_values, 
                                                      sizer = sizer_for_wrap_inputs, 
                                                      parent = scrolled_panel)
-        
-        
+                
         #----------------------------------------------------------------------
-        # The sizer for the discharge curves data
-        sizer_for_discharge_curves_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+        # The sizer for all the discharge objects
+        sizer_for_discharge_inputs = wx.FlexGridSizer(cols = 1, vgap = 4, hgap = 4)
         
         if 'disc_xy_coords' in config:
             self.disc_xy_coords = config['disc_xy_coords']
             
         self.disc_curves = DiscCurvesPanel(scrolled_panel, config)
         
-        self.DiscCoordsButton = wx.Button(scrolled_panel, label = 'Set Port Coordinates')
+        self.DiscCoordsButton = wx.Button(scrolled_panel, label = 'Set Discharge Port Coordinates')
         self.DiscCoordsButton.Bind(wx.EVT_BUTTON,self.OnSetDiscPortCoords) 
         
+        sizer_for_discharge_inputs.Add(self.disc_curves)
+        sizer_for_discharge_inputs.Add(self.DiscCoordsButton, 0, wx.ALIGN_CENTER_HORIZONTAL)
         
-        sizer_for_discharge_curves_inputs.Add(self.disc_curves)
-        sizer_for_discharge_curves_inputs.AddSpacer(5)
-        sizer_for_discharge_curves_inputs.Add(self.DiscCoordsButton)
-        sizer_for_discharge_curves_inputs.AddSpacer(5)
-        
-        #----------------------------------------------------------------------
-        # The sizer for all the discharge objects
-        sizer_for_discharge_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
-        
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
         # Loop over the tube inputs
         annotated_values = []
         for key in ['d_discharge']:
@@ -399,8 +395,10 @@ class GeometryPanel(pdsim_panels.PDPanel):
             
         # Build the items and return the list of annotated GUI objects, add to existing list
         annotated_GUI_objects += [self.construct_items(annotated_values,
-                                                      sizer = sizer_for_discharge_inputs,
+                                                      sizer = sizer,
                                                       parent = scrolled_panel)]
+                                                      
+        sizer_for_discharge_inputs.Add(sizer)
         
         #----------------------------------------------------------------------
         # The sizer for all the tube objects
@@ -453,8 +451,6 @@ class GeometryPanel(pdsim_panels.PDPanel):
         sizer.Add(sizer_for_wrap_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
         sizer.Add(HeaderStaticText(scrolled_panel, 'Discharge Region Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
-        sizer.AddSpacer(5)
-        sizer.Add(sizer_for_discharge_curves_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
         sizer.Add(sizer_for_discharge_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
