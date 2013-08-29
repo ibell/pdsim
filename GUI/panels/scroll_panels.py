@@ -233,12 +233,15 @@ class DischargePortCoordinatesTable(wx.grid.Grid):
     
 class DischargePortCoordinatesDialog(wx.Dialog):
     """ A wx.Dialog to hold the grid with the x,y coords """
-    def __init__(self, parent):
+    def __init__(self, parent, values = None):
         wx.Dialog.__init__(self, parent, title = 'Discharge port coordinates')
         
         self.OKButton = wx.Button(self,label='OK')
         self.OKButton.Bind(wx.EVT_BUTTON, lambda event: self.EndModal(wx.ID_OK))
         self.xy_coords = DischargePortCoordinatesTable(self)
+        
+        if values is not None:
+            self.xy_coords.update_from_configfile(values)
         
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.OKButton, proportion = 0, flag=wx.EXPAND)
@@ -501,7 +504,13 @@ class GeometryPanel(pdsim_panels.PDPanel):
         
     def OnSetDiscPortCoords(self, event = None):
         
-        dlg = DischargePortCoordinatesDialog(None)
+        #  Get the current values for the discharge port coordinates
+        if hasattr(self,'disc_xy_coords'):
+            values = self.disc_xy_coords
+        else:
+            values = None
+            
+        dlg = DischargePortCoordinatesDialog(None, values)
         if dlg.ShowModal() == wx.ID_OK:
             x,y = dlg.xy_coords.get_coords()
             self.disc_xy_coords = x,y
