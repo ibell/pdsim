@@ -126,6 +126,11 @@ def Compressor():
     
     debug_plots(recip)
     
+    del recip.FlowStorage
+    from PDSim.misc.hdf5 import HDF5Writer
+    h5 = HDF5Writer()
+    h5.write_to_file(recip, 'recipsample.h5')
+    
 if __name__=='__main__':    
     Compressor()
 

@@ -1,6 +1,37 @@
 Building and Using PDSim modules
 ********************************
 
+Step-By-Step on Windows
+=======================
+
+#. Run the web installer for Microsoft Visual Studio 2008 Express from `VS2008Express <http://go.microsoft.com/?linkid=7729279>`_
+
+#. Install the most recent version of MSYSGit from `full MSYSGit installs <http://code.google.com/p/msysgit/downloads/list?can=2&q=%22Full+installer+for+official+Git+for+Windows%22>`_.  Accept all the defaults.
+
+#. Install TortoseGit from `TortoiseGit installs <http://code.google.com/p/tortoisegit/wiki/Download>`_ (pick the right version for your operating system)
+
+#. Install python using Python (x,y) python installer.  Download the full installer from `Python(x,y) <https://code.google.com/p/pythonxy/wiki/Downloads?tm=2>`_ website.  In the installer, make sure to check Cython in the python section
+
+#. Check that when you go to a command prompt, you get output like::
+
+    C:\Users\Belli>python
+    Python 2.7.2 (default, Jun 12 2011, 15:08:59) [MSC v.1500 32 bit (Intel)] on win32
+    Type "help", "copyright", "credits" or "license" for more information.
+    >>> import scipy
+    >>> scipy.__version__
+    '0.11.0'
+    >>>
+
+#. Ok, python has been successfully installed.
+
+#. Install the remaining dependencies of PDSim using the command::
+
+    pip install -U 
+    
+You have two steps remaining, building 
+
+
+
 Get PDSim
 ===========
 

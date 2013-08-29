@@ -636,7 +636,10 @@ class OutputTreePanel(wx.Panel):
                 elif isinstance(objects[0][thing], h5py.Group):
                     self.tree.SetItemImage(child, fldridx, which = wx.TreeItemIcon_Normal)
                     self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
-                    _recursive_hdf5_add(child, [o[thing] for o in objects])
+                    try:
+                        _recursive_hdf5_add(child, [o[thing] for o in objects])
+                    except KeyError as KE:
+                        print KE
         
         t1 = clock()
         _recursive_hdf5_add(self.root, self.runs)

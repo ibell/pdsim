@@ -59,6 +59,8 @@ class Run1(Process):
         #Get the module name (file name without the .py)
         script_name = self.script_name.split('.', 1)[0]
         
+        print 'About to run the script file', self.script_name
+        
         #Import the script module
         script_module = __import__(script_name, globals(), locals(), [], -1)
         
@@ -94,7 +96,7 @@ class Run1(Process):
             from plugins.HDF5_plugin import HDF5Writer
             HDF5 = HDF5Writer()
             HDF5.write_to_file(self.sim, hdf5_path)
-            #Prune off undesired keys as provided by get_prune_keys function
+            # Prune off undesired keys as provided by get_prune_keys function
             HDF5.prune(hdf5_path, self.sim.get_prune_keys())
             self.sim.attach_HDF5_annotations(hdf5_path)
             print 'Wrote hdf5 file to', hdf5_path
@@ -253,6 +255,7 @@ class RedirectedWorkerThread(Thread):
                         
                 abort_flag = pipe_abort_inlet.recv()
                 if abort_flag == 'ACK':
+                    hdf5_path = None
                     break
                 else:
                     raise ValueError('abort pipe should have received a value of "ACK"')
