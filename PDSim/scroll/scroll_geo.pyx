@@ -455,9 +455,9 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         a=cos(geo.phi_os-geo.phi_is)+1.0
         b=geo.ro*a-dx*(sin(geo.phi_os)-sin(geo.phi_is))+dy*(cos(geo.phi_os)-cos(geo.phi_is))
         c=1.0/2.0*(2.0*dx*sin(geo.phi_is)*geo.ro-2.0*dy*cos(geo.phi_is)*geo.ro-dy**2-dx**2)
-        if geo.phi_os-(geo.phi_is-pi)>1e-15:
+        if geo.phi_os-(geo.phi_is-pi)>1e-13:
             r2max=(-b+sqrt(b**2-4.0*a*c))/(2.0*a)
-        elif geo.phi_os==geo.phi_is-pi:
+        elif abs((geo.phi_os)-(geo.phi_is-pi)) < 1e-13:
             r2max=-c/b
         else:
             raise ValueError('Error, must enforce phi_os > phi_is-pi to avoid scroll crashing :: phi_os %.16f, phi_is-pi %.16f' %(geo.phi_os,geo.phi_is-pi))
