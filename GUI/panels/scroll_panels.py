@@ -675,33 +675,33 @@ class GeometryPanel(pdsim_panels.PDPanel):
                           )
 
         return textwrap.dedent(
-"""
-#  Parameters from the GUI
-Vdisp = {Vdisp:s} #[m^3/rev]
-Vratio = {Vratio:s} #[-] 
-t = {t:s} #[m]
-ro = {ro:s} #[m]
-phi_i0 = {phi_i0:s} #[rad]
-phi_is = {phi_is:s} #[rad]
-phi_os = {phi_os:s} #[rad]
-
-#  Set the scroll wrap geometry
-sim.set_scroll_geo(Vdisp, # Vdisp [m^3/rev]
-                   Vratio, # Vratio [-]
-                   t, # Thickness [m]
-                   ro, # Orbiting radius [m]
-                   phi_i0 = phi_i0, # [rad]
-                   phi_os = phi_os, # [rad]
-                   phi_is = phi_is) # [rad]
-sim.set_disc_geo("{disc_curves_type:s}", r2 = {disc_curves_r2:s})
-sim.d_discharge = {d_discharge:s}
-{disc_xy_coords_string:s}
-sim.geo.delta_flank = {delta_flank:s} # [m]
-sim.geo.delta_radial = {delta_radial:s} # [m]
-
-sim.geo.phi_ie_offset = {phi_ie_offset:s}
-
-""".format(**str_params))
+                        """
+                        #  Parameters from the GUI
+                        Vdisp = {Vdisp:s} #[m^3/rev]
+                        Vratio = {Vratio:s} #[-] 
+                        t = {t:s} #[m]
+                        ro = {ro:s} #[m]
+                        phi_i0 = {phi_i0:s} #[rad]
+                        phi_is = {phi_is:s} #[rad]
+                        phi_os = {phi_os:s} #[rad]
+                        
+                        #  Set the scroll wrap geometry
+                        sim.set_scroll_geo(Vdisp, # Vdisp [m^3/rev]
+                                           Vratio, # Vratio [-]
+                                           t, # Thickness [m]
+                                           ro, # Orbiting radius [m]
+                                           phi_i0 = phi_i0, # [rad]
+                                           phi_os = phi_os, # [rad]
+                                           phi_is = phi_is) # [rad]
+                        sim.set_disc_geo("{disc_curves_type:s}", r2 = {disc_curves_r2:s})
+                        sim.d_discharge = {d_discharge:s}
+                        {disc_xy_coords_string:s}
+                        sim.geo.delta_flank = {delta_flank:s} # [m]
+                        sim.geo.delta_radial = {delta_radial:s} # [m]
+                        
+                        sim.geo.phi_ie_offset = {phi_ie_offset:s}
+                        
+                        """.format(**str_params))
         
 class FlowOptions(pdsim_panels.PDPanel):
     """

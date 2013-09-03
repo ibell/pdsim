@@ -2,7 +2,7 @@ from __future__ import absolute_import
 import wx, yaml, os
 from panels import scroll_panels, pdsim_panels
 
-family_menu_name = 'Scroll'
+family_menu_name = 'Scroll Compressor'
 
 class InputsToolBook(pdsim_panels.InputsToolBook):
     """
@@ -48,7 +48,7 @@ class InputsToolBook(pdsim_panels.InputsToolBook):
         
 scroll_yaml=(
 """
-family : scroll
+family : Scroll Compressor
 
 GeometryPanel:
   Vdisp : 104.8e-6 # Displacement volume / revolution [m^3/rev]

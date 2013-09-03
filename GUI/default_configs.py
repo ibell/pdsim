@@ -1,59 +1,63 @@
-# -*- coding: latin-1 -*-
+# -*- coding: utf-8 -*-
 
 import yaml
 
 recip_yaml = (
 """
-family = recip
+family : Recip
 
-[GeometryPanel]
-piston_diameter = float,0.02,Piston diameter [m]
-piston_length = float,0.02,Piston length [m]
-crank_length = float,0.01,Crank length [m]
-connecting_rod_length = float,0.04,Connecting rod length [m]
-dead_volume_perc = float,4.0,Dead volume percentage [%%]
-x_TDC = float,0.005,Distance to piston at TDC [m]
-shell_volume = float,100e-6,Shell volume [m³]
+GeometryPanel:
+    piston_diameter : 0.02 # Piston diameter [m]
+    piston_length : 0.02 # Piston length [m]
+    crank_length : 0.01 # Crank length [m]
+    connecting_rod_length : 0.04 # Connecting rod length [m]
+    dead_volume_perc : 4.0 #Dead volume percentage [%]
+    x_TDC : 0.005 # Distance to piston at TDC [m]
+    shell_volume : 100e-6 # Shell volume [\uxb3]
 
-[MassFlowPanel]
-d_discharge = float,0.0059,Discharge port diameter [m]
-d_suction = float,0.0059,Suction port diameter [m]
-valve_E = float,1.93e+11,Youngs Modulus [Pa]
-valve_d = float,0.007,Valve diameter [m]
-valve_h = float,0.0001532,Valve thickness [m]
-valve_l = float,0.018,Valve length [m]
-valve_a = float,0.014,Valve distance from anchor [m]
-valve_x_stopper = float,0.0018,Valve distance to stopper [m]
-valve_rho = float,8000.0,Valve metal density [kg/m³]
-valve_C_D = float,1.17,Valve drag coefficient [-]
+MassFlowPanel:
+    d_discharge : 0.0059 # Discharge port diameter [m]
+    d_suction : 0.0059 # Suction port diameter [m]
+    valve_E : 1.93e+11 # Youngs Modulus [Pa]
+    valve_d : 0.007 # Valve diameter [m]
+    valve_h : 0.0001532 # Valve thickness [m]
+    valve_l : 0.018 # Valve length [m]
+    valve_a : 0.014 # Valve distance from anchor [m]
+    valve_x_stopper : 0.0018 # Valve distance to stopper [m]
+    valve_rho : 8000.0 # Valve metal density [kg/m3]
+    valve_C_D : 1.17 # Valve drag coefficient [-]
 
-[MechanicalLossesPanel]
-eta_motor = float,0.95,Motor efficiency [-]
-h_shell = float,0.01,Shell air-side heat transfer coefficient [kW/m²/K]
-A_shell = float,0.040536,Shell Area [m²]
-Tamb = float,298.0,Ambient temperature [K]
-mu_oil = float,0.0086,Oil viscosity [Pa-s]
-delta_gap = float,2e-05,Gap width [m]
+MechanicalLossesPanel:
+    eta_motor : 0.95 # Motor efficiency [-]
+    h_shell : 0.01 # Shell air-side heat transfer coefficient [kW/m2/K]
+    A_shell : 0.040536 # Shell Area [m2]
+    Tamb : 298.0 # Ambient temperature [K]
+    mu_oil : 0.0086 # Oil viscosity [Pa-s]
+    delta_gap : 2e-05 # Gap width [m]
 
-[StatePanel]
-omega = float,377.0,Rotational speed [rad/s]
-inletState = State,R404A,283.15,5.75
-discharge = Discharge,2.0,Pressure ratio [-]
+StatePanel:
+  omega : 377.0 # Rotational speed [rad/s]
+  inletState: 
+      Fluid : R410A
+      T : 283.15 #[K]
+      rho : 5.75 #[kg/m^3]
+  discharge:
+      pratio : 2.0
 
-[ParametricPanel]
-Term1 = Term,Rotational speed [rad/s],250.0;300.0
+ParametricPanel:
+  structured : True
 
-[SolverInputsPanel]
-Cycle = Cycle,Euler,7000
-
-[OutputDataPanel]
-selected  = selected,['run_index'; 'mdot'; 'eta_v'; 'eta_oi'; 'Td']
+SolverInputsPanel:
+  cycle_integrator: RK45
+  integrator_options: {epsRK45 : 1e-7}
+  eps_cycle : 0.002 # Cycle-Cycle convergence tolerance (RSSE) [-]
+  eps_energy_balance : 0.05 # Energy balance convergence tolerance (RSSE) [-]
 """
 )
 
 scroll_yaml=(
 """
-family : scroll
+family : Scroll Compressor
 
 GeometryPanel:
   Vdisp : 104.8e-6 # Displacement volume / revolution [m^3/rev]
@@ -163,4 +167,7 @@ def get_defaults(family):
         return yaml.load(recip_yaml)
     else:
         raise ValueError('Your machine family [{f:s}] was not found'.format(f=family))
+        
+if __name__=='__main__':
+    print get_defaults('recip')
     

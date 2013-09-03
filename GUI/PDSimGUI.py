@@ -1038,8 +1038,8 @@ class MainFrame(wx.Frame):
             from PDSim.flow.flow_models import IsentropicNozzleWrapper
             from PDSim.core.containers import ControlVolume
             from PDSim.core.core import Tube
-            from PDSim.plot.plots import debug_plots
             from PDSim.core.motor import Motor
+            from PDSim.plot.plots import debug_plots
             
             # Imports from CoolProp
             from CoolProp import State
