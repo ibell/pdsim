@@ -674,7 +674,7 @@ class Scroll(PDSimCore, _Scroll):
         # Loop over all the radial leakage pairs possible for the given geometry
         for pair in pairs:
             if ('sa' in pair or 's1' in pair or 's2' in pair) and hasattr(self,'disable_radial_suction') and self.disable_radial_suction:
-                warnings.warn('radial s1-c1 disabled')
+                warnings.warn('radial s1-c1 disabled',RuntimeWarning)
                 continue
             self.add_flow(FlowPath(key1=pair[0],
                                    key2=pair[1],
@@ -696,9 +696,11 @@ class Scroll(PDSimCore, _Scroll):
         """
         
         # Always a s1-c1 leakage and s2-c2 leakage
-        self.add_flow(FlowPath(key1='s1',key2='c1.1',MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
-        self.add_flow(FlowPath(key1='s2',key2='c2.1',MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
-        #warnings.warn('flank s1-c1 disabled')
+        if hasattr(self,'disable_flank_suction') and self.disable_flank_suction:
+            warnings.warn('flank s1-c1 disabled',RuntimeWarning)
+        else:
+            self.add_flow(FlowPath(key1='s1',key2='c1.1',MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
+            self.add_flow(FlowPath(key1='s2',key2='c2.1',MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
         
         # Only add the DDD-S1 and DDD-S2 flow path if there is one set of
         # compression chambers.   
@@ -732,17 +734,18 @@ class Scroll(PDSimCore, _Scroll):
                 self.add_flow(FlowPath(key1 = keyc1, key2='ddd', MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
                 self.add_flow(FlowPath(key1 = keyc2, key2='ddd', MdotFcn=flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
             
+            flankFunc_kwargs_copy = copy.deepcopy(flankFunc_kwargs)
             # Update the flag so that this term will only be evaluated when the number of pairs of 
             # compression chambers in existence will be equal to     
-            flankFunc_kwargs['Ncv_check'] = nCmax - 1
+            flankFunc_kwargs_copy['Ncv_check'] = nCmax - 1
             
             if alpha == nCmax - 1:
                 # Leakage between the discharge region and the next-most inner chamber when the innermost chambers
                 # have been swallowed into the discharge region
-                self.add_flow(FlowPath(key1 = keyc1, key2 = 'ddd', MdotFcn = flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
-                self.add_flow(FlowPath(key1 = keyc2, key2 = 'ddd', MdotFcn = flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
-                self.add_flow(FlowPath(key1 = keyc1, key2 = 'd1', MdotFcn = flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
-                self.add_flow(FlowPath(key1 = keyc2, key2 = 'd2', MdotFcn = flankFunc, MdotFcn_kwargs = flankFunc_kwargs))
+                self.add_flow(FlowPath(key1 = keyc1, key2 = 'ddd', MdotFcn = flankFunc, MdotFcn_kwargs = flankFunc_kwargs_copy))
+                self.add_flow(FlowPath(key1 = keyc2, key2 = 'ddd', MdotFcn = flankFunc, MdotFcn_kwargs = flankFunc_kwargs_copy))
+                self.add_flow(FlowPath(key1 = keyc1, key2 = 'd1', MdotFcn = flankFunc, MdotFcn_kwargs = flankFunc_kwargs_copy))
+                self.add_flow(FlowPath(key1 = keyc2, key2 = 'd2', MdotFcn = flankFunc, MdotFcn_kwargs = flankFunc_kwargs_copy))
     
     def calculate_scroll_mass(self):
         """
@@ -874,8 +877,8 @@ class Scroll(PDSimCore, _Scroll):
         b) Adjusted because you are at the discharge angle
         
         """ 
-        #This gets called at every step, or partial step
-        self.theta=t
+        # This gets called at every step, or partial step
+        self.theta = t
         
         def angle_difference(angle1,angle2):
             # Due to the periodicity of angles, you need to handle the case where the
@@ -886,7 +889,7 @@ class Scroll(PDSimCore, _Scroll):
             # and the comment of user tk
             return (angle1-angle2+pi)%(2*pi)-pi
         
-        def IsAtMerge(eps = 0.001, eps_d1_higher=0.003,eps_dd_higher=0.00001):
+        def IsAtMerge(eps = 0.001, eps_d1_higher = 0.003, eps_dd_higher = 0.00001):
             pressures = [self.CVs['d1'].State.p,
                          self.CVs['d2'].State.p,
                          self.CVs['dd'].State.p]
@@ -1167,10 +1170,9 @@ class Scroll(PDSimCore, _Scroll):
             return self.losses.bearings #[kW]
     
     def post_cycle(self):
-        #Run the base-class method to set HT terms, etc.
+        # Run the base-class method to set HT terms, etc. - also calls lumps_energy_balance_callback
         PDSimCore.post_cycle(self)
-        #Calculate the mechanical and motor losses 
-        self.lump_energy_balance_callback()
+        
         #Update the heat transfer to the gas in the shell
         self.suction_heating()
         
@@ -1336,15 +1338,6 @@ class Scroll(PDSimCore, _Scroll):
             self.omega = omega
         else:
             raise AttributeError('motor.type must be one of "const_eta_motor" or "motor_map"')
-
-#        print 'mean_Q', self.HTProcessed.mean_Q
-#        print 'self.forces.mean_Fm', self.forces.mean_Fm
-#        print 'self.forces.inertial', self.forces.inertial
-#        print 'self.Qamb', self.Qamb
-#        print 'self.Wdot_forces', self.Wdot_forces
-#        print 'self.Wdot_pv', self.Wdot_pv 
-#        print 'self.losses.bearings', self.losses.bearings
-#        print 'self.Wdot_mechanical', self.Wdot_mechanical
         
         #Motor losses [kW]
         self.motor.losses = self.Wdot_mechanical*(1/self.eta_motor-1)
@@ -1359,13 +1352,14 @@ class Scroll(PDSimCore, _Scroll):
 #        #Set the heat input to the suction line
 #        self.suction_heating()
         
-        print 'At this iteration'
-        print '    Electrical power:', self.Wdot_electrical,'kW'
-        print '    Mass flow rate:', self.mdot,'kg/s'
-        if hasattr(self,'Wdot_i'):
-            print '    Over. isentropic:', self.eta_oi,'-'
-        if hasattr(self,'eta_v'):
-            print '    Volumetric:', self.eta_v,'-'
+        if self.verbosity > 0:
+            print 'At this iteration'
+            print '    Electrical power:', self.Wdot_electrical,'kW'
+            print '    Mass flow rate:', self.mdot,'kg/s'
+            if hasattr(self,'Wdot_i'):
+                print '    Over. isentropic:', self.eta_oi,'-'
+            if hasattr(self,'eta_v'):
+                print '    Volumetric:', self.eta_v,'-'
         
         #Want to return a list
         return [Qnet]
