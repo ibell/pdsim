@@ -1333,6 +1333,9 @@ class PDSimCore(_PDSimCore):
             #  sets the parameter lumps_resid in this class
             self.one_cycle(X, cycle_integrator = cycle_integrator)
             
+            if self.Abort():
+                return
+            
             ###  -----------------------------------
             ###         The lump temperatures
             ###  -----------------------------------
