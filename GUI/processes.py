@@ -269,6 +269,8 @@ class RedirectedWorkerThread(Thread):
             if pipe_results_outlet.poll():
                 hdf5_path = pipe_results_outlet.recv()
                 pipe_results_outlet.send('ACK')
+            else:
+                hdf5_path = None
         
         #Flush out any remaining stuff left in the pipe after process ends
         while pipe_outlet.poll():
