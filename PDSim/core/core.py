@@ -119,6 +119,8 @@ class PDSimCore(_PDSimCore):
         self.solvers = dummy()
         self.solvers.lump_eb_history = []
         self.solvers.hdisc_history = []
+        
+        self.verbosity = 0
     
     def _get_from_matrices(self,i):
         """
@@ -293,20 +295,6 @@ class PDSimCore(_PDSimCore):
         
         self.FlowsProcessed.collected_data = []
                 
-#         MdotMat = np.zeros((len(self.FlowStorage[-1]),len(self.FlowStorage)))
-#         EdotMat = np.zeros_like(MdotMat)
-#         
-#         #  Collect matrices of the mass flow and irreversibility for each flow path
-#         for j, FlowGroup in enumerate(self.FlowStorage):
-#             for i, Flow in enumerate(FlowGroup):
-#                 
-#                 MdotMat[i,j] = Flow.mdot
-#                 if Flow.exists and Flow.State_up is not None and Flow.State_down is not None:    
-#                     #  Change in specific availability (exergy) [kJ/kg]
-#                     deltae = (Flow.State_up.h-Flow.State_down.h)-298.15*(Flow.State_up.s-Flow.State_down.s)
-#                     #  Irreversibility generation rate [kW]
-#                     EdotMat[i,j] = Flow.mdot*deltae
-                
         for i, Flow in enumerate(self.Flows):
              
             mdot = np.array([Flows[i].mdot for Flows in self.FlowStorage])
@@ -320,7 +308,7 @@ class PDSimCore(_PDSimCore):
                         mdot_average = np.trapz(mdot, self.t[0:self.Ntheta])/(self.t[self.Ntheta-1]-self.t[0]),
                         Edot_average = np.trapz(edot, self.t[0:self.Ntheta])/(self.t[self.Ntheta-1]-self.t[0]) 
                         )
-                 
+                
             self.FlowsProcessed.collected_data.append(data)
             
     def _postprocess_HT(self):
@@ -1017,6 +1005,15 @@ class PDSimCore(_PDSimCore):
         self._postprocess_flows()
         self._postprocess_HT()
         
+        #  Calculate the lumped mass energy balance
+        if self.callbacks.lumps_energy_balance_callback is not None:
+            self.lumps_resid = self.callbacks.lumps_energy_balance_callback()
+            #  Convert to an arraym if needed
+            if not isinstance(self.lumps_resid, arraym):
+                self.lumps_resid = arraym(self.lumps_resid)
+        else:
+            raise ValueError('lumps_energy_balance_callback cannot be None')
+        
         if not hasattr(self,'Qamb'):
             self.Qamb = 0
         
@@ -1332,19 +1329,14 @@ class PDSimCore(_PDSimCore):
         worst_error = 1000
         while worst_error > epsilon:
             
-            #  Actually run the cycle
+            #  Actually run the cycle, runs post_cycle at the end,
+            #  sets the parameter lumps_resid in this class
             self.one_cycle(X, cycle_integrator = cycle_integrator)
-            
-            if self.callbacks.lumps_energy_balance_callback is not None:
-                resid_HT = self.callbacks.lumps_energy_balance_callback()
-                if not isinstance(resid_HT, arraym):
-                    resid_HT = arraym(resid_HT)
-            
             
             ###  -----------------------------------
             ###         The lump temperatures
             ###  -----------------------------------
-            self.solvers.lump_eb_history.append([self.Tlumps, resid_HT])
+            self.solvers.lump_eb_history.append([self.Tlumps, self.lumps_resid])
             
             if len(self.solvers.lump_eb_history) == 1:
                 
@@ -1390,7 +1382,7 @@ class PDSimCore(_PDSimCore):
                 
             self.solvers.hdisc_history.append([h_outlet,self.resid_Td])
             
-            if max(np.abs(resid_HT)) > epsilon or len(self.solvers.hdisc_history) == 1:
+            if max(np.abs(self.lumps_resid)) > epsilon or len(self.solvers.hdisc_history) == 1:
                 #  Save the old state of the outlet tube
                 old_fixed = outlet_tube.fixed
                 
@@ -1451,11 +1443,11 @@ class PDSimCore(_PDSimCore):
             print '==========='
             print '|| # {i:03d} ||'.format(i=i)
             print '==========='
-            print error_ascii_bar(abs(resid_HT[0]),epsilon), 'energy balance ', resid_HT[0], self.Tlumps
-            print error_ascii_bar(abs(self.resid_Td),epsilon), 'discharge state', self.resid_Td, self.h_outlet_pump_set
+            print error_ascii_bar(abs(self.lumps_resid[0]),epsilon), 'energy balance ', self.lumps_resid[0], ' Tlumps: ',self.Tlumps,'K'
+            print error_ascii_bar(abs(self.resid_Td),epsilon), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg'
             print error_ascii_bar(np.sqrt(np.sum(np.power(errors, 2))),epsilon), 'cycle-cycle    ',np.sqrt(np.sum(np.power(errors, 2)))
             
-            worst_error = max(abs(resid_HT[0]), abs(self.resid_Td), np.sqrt(np.sum(np.power(errors, 2))))
+            worst_error = max(abs(self.lumps_resid[0]), abs(self.resid_Td), np.sqrt(np.sum(np.power(errors, 2))))
             i += 1
         
         #  If the abort function returns true, quit this loop
