@@ -1422,7 +1422,7 @@ class Scroll(PDSimCore, _Scroll):
         except ZeroDivisionError:
             return 0.0
      
-    def SA_S1(self, FlowPath, X_d=1.0,**kwargs):
+    def SA_S1(self, FlowPath, X_d = 1.0, X_d_precompression = 1.0):
         """
         A wrapper for the flow between the suction area and the S1 chamber
         
@@ -1432,13 +1432,22 @@ class Scroll(PDSimCore, _Scroll):
         used to calculate the flow area.  Otherwise the conventional analysis 
         will be used.
         """
-        if abs(self.geo.phi_ie_offset) > 1e-12:
-            FlowPath.A = X_d*scroll_geo.Area_s_s1_offset(self.theta, self.geo)
+        V,dV = scroll_geo.S1(self.theta,self.geo)[0:2]
+        
+        if dV >= 0:
+            #  Normal incoming suction flow
+            _X_d = X_d 
         else:
-            FlowPath.A = X_d*scroll_geo.Area_s_sa(self.theta, self.geo)
+            #  Back flow at the end
+            _X_d = X_d_precompression
+            
+        if abs(self.geo.phi_ie_offset) > 1e-12:
+            FlowPath.A = scroll_geo.Area_s_s1_offset(self.theta, self.geo)
+        else:
+            FlowPath.A = scroll_geo.Area_s_sa(self.theta, self.geo)
              
         try:
-            mdot = flow_models.IsentropicNozzle(FlowPath.A,
+            mdot = _X_d*flow_models.IsentropicNozzle(FlowPath.A,
                                                 FlowPath.State_up,
                                                 FlowPath.State_down)
             return mdot
@@ -1451,9 +1460,18 @@ class Scroll(PDSimCore, _Scroll):
         """
         return self.SA_S(*args,**kwargs)
         
-    def SA_S(self, FlowPath, X_d=1.0,**kwargs):
+    def SA_S(self, FlowPath, X_d = 1.0, X_d_precompression = 1.0):
         
-        FlowPath.A=X_d*scroll_geo.Area_s_sa(self.theta, self.geo)
+        V,dV = scroll_geo.S1(self.theta,self.geo)[0:2]
+        
+        if dV >= 0:
+            #  Normal incoming suction flow
+            _X_d = X_d 
+        else:
+            #  Back flow at the end
+            _X_d = X_d_precompression
+            
+        FlowPath.A = _X_d*scroll_geo.Area_s_sa(self.theta, self.geo)
         try:
             mdot = flow_models.IsentropicNozzle(FlowPath.A,
                                                 FlowPath.State_up,
