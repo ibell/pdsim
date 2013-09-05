@@ -1470,7 +1470,6 @@ class PDSimCore(_PDSimCore):
               plot_every_cycle = False,
               x0 = None,
               reset_initial_state = False,
-              LS_start = 18,
               timeout = 3600,
               eps_cycle = 0.001,
               eps_energy_balance = 0.01,
@@ -1508,8 +1507,6 @@ class PDSimCore(_PDSimCore):
             The starting values for the solver that modifies the discharge temperature and lump temperatures
         reset_initial_state : boolean
             If ``True``, use the stored initial state from the previous call to ``solve`` as the starting value for the thermodynamic values for the control volumes
-        LS_start : int
-            Number of conventional steps to be taken when not using newton-raphson prior to entering into a line search
         timeout : float
             Number of seconds before the run times out
         eps_cycle : float
@@ -1553,6 +1550,12 @@ class PDSimCore(_PDSimCore):
         # Used from the GUI to kill process from the top-level thread
         self.pipe_abort = pipe_abort
         
+        if len(self.CVs) <= 1:
+            raise ValueError('At least one control volume must be added using the add_CV function')
+            
+        if len(self.Flows) <= 1:
+            raise ValueError('At least one flow must be added using the add_flow function')
+        
         # If a function called pre_solve is provided, call it with no input arguments
         if hasattr(self,'pre_solve'):
             self.pre_solve()
@@ -1589,7 +1592,10 @@ class PDSimCore(_PDSimCore):
             x0 = [self.Tubes.Nodes[key_outlet].T, self.Tubes.Nodes[key_outlet].T]
 
         #  Actually run the solver
-        self.OBJECTIVE_CYCLE(x0, self.x_state, cycle_integrator = solver_method, OneCycle = OneCycle)
+        self.OBJECTIVE_CYCLE(x0, self.x_state, 
+                             cycle_integrator = solver_method, 
+                             OneCycle = OneCycle,
+                             epsilon = eps_energy_balance)
                 
         if not self.Abort(): 
             self.post_solve()
@@ -1847,6 +1853,20 @@ class PDSimCore(_PDSimCore):
         except ZeroDivisionError:
             return 0.0
 
+    def step_callback(self,t,h,i):
+        """ The default step_callback which does nothing
+        
+        Parameters
+        ----------
+        t : float
+            The current value of the independent variable
+        h : float
+            The current step size
+        i : int
+            The current index
+        """
+        return False,h
+        
     def endcycle_callback(self,eps_wrap_allowed=0.0001):
         """
         This function can be called at the end of the cycle if so desired.
