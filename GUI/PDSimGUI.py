@@ -112,43 +112,27 @@ class IntegratorChoices(wx.Choicebook):
         sizer.AddMany([self.RK45_eps_label, self.RK45_eps])
         self.pageRK45.SetSizer(sizer)
     
-    def set_sim(self, simulation):
+    def get_script_chunk(self):
+        """
+        Returns
+        -------
+        IC_type : string
+            One of 'Euler', 'Heun', 'RK45'
+        kwargs : dictionary
+            entries to be passed to solve() function
+        """
         
         if self.GetSelection() == 0:
-            simulation.cycle_integrator_type = 'Euler'
-            simulation.EulerN = int(self.EulerN.GetValue())
+            IC_type = 'Euler'
+            kwargs = dict(EulerN = int(self.EulerN.GetValue()))
         elif self.GetSelection() == 1:
-            simulation.cycle_integrator_type = 'Heun'
-            simulation.HeunN = int(self.HeunN.GetValue())
+            IC_type = 'Heun'
+            kwargs = dict(HeunN = int(self.HeunN.GetValue()))
         else:
-            simulation.cycle_integrator_type = 'RK45'
-            simulation.RK45_eps = float(self.RK45_eps.GetValue())
-
-    def set_from_string(self, config_string):
-        """
-        config_string will be something like Cycle,Euler,7000 or Cycle,RK45,1e-8
-        """
-        #Chop off the Cycle,
-        config_string = config_string.split(',',1)[1]
-        
-        SolverType, config = config_string.split(',',1)
-        if SolverType == 'Euler':
-            self.SetSelection(0)
-            self.EulerN.SetValue(config)
-        elif SolverType == 'Heun':
-            self.SetSelection(1)
-            self.HeunN.SetValue(config)
-        elif SolverType == 'RK45':
-            self.SetSelection(2)
-            self.RK45_eps.SetValue(config)
-        
-    def save_to_string(self):
-        if self.GetSelection() == 0:
-            return 'Cycle = Cycle,Euler,'+self.EulerN.GetValue()
-        elif self.GetSelection() == 1:
-            return 'Cycle = Cycle,Heun,'+self.HeunN.GetValue()
-        else:
-            return 'Cycle = Cycle,RK45,'+self.RK45_eps.GetValue()
+            IC_type = 'RK45'
+            kwargs = dict(RK45_eps = int(self.self.RK45_eps.GetValue()))
+            
+        return IC_type, kwargs
         
 class SolverInputsPanel(pdsim_panels.PDPanel):
     
@@ -220,22 +204,24 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
     
     def get_config_chunk(self):
   
+        IC_type, kwargs = self.IC.get_script_chunk()
         configdict = dict(eps_cycle = self.main.get_GUI_object_value('eps_cycle'),
                           eps_energy_balance = self.main.get_GUI_object_value('eps_energy_balance'),
-                          cycle_integrator = 'RK45',
-                          integrator_options = dict(RK_eps = float(self.IC.RK45_eps.GetValue())),
+                          cycle_integrator = IC_type,
+                          integrator_options = kwargs,
                           Ncore_max = self.Ncore_max.GetValue()
                           )
         return configdict
         
     def get_script_chunks(self):
-        
+
+        IC_type, kwargs = self.IC.get_script_chunk()
+        print IC_type, kwargs
         eps_cycle = self.main.get_GUI_object('eps_cycle').GetValue()
         eps_energy_balance = self.main.get_GUI_object('eps_energy_balance').GetValue()
         
         return textwrap.dedent(
             """
-            sim.RK45_eps = {RK_eps:s}
             t1=time.clock()
             sim.connect_callbacks(step_callback = sim.step_callback, 
                                   endcycle_callback = sim.endcycle_callback,
@@ -245,8 +231,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
             sim.precond_solve(key_inlet = 'inlet.1',
                               key_outlet = 'outlet.2',
                               pipe_abort = pipe_abort,
-                              solver_method = 'RK45',
-                              UseNR = False, #Don't use Newton-Raphson ND solver to determine the initial state
+                              solver_method = \"{IC_type:s}\",
                               OneCycle = {OneCycle:s},
                               plot_every_cycle = {plot_every_cycle:s},
                               hmin = 1e-8, # hard-coded
@@ -258,24 +243,10 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
                        eps_cycle = str(eps_cycle),
                        eps_energy_balance = str(eps_energy_balance),
                        OneCycle = str(self.OneCycle.GetValue()),
-                       plot_every_cycle = str(self.plot_every_cycle.GetValue())
+                       plot_every_cycle = str(self.plot_every_cycle.GetValue()),
+                       IC_type = str(IC_type)
                        )
                    )
-            
-    def post_get_from_configfile(self, key, config_string):
-        """
-        Build the integrator chooser 
-        
-        This function will be called by PDPanel.get_from_configfile
-        """
-        if key == 'Cycle':
-            self.IC.set_from_string(config_string)
-        
-    def post_prep_for_configfile(self):
-        return self.IC.save_to_string()+'\n'
-    
-    def supply_parametric_term(self):
-        pass
         
 class SolverToolBook(wx.Toolbook):
     def __init__(self, parent, configdict, id=-1):
@@ -304,9 +275,7 @@ class SolverToolBook(wx.Toolbook):
     
     def get_script_chunks(self):
         """
-        Pull all the values out of the child panels, using the values in 
-        self.items and the function get_script_chunks if the panel implements
-        it
+        Pull all the values out of the child panels
         
         The values are written into the script file that will be execfile-d
         """

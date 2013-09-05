@@ -1,9 +1,11 @@
 language: python
 python:
   - "2.7"
-  - "3.3"
 # command to install dependencies
-install: "pip install Cython --use-mirrors"
+install: 
+  - pip install Cython --use-mirrors
+  - pip install 
+  
 # command to run tests
 script: 
   - cd wrappers/Python
