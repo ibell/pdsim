@@ -168,7 +168,6 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         self.OneCycle = wx.CheckBox(self, label = "Just run one cycle - not the full solution")
         self.plot_every_cycle = wx.CheckBox(self, label = "Open the plots after each cycle (warning - very annoying but good for debug)")
         
-        
         sizer_Ncore_max = wx.BoxSizer(wx.HORIZONTAL)
         
         self.label_Ncore_max = wx.StaticText(self, label = "Maximum number of computational cores to use", )

@@ -4,14 +4,11 @@ python:
 # command to install dependencies
 install: 
   - pip install Cython --use-mirrors
-  - pip install 
+  - pip install numpy scipy
   
 # command to run tests
 script: 
-  - cd wrappers/Python
-  - python setup.py install # Install CoolProp
-  - cd ..
-  - python -c "from CoolProp.tests.runner import run; run()"
+  - python setup.py install # Install PDSim
 
 notifications:
   email:
