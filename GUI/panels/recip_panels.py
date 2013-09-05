@@ -2,6 +2,7 @@
 import pdsim_panels
 import wx
 from math import pi
+import textwrap
 
 from datatypes import HeaderStaticText
 from wx.lib.scrolledpanel import ScrolledPanel
@@ -13,7 +14,11 @@ class GeometryPanel(pdsim_panels.PDPanel):
                     crank_length = ('Crank length [m]','m'),
                     connecting_rod_length = ('Connecting rod length [m]','m'),
                     x_TDC = ('Distance to piston at TDC [m]','m'),
-                    shell_volume = ('Shell volume [m\xb3]','m^3')
+                    shell_volume = ('Shell volume [m\xb3]','m^3'),
+                    inlet_tube_length = ('Inlet tube length [m]','m',0.02),
+                    inlet_tube_ID = ('Inlet tube inner diameter [m]','m',0.02),
+                    outlet_tube_length = ('Outlet tube length [m]','m',0.02),
+                    outlet_tube_ID = ('Outlet tube inner diameter [m]','m',0.02),
                     )
     
     def __init__(self, parent, config, **kwargs):
@@ -35,7 +40,11 @@ class GeometryPanel(pdsim_panels.PDPanel):
         sizer_for_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
         
         # Loop over the HT inputs
-        annotated_values = self.get_annotated_values(['piston_diameter','piston_length','crank_length','connecting_rod_length','x_TDC','shell_volume'])
+        keys = ['piston_diameter','piston_length','crank_length',
+                'connecting_rod_length','x_TDC','shell_volume',
+                'inlet_tube_length','inlet_tube_ID','outlet_tube_length',
+                'outlet_tube_ID']
+        annotated_values = self.get_annotated_values(keys)
             
         # Build the items and return the list of annotated GUI objects, add to existing list
         annotated_GUI_objects += self.construct_items(annotated_values,
@@ -59,6 +68,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         
     def get_script_chunks(self):
         chunk = ''
+        
         for term in ['piston_diameter','piston_length','crank_length','connecting_rod_length','x_TDC','shell_volume']:
             val = self.main.get_GUI_object_value(term)
             chunk += 'sim.{name:s} = {value:s}\n'.format(name = term, value = str(val))
@@ -136,11 +146,96 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         
     def get_script_chunks(self):
         chunk = ''
-        for term in ['d_discharge','d_suction','valve_E','valve_d',
-                     'valve_h','valve_l','valve_a','valve_x_stopper','valve_rho',
-                     'valve_C_D']:
+        
+        def get(key):
+            # Compact code to get a parameter from the main database
+            return self.main.get_GUI_object(key).GetValue()
+        
+        keys = ['valve_d','valve_C_D','valve_h','valve_a','valve_l','valve_rho',
+                'valve_x_stopper','valve_E', 'inlet_tube_length','inlet_tube_ID',
+                'outlet_tube_length','outlet_tube_ID']
+        
+        strparams = {k:str(get(k)) for k in keys}
+        
+        for term in ['d_discharge','d_suction']:
             val = self.main.get_GUI_object_value(term)
             chunk += 'sim.{name:s} = {value:s}\n'.format(name = term, value = str(val))
+            
+        chunk += textwrap.dedent(
+        """
+        
+        # First add the control volumes.
+        sim.add_CV( ControlVolume(key = 'A',
+                                  initialState = outletState.copy(),
+                                  VdVFcn = sim.V_dV,
+                                  becomes = 'A') )
+        sim.add_CV( ControlVolume(key = 'shell',
+                                  initialState = inletState.copy(),
+                                  VdVFcn = sim.V_shell,
+                                  becomes = 'shell') )
+                                  
+        sim.add_flow(FlowPath(key1='shell', key2='inlet.2', MdotFcn = sim.Inlet))
+        sim.add_flow(FlowPath(key1='shell', key2='A', MdotFcn = sim.Suction))
+        sim.add_flow(FlowPath(key1='outlet.1', key2='A', MdotFcn = sim.Discharge))
+        sim.add_flow(FlowPath(key1='shell', key2='A', MdotFcn = sim.PistonLeakage))
+        
+        # Calculate Vdisp
+        sim.pre_solve()
+    
+        # Get the guess for the mass flow rate
+        mdot_guess = inletState.rho*sim.Vdisp()*sim.omega/(2*pi)
+
+        # Add both the inlet and outlet tubes
+        sim.add_tube(Tube(key1 = 'inlet.1',
+                          key2 = 'inlet.2',
+                          L = {inlet_tube_length:s},
+                          ID = {inlet_tube_ID:s},
+                          mdot = mdot_guess, 
+                          State1 = inletState.copy(),
+                          fixed = 1,
+                          TubeFcn = sim.TubeCode))
+        sim.add_tube(Tube(key1 = 'outlet.1',
+                          key2 = 'outlet.2',
+                          L = {outlet_tube_length:s},
+                          ID = {outlet_tube_ID:s},
+                          mdot = mdot_guess, 
+                          State2 = outletState.copy(),
+                          fixed = 2,
+                          TubeFcn = sim.TubeCode))
+                              
+        #  The suction valve parameters
+        sim.suction_valve = ValveModel(
+              d_valve = {valve_d:s},
+              d_port = sim.d_suction,
+              C_D = {valve_C_D:s},
+              h_valve = {valve_h:s},
+              a_valve = {valve_a:s},
+              l_valve = {valve_l:s},
+              rho_valve = {valve_rho:s},
+              E = {valve_E:s},
+              x_stopper = {valve_x_stopper:s},
+              key_up = 'inlet.2',
+              key_down = 'A'
+              )
+        sim.add_valve(sim.suction_valve)
+        
+        #  The discharge valve parameters
+        sim.discharge_valve=ValveModel(
+              d_valve = {valve_d:s},
+              d_port = sim.d_discharge,
+              C_D = {valve_C_D:s},
+              h_valve = {valve_h:s},
+              a_valve = {valve_a:s},
+              l_valve = {valve_l:s},
+              rho_valve = {valve_rho:s},
+              E = {valve_E:s},
+              x_stopper = {valve_x_stopper:s},
+              key_up='A',
+              key_down='outlet.1'
+              )
+        sim.add_valve(sim.discharge_valve)
+        """).format(**strparams)
+        
         return chunk
         
 class MechanicalLossesPanel(pdsim_panels.PDPanel):
