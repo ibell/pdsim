@@ -1,6 +1,6 @@
 
 import cProfile,subprocess
-from scrolltest import Compressor
+from scroll_compressor import Compressor
 #from recipsample import Compressor
 #from PUrecip import Compressor
 # Compressor(OneCycle = True)
