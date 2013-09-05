@@ -790,6 +790,8 @@ class MainToolBook(wx.Toolbook):
         self.RunTB = RunToolBook(self)
         self.OutputsTB = OutputsToolBook(self, configdict)
         
+        self.Parent.family_module = family
+        
         self.panels=(self.InputsTB,self.SolverTB,self.RunTB,self.OutputsTB)
         for Name,index,panel in zip(['Inputs','Solver','Run','Output'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
@@ -828,19 +830,19 @@ class MainFrame(wx.Frame):
             # Use the config dictionary passed in
             self.config = configfile
         
-        #Get the simulation type (recip, scroll, ...)
+        # Get the simulation type (recip, scroll, ...)
         try:
             self.machinefamily = self.config['family']
         except IndexError:
             raise ValueError('configuration file does not have the top-level key "family"')
             
-        #The position and size are needed when the frame is rebuilt, but not otherwise
+        # The position and size are needed when the frame is rebuilt, but not otherwise
         if position is None:
             position = (-1,-1)
         if size is None:
             size = (-1,-1)
         
-        #Use the builder function to rebuild using the configuration objects
+        # Use the builder function to rebuild using the configuration objects
         self.build()
         
         # Set up redirection of input and output to logging wx.TextCtrl
@@ -973,7 +975,7 @@ class MainFrame(wx.Frame):
         """
         return self.MTB.RunTB.log_ctrls
         
-    def rebuild(self, configfile):
+    def rebuild(self, configfile, family_module):
         """
         Destroy everything in the main frame and recreate 
         the contents based on parsing the config file
@@ -989,8 +991,10 @@ class MainFrame(wx.Frame):
         except:
             raise
         else:
-            #Destroy the current MainFrame
+            # Destroy the current MainFrame
             self.Destroy()
+            
+        self.family_module = family_module
         
     def script_header(self):
         import CoolProp, PDSim
@@ -1023,7 +1027,7 @@ class MainFrame(wx.Frame):
         
     def script_default_imports(self, plugin_paths):
         
-        return textwrap.dedent(
+        s = textwrap.dedent(
             """
             # General python imports
             import time, sys, os
@@ -1044,12 +1048,17 @@ class MainFrame(wx.Frame):
             # Imports from CoolProp
             from CoolProp import State
             from CoolProp import CoolProp as CP
-            
+            """
+            )
+        
+        if plugin_paths:
+            s += textwrap.dedent(
+            """
             # Add the paths for any additional plugin folders (hard-coded absolute paths)
             sys.path.extend({plugin_paths:s})
-            
-            """.format(plugin_paths = plugin_paths)
-            )
+            """).format(plugin_paths = str(plugin_paths))
+        
+        return s
         
     def build(self):
         """ Build the entire GUI """
@@ -1076,11 +1085,14 @@ class MainFrame(wx.Frame):
         run_index : integer, or a string
         
         """
-        self.script_chunks = []
+        self.script = []
         
         def indent_chunk(chunks, N):
-            lines = '\n'.join(chunks)
-            lines = lines.split('\n')
+            if isinstance(chunks,(list,tuple)):
+                lines = '\n'.join(chunks)
+                lines = lines.split('\n')
+            else:
+                lines = [chunks]
             
             new_lines = []
             for line in lines:
@@ -1111,41 +1123,47 @@ class MainFrame(wx.Frame):
                     for key in plugin_chunks.keys():
                         if key in chunks:
                             plugin_chunks[key] += chunks[key]
-                            
-        #  Get the paths for all the plugin folders
-        plugin_paths = str(GUIconfig.get('plugin_dirs', default = []))
+            
+        if hasattr(self,'plugins_list') and any([plugin.is_activated() for plugin in self.plugins_list]):
+            #  Get the paths for all the plugin folders if at least one plugin is enabled
+            plugin_paths = str(GUIconfig.get('plugin_dirs', default = []))
+        else:
+            plugin_paths = []
             
         #Get the header for the script
-        self.script_chunks.append(self.script_header())
+        self.script.append(self.script_header())
         if plugin_chunks['pre_import']:
-            self.script_chunks.append('####### BEGIN PLUGIN INJECTED CODE (pre-import) ############### \n'+plugin_chunks['pre_import']+'################ END PLUGIN INJECTED CODE ############### \n')
-        self.script_chunks.append(self.script_default_imports(plugin_paths))
+            self.script.append('####### BEGIN PLUGIN INJECTED CODE (pre-import) ############### \n'+plugin_chunks['pre_import']+'################ END PLUGIN INJECTED CODE ############### \n')
+        self.script.append(self.script_default_imports(plugin_paths))
+        if hasattr(self,'family_module'):
+            self.script.extend(self.family_module.additional_imports_string)
+            
         if plugin_chunks['post_import']:
-            self.script_chunks.append('####### BEGIN PLUGIN INJECTED CODE (post-import) ############### \n'+plugin_chunks['post_import']+'################ END PLUGIN INJECTED CODE ############### \n')
+            self.script.append('####### BEGIN PLUGIN INJECTED CODE (post-import) ############### \n'+plugin_chunks['post_import']+'################ END PLUGIN INJECTED CODE ############### \n')
         
-        self.script_chunks.extend(['def build():\n'])
+        self.script.extend(['def build():\n'])
         if plugin_chunks['pre_build']:
-            self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE (pre-build) ############### \n'+indent_chunk([plugin_chunks['pre_build']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
-        self.script_chunks.extend(['    from PDSim.scroll.core import Scroll\n'])
+            self.script.extend('####### BEGIN PLUGIN INJECTED CODE (pre-build) ############### \n'+indent_chunk([plugin_chunks['pre_build']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
+        self.script.extend([indent_chunk(self.family_module.import_string,1)])
         if plugin_chunks['pre_build_instantiation']:
-            self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE (pre-build-instantiation) ############### \n'+indent_chunk([plugin_chunks['pre_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
-        self.script_chunks.extend(['    sim = Scroll()\n'])
-        self.script_chunks.extend(['    sim.run_index = {run_index:s}\n'.format(run_index = str(run_index))])
+            self.script.extend('####### BEGIN PLUGIN INJECTED CODE (pre-build-instantiation) ############### \n'+indent_chunk([plugin_chunks['pre_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
+        self.script.extend([indent_chunk(self.family_module.instantiation_string,1)])
+        self.script.extend(['    sim.run_index = {run_index:s}\n'.format(run_index = str(run_index))])
         if plugin_chunks['post_build_instantiation']:
-            self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE (post-build-instantiation) ############### \n'+indent_chunk([plugin_chunks['post_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
+            self.script.extend('####### BEGIN PLUGIN INJECTED CODE (post-build-instantiation) ############### \n'+indent_chunk([plugin_chunks['post_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
         inputs_chunks = self.MTB.InputsTB.get_script_chunks()
-        self.script_chunks.extend(indent_chunk(inputs_chunks,1))
+        self.script.extend(indent_chunk(inputs_chunks,1))
         if plugin_chunks['post_build']:
-            self.script_chunks.extend('####### BEGIN PLUGIN INJECTED CODE (post-build) ############### \n'+indent_chunk([plugin_chunks['post_build']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
-        self.script_chunks.extend(['    return sim\n\n'])
+            self.script.extend('####### BEGIN PLUGIN INJECTED CODE (post-build) ############### \n'+indent_chunk([plugin_chunks['post_build']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
+        self.script.extend(['    return sim\n\n'])
 
-        self.script_chunks.extend(['def run(sim, pipe_abort = None):\n'])
-        self.script_chunks.extend(indent_chunk([plugin_chunks['pre_run']],1))
+        self.script.extend(['def run(sim, pipe_abort = None):\n'])
+        self.script.extend(indent_chunk([plugin_chunks['pre_run']],1))
         solver_chunks = self.MTB.SolverTB.get_script_chunks()
-        self.script_chunks.extend(indent_chunk(solver_chunks,1))
-        self.script_chunks.extend(indent_chunk([plugin_chunks['post_run']],1))
+        self.script.extend(indent_chunk(solver_chunks,1))
+        self.script.extend(indent_chunk([plugin_chunks['post_run']],1))
         
-        self.script_chunks.extend(["if __name__ == '__main__':\n    sim = build()\n    run(sim)"])
+        self.script.extend(["if __name__ == '__main__':\n    sim = build()\n    run(sim)"])
         
         # Create a string in the form xxxxxxxx where each x is in '0123456789abcdef'
         # This is a simple way to ensure that the file name is unique.  
@@ -1159,7 +1177,7 @@ class MainFrame(wx.Frame):
             sys.path.append(pdsim_home_folder) 
         
         f = open(os.path.join(pdsim_home_folder,fName),'w')
-        for chunk in self.script_chunks:
+        for chunk in self.script:
             f.write(chunk)
         f.close()
 
@@ -1358,10 +1376,11 @@ class MainFrame(wx.Frame):
         self.Help = wx.Menu()
         #self.HelpHelp = wx.MenuItem(self.Help, -1, "Help...\tCtrl+H", "", wx.ITEM_NORMAL)
         self.HelpAbout = wx.MenuItem(self.Help, -1, "About", "", wx.ITEM_NORMAL)
-        #self.Help.AppendItem(self.HelpHelp)
+        self.HelpScreenShot = wx.MenuItem(self.Help, -1, "Take screenshot", "", wx.ITEM_NORMAL)        
         self.Help.AppendItem(self.HelpAbout)
+        self.Help.AppendItem(self.HelpScreenShot)
         self.MenuBar.Append(self.Help, "Help")
-        #self.Bind(wx.EVT_MENU, lambda event: self.Destroy(), self.HelpHelp)
+        self.Bind(wx.EVT_MENU, lambda event: self.OnTakeScreenShot(event = None), self.HelpScreenShot)
         self.Bind(wx.EVT_MENU, self.OnAbout, self.HelpAbout)
         
         #Actually set it
@@ -1371,6 +1390,57 @@ class MainFrame(wx.Frame):
     #         Event handlers       #
     ################################
     
+    def OnTakeScreenShot(self, event):
+        """ Takes a screenshot of the screen at give pos & size (rect). """
+        rect = self.GetRect()
+        # see http://aspn.activestate.com/ASPN/Mail/Message/wxpython-users/3575899
+        # created by Andrea Gavana
+        time.sleep(1)        
+        print 'taking screenshot'
+        # adjust widths for Linux (figured out by John Torres 
+        # http://article.gmane.org/gmane.comp.python.wxpython/67327)
+        if sys.platform == 'linux2':
+            client_x, client_y = self.ClientToScreen((0, 0))
+            border_width = client_x - rect.x
+            title_bar_height = client_y - rect.y
+            rect.width += (border_width * 2)
+            rect.height += title_bar_height + border_width
+ 
+        #Create a DC for the whole screen area
+        dcScreen = wx.ScreenDC()
+ 
+        #Create a Bitmap that will hold the screenshot image later on
+        #Note that the Bitmap must have a size big enough to hold the screenshot
+        #-1 means using the current default colour depth
+        bmp = wx.EmptyBitmap(rect.width, rect.height)
+ 
+        #Create a memory DC that will be used for actually taking the screenshot
+        memDC = wx.MemoryDC()
+ 
+        #Tell the memory DC to use our Bitmap
+        #all drawing action on the memory DC will go to the Bitmap now
+        memDC.SelectObject(bmp)
+ 
+        #Blit (in this case copy) the actual screen on the memory DC
+        #and thus the Bitmap
+        memDC.Blit( 0, #Copy to this X coordinate
+                    0, #Copy to this Y coordinate
+                    rect.width, #Copy this width
+                    rect.height, #Copy this height
+                    dcScreen, #From where do we copy?
+                    rect.x, #What's the X offset in the original DC?
+                    rect.y  #What's the Y offset in the original DC?
+                    )
+ 
+        #Select the Bitmap out of the memory DC by selecting a new
+        #uninitialized Bitmap
+        memDC.SelectObject(wx.NullBitmap)
+ 
+        img = bmp.ConvertToImage()
+        fileName = "screenshot.png"
+        img.SaveFile(fileName, wx.BITMAP_TYPE_PNG)
+        print '...saved as screenshot..png'
+        
     def OnManagePluginFolders(self, event):
         plugin_dirs = GUIconfig.get('plugin_dirs', default = [])
         
@@ -1651,7 +1721,7 @@ class MainFrame(wx.Frame):
         
         # Get its defaut config from the family file and rebuild the GUI using 
         # the default values for this family
-        self.rebuild(module.get_defaults())
+        self.rebuild(module.get_defaults(), module)
         
     def OnFlushTemporaryFolder(self, events):
         """
@@ -1714,5 +1784,7 @@ if __name__ == '__main__':
     
     frame = MainFrame() 
     frame.Show(True) 
-    
+
     app.MainLoop()
+    
+    
