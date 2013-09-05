@@ -694,6 +694,9 @@ class OutputTreePanel(wx.Panel):
             menuitem = wx.MenuItem(menu, -1, 'Display this parameter')
             self.Bind(wx.EVT_MENU, lambda event: self.OnArrayDisplay(event, item, col), menuitem)
             menu.AppendItem(menuitem)
+            menuitem = wx.MenuItem(menu, -1, 'Save to Excel-format csv file')
+            self.Bind(wx.EVT_MENU, lambda event: self.OnArray2CSV(event, item, col), menuitem)
+            menu.AppendItem(menuitem)
             
         if _isScript:
             menuitem = wx.MenuItem(menu, -1, 'View Script')
@@ -714,7 +717,46 @@ class OutputTreePanel(wx.Panel):
             self.PopupMenu(menu)
         menu.Destroy()
         
-    
+    def OnArray2CSV(self, event, item, col):
+        """ Write to a comma separated values file"""
+        
+        # Build the path to this term
+        path = ''
+        while not item == self.tree.GetRootItem():
+            path = '/' +  self.tree.GetItemText(item, 0) + path
+            item = self.tree.GetItemParent(item)
+            
+        val = self.runs[col-1].get(path).value
+        
+        FD = wx.FileDialog(None,
+                           "Save HDF5 array to file",
+                           defaultDir='.',
+                           wildcard =  "csv files (*.csv)|*.csv",
+                           style = wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
+        if wx.ID_OK==FD.ShowModal():
+            file_path = FD.GetPath()
+        else:
+            file_path = ''
+        FD.Destroy()
+        
+        # No file selected
+        if not file_path:
+            return
+        
+        rows = []
+        for i in range(val.shape[0]):
+            #  row as a list
+            r = val[i,:].tolist()
+            #  entries of r as strings
+            r = [str(v) for v in r]
+            #  add to rows
+            rows.append(','.join(r))
+        s = '\n'.join(rows)
+        
+        f = open(file_path, 'w')
+        f.write(s)
+        f.close()
+        
     def OnArrayDisplay(self, event, item, col):
         
         # Title for the viewer
