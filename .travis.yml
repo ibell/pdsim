@@ -1,0 +1,19 @@
+language: python
+python:
+  - "2.7"
+  - "3.3"
+# command to install dependencies
+install: "pip install Cython --use-mirrors"
+# command to run tests
+script: 
+  - cd wrappers/Python
+  - python setup.py install # Install CoolProp
+  - cd ..
+  - python -c "from CoolProp.tests.runner import run; run()"
+
+notifications:
+  email:
+    recipients:
+      - ian.h.bell@gmail.com
+    on_success: never # default: change
+    on_failure: always # default: always
