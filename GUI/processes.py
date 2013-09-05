@@ -263,12 +263,13 @@ class RedirectedWorkerThread(Thread):
             #Collect all display output from process
             while pipe_outlet.poll():
                 wx.CallAfter(self.stdout_target.AppendText, pipe_outlet.recv())
-            time.sleep(0.5)
+            time.sleep(1)
             
             #Get back the results from the simulation process if they are waiting
             if pipe_results_outlet.poll():
                 hdf5_path = pipe_results_outlet.recv()
                 pipe_results_outlet.send('ACK')
+                break
             else:
                 hdf5_path = None
         
