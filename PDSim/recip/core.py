@@ -190,6 +190,7 @@ class Recip(PDSimCore,_Recip):
         """
         #Call the base class function
         PDSimCore._PDSimCore__post_solve(self)
+        
         #Extra code for the recip
         #Motor losses
         self.Wdot_motor = self.Wdot*(1/self.eta_motor-1)
