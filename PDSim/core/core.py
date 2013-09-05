@@ -1550,11 +1550,11 @@ class PDSimCore(_PDSimCore):
         # Used from the GUI to kill process from the top-level thread
         self.pipe_abort = pipe_abort
         
-        if len(self.CVs) <= 1:
+        if len(self.CVs) < 1:
             raise ValueError('At least one control volume must be added using the add_CV function')
             
         if len(self.Flows) <= 1:
-            raise ValueError('At least one flow must be added using the add_flow function')
+            raise ValueError('At least two flows must be added using the add_flow function')
         
         # If a function called pre_solve is provided, call it with no input arguments
         if hasattr(self,'pre_solve'):
