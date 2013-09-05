@@ -466,6 +466,9 @@ cdef class ControlVolumeCollection(object):
         else:
             raise KeyError('Your key [{key:s}] of type [{_type:s}] is invalid'.format(key = k,_type = str(type(k))))
             
+    def __len__(self):
+        return len(self.CVs)
+            
     cpdef add(self, ControlVolume CV):
         """
         Add a control volume to the list of control volumes
