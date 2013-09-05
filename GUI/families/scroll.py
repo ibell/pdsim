@@ -1,8 +1,13 @@
+# -*- coding: utf-8 -*-
+
 from __future__ import absolute_import
 import wx, yaml, os
 from panels import scroll_panels, pdsim_panels
 
 family_menu_name = 'Scroll Compressor'
+import_string = 'from PDSim.scroll.core import Scroll\n'
+instantiation_string = 'sim = Scroll()\n'
+additional_imports_string = ''
 
 class InputsToolBook(pdsim_panels.InputsToolBook):
     """
