@@ -63,6 +63,8 @@ cdef class PyFlowFunctionWrapper(FlowFunction):
             return dval
         except ValueError:
             raise ValueError("Wrapped function in PyFlowFunctionWrapper did not return a floating point value; returned "+str(val))
+        except:
+            raise
     
     def __reduce__(self):
         if not isinstance(self.Function,str):
@@ -81,7 +83,7 @@ cdef class IsentropicNozzleWrapper(FlowFunction):
     if the flow area is constant
     """
     
-    cpdef double call(self, FlowPath FP):
+    cpdef double call(self, FlowPath FP) except *:
         """
         Returns the mass flow rate from the isentropic nozzle model
         """
@@ -117,10 +119,16 @@ cdef class FlowFunction(object):
      
      See also PyFlowFunctionWrapper
      
+     Returns
+     -------
+     mdot : float
+         The mass flow rate in kg/s
+     
     """
-    cpdef double call(self, FlowPath FP):
+    cpdef double call(self, FlowPath FP) except *:
         pass
         
+    @cython.returns(cython.double)
     def __call__(self, FlowPath FP):
         """
         This special method calls the call() function of the derived class

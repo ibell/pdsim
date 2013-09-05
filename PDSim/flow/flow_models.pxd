@@ -40,7 +40,7 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, int ot
 
 cdef class FlowFunction(object):
     
-    cpdef double call(self, FlowPath FP)
+    cpdef double call(self, FlowPath FP) except *
     
 cdef class PyFlowFunctionWrapper(FlowFunction):
     cdef dict kwargs
@@ -71,5 +71,3 @@ cdef class ValveModel(object):
     cpdef double flow_velocity(self,State State_up, State State_down)
     cpdef arraym derivs(self, Core)
     cpdef dict __cdict__(self)
-
-
