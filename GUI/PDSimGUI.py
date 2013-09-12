@@ -133,6 +133,20 @@ class IntegratorChoices(wx.Choicebook):
             kwargs = dict(RK45_eps = float(self.RK45_eps.GetValue()))
             
         return IC_type, kwargs
+    
+    def set_from_dict(self,configdict):
+        """
+        
+        """
+        integrator = configdict['cycle_integrator']
+        
+        if integrator == 'Euler':
+            self.SetSelection(0)
+        elif integrator == 'Heun':
+            self.SetSelection(1)
+        elif integrator == 'RK45':
+            self.SetSelection(2)
+            
         
 class SolverInputsPanel(pdsim_panels.PDPanel):
     
@@ -144,6 +158,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         pdsim_panels.PDPanel.__init__(self, parent, **kwargs)
     
         self.IC = IntegratorChoices(self)
+        self.IC.set_from_dict(configdict)
         
         sizer_for_solver_inputs = wx.FlexGridSizer(cols = 2)
         
