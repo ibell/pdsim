@@ -865,6 +865,20 @@ class MainFrame(wx.Frame):
                 raise KeyError('Your annotation [{a:s}] is already in the parameter library for key [{k:s}]'.format(a = o.annotation, k = o.key))
         
             self.GUI_object_library[o.key] = o
+    
+    def unregister_GUI_objects(self, keys):
+        """
+        Unregister GUI objects from the top-level database
+        
+        Parameters
+        ----------
+        keys : list of keys to be removed
+        """
+        for key in keys:
+            if key not in self.GUI_object_library:
+                raise KeyError('Your key [{k:s}] is not in the GUI parameter library'.format(k = key))
+            else:
+                self.GUI_object_library.pop(key)        
         
     def get_GUI_object(self, key):
         """
