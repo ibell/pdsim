@@ -130,7 +130,7 @@ class IntegratorChoices(wx.Choicebook):
             kwargs = dict(HeunN = int(self.HeunN.GetValue()))
         else:
             IC_type = 'RK45'
-            kwargs = dict(RK45_eps = int(self.self.RK45_eps.GetValue()))
+            kwargs = dict(RK45_eps = float(self.RK45_eps.GetValue()))
             
         return IC_type, kwargs
         
@@ -215,7 +215,6 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
     def get_script_chunks(self):
 
         IC_type, kwargs = self.IC.get_script_chunk()
-        print IC_type, kwargs
         eps_cycle = self.main.get_GUI_object('eps_cycle').GetValue()
         eps_energy_balance = self.main.get_GUI_object('eps_energy_balance').GetValue()
         
@@ -943,7 +942,7 @@ class MainFrame(wx.Frame):
         """
         return self.MTB.RunTB.log_ctrls
         
-    def rebuild(self, configfile, family_module):
+    def rebuild(self, configfile):
         """
         Destroy everything in the main frame and recreate 
         the contents based on parsing the config file
@@ -962,7 +961,7 @@ class MainFrame(wx.Frame):
             # Destroy the current MainFrame
             self.Destroy()
             
-        self.family_module = family_module
+        self.family_module = self.families_dict[configfile['family']]
         
     def script_header(self):
         import CoolProp, PDSim
@@ -1689,7 +1688,7 @@ class MainFrame(wx.Frame):
         
         # Get its defaut config from the family file and rebuild the GUI using 
         # the default values for this family
-        self.rebuild(module.get_defaults(), module)
+        self.rebuild(module.get_defaults())
         
     def OnFlushTemporaryFolder(self, events):
         """

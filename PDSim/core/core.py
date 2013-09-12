@@ -712,9 +712,16 @@ class PDSimCore(_PDSimCore):
         self.post_cycle()
         return
         
-    def cycle_RK45(self,x_state,tmin=0,tmax=2.0*pi,hmin=1e-4,eps_allowed=1e-10,step_relax=0.9,
-              valves_callback = None,
-              UseCashKarp=True,**kwargs):
+    def cycle_RK45(self,
+                   x_state,
+                   tmin=0,
+                   tmax=2.0*pi,
+                   hmin=1e-4,
+                   eps_allowed=1e-10,
+                   step_relax=0.9,
+                   valves_callback = None,
+                   UseCashKarp=True,
+                   **kwargs):
         """
         
         This function implements an adaptive Runge-Kutta-Feldberg 4th/5th order
@@ -794,6 +801,7 @@ class PDSimCore(_PDSimCore):
                 return 'abort'
             
             stepAccepted=False
+            
             while not stepAccepted:
                 
                 #Reset the flag
@@ -854,7 +862,7 @@ class PDSimCore(_PDSimCore):
                 else:
                     # Step 1: derivatives evaluated at old values
                     f1=self.derivs(t0,xold)
-                    xnew1=xold+h*(+1.0/5.0*f1)
+                    xnew1=xold+h*(1.0/5.0)*f1
                     
                     #Store a copy of the flows for future use as well as a buffered set of state variables
                     Flows_temporary = self.Flows.get_deepcopy()
@@ -878,7 +886,7 @@ class PDSimCore(_PDSimCore):
                     xnew=xold+h*(37/378*f1 + 250/621*f3 + 125/594*f4 + 512/1771*f6)
                     
                     error = h*(-277/64512*f1+6925/370944*f3-6925/202752*f4-277.0/14336*f5+277/7084*f6)
-                    
+
                 max_error=np.sqrt(np.sum(np.power(error,2)))
                 
                 # If the error is too large, make the step size smaller and try
@@ -917,8 +925,8 @@ class PDSimCore(_PDSimCore):
                 debug_plots(self)
                 raise ValueError('98% of the maximum length of self.T reached, stopping calculation')
             
-            t0+=h
-            Itheta+=1
+            t0 += h
+            Itheta += 1
             xold = xnew
             
             #The error is already below the threshold
@@ -947,7 +955,7 @@ class PDSimCore(_PDSimCore):
         
         # last index is Itheta, number of steps is Itheta+1
         print 'Itheta steps taken', Itheta+1
-        self.Itheta=Itheta
+        self.Itheta = Itheta
         self.Ntheta = Itheta+1
         self.post_cycle()
         
@@ -1231,7 +1239,8 @@ class PDSimCore(_PDSimCore):
     
     def one_cycle(self, 
                   X, 
-                  cycle_integrator = 'RK45'):
+                  cycle_integrator = 'RK45',
+                  integrator_options = None):
         """
         Only run one cycle
         
@@ -1239,6 +1248,8 @@ class PDSimCore(_PDSimCore):
         ----------
         cycle_integrator : string
             One of 'RK45','Euler','Heun'
+        integrator_options : dictionary
+            options to be passed to the constructor for the solver
         """
         X = arraym(X)
                 
@@ -1299,7 +1310,7 @@ class PDSimCore(_PDSimCore):
         # We put it in kW by multiplying by flow rate
         self.resid_Td = mdot_out * (h_outlet_Tube - h_outlet)
         
-    def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45', OneCycle = False):
+    def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45', OneCycle = False, integrator_options = None):
         """
         The Objective function for the energy balance solver
         
@@ -1331,7 +1342,9 @@ class PDSimCore(_PDSimCore):
             
             #  Actually run the cycle, runs post_cycle at the end,
             #  sets the parameter lumps_resid in this class
-            self.one_cycle(X, cycle_integrator = cycle_integrator)
+            self.one_cycle(X, 
+                           cycle_integrator = cycle_integrator,
+                           integrator_options = integrator_options)
             
             if self.Abort():
                 return
@@ -1473,6 +1486,7 @@ class PDSimCore(_PDSimCore):
               timeout = 3600,
               eps_cycle = 0.001,
               eps_energy_balance = 0.01,
+              integrator_options = None,
               **kwargs):
         """
         This is the driving function for the PDSim model.  It can be extended through the 
@@ -1513,6 +1527,8 @@ class PDSimCore(_PDSimCore):
             Cycle-cycle convergence criterion
         eps_energy_balance : float
             Energy balance convergence criterion
+        integrator_options : dictionary
+            A dictionary of options to be passed to the cycle integrator
         
         Notes
         -----
@@ -1595,7 +1611,8 @@ class PDSimCore(_PDSimCore):
         self.OBJECTIVE_CYCLE(x0, self.x_state, 
                              cycle_integrator = solver_method, 
                              OneCycle = OneCycle,
-                             epsilon = eps_energy_balance)
+                             epsilon = eps_energy_balance,
+                             integrator_options = integrator_options)
                 
         if not self.Abort(): 
             self.post_solve()
@@ -1707,8 +1724,8 @@ class PDSimCore(_PDSimCore):
         self.rho = self.rho[:,0:self.Ntheta]
         self.V = self.V[:,0:self.Ntheta]
         self.dV = self.dV[:,0:self.Ntheta]
-        self.h = self.p[:,0:self.Ntheta]
-        self.xL = self.p[:,0:self.Ntheta]
+        self.h = self.h[:,0:self.Ntheta]
+        self.xL = self.xL[:,0:self.Ntheta]
         self.xValves = self.xValves[:,0:self.Ntheta]
         
         print 'mdot*(h2-h1),P-v,Qamb', self.Wdot, self.Wdot_pv, self.Qamb
@@ -1748,6 +1765,7 @@ class PDSimCore(_PDSimCore):
         #  Join the pressures of the CV in existence and the tubes
         Tarray = self.core.T.copy()
         Tarray.extend(self.Tubes.get_T())
+        
         # Calculate the flows and sum up all the terms
         self.core.calculate_flows(self.Flows, harray, parray, Tarray)
         

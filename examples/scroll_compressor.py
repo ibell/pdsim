@@ -143,8 +143,6 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
 #            pass
 #    plt.show()
     
-    State.debug(0)
-    
     if f is None:
         Injection = False
         
@@ -203,8 +201,8 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     
     ScrollComp.auto_add_CVs(inletState, outletState)
     
-    ScrollComp.auto_add_leakage(flankFunc = ScrollComp.FlankLeakage, 
-                                radialFunc = ScrollComp.RadialLeakage)
+##     ScrollComp.auto_add_leakage(flankFunc = ScrollComp.FlankLeakage, 
+##                                 radialFunc = ScrollComp.RadialLeakage)
     
     FP = FlowPath(key1='inlet.2', 
                   key2='sa', 
@@ -276,13 +274,13 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     
     from time import clock
     t1=clock()
-    ScrollComp.RK45_eps = 1e-9
+    ScrollComp.RK45_eps = 1e-6
     ScrollComp.eps_cycle = 3e-3
     try:
         ScrollComp.precond_solve(key_inlet='inlet.1',
                                  key_outlet='outlet.2',
                                  solver_method='RK45',
-                                 OneCycle = OneCycle,
+                                 OneCycle = True,
                                  plot_every_cycle= False,
                                  #hmin = 1e-3
                                  eps_cycle = 3e-3
@@ -314,7 +312,8 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     del ScrollComp.FlowStorage
     from PDSim.misc.hdf5 import HDF5Writer
     h5 = HDF5Writer()
-    h5.write_to_file(ScrollComp, 'Simulation.h5')
+    import CoolProp
+    h5.write_to_file(ScrollComp, 'CPgit_'+CoolProp.__gitrevision__+'.h5')
     
     return ScrollComp
     

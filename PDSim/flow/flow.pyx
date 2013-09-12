@@ -189,23 +189,11 @@ cdef class FlowPathCollection(list):
                 summerdm.data[Flow.ikey_down] += mdot/self.omega
                 summerdT.data[Flow.ikey_down] += mdot/self.omega*h_up
     
-    def __reduce__(self):
-        return rebuildFPC,(self[:],)
-    
     cpdef get_deepcopy(self):
         """
         Using this method, the link to the mass flow function is broken
         """
         return [Flow.get_deepcopy() for Flow in self]
-
-def rebuildFPC(d):
-    """
-    Used with cPickle to recreate the (empty) flow path collection class
-    """
-    FPC = FlowPathCollection()
-    for Flow in d:
-        FPC.append(Flow)
-    return FPC
 
 cdef class FlowPath(object):
     
