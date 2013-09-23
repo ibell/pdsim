@@ -22,14 +22,16 @@ class Plot(wx.Panel):
         self.SetSizer(sizer)
 
 class PlotNotebook(wx.Panel):
-    def __init__(self,  Simulation, parent, id = -1,plot_names=None):
+    def __init__(self,  Simulation, parent, id = -1, plot_names=None, family = None):
         wx.Panel.__init__(self, parent, id=id)
         self.nb = wx.aui.AuiNotebook(self)
         sizer = wx.BoxSizer()
         sizer.Add(self.nb, 1, wx.EXPAND)
         self.SetSizer(sizer)
-        self.build_main_page()
         self.Sim=Simulation
+        self.family = family
+        
+        self.build_main_page()        
         
         if plot_names is not None:
             for plot_name in plot_names:
@@ -90,20 +92,21 @@ class PlotNotebook(wx.Panel):
             btn = wx.Button(page, label = value)
             sizer.Add(btn)
             btn.Bind(wx.EVT_BUTTON, callbackfcn)
-            
-        # Try to deduce what type of family of compressor this is.
-        if hasattr(self.Sim,'family') and self.Sim.family == 'scroll' or hasattr(self.Sim,'geo') and hasattr(self.Sim.geo,'phi_ie'):
-            family = 'scroll'
-        else:
-            family = ''
         
-        if family == 'scroll':
-            for value, callbackfcn in self.scroll_plot_buttons:
+        if self.family == 'Scroll Compressor':
+            more_plot_buttons = self.scroll_plot_buttons
+        elif self.family == 'Recip Compressor':
+            more_plot_buttons = self.recip_plot_buttons
+        else:
+            more_plot_buttons = None
+        
+        if more_plot_buttons is not None:           
+            for value, callbackfcn in more_plot_buttons:
                 btn = wx.Button(page, label = value)
                 sizer.Add(btn)
                 btn.Bind(wx.EVT_BUTTON, callbackfcn)
-        elif not family:
-            raise ValueError("family of simulation could not be deduced")
+        else:
+            print 'could not add more buttons particular to current family'
             
         page.SetSizer(sizer)
         self.nb.AddPage(page,"Main")

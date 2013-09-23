@@ -5,6 +5,8 @@ import wx, yaml, os
 from panels import scroll_panels, pdsim_panels
 
 family_menu_name = 'Scroll Compressor'
+
+# Strings for the script
 import_string = 'from PDSim.scroll.core import Scroll\n'
 instantiation_string = 'sim = Scroll()\n'
 additional_imports_string = ''

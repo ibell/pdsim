@@ -744,7 +744,9 @@ class OutputsToolBook(wx.Toolbook):
     def plot_outputs(self, sim = None):
         # First call there is no plot notebook in existence
         if self.PN is None:
-            self.PN = PlotNotebook(sim, self.PlotsPanel)
+            self.PN = PlotNotebook(sim, 
+                                   self.PlotsPanel, 
+                                   family = self.GetTopLevelParent().machinefamily)
             sizer = wx.BoxSizer(wx.VERTICAL)
             sizer.Add(self.PN, 1, wx.EXPAND)
             self.PlotsPanel.SetSizer(sizer)
