@@ -280,7 +280,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
         ScrollComp.precond_solve(key_inlet='inlet.1',
                                  key_outlet='outlet.2',
                                  solver_method='RK45',
-                                 OneCycle = True,
+                                 OneCycle = OneCycle,
                                  plot_every_cycle= False,
                                  #hmin = 1e-3
                                  eps_cycle = 3e-3

@@ -65,31 +65,46 @@ class PlotNotebook(wx.Panel):
         sizer.Add(label1)
         self.plot_buttons=[('Stepsize',self.stepsize_theta),
                            ('Volume v. crank angle',self.V_theta),
-                          ('Derivative of Volume v. crank angle',self.dV_dtheta),
-                          ('Temperature v. crank angle',self.T_theta),
-                          ('Pressure v. crank angle',self.p_theta),
-                          ('Pressure v. volume',self.p_V),
-                          ('Density v. crank angle',self.rho_theta),
-                          ('Mass v. crank angle',self.m_theta),
-                          ('Mass flow v. crank angle',self.mdot_theta),
-                          ('Valve lift v. crank angle',self.valve_theta),
-                          ('Temperature-pressure',self.temperature_pressure),
-                          ('Heat transfer v. crank angle', self.heat_transfer),
-                          ('Axial force v. crank angle',self.axial_force),
-                          ('X-direction force v. crank angle',self.x_direction_force),
-                          ('Y-direction force v. crank angle',self.y_direction_force),
-                          ('Crank pin force magnitude v. crank angle',self.magnitude_force),
-                          ('Gas Torque v. crank angle',self.torque),
-                          ('Force trace', self.force_trace),
-                          ('Force component trace',self.force_component_trace),
-                          ('Radial force', self.radial_force),
-                          ('Tangential force', self.tangential_force)
-                          
-                          ]
-        for value,callbackfcn in self.plot_buttons:
-            btn = wx.Button(page,label=value)
+                           ('Derivative of Volume v. crank angle',self.dV_dtheta),
+                           ('Temperature v. crank angle',self.T_theta),
+                           ('Pressure v. crank angle',self.p_theta),
+                           ('Pressure v. volume',self.p_V),
+                           ('Density v. crank angle',self.rho_theta),
+                           ('Mass v. crank angle',self.m_theta),
+                           ('Mass flow v. crank angle',self.mdot_theta),
+                           ('Temperature-pressure',self.temperature_pressure),             
+                           ('Heat transfer v. crank angle', self.heat_transfer)
+                           ]
+        self.recip_plot_buttons = [('Valve lift v. crank angle',self.valve_theta)]
+        self.scroll_plot_buttons = [('Axial force v. crank angle',self.axial_force),
+                                    ('X-direction force v. crank angle',self.x_direction_force),
+                                    ('Y-direction force v. crank angle',self.y_direction_force),
+                                    ('Crank pin force magnitude v. crank angle',self.magnitude_force),
+                                    ('Gas Torque v. crank angle',self.torque),
+                                    ('Force trace', self.force_trace),
+                                    ('Force component trace',self.force_component_trace),
+                                    ('Radial force', self.radial_force),
+                                    ('Tangential force', self.tangential_force)
+                                    ]
+        for value, callbackfcn in self.plot_buttons:
+            btn = wx.Button(page, label = value)
             sizer.Add(btn)
-            btn.Bind(wx.EVT_BUTTON,callbackfcn)
+            btn.Bind(wx.EVT_BUTTON, callbackfcn)
+            
+        # Try to deduce what type of family of compressor this is.
+        if hasattr(self.Sim,'family') and self.Sim.family == 'scroll' or hasattr(self.Sim,'geo') and hasattr(self.Sim.geo,'phi_ie'):
+            family = 'scroll'
+        else:
+            family = ''
+        
+        if family == 'scroll':
+            for value, callbackfcn in self.scroll_plot_buttons:
+                btn = wx.Button(page, label = value)
+                sizer.Add(btn)
+                btn.Bind(wx.EVT_BUTTON, callbackfcn)
+        elif not family:
+            raise ValueError("family of simulation could not be deduced")
+            
         page.SetSizer(sizer)
         self.nb.AddPage(page,"Main")
     
