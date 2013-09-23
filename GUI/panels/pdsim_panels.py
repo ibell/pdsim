@@ -587,6 +587,12 @@ class OutputTreePanel(wx.Panel):
              
         self.tree.DeleteAllItems()
         self.tree.DeleteRoot()
+
+        # If all the runs that are being run have the run_index key, sort based on it
+        if self.runs and all(['run_index' in run.keys() for run in self.runs]):
+            s = sorted([(run['run_index'].value,run) for run in self.runs])
+            indices, runs = zip(*s)
+            self.runs = list(runs)
         
         if not self.runs:
             return
@@ -780,7 +786,6 @@ class OutputTreePanel(wx.Panel):
         self.Parent.Parent.plot_outputs(self.runs[col-1])
         self.Parent.Parent.SetSelection(1)
         
-        
     def OnScriptDisplay(self, event, item, col):
         path = ''
         script = self.tree.GetItemText(item, col)
@@ -789,7 +794,7 @@ class OutputTreePanel(wx.Panel):
         frm.Show()
         
     def OnSortByRow(self, event, item):
-        
+        self.tree.MoveAfterInTabOrder()
         #Skip column 0 which is the header column
         values = [self.tree.GetItemText(item, col) for col in range(1, self.tree.ColumnCount)]
         print 'Not currently implemented'

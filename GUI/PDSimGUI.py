@@ -860,6 +860,9 @@ class MainFrame(wx.Frame):
         self.timer.Start(1000) #1000 ms between checking the queue
         
         self.Bind(wx.EVT_CLOSE, self.OnClose)
+        
+        if not os.path.exists(pdsim_home_folder):
+            os.makedirs(pdsim_home_folder)
     
     def register_GUI_objects(self, annotated_GUI_objects):
         """
@@ -1665,21 +1668,16 @@ class MainFrame(wx.Frame):
         This is only run every once in a while (see __init__) for performance-sake 
         """
         
-        #Add results from the pipe to the GUI
+        # Add results from the pipe to the GUI
         if not self.results_list.empty():
             print 'readying to get simulation; ',
             sim = self.results_list.get()
             print 'got a simulation'
             
-#            self.MTB.OutputsTB.plot_outputs(sim)
             self.MTB.OutputsTB.DataPanel.add_runs([sim])
-#            self.MTB.OutputsTB.DataPanel.rebuild()
             
-            #Check whether there are no more results to be processed and threads list is empty
-            #This means the manager has completed its work - reset it
-            if self.results_list.empty() and not self.WTM.threadsList:
-                self.WTM = None
-        
+        # Check whether there are no more results to be processed and threads list is empty
+        # This means the manager has completed its work - reset it
         if self.results_list.empty() and self.WTM is not None and not self.WTM.threadsList:
             self.WTM = None
     
