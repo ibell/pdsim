@@ -121,6 +121,8 @@ class PDSimCore(_PDSimCore):
         self.solvers.hdisc_history = []
         
         self.verbosity = 0
+        
+        self.summary = dummy()
     
     def _get_from_matrices(self,i):
         """

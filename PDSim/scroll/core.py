@@ -20,6 +20,7 @@ import numpy as np
 import copy
 import types
 import scipy.interpolate
+import matplotlib.pyplot as plt
 
 class struct(object):
     pass
@@ -1173,8 +1174,143 @@ class Scroll(PDSimCore, _Scroll):
         # Run the base-class method to set HT terms, etc. - also calls lumps_energy_balance_callback
         PDSimCore.post_cycle(self)
         
-        #Update the heat transfer to the gas in the shell
+        # Update the heat transfer to the gas in the shell
         self.suction_heating()
+    
+    def post_solve(self):
+        
+        # Run the base-class method to set HT terms, etc. - also calls lumps_energy_balance_callback
+        PDSimCore.post_solve(self)
+        
+        # Build the pressure profiles
+        self.build_pressure_profile()
+        
+    def build_pressure_profile(self):
+        """
+        Build the pressure profile, tracking along s1,c1.x,d1,ddd and
+        s2,c2.x,d2,ddd and store them in the variables summary.theta_profile,
+        summary.p1_profile, summary.p2_profile
+        """
+        
+        # Calculate along one path to track one set of pockets through the whole process
+        theta = self.t
+
+        # Suction chambers
+        p1 = self.p[self.CVs.index('s1')]
+        p2 = self.p[self.CVs.index('s2')]
+        
+        nCmax = scroll_geo.nC_Max(self.geo)
+        
+        if nCmax > 1:
+            for alpha in range(1,nCmax):
+                # Compression chambers up to the next-to-innermost set are handled
+                # just like the suction chambers
+                theta = np.append(theta, self.t + 2*pi*alpha)
+                p1 = np.append(p1, self.p[self.CVs.index('c1.'+str(alpha))])
+                p2 = np.append(p2, self.p[self.CVs.index('c2.'+str(alpha))])   
+        
+        # Innermost compression chamber begins to be tricky
+        # By definition innermost compression chamber doesn't make it to the 
+        # end of the rotation
+        next_theta = self.t + 2*pi*nCmax
+        next_p1 = self.p[self.CVs.index('c1.'+str(nCmax))]
+        next_p2 = self.p[self.CVs.index('c2.'+str(nCmax))]
+        next_p1[np.isnan(next_p1)] = 0
+        next_p2[np.isnan(next_p2)] = 0
+        
+        pd1 = self.p[self.CVs.index('d1')]
+        pd2 = self.p[self.CVs.index('d2')]
+        pddd = self.p[self.CVs.index('ddd')]
+        # Now check if d1 and d2 end before the end of the rotation (they don't 
+        # neccessarily)
+        if np.isnan(pd1[0]) and np.isnan(pd1[self.Itheta]):
+            # d1 & d2 end before the end of the rotation
+            # straightforward analysis (just add on pd1 and pd2)
+            pd1[np.isnan(pd1)] = 0
+            pd2[np.isnan(pd2)] = 0
+            next_p1 += pd1
+            next_p2 += pd2
+            
+            # So we know that ddd DOES exist at the beginning/end of the rotation
+            # work backwards to find the first place that the ddd does exist
+            pdddA = pddd.copy()
+            pdddB = pddd.copy()
+            
+            i = self.Itheta
+            while i > 0:
+                if np.isnan(pdddA[i]):
+                    i += 1
+                    break;
+                i -= 1
+            pdddA[0:i] = 0 # This is the end of the rotation
+            next_p1 += pdddA
+            next_p2 += pdddA
+            
+            theta = np.append(theta, next_theta)
+            p1 = np.append(p1, next_p1)
+            p2 = np.append(p2, next_p2)
+            
+            i = 0
+            while i < len(pdddB):
+                if np.isnan(pdddB[i]):
+                    break;
+                i += 1
+            
+            pdddB[i::] = np.nan # This is the beginning of the next rotation
+            
+            theta = np.append(theta, self.t + 2*pi*(nCmax+1))
+            p1 = np.append(p1, pdddB)
+            p2 = np.append(p2, pdddB)
+        
+        # Now check if d1 & d2 still exist at the end of the rotation
+        elif not np.isnan(pd1[0]) and not np.isnan(pd1[self.Itheta]):
+            # d1 & d2 don't end before the end of the rotation
+            pd1A = pd1.copy()
+            pd1B = pd1.copy()
+            pd2A = pd2.copy()
+            pd2B = pd2.copy()
+            
+            i = self.Itheta
+            while i > 0:
+                if np.isnan(pd2A[i]):
+                    i += 1
+                    break;
+                i -= 1
+            pd1A[0:i] = 0 # This is the end of the rotation
+            pd2A[0:i] = 0 # This is the end of the rotation
+            next_p1 += pd1A
+            next_p2 += pd2A
+            
+            theta = np.append(theta, next_theta)
+            p1 = np.append(p1, next_p1)
+            p2 = np.append(p2, next_p2)
+            
+            last_theta = self.t + 2*pi*(nCmax+1)
+            last_p1 = pddd.copy()
+            last_p2 = pddd.copy()
+            last_p1[np.isnan(last_p1)] = 0
+            last_p2[np.isnan(last_p2)] = 0
+            
+            i = 0
+            while i < len(pd1B):
+                if np.isnan(pd1B[i]):
+                    break;
+                i += 1
+            if i == len(pd1B)-1:
+                raise ValueError('d1B could not find NaN')
+            
+            pd1B[i::] = 0
+            pd2B[i::] = 0
+            last_p1 += pd1B
+            last_p2 += pd2B
+            
+            theta = np.append(theta, last_theta)
+            p1 = np.append(p1, last_p1)
+            p2 = np.append(p2, last_p2)
+        
+        self.summary.theta_profile = theta
+        self.summary.p1_profile = p1
+        self.summary.p2_profile = p2
         
     def ambient_heat_transfer(self, Tshell):
         """
@@ -2157,18 +2293,6 @@ class Scroll(PDSimCore, _Scroll):
         F[np.isnan(F)] = 0
         
         return F
-        
-    def IsentropicNozzleFMSafe(self,*args,**kwargs):
-        """
-        A thin wrapper around the base class function for pickling purposes
-        """
-        return PDSimCore.IsentropicNozzleFMSafe(self, *args, **kwargs)
-        
-    def IsentropicNozzleFM(self,*args,**kwargs):
-        """
-        A thin wrapper around the base class function for pickling purposes
-        """
-        return PDSimCore.IsentropicNozzleFM(self, *args, **kwargs)
     
     def attach_HDF5_annotations(self, fName):
         """

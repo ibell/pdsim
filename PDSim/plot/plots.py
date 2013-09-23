@@ -78,7 +78,8 @@ class PlotNotebook(wx.Panel):
                            ('Heat transfer v. crank angle', self.heat_transfer)
                            ]
         self.recip_plot_buttons = [('Valve lift v. crank angle',self.valve_theta)]
-        self.scroll_plot_buttons = [('Axial force v. crank angle',self.axial_force),
+        self.scroll_plot_buttons = [('Pressure profile',self.pressure_profile),
+                                    ('Axial force v. crank angle',self.axial_force),
                                     ('X-direction force v. crank angle',self.x_direction_force),
                                     ('Y-direction force v. crank angle',self.y_direction_force),
                                     ('Crank pin force magnitude v. crank angle',self.magnitude_force),
@@ -512,6 +513,29 @@ class PlotNotebook(wx.Panel):
         axes.plot(theta, mean_tau*np.ones_like(theta),'k--', lw = 1.5)
         axes.set_ylabel(r'$\tau$ [kN-m]')
         axes.set_xlabel(r'$\theta$ [rad]')
+        
+    def pressure_profile(self, event = None):
+        #pressure profiles
+            
+        axes = self.add('Pressure profiles').gca()
+        if isinstance(self.Sim,h5py.File):
+            theta = self.Sim.get('summary/theta_profile').value
+            p1 = self.Sim.get('summary/p1_profile').value.T
+            p2 = self.Sim.get('summary/p2_profile').value.T
+        else:
+            theta = self.Sim.t
+            p1 = self.Sim.summary.p1_profile
+            p2 = self.Sim.summary.p2_profile
+            
+        axes.plot(theta, p1, lw = 1.5, label='s1-c1.x-d1-ddd')
+        axes.plot(theta, p2, lw = 1.5, label='s2-c2.x-d2-ddd')
+        axes.set_ylabel(r'Pressure [kPa]')
+        axes.set_xlabel(r'$\theta$ [rad]')
+        
+        xmin,xmax = axes.get_xlim()
+        axes.set_xlim(xmin, xmin + (xmax-xmin)*1.5)
+        axes.legend(loc='upper right', bbox_to_anchor=(1, 1), ncol=2, 
+                    fancybox=True, shadow=True)
          
     
 def debug_plots(Comp, plotparent=None, plot_names = None):

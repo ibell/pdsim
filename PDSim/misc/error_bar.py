@@ -1,4 +1,4 @@
-
+import numpy as np
 from math import log10
 
 def error_ascii_bar(val, tol, N = 50, min_p = -5, max_p = 2):
@@ -7,6 +7,8 @@ def error_ascii_bar(val, tol, N = 50, min_p = -5, max_p = 2):
     
     base_string = list('||'+'.'*N+'||')
     
+    if np.isnan(val):
+        return ' XXX VAL is NAN XXX '
     #Add the bar for the tolerance
     i = int(N*(log10(tol)-min_p)/(max_p-min_p)+1)
     base_string[i] = '|'
