@@ -1727,14 +1727,17 @@ class MainFrame(wx.Frame):
         
         Checks to see if temp folder exists, if so, removes it
         """
-        import shutil, glob
+        import glob
         
+        files = glob.glob(os.path.join(pdsim_home_folder,'*.py'))
+        files += glob.glob(os.path.join(pdsim_home_folder,'*.pyc'))
+        files += glob.glob(os.path.join(pdsim_home_folder,'*.h5'))
         if os.path.exists(pdsim_home_folder):
-            N = len(glob.glob(os.path.join(pdsim_home_folder,'*.*')))
-            dlg = wx.MessageDialog(None,'There are '+str(N)+' files in the temporary folder.\n\nPress Ok to remove all the temporary files',style = wx.OK|wx.CANCEL)
+            N = len(files)
+            dlg = wx.MessageDialog(None,'There are '+str(N)+' files in the temporary folder ['+pdsim_home_folder+'].\n\nPress Ok to remove all the temporary files',style = wx.OK|wx.CANCEL)
             if dlg.ShowModal() == wx.ID_OK:    
-                shutil.rmtree(pdsim_home_folder)
-                print 'removed the folder',pdsim_home_folder 
+                for file in files:
+                    os.remove(file)
             dlg.Destroy()
         else:
             dlg = wx.MessageDialog(None,'Temporary folder does not exist', style = wx.OK)
