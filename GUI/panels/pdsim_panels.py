@@ -658,6 +658,102 @@ class OutputTreePanel(wx.Panel):
         self.tree.GetMainWindow().Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
         self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnActivate)
         
+    def OnSaveXLSX(self):
+        
+        def get_row(item):
+            return [self.tree.GetItemText(item,col) for col in range(self.tree.GetColumnCount())]
+        
+        def get_path(item):
+            parents = []
+            counter = 0
+            while True:
+                item = self.tree.GetItemParent(item)
+                if not item or item == self.tree.GetRootItem():
+                    parents.reverse()
+                    return parents
+                name = self.tree.GetItemText(item,0)
+                parents.append(name)
+                counter += 1
+                if counter > 10:
+                    raise ValueError('get_path died by hitting recursion limit')
+            
+        from openpyxl import Workbook
+        from openpyxl.cell import get_column_letter
+        
+        wb = Workbook()        
+        dest_filename = r'table.xlsx'     
+        ws = wb.worksheets[0]
+        ws.title = "Summary"
+
+        r = 1   
+        item = self.tree.GetRootItem()
+        while item:
+               
+            item = self.tree.GetNext(item)
+            if not item:
+                break
+            
+            row = get_row(item)
+            
+            ws.cell('A%s'%(r)).value = '::'.join(get_path(item)+[row[0]])
+            for c in range(1,len(row)):
+                ws.cell('%s%s' % (get_column_letter(c+1), r)).value = row[c]
+            
+            r += 1
+            
+        ws = wb.create_sheet()
+        ws.title = 'Pressure profiles'
+        
+        # Adjust these to adjust the spacing around each block of data
+        row_idx = 3
+        col_idx = 1
+        for run in self.runs:
+            
+            theta = run.get('summary/theta_profile').value
+            p1 = run.get('summary/p1_profile').value
+            p2 = run.get('summary/p2_profile').value
+            
+            # Header
+            ws.cell('%s%s' % (get_column_letter(col_idx + 0), row_idx-1)).value = 'theta'
+            ws.cell('%s%s' % (get_column_letter(col_idx + 1), row_idx-1)).value = 'path #1'
+            ws.cell('%s%s' % (get_column_letter(col_idx + 2), row_idx-1)).value = 'path #2'
+                
+            # Data
+            for r in range(1, len(theta)+1):
+                ws.cell('%s%s' % (get_column_letter(col_idx + 0), r + row_idx)).value = theta[r-1]
+                ws.cell('%s%s' % (get_column_letter(col_idx + 1), r + row_idx)).value = p1[r-1]
+                ws.cell('%s%s' % (get_column_letter(col_idx + 2), r + row_idx)).value = p2[r-1]
+        
+            col_idx += 3 + 2
+        
+        for key,name in [('p','Pressure'),('T','Temperature'),('rho','Density'),('V','Volume')]:
+            ## Output 
+            ws = wb.create_sheet()
+            
+            ws.title = name
+            
+            # Adjust these to adjust the spacing around each block of data
+            row_idx = 3
+            col_idx = 1
+            for run in self.runs:
+                t = run.get('t').value
+                p = run.get(key).value.T
+                
+                ws.cell('%s%s' % (get_column_letter(col_idx + 0), row_idx-1)).value = 'theta'
+                for c in range(1, p.shape[1]+1):
+                    CVkey = run.get('CVs/keys/%s' %(c-1,)).value
+                    ws.cell('%s%s' % (get_column_letter(col_idx + c), row_idx-1)).value = CVkey
+                    
+                for r in range(1, len(t)+1):
+                    ws.cell('%s%s' % (get_column_letter(col_idx + 0), r + row_idx)).value = t[r-1]
+                    for c in range(1, p.shape[1]+1):
+                        ws.cell('%s%s' % (get_column_letter(col_idx + c), r + row_idx)).value = p[r-1,c-1]
+                        
+                col_idx += 3 + p.shape[1]
+            
+        wb.save(filename = dest_filename)
+            
+        
     def OnActivate(self, evt):
         
         annotation_dict = self.tree.GetItemPyData(evt.GetItem())
