@@ -1149,6 +1149,8 @@ class MainFrame(wx.Frame):
         if plugin_chunks['pre_build_instantiation']:
             self.script.extend('####### BEGIN PLUGIN INJECTED CODE (pre-build-instantiation) ############### \n'+indent_chunk([plugin_chunks['pre_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
         self.script.extend([indent_chunk(self.family_module.instantiation_string,1)])
+        run_index = GUIconfig.get('run_index', run_index-1)+1
+        GUIconfig.set('run_index',run_index)
         self.script.extend(['    sim.run_index = {run_index:s}\n'.format(run_index = str(run_index))])
         if plugin_chunks['post_build_instantiation']:
             self.script.extend('####### BEGIN PLUGIN INJECTED CODE (post-build-instantiation) ############### \n'+indent_chunk([plugin_chunks['post_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
