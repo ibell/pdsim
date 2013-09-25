@@ -214,8 +214,8 @@ class Scroll(PDSimCore, _Scroll):
             plt.show()
             
         #  Save these values
-        self.Adisc_dd = Add
-        self.Adisc_d1 = Ad1
+        self.Adisc_dd = np.array(Add)
+        self.Adisc_d1 = np.array(Ad1)
         
         #  Create a spline interpolator object for the area between DD and port
         self.spline_Adisc_DD = scipy.interpolate.splrep(t, Add, k = 2, s = 0)
@@ -1184,6 +1184,10 @@ class Scroll(PDSimCore, _Scroll):
         
         # Build the pressure profiles
         self.build_pressure_profile()
+        
+        # Add some more entries to the summary
+        self.summary.eta_oi = self.eta_oi
+        self.summary.Wdot_electrical = self.Wdot_electrical
         
     def build_pressure_profile(self):
         """
