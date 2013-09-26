@@ -658,7 +658,27 @@ class OutputTreePanel(wx.Panel):
         self.tree.GetMainWindow().Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
         self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnActivate)
         
-    def OnSaveXLSX(self):
+    def OnSaveXLSX(self, event = None):
+        
+        
+        FD = wx.FileDialog(None,
+                           "Save XLSX file",
+                           defaultDir='.',
+                           wildcard = 'Excel xlsx files (*.xlsx)|*.xlsx',
+                           style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
+        
+        if wx.ID_OK == FD.ShowModal():
+            #Get the file path
+            fName = FD.GetPath()
+
+            FD.Destroy()
+        else:
+            FD.Destroy()
+            return
+        
+        dlg = wx.MessageDialog(None, "About to write to XLSX file and then open file.  Please be patient", style = wx.OK)
+        dlg.ShowModal()
+        dlg.Destroy()
         
         def get_row(item):
             return [self.tree.GetItemText(item,col) for col in range(self.tree.GetColumnCount())]
@@ -677,82 +697,120 @@ class OutputTreePanel(wx.Panel):
                 if counter > 10:
                     raise ValueError('get_path died by hitting recursion limit')
             
-        from openpyxl import Workbook
-        from openpyxl.cell import get_column_letter
-        
-        wb = Workbook()        
-        dest_filename = r'table.xlsx'     
-        ws = wb.worksheets[0]
-        ws.title = "Summary"
+        import time
+        t1 = time.clock()
 
-        r = 1   
+        import xlsxwriter
+        workbook = xlsxwriter.Workbook(fName, {'constant_memory': True})
+        
+        ws = workbook.add_worksheet('Summary')
+        
+        r = 0
         item = self.tree.GetRootItem()
         while item:
                
             item = self.tree.GetNext(item)
-            if not item:
-                break
+
+            # Don't use this item if it got an empty item (at end) 
+            if not item: break
             
             row = get_row(item)
             
-            ws.cell('A%s'%(r)).value = '::'.join(get_path(item)+[row[0]])
+            # Go to the next item if there is nothing in row
+            if not row[1]: continue
+                
+            # Write the name of the term
+            ws.write(r, 0, '::'.join(get_path(item)+[row[0]]))
+            
+            # Write the annotation to the name cell comment if it has an annotation
+            annotation_dict = self.tree.GetItemPyData(item)
+            if annotation_dict:
+                ws.write_comment(r,0,annotation_dict['annotation'])
+            
             for c in range(1,len(row)):
-                ws.cell('%s%s' % (get_column_letter(c+1), r)).value = row[c]
+                ws.write(r,c,row[c])
             
             r += 1
-            
-        ws = wb.create_sheet()
-        ws.title = 'Pressure profiles'
-        
-        # Adjust these to adjust the spacing around each block of data
-        row_idx = 3
-        col_idx = 1
-        for run in self.runs:
-            
-            theta = run.get('summary/theta_profile').value
-            p1 = run.get('summary/p1_profile').value
-            p2 = run.get('summary/p2_profile').value
-            
-            # Header
-            ws.cell('%s%s' % (get_column_letter(col_idx + 0), row_idx-1)).value = 'theta'
-            ws.cell('%s%s' % (get_column_letter(col_idx + 1), row_idx-1)).value = 'path #1'
-            ws.cell('%s%s' % (get_column_letter(col_idx + 2), row_idx-1)).value = 'path #2'
-                
-            # Data
-            for r in range(1, len(theta)+1):
-                ws.cell('%s%s' % (get_column_letter(col_idx + 0), r + row_idx)).value = theta[r-1]
-                ws.cell('%s%s' % (get_column_letter(col_idx + 1), r + row_idx)).value = p1[r-1]
-                ws.cell('%s%s' % (get_column_letter(col_idx + 2), r + row_idx)).value = p2[r-1]
-        
-            col_idx += 3 + 2
-        
-        for key,name in [('p','Pressure'),('T','Temperature'),('rho','Density'),('V','Volume')]:
-            ## Output 
-            ws = wb.create_sheet()
-            
-            ws.title = name
+
+        ## Output the matrices
+        ## Data has to be written by row because workbook opened with constant_memory = True for writing speed
+        for key,name in [('p','Pressure (kPa)'),('T','Temperature (K)'),('rho','Density (kg per m3)'),('V','Volume (m3)')]:
+
+            ws = workbook.add_worksheet(name)
             
             # Adjust these to adjust the spacing around each block of data
-            row_idx = 3
+            row_idx = 4
             col_idx = 1
+            
+            # 3 is the number of empty columns between runs
+            offset = 3 + self.runs[0].get(key).value.T.shape[1]
+            
+            # Header 
+            my_col_idx = col_idx
             for run in self.runs:
-                t = run.get('t').value
-                p = run.get(key).value.T
+                run_index = run.get('run_index').value
+                ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index))
                 
-                ws.cell('%s%s' % (get_column_letter(col_idx + 0), row_idx-1)).value = 'theta'
-                for c in range(1, p.shape[1]+1):
-                    CVkey = run.get('CVs/keys/%s' %(c-1,)).value
-                    ws.cell('%s%s' % (get_column_letter(col_idx + c), row_idx-1)).value = CVkey
+                if run.get('description'):
+                    description = run.get('description')
+                    ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index)+': '+description)
                     
-                for r in range(1, len(t)+1):
-                    ws.cell('%s%s' % (get_column_letter(col_idx + 0), r + row_idx)).value = t[r-1]
-                    for c in range(1, p.shape[1]+1):
-                        ws.cell('%s%s' % (get_column_letter(col_idx + c), r + row_idx)).value = p[r-1,c-1]
+                my_col_idx += offset
+                
+                
+            datas = []
+            maxlen = 0
+            for run in self.runs:
+                # Each are stored as 1D array, convert to 2D column matrix
+                theta = np.array(run.get('t').value, ndmin = 2).T
+                mat = np.array(run.get(key).value, ndmin = 2).T
+            
+                datas.append(np.c_[theta, mat])
+                if np.prod(theta.shape) > maxlen:
+                    maxlen = np.prod(theta.shape)
+
+            # Column headers
+            my_col_idx = col_idx
+            for run in self.runs:
+                ws.write(row_idx-2, my_col_idx - 1, 'theta')
+                for c in range(0, datas[0].shape[1]-1):
+                    CVkey = run.get('CVs/keys/%s' %(c,)).value
+                    ws.write(row_idx - 2, my_col_idx+c,CVkey)
                         
-                col_idx += 3 + p.shape[1]
+                my_col_idx += offset
+                    
+            # Data
+            for r in range(maxlen):
+                my_col_idx = col_idx
+                for data in datas:
+                    
+                    if r >= data.shape[0]:
+                        my_col_idx += offset
+                        continue
+                        
+                    # Theta            
+                    ws.write(r+row_idx-1, my_col_idx-1,data[r, 0])
+                    
+                    # Data
+                    for c in range(1,data.shape[1]):
+                        if not np.isnan(data[r,c]):
+                            ws.write(r+row_idx-1, my_col_idx-1+c, data[r, c])
+                            
+                    my_col_idx += offset
+
+        # Let the family do things to the opened worksheet
+        Main = self.GetTopLevelParent()
+        family_module = Main.families_dict[Main.machinefamily]
+        if hasattr(family_module,'write_to_xlsx'):
+            family_module.write_to_xlsx(workbook, self.runs)
             
-        wb.save(filename = dest_filename)
-            
+        # Let the plugins do things to the opened worksheet if they are activated
+        
+        workbook.close()
+        
+        os.startfile(fName)
+        
+        print 'summary sheet', time.clock() - t1       
         
     def OnActivate(self, evt):
         

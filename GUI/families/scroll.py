@@ -3,6 +3,7 @@
 from __future__ import absolute_import
 import wx, yaml, os
 from panels import scroll_panels, pdsim_panels
+import numpy as np
 
 family_menu_name = 'Scroll Compressor'
 
@@ -10,6 +11,82 @@ family_menu_name = 'Scroll Compressor'
 import_string = 'from PDSim.scroll.core import Scroll\n'
 instantiation_string = 'sim = Scroll()\n'
 additional_imports_string = ''
+
+def write_to_xlsx(workbook, runs):
+    """
+    This provides code to the GUI to add additional terms that are interesting for the scroll compressor
+    
+    workbook : xlsxwriter.Workbook opened with constant_memory = True
+    runs : opened HDF5 files from the runs
+    """
+    
+    ws = workbook.add_worksheet('Pressure profiles')
+    
+    # Adjust these to adjust the spacing around each block of data
+    row_idx = 3
+    col_idx = 1
+    
+    ## Output the matrices
+    ## Data has to be written by row because workbook opened with constant_memory = True for writing speed
+    
+    # Adjust these to adjust the spacing around each block of data
+    row_idx = 4
+    col_idx = 1
+    
+    # 3 is the number of empty columns between runs
+    offset = 3 + 3
+    
+    # Header 
+    my_col_idx = col_idx
+    for run in runs:
+        run_index = run.get('run_index').value
+        ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index))
+        
+        if run.get('description'):
+            description = run.get('description')
+            ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index)+': '+description)
+            
+        my_col_idx += offset
+    
+    # Column headers
+    my_col_idx = col_idx
+    for run in runs:
+        ws.write(row_idx-2, my_col_idx - 1, 'theta')
+        ws.write(row_idx-2, my_col_idx , 'p1')
+        ws.write(row_idx-2, my_col_idx + 1, 'p2')
+                
+        my_col_idx += offset
+        
+    datas = []
+    maxlen = 0
+    for run in runs:
+        # Each are stored as 1D array, convert to 2D column matrix
+        theta = np.array(run.get('summary/theta_profile').value, ndmin = 2)
+        p1 = np.array(run.get('summary/p1_profile').value, ndmin = 2)
+        p2 = np.array(run.get('summary/p2_profile').value, ndmin = 2)
+    
+        datas.append(np.r_[theta, p1, p2].T)
+        if np.prod(theta.shape) > maxlen:
+            maxlen = np.prod(theta.shape)
+
+    # Data
+    for r in range(maxlen):
+        my_col_idx = col_idx
+        for data in datas:
+
+            if r >= data.shape[0]:
+                my_col_idx += offset
+                continue
+                
+            # Theta            
+            ws.write(r+row_idx-1, my_col_idx-1,data[r, 0])
+            
+            if not np.isnan(data[r,1]):
+                ws.write(r+row_idx-1, my_col_idx,data[r, 1])
+            if not np.isnan(data[r,2]):
+                ws.write(r+row_idx-1, my_col_idx+1,data[r, 2])
+                    
+            my_col_idx += offset    
 
 class InputsToolBook(pdsim_panels.InputsToolBook):
     """

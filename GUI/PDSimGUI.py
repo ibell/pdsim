@@ -651,6 +651,15 @@ class FileOutputDialog(wx.Dialog):
             fp.write(s)
             fp.close()
     
+output_template = textwrap.dedent("""Potentially Useful Information:
+
+1. The output HDF5 files are in the folder {home:s}
+
+2. You can output the runs in the tree below to a file with the Output Runs button
+
+3. If you select a field below and it has an annotation it will be displayed in the annotation window
+""")
+
 class OutputDataPanel(pdsim_panels.PDPanel):
     def __init__(self, parent, runs, **kwargs):
         pdsim_panels.PDPanel.__init__(self, parent, **kwargs)
@@ -663,9 +672,19 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         self.LoadButton = pdsim_panels.HackedButton(self._mb, label = 'Load Results')
         self._mb.AddControl(self.LoadButton)
         self.LoadButton.Bind(wx.EVT_BUTTON, self.OnLoadRuns)
+
+        self.OutputRunsButton = pdsim_panels.HackedButton(self._mb, label = 'Output Runs')
+        self._mb.AddControl(self.OutputRunsButton)
+        
+        self.HelpButton = pdsim_panels.HackedButton(self._mb, label = 'Help!!!')
+        self._mb.AddControl(self.HelpButton)
+        self.HelpButton.Bind(wx.EVT_BUTTON, self.OnOutputHelp)
         
         self.OutputTree = pdsim_panels.OutputTreePanel(self, runs)
         self.AnnotationTarget = wx.StaticText(self, label='Annnotation:')
+
+        #  Bind events        
+        self.OutputRunsButton.Bind(wx.EVT_BUTTON, self.OutputTree.OnSaveXLSX)
         
         #Layout of the panel
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -691,6 +710,20 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         """
         self.OutputTree.remove_run(index)
         
+    def OnOutputHelp(self, event= None):
+        
+        text = output_template.format(home = pdsim_home_folder)
+        
+        dlg = wx.MessageDialog(None, text)
+        dlg.ShowModal()
+        dlg.Destroy()
+        
+    def OnOutputRuns(self, event = None):
+        
+        dlg = wx.MessageDialog(None, 'Sorry not working yet')
+        dlg.ShowModal()
+        dlg.Destroy()
+        
     def OnLoadRuns(self, event = None):
         """
         Load a HDF5 of output from PDSimGUI
@@ -705,16 +738,7 @@ class OutputDataPanel(pdsim_panels.PDPanel):
                 self.OutputTree.add_runs(h5py.File(file,'r'))
                 print 'added',file
         FD.Destroy()
-                
-    def OnWriteFiles(self, event):
-        """
-        Event that fires when the button is clicked to write a selection of things to files
-        """
-        table_string = self.ResultsList.AsString()
-        dlg = FileOutputDialog(self.results, table_string = table_string)
-        dlg.ShowModal()
-        dlg.Destroy()
-        
+
     def OnRefresh(self, event):
         self.rebuild()
         
@@ -898,7 +922,7 @@ class MainFrame(wx.Frame):
             if key not in self.GUI_object_library:
                 raise KeyError('Your key [{k:s}] is not in the GUI parameter library'.format(k = key))
             else:
-                self.GUI_object_library.pop(key)        
+                self.GUI_object_library.pop(key)    
         
     def get_GUI_object(self, key):
         """
