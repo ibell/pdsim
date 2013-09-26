@@ -43,7 +43,7 @@ def write_to_xlsx(workbook, runs):
         ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index))
         
         if run.get('description'):
-            description = run.get('description')
+            description = run.get('description').value
             ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index)+': '+description)
             
         my_col_idx += offset

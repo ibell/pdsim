@@ -1101,13 +1101,14 @@ class MainFrame(wx.Frame):
         
         self.load_plugins(self.PluginsMenu, self.config)
     
-    def build_simulation_script(self, run_index = 1):
+    def build_simulation_script(self, run_index = 1, description = ''):
         """
         Build the simulation script file
         
         Parameters
         ----------
         run_index : integer, or a string
+        description : string
         
         """
         self.script = []
@@ -1176,6 +1177,8 @@ class MainFrame(wx.Frame):
         run_index = GUIconfig.get('run_index', run_index-1)+1
         GUIconfig.set('run_index',run_index)
         self.script.extend(['    sim.run_index = {run_index:s}\n'.format(run_index = str(run_index))])
+        if description:
+            self.script.extend(['    sim.description = {description:s}\n'.format(description = description)])
         if plugin_chunks['post_build_instantiation']:
             self.script.extend('####### BEGIN PLUGIN INJECTED CODE (post-build-instantiation) ############### \n'+indent_chunk([plugin_chunks['post_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
         inputs_chunks = self.MTB.InputsTB.get_script_chunks()
@@ -1670,8 +1673,19 @@ class MainFrame(wx.Frame):
         """
         Runs the primary inputs without applying the parametric table inputs
         """
+        dlg = wx.TextEntryDialog(
+                self, 'Run description [Enter for none]',
+                'Run description', '')
+
+        if dlg.ShowModal() == wx.ID_OK:
+            description = '"' + dlg.GetValue().replace('"','\"') + '"'
+        else:
+            description = ''        
+        
+        dlg.Destroy()
+        
         self.MTB.SetSelection(2)
-        script_name = self.build_simulation_script()
+        script_name = self.build_simulation_script(description = description)
         self.run_batch([script_name])
             
     def OnStop(self, event):

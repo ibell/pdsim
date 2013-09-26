@@ -676,7 +676,7 @@ class OutputTreePanel(wx.Panel):
             FD.Destroy()
             return
         
-        dlg = wx.MessageDialog(None, "About to write to XLSX file and then open file.  Please be patient", style = wx.OK)
+        dlg = wx.MessageDialog(None, "About to write to XLSX file and then open file.  Please be patient, could take a while", style = wx.OK)
         dlg.ShowModal()
         dlg.Destroy()
         
@@ -752,7 +752,7 @@ class OutputTreePanel(wx.Panel):
                 ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index))
                 
                 if run.get('description'):
-                    description = run.get('description')
+                    description = run.get('description').value
                     ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index)+': '+description)
                     
                 my_col_idx += offset
