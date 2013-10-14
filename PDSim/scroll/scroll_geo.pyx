@@ -197,11 +197,17 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
     elif CVkey.startswith('c1'):
         #  Go from c1.1 to 1
         alpha = int(CVkey.split('.')[1])
-        phi = np.linspace(geo.phi_ie - theta - 2*pi*alpha, geo.phi_ie-theta-2*pi*(alpha-1), 1000)
-        (xi, yi) = coords_inv(phi, geo, theta, 'fi')
-        phi = np.linspace(geo.phi_ie - theta - 2*pi*(alpha-1)-pi, geo.phi_ie-theta-2*pi*alpha-pi, 1000)
-        (xo, yo) = coords_inv(phi, geo, theta, 'oo')
-        return np.r_[xi,xo], np.r_[yi,yo]
+        #  Number of pairs of compression chambers in existence
+        Nc = getNc(theta,geo)
+        #  If invalid index, raise error
+        if alpha > Nc:
+            raise ValueError("c1.{i:d} is an invalid c1.x chamber".format(i=alpha))
+        else:
+            phi = np.linspace(geo.phi_ie - theta - 2*pi*alpha, geo.phi_ie-theta-2*pi*(alpha-1), 1000)
+            (xi, yi) = coords_inv(phi, geo, theta, 'fi')
+            phi = np.linspace(geo.phi_ie - theta - 2*pi*(alpha-1)-pi, geo.phi_ie-theta-2*pi*alpha-pi, 1000)
+            (xo, yo) = coords_inv(phi, geo, theta, 'oo')
+            return np.r_[xi,xo], np.r_[yi,yo]
     
     elif CVkey.startswith('c2'):
         #  Go from c2.1 to 1
@@ -210,7 +216,24 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
         x, y = CVcoords('c1.'+str(alpha), geo, theta)
         #  Return the coordinates for the c2.x CV
         return -x + geo.ro*np.cos(om), -y + geo.ro*np.sin(om)
+
+    elif CVkey == 'd1':
+        Nc = getNc(theta,geo)
+        
+        phi = np.linspace(geo.phi_os+pi, geo.phi_ie-theta-2.0*pi*Nc, 1000)
+        (xi,yi) = coords_inv(phi, geo, theta, "fi")
+        phi = np.linspace(geo.phi_ie-theta-2.0*pi*Nc-pi, geo.phi_os, 1000)
+        (xo,yo) = coords_inv(phi, geo, theta, "oo")
+#        plt.plot(np.r_[xi,xo], np.r_[yi,yo])
+#        plt.show()
+        return np.r_[xi,xo], np.r_[yi,yo]
     
+    elif CVkey == 'd2':
+        #  Get the coordinates from the d1.x CV
+        x, y = CVcoords('d1', geo, theta)
+        #  Return the coordinates for the c2.x CV
+        return -x + geo.ro*np.cos(om), -y + geo.ro*np.sin(om)
+        
     else:
         raise KeyError('{k:s} is an invalid key for CVCoords'.format(k=CVkey))
         

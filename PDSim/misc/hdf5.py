@@ -55,10 +55,10 @@ class HDF5Writer(object):
                 # dictionary into a class
                 self._recursive_write(dict_group, StubClass(value))
             
-            elif isinstance(value, list):
+            elif isinstance(value, (list,tuple)):
                 dict_group = f.create_group(thing)
                 #Convert to numpy array
-                #List to a class
+                #List/Tuple to a class
                 cls = StubClass({str(i):v for i,v in enumerate(value)})
                 #Write class recursively
                 self._recursive_write(dict_group, cls)

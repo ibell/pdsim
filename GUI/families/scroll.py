@@ -20,6 +20,10 @@ def write_to_xlsx(workbook, runs):
     runs : opened HDF5 files from the runs
     """
     
+    ######################### PRESSURE PROFILES ###############################
+    ######################### PRESSURE PROFILES ###############################
+    ######################### PRESSURE PROFILES ###############################
+    
     ws = workbook.add_worksheet('Pressure profiles')
     
     # Adjust these to adjust the spacing around each block of data
@@ -87,6 +91,71 @@ def write_to_xlsx(workbook, runs):
                 ws.write(r+row_idx-1, my_col_idx+1,data[r, 2])
                     
             my_col_idx += offset    
+            
+    ########################### VIRTUAL SENSORS ###############################
+    ########################### VIRTUAL SENSORS ###############################
+    ########################### VIRTUAL SENSORS ###############################
+    
+    if run.get('sensors') is not None:
+        
+        ws = workbook.add_worksheet('Virtual Sensors')
+        
+        ## Build a sensor structure, which includes a header and the data
+        theta = run.get('t').value
+        
+        run_sensors = []
+        nrow = 0
+        ncol = 0
+        for run in runs:
+            vals = []
+            sensors_grp = run.get('sensors')
+            for i in range(len(sensors_grp.get('T'))):
+                x = sensors_grp.get('coords/{i:d}/0'.format(i=i)).value
+                y = sensors_grp.get('coords/{i:d}/1'.format(i=i)).value
+                T = sensors_grp.get('T/{i:d}'.format(i=i)).value
+                p = sensors_grp.get('p/{i:d}'.format(i=i)).value
+                rho = sensors_grp.get('rho/{i:d}'.format(i=i)).value
+                if len(p) > nrow:
+                    nrow = len(p)
+                ncol += 6
+                
+                vals.append((x, y, T, p, rho))
+            run_sensors.append(vals)
+        
+        ## Make a large list of list of empty strings
+        
+        buf = [['' for col in range(ncol)] for row in range(nrow+10)]
+        
+        col_offset = 0
+        row_offset = 3
+        for run, sensors in zip(runs, run_sensors):
+            
+            run_index = run.get('run_index').value
+            s = 'Run index #'+str(run_index)
+            
+            if run.get('description'):
+                description = run.get('description').value
+                s = 'Run index #'+str(run_index)+': '+description
+            
+            buf[row_offset-2][0 + col_offset] = s
+            for sensor in sensors:                
+                buf[row_offset][0 + col_offset] = 'theta [rad]'
+                buf[row_offset][1 + col_offset] = 'T [K]'
+                buf[row_offset][2 + col_offset] = 'p [kPa]'
+                buf[row_offset][3 + col_offset] = 'rho [kg/m^3]'
+                x, y, T, p, rho = sensor
+                buf[row_offset-1][0 + col_offset] = 'x={x:g}, y={y:g}'.format(x = x, y = y)
+                for row in range(len(T)):
+                    buf[row+1+row_offset][0 + col_offset] = theta[row]
+                    buf[row+1+row_offset][1 + col_offset] = T[row]
+                    buf[row+1+row_offset][2 + col_offset] = p[row]
+                    buf[row+1+row_offset][3 + col_offset] = rho[row]
+                col_offset += 5
+
+        for r in range(len(buf)):
+            for c in range(len(buf[0])):
+                if isinstance(buf[r][c],basestring) or not np.isnan(buf[r][c]):
+                    ws.write(r, c, buf[r][c])
 
 class InputsToolBook(pdsim_panels.InputsToolBook):
     """
@@ -105,7 +174,8 @@ class InputsToolBook(pdsim_panels.InputsToolBook):
         for imgfile in ['Geometry.png',
                         'StatePoint.png',
                         'MassFlow.png',
-                        'MechanicalLosses.png']:
+                        'MechanicalLosses.png',
+                        'Sensor.png']:
             ico_path = os.path.join('ico',imgfile)
             indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
         self.AssignImageList(il)
@@ -116,9 +186,10 @@ class InputsToolBook(pdsim_panels.InputsToolBook):
                      pdsim_panels.StateInputsPanel(self, config['StatePanel'], name='StatePanel'),
                      scroll_panels.MassFlowPanel(self, config['MassFlowPanel'], name='MassFlowPanel'),
                      scroll_panels.MechanicalLossesPanel(self, config['MechanicalLossesPanel'], name='MechanicalLossesPanel'),
+                     scroll_panels.VirtualSensorsPanel(self,{}, name='VirtualSensorsPanel')
                      )
         
-        for Name, index, panel in zip(['Geometry','State Points','Mass Flow - Valves','Mechanical'],indices,self.panels):
+        for Name, index, panel in zip(['Geometry','State Points','Mass Flow - Valves','Mechanical','Sensors'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
             
         #: A dictionary that maps name to panel 

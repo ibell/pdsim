@@ -1,0 +1,1 @@
+import fanno #so that cx_Freeze will be happy - seems like a bug to me

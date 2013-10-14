@@ -1319,3 +1319,217 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         dlg.ShowModal()
         dlg.Destroy()
         
+class InvoluteToCoords(wx.Dialog):
+    def __init__(self, parent):
+        wx.Dialog.__init__(self, parent, title = 'Involute to coordinates')
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        FGS = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+        
+        self.inv = wx.Choice(self)
+        self.inv.AppendItems(['Fixed Inner','Fixed Outer'])
+        self.angle = wx.TextCtrl(self)
+        self.offset = wx.TextCtrl(self)
+        self.AddButton = wx.Button(self, label = 'Add')
+        self.AddButton.Bind(wx.EVT_BUTTON, self.OnAdd)
+        
+        FGS.Add(wx.StaticText(self,label='Involute'))
+        FGS.Add(self.inv)
+        FGS.Add(wx.StaticText(self,label='Angle [rad]'))
+        FGS.Add(self.angle)
+        FGS.Add(wx.StaticText(self,label='Offset [m]'))
+        FGS.Add(self.offset)
+        
+        sizer.Add(FGS)
+        sizer.Add(self.AddButton)
+        
+        self.SetSizer(sizer)
+        self.Fit()
+        
+        #Bind a key-press event to all objects to get Esc 
+        children = self.GetChildren()
+        for child in children:
+            child.Bind(wx.EVT_KEY_UP,  self.OnKeyPress)
+    
+    def OnAdd(self, event = None):
+        self.EndModal(wx.ID_OK)
+        
+    def OnKeyPress(self,event = None):
+        """ cancel if Escape key is pressed """
+        event.Skip()
+        if event.GetKeyCode() == wx.WXK_ESCAPE:
+            self.EndModal(wx.ID_CANCEL)
+        
+class AddSensorDialog(wx.Dialog):
+    
+    def __init__(self, parent, geo):
+        
+        wx.Dialog.__init__(self, parent, title = 'Virtual Sensor Selection', size = (500,500))
+        
+        # local copy of geometry
+        self.geo = geo
+        
+        # The plot of the scroll wraps
+        self.PP = PlotPanel(self)
+        self.ax = self.PP.figure.add_axes((0, 0, 1, 1))
+        
+        self.FromInvolute = wx.Button(self, label = 'From Involute...')
+        self.FromInvolute.Bind(wx.EVT_BUTTON, self.OnFromInvolute)
+        self.Accept = wx.Button(self, label = 'Accept')
+        self.Accept.Bind(wx.EVT_BUTTON, self.OnAccept)
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        xsizer = wx.BoxSizer(wx.HORIZONTAL)
+        ysizer = wx.BoxSizer(wx.HORIZONTAL)
+        
+        self.x = wx.TextCtrl(self, value='')
+        self.y = wx.TextCtrl(self, value='')
+        
+        xsizer.Add(wx.StaticText(self,label='x [m]'))
+        xsizer.Add(self.x)
+        ysizer.Add(wx.StaticText(self,label='y [m]'))
+        ysizer.Add(self.y)
+        
+        sizer.Add(self.PP, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(xsizer, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(ysizer, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(self.FromInvolute, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(self.Accept, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        self.SetSizer(sizer)
+        
+        self.OnRefresh()
+        self.Fit()
+        
+        #Bind a key-press event to all objects to get Esc 
+        children = self.GetChildren()
+        for child in children:
+            child.Bind(wx.EVT_KEY_UP,  self.OnKeyPress)
+    
+    def OnAccept(self, event = None):
+        self.EndModal(wx.ID_OK)
+        
+    def OnKeyPress(self,event = None):
+        """ cancel if Escape key is pressed """
+        event.Skip()
+        if event.GetKeyCode() == wx.WXK_ESCAPE:
+            self.EndModal(wx.ID_CANCEL)
+        
+    def OnFromInvolute(self, event = None):
+        key_dict = {'Orbiting Inner': 'oi', 'Orbiting Outer':'oo','Fixed Inner':'fi','Fixed Outer':'fo'}
+        dlg = InvoluteToCoords(None)
+        if dlg.ShowModal() == wx.ID_OK:
+            inv = dlg.inv.GetStringSelection()
+            phi = float(dlg.angle.GetValue())
+            offset = float(dlg.offset.GetValue())
+            
+            xinv, yinv = scroll_geo.coords_inv(phi, self.geo, 0, key_dict[inv])
+            nxinv, nyinv = scroll_geo.coords_norm(phi, self.geo, 0, key_dict[inv])
+            
+            self.x.SetValue(str(xinv - nxinv[0]*offset))
+            self.y.SetValue(str(yinv - nyinv[0]*offset))
+            
+            self.OnRefresh()
+            
+        dlg.Destroy()
+        
+    def OnRefresh(self, event = None):
+        self.ax.cla()
+        
+        plotScrollSet(pi/4.0, 
+                      axis = self.ax, 
+                      geo = self.geo,
+                      offsetScroll = self.geo.phi_ie_offset > 0)
+        
+        xlims = self.ax.get_xlim()
+        ylims = self.ax.get_ylim()
+        try:            
+            x = float(self.x.GetValue())
+            y = float(self.y.GetValue())
+            if ylims[0] < y < ylims[1] and xlims[0] < x < xlims[1]:
+                self.ax.plot(x,y,'yo')
+        except ValueError:
+            pass
+        
+        self.PP.canvas.draw()
+        
+class SuperButton(wx.Button):
+    """ Button that destroys itself if right-clicked """
+    def __init__(self, parent, *args, **kwargs):
+        wx.Button.__init__(self, parent, *args, **kwargs)
+        self.Bind(wx.EVT_RIGHT_UP, self.OnDestroy)
+    def OnDestroy(self, event = None):
+        self.Destroy()
+        
+class VirtualSensorsPanel(pdsim_panels.PDPanel):
+    
+    desc_map = dict()
+    
+    def __init__(self, parent, config, **kwargs):
+        pdsim_panels.PDPanel.__init__(self, parent, **kwargs)
+        
+        # Now we are going to put everything into a scrolled window
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # The scrolled panel
+        scrolled_panel = ScrolledPanel(self, size = (-1,-1), style = wx.TAB_TRAVERSAL, name="panel1")
+        scrolled_panel.SetScrollbars(1, 1, 1, 1)
+        
+        self.AddSensor = wx.Button(scrolled_panel, label='Add Sensor')
+        
+        self.AddSensor.Bind(wx.EVT_BUTTON, self.OnAddSensor)
+        
+        self.sensor_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        s = textwrap.dedent('''
+        INFORMATION: In this panel, virtual sensors can be added to
+        the model.  These virtual sensors will "measure" all the state variables
+        for the control volumes that overlap a given Cartesian coordinate.  In 
+        this way it is possible to carry out virtual dynamic pressure measurements
+        for instance using the simulation code.
+        
+        You can add a sensor by clicking on the "Add Sensor" button below.  Sensors can
+        be removed by right-clicking on the sensor''')
+        
+        self.description = wx.StaticText(scrolled_panel,label = s)
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(HeaderStaticText(scrolled_panel, "Description"), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(self.description)
+
+        sizer.Add(HeaderStaticText(scrolled_panel, "Virtual Sensors"), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(self.AddSensor, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        
+        sizer.Add(HeaderStaticText(scrolled_panel, "List of Virtual Sensors"), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(self.sensor_sizer,0, wx.ALIGN_CENTER_HORIZONTAL)
+        
+        scrolled_panel.SetSizer(sizer)
+        main_sizer.Add(scrolled_panel, 1, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL)
+        self.SetSizer(main_sizer)
+        
+        sizer.Layout()
+        self.Fit()
+        self.scrolled_panel = scrolled_panel
+        
+    def OnAddSensor(self, event):
+        
+        Scroll = self.Parent.panels_dict['GeometryPanel'].Scroll
+        dlg = AddSensorDialog(None, Scroll.geo)
+        if dlg.ShowModal() == wx.ID_OK:
+            x,y = float(dlg.x.GetValue()), float(dlg.y.GetValue())
+            but = SuperButton(self.scrolled_panel,label='x = {x:g}, y = {y:g}'.format(x=x,y=y))
+            but.xval = x
+            but.yval = y
+            self.sensor_sizer.Add(but)
+            self.sensor_sizer.Layout()
+            self.GetSizer().Layout()
+            self.Refresh()
+            
+        dlg.Destroy()
+    
+    def get_script_chunks(self):
+        """ Chunk for the script file """
+        chunk = ''
+        for button in self.sensor_sizer.Children:
+            x,y = button.Window.xval, button.Window.yval
+            chunk += 'sim.add_sensor({x:g}, {y:g})\n'.format(x = x, y = y)
+        return chunk

@@ -42,12 +42,17 @@ class Scroll(PDSimCore, _Scroll):
         
         ## Define the geometry structure
         self.geo=scroll_geo.geoVals()
+
+        ## Structure for virtual sensors        
+        self.sensors = struct()
         
         ## Set flags
         self.__Setscroll_geo__=False
         self.__SetDiscGeo__=False
         self.__before_discharge1__=False #Step bridging theta_d
         self.__before_discharge2__=False #Step up to theta_d
+        
+        
 
     def __getstate__(self):
         """
@@ -414,7 +419,101 @@ class Scroll(PDSimCore, _Scroll):
         
         #Set the flags to ensure all parameters are fresh
         self.__Setscroll_geo__=True
-        self.__SetDiscGeo__=False     
+        self.__SetDiscGeo__=False
+        
+    def add_sensor(self, x, y):
+        """
+        Add a virtual sensor at the coordinates x,y
+        
+        Parameters
+        ----------
+        x : float
+            Cartesian coordinates corresponding to the point on the fixed scroll
+        y : float
+            Cartesian coordinates corresponding to the point on the fixed scroll
+        """
+        if not hasattr(self.sensors,'coords'):
+            self.sensors.coords = []
+            self.sensors.T = []
+            self.sensors.p = []
+            self.sensors.rho = []
+            
+        self.sensors.coords.append((x,y))
+        
+    def determine_partner_CVs(self,x,y,N = 1000, theta = None):
+        """
+        For a given point, determine which control volume is connected to it 
+        over the course of a rotation.  This can be useful for "instrumenting"
+        of the numerical model
+        
+        Parameters
+        ----------
+        x : float
+            X coordinate of the point
+        y : float
+            Y coordinate of the point
+        N : int
+            Number of elements in the crank angle array
+        theta : iterable, optional
+            The crank angles to be considered (N ignored if theta provided)
+            
+        Returns
+        ------
+        theta : numpy aray
+            Crank angle array
+        partners : list
+            List of string keys for the CV found, ``None`` if no partner
+        
+        """
+        if theta is not None:
+            thetav = theta
+        else:
+            thetav = np.linspace(0,2*pi,1000)        
+        
+        #  The clipper library operates on integers, so we need to take our 
+        #  floating point values and convert it to a large integer
+        scale_factor = 1000000000
+        
+        # Scale to integers (a box one unit a side)
+        scaled_x = [x*scale_factor,x*scale_factor+1,x*scale_factor+1,x*scale_factor,x*scale_factor]
+        scaled_y = [y*scale_factor,y*scale_factor,y*scale_factor+1,y*scale_factor+1,y*scale_factor]
+        
+        from PDSim.misc.clipper import pyclipper
+        
+        partners = []
+        for i, theta in enumerate(thetav):
+            _found = False
+            #  Find all the CVs that do have some overlap with this point
+            for CVkey in self.CVs.keys:
+                
+                try:
+                    # Get the coordinates of this chamber
+                    xcv, ycv = scroll_geo.CVcoords(CVkey, self.geo, theta)
+                    
+                    # Get the coordinates in scaled values
+                    scaled_xcv = xcv*scale_factor
+                    scaled_ycv = ycv*scale_factor
+                    
+                    # Clip them
+                    clip = pyclipper.Pyclipper()
+                    clip.subject_polygon([pair for pair in zip(scaled_x, scaled_y)])
+                    clip.clip_polygon([pair for pair in zip(scaled_xcv, scaled_ycv)])
+                    
+                    #  Actually do the intersection
+                    soln = clip.execute(pyclipper.INTERSECTION)
+                    
+                    if soln:
+                        partners.append(CVkey)
+                        _found = True
+                        break
+                except:
+#                    raise
+                    pass
+                
+            if not _found:
+                partners.append(None)
+        
+        return thetav, partners
     
     def poly_intersection_with_cvs(self, x, y, N, multiple_solns = 'sum'):
         """
@@ -473,8 +572,12 @@ class Scroll(PDSimCore, _Scroll):
             for i, theta in enumerate(thetav):
                 
                 #  Calculate the port free area between the port and the chamber
-                xcv, ycv = scroll_geo.CVcoords(CVkey, self.geo, theta)
-                
+                try:
+                    xcv, ycv = scroll_geo.CVcoords(CVkey, self.geo, theta)
+                except ValueError:
+                    Av[i] = 0
+                    continue
+                    
                 scaled_xcv = xcv*scale_factor
                 scaled_ycv = ycv*scale_factor
                 
@@ -1185,9 +1288,39 @@ class Scroll(PDSimCore, _Scroll):
         # Build the pressure profiles
         self.build_pressure_profile()
         
+        # Build the virtual sensor profile
+        self.build_sensor_profile()
+        
         # Add some more entries to the summary
         self.summary.eta_oi = self.eta_oi
         self.summary.Wdot_electrical = self.Wdot_electrical
+        
+    def build_sensor_profile(self):
+        """
+        Build the themo data for each point along the process
+        """
+        print 'preparing to calculate sensor profiles, this could take a while'
+        for x,y in self.sensors.coords:
+            theta, partners = self.determine_partner_CVs(x, y, theta = self.t)
+
+            ##  Collect all the data            
+            T,p,rho = [],[],[]
+            for i,partner in enumerate(partners):
+                if partner is None:
+                    T.append(np.nan)
+                    p.append(np.nan)
+                    rho.append(np.nan)
+                else:
+                    ##  Get integer key for partner
+                    I = self.CVs.index(partner)
+                    
+                    T.append(self.T[I,i])
+                    p.append(self.p[I,i])
+                    rho.append(self.rho[I,i])
+            
+            self.sensors.T.append(np.array(T))
+            self.sensors.p.append(np.array(p))
+            self.sensors.rho.append(np.array(rho))
         
     def build_pressure_profile(self):
         """
