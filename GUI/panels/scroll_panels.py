@@ -12,15 +12,10 @@ import matplotlib as mpl
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as WXCanvas
 from matplotlib.backends.backend_wxagg import NavigationToolbar2Wx as WXToolbar
 
-from CoolProp import State as CPState
 import numpy as np
-import yaml
 
 from PDSim.scroll.core import Scroll
 from PDSim.scroll.plots import plotScrollSet, ScrollAnimForm
-from PDSim.flow.flow import FlowPath
-from PDSim.core.core import Tube
-from PDSim.core.motor import Motor
 from PDSim.misc.datatypes import AnnotatedValue
 import pdsim_panels
 from pdsim_panels import LaTeXImageMaker, MotorChoices, PlotPanel
@@ -406,11 +401,16 @@ class GeometryPanel(pdsim_panels.PDPanel):
             
         self.disc_curves = DiscCurvesPanel(scrolled_panel, config)
         
-        self.DiscCoordsButton = wx.Button(scrolled_panel, label = 'Set Discharge Port Coordinates')
+        self.DiscCoordsButton = wx.Button(scrolled_panel, label = 'Set Disc. Port Coordinates')
         self.DiscCoordsButton.Bind(wx.EVT_BUTTON,self.OnSetDiscPortCoords) 
+        self.ClearDiscCoordsButton = wx.Button(scrolled_panel, label = 'Clear Disc. Port Coordinates')
+        self.ClearDiscCoordsButton.Bind(wx.EVT_BUTTON,self.OnClearDiscPortCoords) 
+        discbut_sizer = wx.BoxSizer(wx.HORIZONTAL)
         
         sizer_for_discharge_inputs.Add(self.disc_curves)
-        sizer_for_discharge_inputs.Add(self.DiscCoordsButton, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        discbut_sizer.Add(self.DiscCoordsButton, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        discbut_sizer.Add(self.ClearDiscCoordsButton, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer_for_discharge_inputs.Add(discbut_sizer, 0, wx.ALIGN_CENTER_HORIZONTAL)
         
         sizer = wx.BoxSizer(wx.HORIZONTAL)
         # Loop over the tube inputs
@@ -540,6 +540,11 @@ class GeometryPanel(pdsim_panels.PDPanel):
             self.disc_xy_coords = x,y
             self.OnRefresh()
         dlg.Destroy()
+    
+    def OnClearDiscPortCoords(self, event = None):
+        """ Clear the coordinates for the discharge port """
+        del self.disc_xy_coords
+        self.OnRefresh()
         
     def OnShowWrapGeo(self, event = None):
         if event is not None: event.Skip()
@@ -1485,7 +1490,8 @@ class VirtualSensorsPanel(pdsim_panels.PDPanel):
         the model.  These virtual sensors will "measure" all the state variables
         for the control volumes that overlap a given Cartesian coordinate.  In 
         this way it is possible to carry out virtual dynamic pressure measurements
-        for instance using the simulation code.
+        using the simulation code.  In this way you can check the selection of
+        the locations of pressure sensors.
         
         You can add a sensor by clicking on the "Add Sensor" button below.  Sensors can
         be removed by right-clicking on the sensor in the list below''')
