@@ -2476,7 +2476,7 @@ cpdef double phi_d_dd(double theta, geoVals geo):
         if (iter>20 and x3<geo.phi_is):
             return geo.phi_is;
 
-    if (x3>geo.phi_is + 2*pi):
+    if (x3 > geo.phi_is + 2*pi):
         # Bad solution obtained, we are going to use phi_is
         return geo.phi_is
     elif (x3 > geo.phi_is):

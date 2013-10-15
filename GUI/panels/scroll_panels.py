@@ -1488,13 +1488,13 @@ class VirtualSensorsPanel(pdsim_panels.PDPanel):
         for instance using the simulation code.
         
         You can add a sensor by clicking on the "Add Sensor" button below.  Sensors can
-        be removed by right-clicking on the sensor''')
+        be removed by right-clicking on the sensor in the list below''')
         
         self.description = wx.StaticText(scrolled_panel,label = s)
         
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(HeaderStaticText(scrolled_panel, "Description"), 0, wx.ALIGN_CENTER_HORIZONTAL)
-        sizer.Add(self.description)
+        sizer.Add(self.description, 0, wx.ALIGN_CENTER_HORIZONTAL)
 
         sizer.Add(HeaderStaticText(scrolled_panel, "Virtual Sensors"), 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.Add(self.AddSensor, 0, wx.ALIGN_CENTER_HORIZONTAL)
@@ -1533,3 +1533,12 @@ class VirtualSensorsPanel(pdsim_panels.PDPanel):
             x,y = button.Window.xval, button.Window.yval
             chunk += 'sim.add_sensor({x:g}, {y:g})\n'.format(x = x, y = y)
         return chunk
+        
+    def get_config_chunk(self):
+        configdict = {}
+        coords = []
+        for button in self.sensor_sizer.Children:
+            x,y = button.Window.xval, button.Window.yval
+            coords.append((x,y))
+        configdict['coords'] = coords
+        return configdict

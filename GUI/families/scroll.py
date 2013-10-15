@@ -96,7 +96,7 @@ def write_to_xlsx(workbook, runs):
     ########################### VIRTUAL SENSORS ###############################
     ########################### VIRTUAL SENSORS ###############################
     
-    if run.get('sensors') is not None:
+    if run.get('sensors') is not None and run.get('sensors/coords') is not None:
         
         ws = workbook.add_worksheet('Virtual Sensors')
         

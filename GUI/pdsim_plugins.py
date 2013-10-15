@@ -47,7 +47,7 @@ class PDSimPlugin(object):
                 
         * ``pre_build`` (goes at the very beginning of the build function)
         * ``pre_build_instantiation`` (goes right before instantiation of the PDSimCore subclass)
-        * ``post_build_instatciation`` (goes right before instantiation of the PDSimCore subclass)
+        * ``post_build_instantiation`` (goes right before instantiation of the PDSimCore subclass)
         * ``post_build`` (goes at the very end of the build function)
         
         

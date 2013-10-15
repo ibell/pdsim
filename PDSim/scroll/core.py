@@ -1299,6 +1299,10 @@ class Scroll(PDSimCore, _Scroll):
         """
         Build the themo data for each point along the process
         """
+        
+        # First check if this run uses any virtual sensors
+        if not hasattr(self.sensors,'T') and not hasattr(self.sensors,'coords'): return
+        
         print 'preparing to calculate sensor profiles, this could take a while'
         for x,y in self.sensors.coords:
             theta, partners = self.determine_partner_CVs(x, y, theta = self.t)
