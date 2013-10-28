@@ -92,6 +92,7 @@ class Scroll(PDSimCore, _Scroll):
             Whether or not to generate plots for each crank angle
         """
         
+        
         import matplotlib.pyplot as plt
         from PDSim.misc.clipper import pyclipper
         
@@ -102,6 +103,7 @@ class Scroll(PDSimCore, _Scroll):
             xport = self.geo.xa_arc1 + 0.9*self.geo.ra_arc1*np.cos(np.linspace(0,2*pi,100))
             yport = self.geo.ya_arc1 + 0.9*self.geo.ra_arc1*np.sin(np.linspace(0,2*pi,100))
         
+        print 'caching discharge port blockage, please wait...',
         # Scale the floating points to long integers
         scaled_xport = xport*scale_factor
         scaled_yport = yport*scale_factor
@@ -109,6 +111,8 @@ class Scroll(PDSimCore, _Scroll):
         xinvi, yinvi = scroll_geo.coords_inv(np.linspace(self.geo.phi_is+pi/2,self.geo.phi_is,75), self.geo, 0, flag="fi")
         xarc1 = self.geo.xa_arc1 + self.geo.ra_arc1*np.cos(np.linspace(self.geo.t2_arc1,self.geo.t1_arc1,75))
         yarc1 = self.geo.ya_arc1 + self.geo.ra_arc1*np.sin(np.linspace(self.geo.t2_arc1,self.geo.t1_arc1,75))
+        xarc2 = self.geo.xa_arc2 + self.geo.ra_arc2*np.cos(np.linspace(self.geo.t1_arc2,self.geo.t2_arc2,75))
+        yarc2 = self.geo.ya_arc2 + self.geo.ra_arc2*np.sin(np.linspace(self.geo.t1_arc2,self.geo.t2_arc2,75))
         xinvo, yinvo = scroll_geo.coords_inv(np.linspace(self.geo.phi_os,self.geo.phi_os+3*pi/2,75), self.geo, 0, flag="fo")
         
         if plot:
@@ -116,7 +120,7 @@ class Scroll(PDSimCore, _Scroll):
             ax = fig.add_subplot(111)
 
         t,A,Add,Ad1=[],[],[],[]
-        for i,theta in enumerate(np.linspace(0,2*pi,200)):
+        for i,theta in enumerate(np.linspace(0, 2*pi, 200)):
             
             THETA = self.geo.phi_ie-pi/2.0-theta
             
@@ -150,8 +154,8 @@ class Scroll(PDSimCore, _Scroll):
             if plot:
                 ax.cla()
         
-            xscroll = -np.r_[xinvi,xarc1,xinvo,xinvi[0]]+self.geo.ro*np.cos(THETA)
-            yscroll = -np.r_[yinvi,yarc1,yinvo,yinvi[0]]+self.geo.ro*np.sin(THETA)
+            xscroll = -np.r_[xinvi,xarc1,xarc2,xinvo,xinvi[0]]+self.geo.ro*np.cos(THETA)
+            yscroll = -np.r_[yinvi,yarc1,yarc2,yinvo,yinvi[0]]+self.geo.ro*np.sin(THETA)
             
             xscroll = xscroll[::-1]
             yscroll = yscroll[::-1]
@@ -207,26 +211,31 @@ class Scroll(PDSimCore, _Scroll):
                 ax.set_ylim(-0.025*scale_factor,0.025*scale_factor)
                 ax.set_aspect(1.0)
                 fig.savefig('disc_'+str(i)+'.png')
+        #  Save these values
+        self.Adisc_dd = np.array(Add)
+        self.Adisc_d1 = np.array(Ad1)
         
         if plot:
             fig = plt.figure()  
             ax = fig.add_subplot(111)
-            ax.plot(t, A, label='A')
-            ax.plot(t, Add, label='Add')
-            ax.plot(t, Ad1, label='Ad1')
+            ax.plot(t, (self.Adisc_dd+self.Adisc_d1)*1e6, label='A')
+            ax.plot(t, self.Adisc_dd*1e6, label='Add')
+            ax.plot(t, self.Adisc_d1*1e6, label='Ad1')
             plt.legend()
+            plt.xlabel('Crank angle [rad]')
+            plt.ylabel('Area [mm$^2$]')
             fig.savefig('A_v_t.png')
             plt.show()
             
-        #  Save these values
-        self.Adisc_dd = np.array(Add)
-        self.Adisc_d1 = np.array(Ad1)
+        
         
         #  Create a spline interpolator object for the area between DD and port
         self.spline_Adisc_DD = scipy.interpolate.splrep(t, Add, k = 2, s = 0)
         
         #  Create a spline interpolator object for the area between D1 and port
         self.spline_Adisc_D1 = scipy.interpolate.splrep(t, Ad1, k = 2, s = 0)
+        
+        print 'done'
             
     @property
     def theta_d(self):

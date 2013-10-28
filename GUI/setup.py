@@ -19,7 +19,7 @@ include_files = []
 includes = ['numpy','scipy.sparse.csgraph._validation']
 excludes = ['_gtkagg', '_tkagg', 'bsddb', 'curses', 'email', 'PyQt4',
             'pywin.debugger', 'pywin.debugger.dbgcon', 'pywin.dialogs',
-            'tcl', 'Tkconstants', 'Tkinter']
+            'tcl', 'Tkconstants', 'Tkinter','sympy']
 packages = ['h5py','CoolProp','scipy','PDSim']
 path = []
 

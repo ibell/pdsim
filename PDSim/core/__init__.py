@@ -1,0 +1,1 @@
+import motor # To force cx_freeze to import motor.py

@@ -291,6 +291,7 @@ class PDSimCore(_PDSimCore):
             
             #For each tube, update the flow going through it
             #Tube.mdot is always a positive value
+            print 'Tube mdots',mdot1, mdot2
             Tube.mdot = max(abs(mdot1), abs(mdot2))
             
         self.mdot = self.FlowsProcessed.mean_mdot[self.key_inlet]
