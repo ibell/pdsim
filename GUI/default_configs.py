@@ -140,7 +140,7 @@ SolverInputsPanel:
   
 Plugin:ScrollInjectionPlugin:
     - Length : 1.1
-      ID : 0.0000001
+      ID : 0.01
       inletState: 
           Fluid : R410A
           T : 283.15 #[K]
@@ -148,11 +148,13 @@ Plugin:ScrollInjectionPlugin:
       ports:
       - phi : 7.2
         D : 0.0025
+        offset : 0.00125
         check_valve : True
         inner_outer : 'i'
         symmetric : None
       - phi : 10.1
         D : 0.0025
+        offset : 0.00125
         check_valve : True
         inner_outer : 'o'
         symmetric : 1
