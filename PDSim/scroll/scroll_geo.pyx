@@ -201,7 +201,7 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
         Nc = getNc(theta,geo)
         #  If invalid index, raise error
         if alpha > Nc:
-            raise ValueError("c1.{i:d} is an invalid c1.x chamber".format(i=alpha))
+            raise ValueError("c1.{i:d} is an invalid c1.x chamber, currently {Nc:d} pairs in existence".format(i=alpha, Nc = Nc))
         else:
             phi = np.linspace(geo.phi_ie - theta - 2*pi*alpha, geo.phi_ie-theta-2*pi*(alpha-1), 1000)
             (xi, yi) = coords_inv(phi, geo, theta, 'fi')
@@ -234,6 +234,30 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
         #  Return the coordinates for the c2.x CV
         return -x + geo.ro*np.cos(om), -y + geo.ro*np.sin(om)
         
+    elif CVkey == 'dd':
+        t = np.linspace(geo.t1_arc1,geo.t2_arc1,300)
+        (x_farc1,y_farc1)=(
+            geo.xa_arc1+geo.ra_arc1*np.cos(t),
+            geo.ya_arc1+geo.ra_arc1*np.sin(t))
+        (x_oarc1,y_oarc1)=(
+           -geo.xa_arc1-geo.ra_arc1*np.cos(t)+geo.ro*cos(om),
+           -geo.ya_arc1-geo.ra_arc1*np.sin(t)+geo.ro*sin(om))
+        
+        t=np.linspace(geo.t1_arc2,geo.t2_arc2,300)
+        (x_farc2,y_farc2)=(
+            geo.xa_arc2+geo.ra_arc2*np.cos(t),
+            geo.ya_arc2+geo.ra_arc2*np.sin(t))
+        (x_oarc2,y_oarc2)=(
+           -geo.xa_arc2-geo.ra_arc2*np.cos(t)+geo.ro*cos(om),
+           -geo.ya_arc2-geo.ra_arc2*np.sin(t)+geo.ro*sin(om)) 
+        
+        phi=np.linspace(geo.phi_is, geo.phi_os+pi, 300)
+        (x_finv,y_finv)=coords_inv(phi,geo,theta,'fi')
+        (x_oinv,y_oinv)=coords_inv(phi,geo,theta,'oi')
+        
+        x=np.r_[x_farc2[::-1],x_farc1,x_finv,x_oarc2[::-1],x_oarc1,x_oinv,x_farc2[-1]]
+        y=np.r_[y_farc2[::-1],y_farc1,y_finv,y_oarc2[::-1],y_oarc1,y_oinv,y_farc2[-1]]
+        return x,y
     else:
         raise KeyError('{k:s} is an invalid key for CVCoords'.format(k=CVkey))
         
@@ -653,7 +677,7 @@ cpdef tuple scroll_wrap(geoVals geo):
     
     return Vwrap, xstar, ystar
     
-def overlay_injection_port(theta, geo, phi, ax, inner_outer):
+def overlay_injection_port(theta, geo, phi, ax, inner_outer, rport = None, offset = None):
     """
     Plot the injection ports on an axis - no scroll wrap plot is generated.  Also see
     plot_injection_ports()
@@ -680,19 +704,22 @@ def overlay_injection_port(theta, geo, phi, ax, inner_outer):
     """
     
     #Common terms
-    rport = geo.t/2.0
+    if rport is None:
+        rport = geo.t/2.0
+    if offset is None:
+        offset = rport/2.0
     t = np.linspace(0,2*pi,100)
     
     if inner_outer == 'o':
         #Involute angle along the outer involute of the scroll wrap
         x, y = coords_inv(phi, geo, theta, 'fo')
         nx, ny = coords_norm(phi, geo, theta, 'fo')
-        xc,yc = x-nx*rport,y-ny*rport
+        xc,yc = x-nx*offset,y-ny*offset
         ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
     elif inner_outer == 'i':
         x, y = coords_inv(phi, geo, theta, 'fi')
         nx, ny = coords_norm(phi, geo, theta, 'fi')
-        xc,yc = x-nx*rport,y-ny*rport
+        xc,yc = x-nx*offset,y-ny*offset
         ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
     else:
         raise KeyError
