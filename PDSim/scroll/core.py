@@ -15,15 +15,45 @@ import warnings
 from scipy.optimize import fsolve, newton
 from CoolProp.CoolProp import Props
 from CoolProp import State
-from math import pi,cos
+from math import pi
 import numpy as np
 import copy
 import types
 import scipy.interpolate
 import matplotlib.pyplot as plt
+import subprocess
+import glob
+import os
 
 class struct(object):
     pass
+
+class Port(object):
+    
+    #: Involute angle of the involute used to locate this port
+    phi = 3.14159
+    
+    #: The code for the involute used to locate this point: 'i' or 'o'
+    involute = 'i'
+    
+    #: Distance away from the involute
+    offset = 0.001
+    
+    #: Diameter of the port
+    D = 0.0005
+    
+    #: The x coordinate of the center of the port
+    x0 = None
+    
+    #: The y coordinate of the center of the port
+    y0 = None
+    
+    #: The array of crank angles used to calculate the free area of the port
+    theta = None
+    
+    #: A dictionary with keys of each partner CV, and values equal to the 
+    #: free area of the port with that control volume
+    area_dict = None
 
 class Scroll(PDSimCore, _Scroll):
     """
@@ -51,8 +81,6 @@ class Scroll(PDSimCore, _Scroll):
         self.__SetDiscGeo__=False
         self.__before_discharge1__=False #Step bridging theta_d
         self.__before_discharge2__=False #Step up to theta_d
-        
-        
 
     def __getstate__(self):
         """
@@ -72,7 +100,124 @@ class Scroll(PDSimCore, _Scroll):
         for k,v in d.iteritems():
             setattr(self,k,v)
         
-    def cache_discharge_port_blockage(self, xport = None, yport = None, plot = False):
+    def INTERPOLATING_NOZZLE_FLOW(self, 
+                                FlowPath, 
+                                X_d = 1.0,
+                                X_d_backflow = 0.8,
+                                upstream_key = 'EVICIV',
+                                A_interpolator = None,
+                                DP_floor = 1e-10):
+        """
+        A generic isentropic nozzle flow model wrapper with the added consideration
+        that if the pressure drop is below the floor value, there is no flow.
+        This code was originally added to handle the case of the injection line 
+        where there is no flow out of the injection which greatly increases the 
+        numerical stiffness.
+        
+        Furthermore, the area is determined through the use of the spline
+        interpolator
+        
+        This function also implements the use of spline interpolation to calculate
+        the area between the EVI port and the control volume
+        
+        Parameters
+        ----------
+        FlowPath : FlowPath instance
+            A fully-instantiated flow path model
+        X_d : float
+            Flow coefficient when the flow goes from ``upstream_key`` to the downstream key
+        X_d_backflow : float
+            Flow coefficient when the flow goes from downstream key to  ``upstream_key``
+        upstream_key : string
+            Key for the side of the flow path that is considered to be "upstream"
+        A_interpolator : float
+            throat area for isentropic nozzle model [:math:`m^2`]
+        DP_floor: float
+            The minimum pressure drop [kPa]
+            
+        Returns
+        -------
+        mdot : float
+            The mass flow through the flow path [kg/s]
+        """
+        FlowPath.A = scipy.interpolate.splev(self.theta, A_interpolator)
+        
+        try:
+            if FlowPath.State_up.p - FlowPath.State_down.p > DP_floor and abs(FlowPath.A) > 1e-15:
+                if FlowPath.key_up == upstream_key:
+                    _X_d = X_d #Normal flow into CV from EVI
+                else:
+                    _X_d = X_d_backflow #backflow from CV to EVI
+                mdot = _X_d*flow_models.IsentropicNozzle(FlowPath.A,
+                                                         FlowPath.State_up,
+                                                         FlowPath.State_down)
+                return mdot
+            else:
+                return 0.0
+        except ZeroDivisionError:
+            return 0.0
+            
+    def calculate_port_areas(self):
+        """ 
+        Calculate the area between a port on the fixed scroll and all of the 
+        control volumes.
+
+        This port could be a port for injection, a pressure tap for dynamic
+        pressure measurement, etc.
+        
+        This function iterates over the ports in ``self.fixed_scroll_ports`` and
+        loads the variables ``theta`` and ``area_dict`` for each port
+        """
+        
+        # Iterate over the ports
+        for port in self.fixed_scroll_ports:
+            
+            #  Make sure it is an Port instance
+            assert (isinstance(port,Port))
+              
+            #  Get the reference point on the scroll wrap
+            if port.involute == 'i':
+                #  Point on the scroll involute
+                x, y = scroll_geo.coords_inv(port.phi, self.geo, 0, 'fi')
+                #  Unit normal vector components
+                nx, ny = scroll_geo.coords_norm(port.phi, self.geo, 0, 'fi')
+            elif port.involute == 'o':
+                #  Point on the scroll involute
+                x, y = scroll_geo.coords_inv(port.phi, self.geo, 0, 'fo')
+                #  Unit normal vector components
+                nx, ny = scroll_geo.coords_norm(port.phi, self.geo, 0, 'fo')
+            else:
+                raise ValueError('port involute[{0:s}] must be one of "i" or "o"'.format(port.involute))
+            
+            #  Normal direction points towards the scroll wrap, take the opposite 
+            #  direction to locate the center of the port
+            port.x0 = x - port.offset*nx
+            port.y0 = y - port.offset*ny
+            
+            #  The coordinates for the center of the port
+            t = np.linspace(0, 2*pi)
+            xport = port.x0 + port.D/2.0*np.cos(t)
+            yport = port.y0 + port.D/2.0*np.sin(t)
+            
+            #  Actually use the clipper library to carry out the intersection
+            #  of the port with all of the control volumes
+            theta_area, area_dict = self.poly_intersection_with_cvs(xport, yport, 100)
+            
+            #  Save the values
+            port.area_dict = area_dict
+            port.theta = theta_area
+            
+#            #  Plot them
+#            for k, A in area_dict.iteritems():
+#                plt.plot(theta_area, A*1e6, label = k)
+#            
+#            plt.legend()
+#            plt.xlabel('Crank angle [rad]')
+#            plt.ylabel('Area [mm$^2$]')
+#            plt.savefig('Aport.png')
+#            plt.show()  
+            
+    def cache_discharge_port_blockage(self, xport = None, yport = None, plot = False, N = 100):
         """
         Precalculate the discharge port blockage using the clipper polygon math module
         
@@ -90,10 +235,13 @@ class Scroll(PDSimCore, _Scroll):
             The y coordinates for the port
         plot  : bool, optional
             Whether or not to generate plots for each crank angle
+        N : int, optional
+            How many steps to include over one rotation
         """
         
-        
-        import matplotlib.pyplot as plt
+        if plot:
+            print 'plotting of disc port blockage is on'
+            
         from PDSim.misc.clipper import pyclipper
         
         scale_factor = 1000000000
@@ -119,37 +267,42 @@ class Scroll(PDSimCore, _Scroll):
             fig = plt.figure()
             ax = fig.add_subplot(111)
 
-        t,A,Add,Ad1=[],[],[],[]
-        for i,theta in enumerate(np.linspace(0, 2*pi, 200)):
+        t, A, Add, Ad1, Ac1_N, Ac1_Nm1 = [], [], [], [], [], []
+        for i,theta in enumerate(np.linspace(0, 2*pi, 100)):
             
             THETA = self.geo.phi_ie-pi/2.0-theta
             
-            def DD_coords():
-                # The coordinates of the dd chamber at the center of the compressor
-                t = np.linspace(self.geo.t1_arc1, self.geo.t2_arc1, 300)
-                x_farc1 = self.geo.xa_arc1+self.geo.ra_arc1*np.cos(t)
-                y_farc1 = self.geo.ya_arc1+self.geo.ra_arc1*np.sin(t)
-                x_oarc1 = -x_farc1 + self.geo.ro*np.cos(THETA)
-                y_oarc1 = -y_farc1 + self.geo.ro*np.sin(THETA)
-                
-                t = np.linspace(self.geo.t1_arc2, self.geo.t2_arc2, 300)
-                x_farc2 = self.geo.xa_arc2+self.geo.ra_arc2*np.cos(t)
-                y_farc2 = self.geo.ya_arc2+self.geo.ra_arc2*np.sin(t)
-                x_oarc2 = -x_farc2 + self.geo.ro*np.cos(THETA)
-                y_oarc2 = -y_farc2 + self.geo.ro*np.sin(THETA)
-                
-                phi = np.linspace(self.geo.phi_is, self.geo.phi_os+pi, 300)
-                (x_finv,y_finv) = scroll_geo.coords_inv(phi,self.geo,theta,'fi')
-                (x_oinv,y_oinv) = scroll_geo.coords_inv(phi,self.geo,theta,'oi')
-                
-                xdd=np.r_[x_farc2[::-1],x_farc1,x_finv,x_oarc2[::-1],x_oarc1,x_oinv,x_farc2[-1]]
-                ydd=np.r_[y_farc2[::-1],y_farc1,y_finv,y_oarc2[::-1],y_oarc1,y_oinv,y_farc2[-1]]
-                
-                return xdd, ydd
+            xdd, ydd = scroll_geo.CVcoords('dd',self.geo,theta)
+            xd1, yd1 = scroll_geo.CVcoords('d1',self.geo,theta)
+            Ncmax = scroll_geo.nC_Max(self.geo)
+            Nc = scroll_geo.getNc(theta, self.geo)
             
-            xdd, ydd = DD_coords()
+            if Nc == Ncmax:
+                xc1_N, yc1_N = scroll_geo.CVcoords('c1.+'+str(Ncmax), self.geo, theta)
+            else:
+                xc1_N, yc1_N = None, None
+                
+            if Nc == Ncmax-1:
+                xc1_Nm1, yc1_Nm1 = scroll_geo.CVcoords('c1.+'+str(Ncmax-1), self.geo, theta)
+            else:
+                xc1_Nm1, yc1_Nm1 = None, None
+            
             scaled_xdd = xdd*scale_factor
             scaled_ydd = ydd*scale_factor
+            scaled_xd1 = xd1*scale_factor
+            scaled_yd1 = yd1*scale_factor
+            if xc1_N is not None:
+                scaled_xc1_N = xc1_N*scale_factor
+                scaled_yc1_N = yc1_N*scale_factor
+            else:
+                scaled_xc1_N = None
+                scaled_yc1_N = None
+            if xc1_Nm1 is not None:
+                scaled_xc1_Nm1 = xc1_Nm1*scale_factor
+                scaled_yc1_Nm1 = yc1_Nm1*scale_factor
+            else:
+                scaled_xc1_Nm1 = None
+                scaled_yc1_Nm1 = None
             
             if plot:
                 ax.cla()
@@ -171,69 +324,94 @@ class Scroll(PDSimCore, _Scroll):
             if plot:
                 ax.plot(scaled_xport, scaled_yport)
                 ax.plot(scaled_xscroll, scaled_yscroll)
-                ax.fill(scaled_xdd, scaled_ydd, alpha = 0.2)
+                ax.fill(scaled_xdd, scaled_ydd, alpha = 0.1, zorder = 1000)
+                ax.fill(scaled_xd1, scaled_yd1, alpha = 0.1, zorder = 1000)
+                if xc1_N is not None:
+                    ax.fill(scaled_xc1_N, scaled_yc1_N, alpha = 0.1, zorder = 1000)
+                if xc1_Nm1 is not None:
+                    ax.fill(scaled_xc1_Nm1, scaled_yc1_Nm1, alpha = 0.1, zorder = 1000)
                 
             for loop in soln:
                 scaled_x, scaled_y = zip(*loop)
-                x = [_/scale_factor for _ in scaled_x]
-                y = [_/scale_factor for _ in scaled_y]
                 if plot:
                     ax.fill(scaled_x, scaled_y)
             
             #  The total flow area unblocked by the scroll wrap    
             Atotal = sum([pyclipper.area(loop) for loop in soln])/scale_factor**2
             
-            A_dd = 0
-            for loop in soln:
+            def calculate_area(scaled_xcv,scaled_ycv):
+                if scaled_xcv is None:
+                    return 0.0
+                    
+                A_CV = 0
+                for loop in soln:
+                    scaled_x, scaled_y = zip(*loop)
+                    if plot:
+                        ax.fill(scaled_x, scaled_y, 'r')
+                    
+                    #  Now see if it has overlap with the DD chamber    
+                    clip = pyclipper.Pyclipper()
+                    clip.subject_polygon([pair for pair in zip(scaled_x, scaled_y)])
+                    clip.clip_polygon([pair for pair in zip(scaled_xcv, scaled_ycv)])
+                    soln_cv = clip.execute(pyclipper.INTERSECTION)
+                    
+                    #  Get the area of overlap with the DD chamber
+                    A_CV += sum([pyclipper.area(loop) for loop in soln_cv])/scale_factor**2
                 
-                scaled_x, scaled_y = zip(*loop)
-                x = [_/scale_factor for _ in scaled_x]
-                y = [_/scale_factor for _ in scaled_y]
-                if plot:
-                    ax.fill(scaled_x, scaled_y)
-                
-                #  Now see if it has overlap with the DD chamber    
-                clip = pyclipper.Pyclipper()
-                clip.subject_polygon([pair for pair in zip(scaled_x, scaled_y)])
-                clip.clip_polygon([pair for pair in zip(scaled_xdd, scaled_ydd)])
-                soln_dd = clip.execute(pyclipper.INTERSECTION)
-                
-                #  Get the area of overlap with the DD chamber
-                A_dd += sum([pyclipper.area(loop_dd) for loop_dd in soln_dd])/scale_factor**2
+                return A_CV
             
             t.append(theta)
             A.append(Atotal)
-            Add.append(A_dd)
-            Ad1.append(Atotal-A_dd)
+            Add.append(calculate_area(scaled_xdd, scaled_ydd))
+            Ad1.append(calculate_area(scaled_xd1, scaled_yd1))
+            Ac1_N.append(calculate_area(scaled_xc1_N, scaled_yc1_N))
+            Ac1_Nm1.append(calculate_area(scaled_xc1_Nm1, scaled_yc1_Nm1))
             
             if plot:
                 ax.set_xlim(-0.025*scale_factor,0.025*scale_factor)
                 ax.set_ylim(-0.025*scale_factor,0.025*scale_factor)
                 ax.set_aspect(1.0)
-                fig.savefig('disc_'+str(i)+'.png')
+                fig.savefig('disc_' + '{i:04d}'.format(i=i) + '.png')
         #  Save these values
+        self.tdisc = np.array(t)
         self.Adisc_dd = np.array(Add)
         self.Adisc_d1 = np.array(Ad1)
+        self.Adisc_c1_N = np.array(Ac1_N)
+        self.Adisc_c1_Nm1 = np.array(Ac1_Nm1)
         
         if plot:
             fig = plt.figure()  
             ax = fig.add_subplot(111)
-            ax.plot(t, (self.Adisc_dd+self.Adisc_d1)*1e6, label='A')
+            ax.plot(t, (self.Adisc_dd+self.Adisc_d1+self.Adisc_c1_N+self.Adisc_c1_Nm1)*1e6, label='A')
             ax.plot(t, self.Adisc_dd*1e6, label='Add')
             ax.plot(t, self.Adisc_d1*1e6, label='Ad1')
+            ax.plot(t, self.Adisc_c1_N*1e6, label='Ac1.N')
+            ax.plot(t, self.Adisc_c1_Nm1*1e6, label='Ac1.(N-1)')
+            ax.axvline(self.theta_d)
             plt.legend()
             plt.xlabel('Crank angle [rad]')
             plt.ylabel('Area [mm$^2$]')
             fig.savefig('A_v_t.png')
-            plt.show()
+            plt.close()
             
-        
+        if plot:
+            print 'making animation in disc_ani.gif'
+            subprocess.check_call('convert disc_0*.png disc_ani.gif',shell=True)
+            print 'removing disc_0*.png'
+            for file in glob.glob('disc_0*.png'):
+                os.remove(file)
         
         #  Create a spline interpolator object for the area between DD and port
-        self.spline_Adisc_DD = scipy.interpolate.splrep(t, Add, k = 2, s = 0)
+        self.spline_Adisc_DD = scipy.interpolate.splrep(t, self.Adisc_dd, k = 2, s = 0)
         
         #  Create a spline interpolator object for the area between D1 and port
-        self.spline_Adisc_D1 = scipy.interpolate.splrep(t, Ad1, k = 2, s = 0)
+        self.spline_Adisc_D1 = scipy.interpolate.splrep(t, self.Adisc_d1, k = 2, s = 0)
+        
+        #  Create a spline interpolator object for the area between C1_N and port
+        self.spline_Adisc_C1_N = scipy.interpolate.splrep(t, self.Adisc_c1_N, k = 2, s = 0)
+        
+        #  Create a spline interpolator object for the area between C1_N and port
+        self.spline_Adisc_C1_Nm1 = scipy.interpolate.splrep(t, self.Adisc_c1_Nm1, k = 2, s = 0)
         
         print 'done'
             
@@ -1703,6 +1881,28 @@ class Scroll(PDSimCore, _Scroll):
         """
         
         FP.A = scipy.interpolate.splev(self.theta, self.spline_Adisc_D1)
+        try:
+            return flow_models.IsentropicNozzle(FP.A, FP.State_up, FP.State_down) * X_d
+        except ZeroDivisionError:
+            return 0.0
+    
+    def DISC_C1_N(self, FP, X_d = 1.0):
+        """
+        The flow path function for the flow between discharge port and the D1 chamber
+        """
+        
+        FP.A = scipy.interpolate.splev(self.theta, self.spline_Adisc_C1_N)
+        try:
+            return flow_models.IsentropicNozzle(FP.A, FP.State_up, FP.State_down) * X_d
+        except ZeroDivisionError:
+            return 0.0
+            
+    def DISC_C1_Nm1(self, FP, X_d = 1.0):
+        """
+        The flow path function for the flow between discharge port and the D1 chamber
+        """
+        
+        FP.A = scipy.interpolate.splev(self.theta, self.spline_Adisc_C1_Nm1)
         try:
             return flow_models.IsentropicNozzle(FP.A, FP.State_up, FP.State_down) * X_d
         except ZeroDivisionError:
