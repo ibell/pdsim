@@ -206,7 +206,10 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
             p=State2.p
             T2=State2.T
             
-        #Q_add needs to be in W
+        if abs(mdot) < 1e-10:
+            return 0.0
+            
+        # Q_add needs to be in W
         Q_add *= 1000       
         
         S=State(Fluid,{'T':Tmean,'P':p})
@@ -235,13 +238,13 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
             alpha = k*Nu/ID #W/m^2-K
 
         #Pressure gradient using Darcy friction factor
-        G=mdot/InnerFlowArea
-        dp_dz=-f/rho*G**2/(2*ID)
-        DELTAP=dp_dz*L
+        G = mdot/InnerFlowArea
+        dp_dz = -f/rho*G**2/(2*ID)
+        DELTAP = dp_dz*L
 
         if fixed==1:
             # The outlet temperature considering just the wall heat transfer 
-            T2_star=T_wall-(T_wall-T1)*exp(-pi*ID*L*alpha/(mdot*cp))
+            T2_star = T_wall-(T_wall-T1)*exp(-pi*ID*L*alpha/(mdot*cp))
             
             # Get the actual outlet enthalpy based on the additional heat input
             S_star = State(Fluid,{'T':T2_star,'P':p + DELTAP/1000.0})
@@ -399,6 +402,9 @@ cdef class ValveModel(object):
         self.x_stopper = x_stopper
         self.key_up = key_up
         self.key_down = key_down
+        self.x_tr = 0.25*(self.d_port**2/self.d_valve)
+        
+        self. xv = empty_arraym(2)
         
     cpdef get_States(self, Core):
         """
@@ -407,7 +413,7 @@ cdef class ValveModel(object):
         """
         exists_keys=Core.CVs.exists_keys
         Tubes_Nodes=Core.Tubes.Nodes
-        for key,Statevar in [(self.key_up,'State_up'),(self.key_down,'State_down')]:
+        for key, Statevar in [(self.key_up,'State_up'),(self.key_down,'State_down')]:
             ## Update the pointers to the states for the ends of the flow path
             if key in exists_keys:
                 setattr(self,Statevar,Core.CVs[key].State)
@@ -417,41 +423,57 @@ cdef class ValveModel(object):
     @cython.cdivision(True)
     cdef _pressure_dominant(self, arraym f, double x, double xdot, double rho, double V, double deltap):
         f.set_index(0, xdot) #dxdt
-        f.set_index(1, (0.5*self.C_D*rho*(V-xdot)**2*self.A_valve+deltap*self.A_valve-self.k_valve*x)/(self.m_eff)) #dxdotdt
+        if abs(V-xdot) > 0:
+            f.set_index(1, ((V-xdot)/abs(V-xdot)*0.5*self.C_D*rho*(V-xdot)**2*self.A_valve+deltap*self.A_valve-self.k_valve*x)/(self.m_eff)) #d(xdot)dt
+        else:
+            f.set_index(1, (deltap*self.A_valve-self.k_valve*x)/(self.m_eff)) #d(xdot)dt
         return
         
     @cython.cdivision(True)
     cdef _flux_dominant(self, arraym f, double x, double xdot, double rho, double V):
         f.set_index(0, xdot) #dxdt
-        f.set_index(1, (0.5*self.C_D*rho*(V-xdot)**2*self.A_valve+rho*(V-xdot)**2*self.A_port-self.k_valve*x)/(self.m_eff)) #dxdotdt
+        if abs(V-xdot) > 0:
+            f.set_index(1, ((V-xdot)/abs(V-xdot)*0.5*self.C_D*rho*(V-xdot)**2*self.A_valve+(V-xdot)/abs(V-xdot)*rho*(V-xdot)**2*self.A_port-self.k_valve*x)/(self.m_eff)) #d(xdot)dt
+        else:
+            f.set_index(1, (-self.k_valve*x)/(self.m_eff)) #d(xdot)dt
         return
     
     cpdef set_xv(self, arraym xv):
+        self.xv = xv.copy()
         #If valve opening is less than zero, just use zero (the valve is closed)
-        if xv.get_index(0)<0.0:
-            xv.set_index(0,0.0)
-            xv.set_index(1,0.0)
+        if self.xv.get_index(0) < -1e-15 and self.xv.get_index(1) < 1e-15:
+            #print 'closed, desired position is',self.xv.get_index(0),' and velocity is',self.xv.get_index(1)
+            self.xv.set_index(0, 0.0)
+            self.xv.set_index(1, 0.0)
         #If it predicts a valve opening greater than max opening, just use the max opening
-        elif xv.get_index(0)>self.x_stopper:
-            xv.set_index(0,self.x_stopper)
-            xv.set_index(1,0.0)
-        self.xv=xv
+        elif self.xv.get_index(0) > self.x_stopper:
+            self.xv.set_index(0, self.x_stopper)
+            self.xv.set_index(1, 0.0)
+        print self.xv,'set_xv',xv
         
     cpdef double A(self):
-        return pi*self.xv.get_index(0)*self.d_valve
+        if self.xv is None:
+            print 'self.xv is None'
+        cdef double x = self.xv.get_index(0)
+        if x >= self.x_tr:
+            return self.A_port
+        else:
+            return pi*x*self.d_valve
     
-    cpdef double flow_velocity(self,State State_up, State State_down):
+    cpdef double flow_velocity(self, State State_up, State State_down):
         """
         For a given set of states, and a known valve lift, first
         check whether it is within the valve lift range, and then
         calculate the flow velocity
         """
-        cdef double v
-        if State_up.get_p()<State_down.get_p():
+        cdef double A = self.A(), x = self.xv.get_index(0)
+        if A > 0:
+            if x > self.x_tr:
+                return IsentropicNozzle(A, State_up, State_down, OUTPUT_VELOCITY)
+            else:
+                return x/self.x_tr*IsentropicNozzle(A, State_up, State_down, OUTPUT_VELOCITY)
+        else:
             return 0.0
-            #Need a dummy value for the area to get a flow velocity even when the valve is closed
-        A_dummy=0.001 
-        return IsentropicNozzle(A_dummy,State_up,State_down,OUTPUT_VELOCITY)
         
     @cython.cdivision(True)
     cpdef arraym derivs(self, Core):
@@ -460,7 +482,7 @@ cdef class ValveModel(object):
         
         Parameters
         ----------
-        Core : :class:`PDSimCore <PSSim.core.core.PDSimCore>` instance
+        Core : :class:`PDSimCore <PDSim.core.core.PDSimCore>` instance
         
         Returns
         -------
@@ -470,34 +492,38 @@ cdef class ValveModel(object):
         cdef double omega
         cdef arraym f = empty_arraym(2)
         cdef arraym out_array = empty_arraym(2)
-        x=self.xv.get_index(0)
-        xdot=self.xv.get_index(1)
+        x = self.xv.get_index(0)
+        xdot = self.xv.get_index(1)
         
         self.get_States(Core)
         
-        rho=self.State_up.get_rho()
-        p_high=self.State_up.get_p()
-        p_low=self.State_down.get_p()
-        deltap=(p_high-p_low)*1000
+        rho = self.State_up.get_rho()
+        p_high = self.State_up.get_p()
+        p_low = self.State_down.get_p()
+        deltap = (p_high - p_low)*1000
         
-        # Not clear why this conditional is here... 
-        if deltap < 0.0:
-            return out_array #(Its filled with zeros)
+        if deltap > 0:
+            V = self.flow_velocity(self.State_up, self.State_down)
+        else:
+            V = -self.flow_velocity(self.State_down, self.State_up)
         
-        V = self.flow_velocity(self.State_up, self.State_down)
-        
-        x_tr = 0.25*(self.d_port**2/self.d_valve)
-        
-        if x>=x_tr:
+        if x <= self.x_tr:
             self._pressure_dominant(f,x,xdot,rho,V,deltap)
         else:
             self._flux_dominant(f,x,xdot,rho,V)
+            
+        print deltap, p_high, p_low, x, xdot, V, f,'valves'
             
         omega = Core.omega
         out_array.set_index(0, f.get_index(0)/omega)
         out_array.set_index(1, f.get_index(1)/omega)
         
-        return out_array #[dxdtheta, dxdot_dtheta]
+        if abs(x) < 1e-15 and xdot < -1e-12:
+            print 'stationary valve'
+            out_array.set_index(0, 0.0)
+            out_array.set_index(1, 0.0)
+        
+        return out_array #[dxdtheta, d(xdot)_dtheta]
     
     cpdef dict __cdict__(self):
         items=['A_port','A_valve','d_valve','h_valve','d_port','m_eff','C_D','a_valve','l_valve',

@@ -59,6 +59,7 @@ cdef class ValveModel(object):
     cdef public bytes key_up, key_down
     cdef public State State_up, State_down
     cdef public arraym xv
+    cdef public double x_tr
     
     cpdef set_xv(self, arraym xv)
     cpdef double A(self)
