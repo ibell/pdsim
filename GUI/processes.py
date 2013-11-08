@@ -93,7 +93,7 @@ class Run1(Process):
             identifier = 'PDSimGUI ' + time.strftime('%Y-%m-%d-%H-%M-%S')+'_t'+script_name.split('_')[1]
             hdf5_path = os.path.join(temp_folder, identifier + '.h5')
             
-            from plugins.HDF5_plugin import HDF5Writer
+            from PDSim.misc.hdf5 import HDF5Writer
             HDF5 = HDF5Writer()
             HDF5.write_to_file(self.sim, hdf5_path)
             # Prune off undesired keys as provided by get_prune_keys function
