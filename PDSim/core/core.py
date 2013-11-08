@@ -865,7 +865,7 @@ class PDSimCore(_PDSimCore):
                 else:
                     # Step 1: derivatives evaluated at old values
                     f1=self.derivs(t0,xold)
-                    xnew1=xold+h*(1.0/5.0)*f1
+                    xnew1=xold+h*(1.0/5.0)*f1   
                     
                     #Store a copy of the flows for future use as well as a buffered set of state variables
                     Flows_temporary = self.Flows.get_deepcopy()
@@ -1043,6 +1043,7 @@ class PDSimCore(_PDSimCore):
             Vdisp = self.Vdisp
             
         self.eta_v = self.mdot / (self.omega/(2*pi)*Vdisp*inletState.rho)
+
         h1 = inletState.h
         h2 = outletState.h
         s1 = inletState.s
@@ -1313,7 +1314,7 @@ class PDSimCore(_PDSimCore):
         # We put it in kW by multiplying by flow rate
         self.resid_Td = mdot_out * (h_outlet_Tube - h_outlet)
         
-    def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45', OneCycle = False, integrator_options = None):
+    def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45', OneCycle = False, integrator_options = None, plot_every_cycle = False):
         """
         The Objective function for the energy balance solver
         
@@ -1327,6 +1328,8 @@ class PDSimCore(_PDSimCore):
             Which solver is to be used to integrate the steps
         OneCycle : boolean
             If ``True``, stop after one cycle
+        plot_every_cycle : boolean
+            If ``True``, make the debug plots at every cycle
         """
         
         # Consume the first element as the discharge temp 
@@ -1449,6 +1452,9 @@ class PDSimCore(_PDSimCore):
             if OneCycle:
                 print 'Quitting due to OneCycle being set to True'
                 return
+                
+            if plot_every_cycle:
+                debug_plots(self)
             
             if self.Abort():
                 print 'Quitting because Abort flag hit'
@@ -1615,9 +1621,11 @@ class PDSimCore(_PDSimCore):
                              cycle_integrator = solver_method, 
                              OneCycle = OneCycle,
                              epsilon = eps_energy_balance,
-                             integrator_options = integrator_options)
+                             integrator_options = integrator_options,
+                             plot_every_cycle = plot_every_cycle
+                             )
                 
-        if not self.Abort(): 
+        if not self.Abort() and not OneCycle: 
             self.post_solve()
             
         if hasattr(self,'resid_Td'):
@@ -1791,12 +1799,12 @@ class PDSimCore(_PDSimCore):
         if self.__hasValves__:
             # 
             offset = len(self.stateVariables)*self.CVs.Nexist
-            for i,valve in enumerate(self.Valves):
-                #Get the values from the input array for this valve
+            for i, valve in enumerate(self.Valves):
+                # Get the values from the input array for this valve
                 xvalve = x[offset+i*2:offset+2+i*2]
-                #Set the values in the valve class
+                # Set the values in the valve class
                 valve.set_xv(xvalve)
-                # Get the derivatives of position and derivative of velocity
+                # Get the derivatives of position and derivative of velocity                
                 self.core.property_derivs.extend(valve.derivs(self))
         
         return self.core.property_derivs
