@@ -45,6 +45,14 @@ class InjectionPortPanel(wx.Panel):
         element_sizer = wx.FlexGridSizer(cols=2,hgap = 2, vgap = 2)
         element_sizer.AddSpacer(10)
         element_sizer.AddSpacer(10)
+        element_sizer.Add(wx.StaticText(self,label="Diameter [m]"))
+        self.D_port = wx.TextCtrl(self,value="0.001") 
+        self.D_port.SetToolTipString('Diameter of the port')
+        element_sizer.Add(self.D_port)
+        element_sizer.Add(wx.StaticText(self,label="Offset [m]"))
+        self.offset_port = wx.TextCtrl(self,value="0.001") 
+        self.offset_port.SetToolTipString('Offset of the port away from involute it is referenced from')
+        element_sizer.Add(self.offset_port)
         element_sizer.Add(wx.StaticText(self,label="Involute Angle"))
         self.phi_inj_port = wx.TextCtrl(self,value="7.141") 
         self.phi_inj_port.SetToolTipString('If you want symmetric injection ports, the involute angle on the inner involute should be pi radians greater than that on the outer involute.  View the ports to be sure')
@@ -87,7 +95,7 @@ class InjectionPortPanel(wx.Panel):
         self.index = index
         self.indexText.SetLabel('#'+str(index))
         
-    def set_values(self,phi,inner_outer,check_valve,symmetric):
+    def set_values(self,phi,inner_outer,check_valve,symmetric,D,offset):
         """
         Takes in a tuple of involute_angle, inner_outer, and check_valve and
         sets the values in the panel
@@ -102,9 +110,15 @@ class InjectionPortPanel(wx.Panel):
         symmetric : string
             If 'None', no symmetric link for this port, otherwise it is the string
             representation of an integer with the 1-based index of the port
+        D : float
+            Diameter of the port
+        offset : float
+            Offset from the scroll wrap
         """
         self.phi_inj_port.SetValue(str(phi))
         self.check_valve.SetValue(check_valve)
+        self.D_port.SetValue(str(D))
+        self.offset_port.SetValue(str(offset))
         if inner_outer == 'i':
             self.involute.SetStringSelection('Inner involute')
         elif inner_outer == 'o':
@@ -117,7 +131,7 @@ class InjectionPortPanel(wx.Panel):
     
     def get_values(self):
         """
-        Returns a tuple of phi, inner_outer, check_valve
+        Returns a tuple of phi, inner_outer, check_valve, D, offset
         
         Variables as described as in set_values(), but check_valve is a boolean here
         """
@@ -128,7 +142,7 @@ class InjectionPortPanel(wx.Panel):
         else:
             raise ValueError
         
-        return float(self.phi_inj_port.GetValue()), inner_outer, self.check_valve.IsChecked()
+        return float(self.phi_inj_port.GetValue()), inner_outer, self.check_valve.IsChecked(), float(self.D_port.GetValue()), float(self.offset_port.GetValue())
     
     def OnMakeSymmetric(self, event = None):
         """
@@ -421,15 +435,14 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         SAF = ScrollAnimForm(geo, start = False)
         
         #IEPs are children that are instances of InjectionElementPanel class
-        IEPs = [child for child in self.scrolled_panel.Children if isinstance(child,InjectionElementPanel)]
+        IEPs = [child for child in self.scrolled_panel.Children if isinstance(child, InjectionElementPanel)]
         for IEP in IEPs:
             for child in IEP.Children:
                 if isinstance(child, InjectionPortPanel):
-                    #Get the values from the panel
-                    phi,inner_outer,check_valve = child.get_values()
-                    #Overlay the port on the scroll wrap plot
-                    scroll_geo.overlay_injection_port(0, geo, phi, SAF.ax, inner_outer)
-        
+                    # Get the values from the panel
+                    phi, inner_outer, check_valve, D, offset = child.get_values()
+                    # Overlay the port on the scroll wrap plot
+                    scroll_geo.overlay_injection_port(0, geo, phi, SAF.ax, inner_outer, rport = D/2, offset = offset)
         SAF.start()
         SAF.Show()
         
@@ -450,7 +463,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
             for child in IEP.Children:
                 if isinstance(child,InjectionPortPanel):
                     #Get the values from the port panel
-                    phi,inner_outer,check_valve = child.get_values()
+                    phi,inner_outer,check_valve,D,offset = child.get_values()
                     
                     partner_list = []
                     
@@ -481,8 +494,6 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         pylab.ylim(0.5,Iport-1+0.5)
         pylab.yticks(range(1,Iport+1))
         pylab.show()
-    
-    
         
     def build_from_configfile(self, config):
         """
@@ -514,7 +525,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
                         # Get a pointer to the port panel
                         portpanel = IEP.ports_list[-1]
                         # Set the values in the panel
-                        portpanel.set_values(port['phi'], port['inner_outer'], port['check_valve'], port['symmetric'])
+                        portpanel.set_values(port['phi'], port['inner_outer'], port['check_valve'], port['symmetric'], port['D'], port['offset'])
     
     def get_additional_parametric_terms(self):
         
@@ -694,24 +705,104 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
         attrs, vals = apply_port_terms(attrs,vals)
     
         return attrs,vals
+      
+
+VI_template = """           
         
+from PDSim.scroll.core import Port
+import scipy.interpolate
+
+phi_list = {phi_list:s}
+involute_list = {involute_list:s}
+offset_list = {offset_list:s}
+D_list = {D_list:s}
+
+port_tube_list = {port_tube_list:s}
+
+Ltube_list = {Ltube_list:s}
+IDtube_list = {IDtube_list:s}
+Ttube_list = {Ttube_list:s}
+RHOtube_list = {RHOtube_list:s}
+
+sim.fixed_scroll_ports = []
+
+for phi,involute,offset,D,parent in zip(phi_list,involute_list,offset_list,D_list,port_tube_list):
+    p = Port()
+    p.phi = phi
+    p.involute = involute
+    p.offset = offset
+    p.D = D
+    p.parent = parent
+    sim.fixed_scroll_ports.append(p)
+    
+print mdot_guess*0.1
+for i,(L,ID,T,D) in enumerate(zip(Ltube_list,IDtube_list,Ttube_list,RHOtube_list)):
+    sim.add_tube(Tube(key1 = 'VITube'+str(i+1)+'.1',
+                      key2 = 'VITube'+str(i+1)+'.2',
+                      L = L,
+                      ID = ID,
+                      mdot = mdot_guess*0.1, 
+                      State1 = State.State(inletState.Fluid,
+                                           dict(T = T, D = D)
+                                           ),
+                      fixed = 1,
+                      TubeFcn = sim.TubeCode
+                      )     
+                  )
+        
+##This block can be uncommented to plot the scroll wrap with the VI ports
+##plotScrollSet(0, geo = sim.geo)
+#for port in sim.VI_ports:
+#    x,y = scroll_geo.coords_inv(port.phi, sim.geo, 0, 'f'+port.involute)
+#    nx,ny = scroll_geo.coords_norm(port.phi, sim.geo, 0, 'f'+port.involute)
+#    
+#    x0 = x - nx*port.offset
+#    y0 = y - ny*port.offset
+#    
+#    t = np.linspace(0, 2*pi)
+#    plt.plot(port.D/2.0*np.cos(t) + x0, port.D/2.0*np.sin(t) + y0,'b')
+#    
+#plt.savefig('wrap_with_VI_ports.png',transparent=True)
+#plt.close()
+#quit()
+        
+#  Calculate the areas between each VI port and every control volume
+sim.calculate_port_areas()
+    
+for port in sim.fixed_scroll_ports:
+    for partner in port.area_dict:
+    
+        #  Create a spline interpolator object for the area between port and the partner chamber
+        A_interpolator = scipy.interpolate.splrep(port.theta, port.area_dict[partner], k = 2, s = 0)
+        
+        #  Add the flow between the EVI control volume and the chamber through the port
+        sim.add_flow(FlowPath(key1 = 'VITube'+str(port.parent+1)+'.2',
+                              key2 = partner,
+                              MdotFcn = sim.INTERPOLATING_NOZZLE_FLOW,
+                              MdotFcn_kwargs = dict(X_d = 0.8,
+                                                    X_d_backflow = 0.0, # No backflow
+                                                    upstream_key = 'VITube'+str(port.parent+1)+'.2',
+                                                    A_interpolator = A_interpolator
+                                                    )
+                             )
+                     )
+"""
 class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
     """
     A plugin that adds the injection ports for the scroll compressor
     """
     
     #: A short description of the plugin 
-    short_description = 'Refrigerant injection for scroll'
+    short_description = 'Vapor injection for scroll compressor'
         
     def should_enable(self):
         """
         Only enable if it is a scroll type compressor
         """
-        warnings.warn('Never enabling injection')
-#        if not self.GUI.family.lower() == 'scroll':
-#            return False
-#        else:
-        return False
+        if self.GUI.machinefamily.lower().startswith('scroll'):
+            return True
+        else:
+            return False
     
     def get_config_chunk(self):
         """
@@ -750,19 +841,7 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
             chunk.append(l)
         
         top_level_dict = {'Plugin:ScrollInjectionPlugin':chunk}
-        return top_level_dict
-        
-    def build_from_configfile(self, config):
-        """
-        Take in the dictionary of items from the configfile and pass
-        them along to the injection_panel
-         
-        Parameters
-        ----------
-        config : dict
-        
-        """
-        self.injection_panel.build_from_configfile(config)
+        return top_level_dict    
         
     def activate(self, event = None, config = ''):
         """
@@ -778,6 +857,7 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
             self.injection_panel = InjectionInputsPanel(ITB, name = 'Plugin:ScrollInjectionPlugin')
             ITB.AddPage(self.injection_panel,"Injection")
             self._activated = True
+            self.injection_panel.build_from_configfile(config)
         else:
             page_names = [ITB.GetPageText(I) for I in range(ITB.GetPageCount())]
             I = page_names.index("Injection")
@@ -785,122 +865,67 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
             self.injection_panel.Destroy()
             del self.injection_panel
             self._activated = False
-            
-        self.injection_panel.build_from_configfile(config)
-            
-    def apply(self, ScrollComp, **kwargs):
+        
+    def get_script_chunks(self):
         """
         Add the necessary things for the scroll compressor injection
-        
-        Parameters
-        ----------
-        ScrollComp : Scroll instance
         """
         
-        #Add a struct (empty class with no methods)
-        ScrollComp.injection = struct()
-        #Empty dictionaries for the port terms
-        ScrollComp.injection.phi = {}
-        ScrollComp.injection.inner_outer = {}
-        ScrollComp.injection.check_valve = {}
+        Ltube_list,IDtube_list,Ttube_list,RHOtube_list = [],[],[],[]
+        phi_list,involute_list,offset_list,check_valve_list, D_list, port_tube_list = [],[],[],[],[],[]
             
         #IEPs are children of injection_panel that are instances of InjectionElementPanel class
         IEPs = [child for child in self.injection_panel.scrolled_panel.Children if isinstance(child,InjectionElementPanel)]
-        for i,IEP in enumerate(IEPs):
-            L = float(IEP.Lval.GetValue())
-            ID = float(IEP.IDval.GetValue())
-            injState = IEP.state.GetState().copy()
-            V_tube = L*pi*ID**2/4.0
-            
-            CVkey = 'injCV.'+str(i+1)
-            #Add the control volume for the injection line
-            ScrollComp.add_CV(ControlVolume(key = CVkey,
-                                            VdVFcn = ScrollComp.V_injection,
-                                            VdVFcn_kwargs = dict(V_tube = V_tube),
-                                            initialState = injState,
-                                            )
-                              )
-            
-            InjLine = Tube(key1='injection_line.'+str(i+1)+'.1',
-                         key2='injection_line.'+str(i+1)+'.2',
-                         L=L,
-                         ID=ID,
-                         mdot=0.001,
-                         State1=ScrollComp.CVs[CVkey].State.copy(),
-                         fixed=1,
-                         TubeFcn=ScrollComp.TubeCode
-                         )
-            #Turn off heat transfer in the injection line
-            InjLine.alpha = 0.0
-            #Add the tube for the injection line
-            ScrollComp.add_tube(InjLine)
-            
-            
-            #Add the flow model between the injection line tube and the injection CV 
-            ScrollComp.add_flow(FlowPath(key1='injection_line.'+str(i+1)+'.2',
-                                         key2=CVkey,
-                                         MdotFcn=ScrollComp.IsentropicNozzleFMSafe,
-                                         MdotFcn_kwargs = dict(A = pi*ID**2/4,
-                                                               DP_floor = 0.2)
-                                         )
-                                )
-            
+        for i, IEP in enumerate(IEPs):
+            Ltube_list.append(float(IEP.Lval.GetValue()))
+            IDtube_list.append(float(IEP.IDval.GetValue()))
+            injState = IEP.state.GetState()
+            Ttube_list.append(injState.T)
+            RHOtube_list.append(injState.rho)
             
             Ports = [c for c in IEP.Children if isinstance(c,InjectionPortPanel)]
             for j,child in enumerate(Ports):
-                phi,inner_outer,check_valve = child.get_values()
-                
-                #Figure out which CV are in contact with this location for the injection port
-                partner_key_start = ScrollComp._get_injection_CVkey(phi, 0*pi, inner_outer)
-                partner_key_end = ScrollComp._get_injection_CVkey(phi, 2*pi, inner_outer)
-                
-                #Store the port parameters for writing in the collect_output_terms function
-                k = str(i+1)+':'+str(j+1)
-                ScrollComp.injection.phi[k]=phi
-                ScrollComp.injection.inner_outer[k]=inner_outer
-                ScrollComp.injection.check_valve[k]=check_valve
-                
-                #Add the CV that start and end the rotation connected to the port
-                for partner_key in [partner_key_start, partner_key_end]:
-                    #Injection flow paths
-                    ScrollComp.add_flow(FlowPath(key1= partner_key, 
-                                                 key2 = CVkey, 
-                                                 MdotFcn=ScrollComp.Injection_to_Comp,
-                                                 MdotFcn_kwargs = dict(phi = phi,
-                                                                       inner_outer = inner_outer,
-                                                                       check_valve = check_valve)
-                                                )
-                                        )
+                phi,involute,check_valve,D,offset = child.get_values()
+                phi_list.append(phi)
+                involute_list.append(involute)
+                check_valve_list.append(check_valve)
+                D_list.append(D)                
+                offset_list.append(offset)                
+                port_tube_list.append(i)
+                                        
+        post_build = VI_template.format(**{k:str(v) for k,v in locals().iteritems()})        
+        print post_build
+        return dict(post_build = post_build)
                         
-    def post_process(self, sim):
-        """
-        Post-process the results from the simulation in order to calculate any parameters that
-        are required
-        
-        This function will be called by OnIdle in GUI Main frame when run finishes
-        """
-
-        sim.injection.massflow={}
-        #:the ratio of the injection flow rate to the suction flow rate
-        sim.injection.flow_ratio={}
-        #injection pressure
-        sim.injection.pressure={}
-        #injection temperature
-        sim.injection.temperature={}
-        
-        #The tubes that are injection tubes have a key1 that starts with 'injection_line'
-        ITubes = [T for T in sim.Tubes if T.key1.startswith('injection_line')]
-        
-        for i,Tube in enumerate(ITubes):
-            key = Tube.key1
-            sim.injection.massflow[i+1]=sim.FlowsProcessed.mean_mdot[key]
-            sim.injection.flow_ratio[i+1]=(sim.injection.massflow[i+1]/
-                                           sim.mdot)
-            sim.injection.pressure[i+1] = Tube.State1.p
-            sim.injection.temperature[i+1] = Tube.State1.T
-                
-        #Save a local copy of a pointer to the simulation
-        self.simulation = sim
+#    def post_process(self, sim):
+#        """
+#        Post-process the results from the simulation in order to calculate any parameters that
+#        are required
+#        
+#        This function will be called by OnIdle in GUI Main frame when run finishes
+#        """
+#
+#        sim.injection.massflow={}
+#        #:the ratio of the injection flow rate to the suction flow rate
+#        sim.injection.flow_ratio={}
+#        #injection pressure
+#        sim.injection.pressure={}
+#        #injection temperature
+#        sim.injection.temperature={}
+#        
+#        #The tubes that are injection tubes have a key1 that starts with 'injection_line'
+#        ITubes = [T for T in sim.Tubes if T.key1.startswith('injection_line')]
+#        
+#        for i,Tube in enumerate(ITubes):
+#            key = Tube.key1
+#            sim.injection.massflow[i+1]=sim.FlowsProcessed.mean_mdot[key]
+#            sim.injection.flow_ratio[i+1]=(sim.injection.massflow[i+1]/
+#                                           sim.mdot)
+#            sim.injection.pressure[i+1] = Tube.State1.p
+#            sim.injection.temperature[i+1] = Tube.State1.T
+#                
+#        #Save a local copy of a pointer to the simulation
+#        self.simulation = sim
         
         
         

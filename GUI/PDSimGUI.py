@@ -6,36 +6,24 @@ sys.path.append(os.path.abspath('plugins'))
 
 #Imports from wx package
 import wx
-from wx.lib.mixins.listctrl import CheckListCtrlMixin, ColumnSorterMixin, ListCtrlAutoWidthMixin
-from wx.lib.embeddedimage import PyEmbeddedImage
 from wx.lib.wordwrap import wordwrap
 wx.SetDefaultPyEncoding('latin-1')
 
 #Provided by python
 import codecs
-from operator import itemgetter
-from math import pi
-from Queue import Queue, Empty
+from Queue import Queue
 from multiprocessing import freeze_support, cpu_count
-
 import time
 import textwrap
-import cPickle
-from ConfigParser import SafeConfigParser
-import StringIO
 import warnings
 import random
 
 #Other packages that are required
 import numpy as np
-import CoolProp.State as CPState
 import yaml
 import h5py
 
 #PDSim imports
-from PDSim.recip.core import Recip
-from PDSim.scroll.core import Scroll
-from PDSimLoader import RecipBuilder, ScrollBuilder
 from PDSim.plot.plots import PlotNotebook
 import PDSim
 
@@ -44,8 +32,6 @@ import processes
 import pdsim_plugins
 import default_configs 
 import panels.pdsim_panels as pdsim_panels
-import panels.recip_panels as recip_panels
-import panels.scroll_panels as scroll_panels
 import datatypes
 
 # The path to the home folder that will hold everything
