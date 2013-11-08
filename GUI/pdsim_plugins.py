@@ -1,7 +1,7 @@
-import abc
+#import abc
 
 class PDSimPlugin(object):
-    __metaclass__ = abc.ABCMeta
+    #__metaclass__ = abc.ABCMeta
      
     def __init__(self):
         """
@@ -19,13 +19,6 @@ class PDSimPlugin(object):
         Can be overloaded in the derived class
         """
         return True
-    
-    @abc.abstractmethod
-    def apply(self, **kwargs):
-        """
-        Apply the plugin's code - it can do whatever it wants to the GUI 
-        """
-        raise NotImplementedError("Subclasses of PDSimPlugin must provide the apply() function")
         
 
     def _check_plugin_chunks(self, chunks):
@@ -33,9 +26,8 @@ class PDSimPlugin(object):
         
         allowed = ['pre_import','post_import','pre_build','pre_build_instantiation','post_build_instantiation','post_build','pre_run','post_run']
         if not all([key in allowed for key in chunks.keys()]):
-            raise ValueError
+            raise ValueError(key+' is an invalid key to be returned in dictionary from get_script_chunks')
         
-    
     def get_script_chunks(self):
         """
         Get the chunks for the script from the plugin
