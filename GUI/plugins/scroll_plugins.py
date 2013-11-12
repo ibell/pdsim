@@ -835,6 +835,8 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                 
                 port['check_valve'] = portpanel.check_valve.IsChecked()
                 port['symmetric'] = portpanel.SymmTarget.GetStringSelection()
+                port['D'] = float(portpanel.D_port.GetValue())
+                port['offset'] = float(portpanel.offset_port.GetValue())
                 
                 l['ports'].append(port)
             
@@ -893,8 +895,7 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                 offset_list.append(offset)                
                 port_tube_list.append(i)
                                         
-        post_build = VI_template.format(**{k:str(v) for k,v in locals().iteritems()})        
-        print post_build
+        post_build = VI_template.format(**{k:str(v) for k,v in locals().iteritems()})
         return dict(post_build = post_build)
                         
 #    def post_process(self, sim):

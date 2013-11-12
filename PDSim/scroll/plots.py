@@ -1116,7 +1116,6 @@ class ScrollAnimForm(wx.Frame):
         animMenu = FM.FlatMenu()
         
         self.SaveAnimation = FM.FlatMenuItem(layersMenu, -1, "Save animation", "Tooltip", wx.ITEM_NORMAL)
-        print self.SaveAnimation.GetId()
         self.Bind(FM.EVT_FLAT_MENU_SELECTED, self.OnSaveAnimation,id = self.SaveAnimation.GetId())
         animMenu.AppendItem(self.SaveAnimation)
         

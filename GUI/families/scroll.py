@@ -285,11 +285,33 @@ SolverInputsPanel:
   eps_cycle : 0.002 # Cycle-Cycle convergence tolerance (RSSE) [-]
   eps_energy_balance : 0.05 # Energy balance convergence tolerance (RSSE) [-]
 
-Plugin:ScrollInjectionPlugin:
-    L = 1
-
 """
 )
+
+# This block was removed from the default configuration so that injection is not
+# enabled by default.  It can be replaced to enable injection by default
+"""
+Plugin:ScrollInjectionPlugin:
+    - Length : 1.1
+      ID : 0.01
+      inletState: 
+          Fluid : R410A
+          T : 283.15 #[K]
+          rho : 5.75 #[kg/m^3]
+      ports:
+      - phi : 7.2
+        D : 0.0025
+        offset : 0.00125
+        check_valve : True
+        inner_outer : 'i'
+        symmetric : None
+      - phi : 10.1
+        D : 0.0025
+        offset : 0.00125
+        check_valve : True
+        inner_outer : 'o'
+        symmetric : 1
+"""
 
 def get_defaults():
     return yaml.load(scroll_yaml)

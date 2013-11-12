@@ -1647,7 +1647,7 @@ class MainFrame(wx.Frame):
                 print 'Not all the keys are the same'
             else:
                 for k in check_dict.iterkeys():
-                    print check_dict[k].GetValue(),my_dict[k].GetValue()
+                    print 'Different key: ',check_dict[k].GetValue(),my_dict[k].GetValue()
                     
             # Write current location to config
             current_path,fname = os.path.split(file_path)
