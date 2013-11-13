@@ -62,6 +62,15 @@ class InjectionPortPanel(wx.Panel):
         self.involute.AppendItems(['Outer involute','Inner involute'])
         self.involute.SetSelection(0)
         element_sizer.Add(self.involute)
+        element_sizer.Add(wx.StaticText(self,label="X_d"))
+        self.X_d = wx.TextCtrl(self,value="0.8") 
+        self.X_d.SetToolTipString('Flow coefficient into the working chamber')
+        element_sizer.Add(self.X_d)
+        element_sizer.Add(wx.StaticText(self,label="X_d_backflow"))
+        self.X_d_backflow = wx.TextCtrl(self,value="0.8") 
+        self.X_d_backflow.SetToolTipString('Flow coefficient for backflow')
+        element_sizer.Add(self.X_d_backflow)
+        
         element_sizer.Add(wx.StaticText(self,label="Uses check valve"))
         self.check_valve = wx.CheckBox(self,label="")
         element_sizer.Add(self.check_valve)
@@ -95,15 +104,14 @@ class InjectionPortPanel(wx.Panel):
         self.index = index
         self.indexText.SetLabel('#'+str(index))
         
-    def set_values(self,phi,inner_outer,check_valve,symmetric,D,offset):
+    def set_values(self,vals):
         """
-        Takes in a tuple of involute_angle, inner_outer, and check_valve and
-        sets the values in the panel
+        Takes in a dictionary of terms and sets the values in the panel
         
         Parameters
         ----------
         phi : float
-        inner_outer : string
+        involute : string
             If ``'i'``, phi is along the inner involute of the fixed scroll
             If ``'o'``, phi is along the outer involute of the fixed scroll
         check_valve : boolean
@@ -115,25 +123,27 @@ class InjectionPortPanel(wx.Panel):
         offset : float
             Offset from the scroll wrap
         """
-        self.phi_inj_port.SetValue(str(phi))
-        self.check_valve.SetValue(check_valve)
-        self.D_port.SetValue(str(D))
-        self.offset_port.SetValue(str(offset))
-        if inner_outer == 'i':
+        self.phi_inj_port.SetValue(str(vals['phi']))
+        self.check_valve.SetValue(vals['check_valve'])
+        self.D_port.SetValue(str(vals['D']))
+        self.offset_port.SetValue(str(vals['offset']))
+        if vals['involute'] == 'i':
             self.involute.SetStringSelection('Inner involute')
-        elif inner_outer == 'o':
+        elif vals['involute'] == 'o':
             self.involute.SetStringSelection('Outer involute')
         else:
             raise ValueError
-        self.SymmTarget.SetStringSelection(str(symmetric))
-        if not symmetric == 'None':
+        self.SymmTarget.SetStringSelection(str(vals['symmetric']))
+        if not vals['symmetric'] == 'None':
             self.OnMakeSymmetric()
+        self.X_d.SetValue(str(vals['X_d']))
+        self.X_d_backflow.SetValue(str(vals['X_d_backflow']))
     
     def get_values(self):
         """
-        Returns a tuple of phi, inner_outer, check_valve, D, offset
+        Returns a dictionary of values
         
-        Variables as described as in set_values(), but check_valve is a boolean here
+        Variables as described as in set_values()
         """
         if self.involute.GetStringSelection() == 'Outer involute':
             inner_outer = 'o'
@@ -142,7 +152,16 @@ class InjectionPortPanel(wx.Panel):
         else:
             raise ValueError
         
-        return float(self.phi_inj_port.GetValue()), inner_outer, self.check_valve.IsChecked(), float(self.D_port.GetValue()), float(self.offset_port.GetValue())
+        return dict(phi = float(self.phi_inj_port.GetValue()),
+                    involute = inner_outer,
+                    symmetric = self.SymmTarget.GetStringSelection(),
+                    check_valve = self.check_valve.IsChecked(),
+                    D = float(self.D_port.GetValue()),
+                    offset = float(self.offset_port.GetValue()),
+                    X_d = float(self.X_d.GetValue()),
+                    X_d_backflow = float(self.X_d_backflow.GetValue())
+                    )
+
     
     def OnMakeSymmetric(self, event = None):
         """
@@ -440,9 +459,9 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
             for child in IEP.Children:
                 if isinstance(child, InjectionPortPanel):
                     # Get the values from the panel
-                    phi, inner_outer, check_valve, D, offset = child.get_values()
+                    vals = child.get_values()
                     # Overlay the port on the scroll wrap plot
-                    scroll_geo.overlay_injection_port(0, geo, phi, SAF.ax, inner_outer, rport = D/2, offset = offset)
+                    scroll_geo.overlay_injection_port(0, geo, vals['phi'], SAF.ax, vals['involute'], rport = vals['D']/2, offset = vals['offset'])
         SAF.start()
         SAF.Show()
         
@@ -463,13 +482,13 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
             for child in IEP.Children:
                 if isinstance(child,InjectionPortPanel):
                     #Get the values from the port panel
-                    phi,inner_outer,check_valve,D,offset = child.get_values()
+                    v = child.get_values()
                     
                     partner_list = []
                     
                     theta = np.linspace(0, 2*pi, 1000)
                     for th in theta:
-                        partner_list.append(_Scroll._get_injection_CVkey(phi, th, inner_outer))
+                        partner_list.append(_Scroll._get_injection_CVkey(v['phi'], th, v['involute']))
         
                     #Find the break points in each segment
                     dividers = [i for i in range(len(theta)-1) if not partner_list[i] == partner_list[i+1]]
@@ -525,7 +544,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
                         # Get a pointer to the port panel
                         portpanel = IEP.ports_list[-1]
                         # Set the values in the panel
-                        portpanel.set_values(port['phi'], port['inner_outer'], port['check_valve'], port['symmetric'], port['D'], port['offset'])
+                        portpanel.set_values(port)
     
     def get_additional_parametric_terms(self):
         
@@ -716,6 +735,8 @@ phi_list = {phi_list:s}
 involute_list = {involute_list:s}
 offset_list = {offset_list:s}
 D_list = {D_list:s}
+X_d_list = {X_d_list:s}
+X_d_backflow_list = {X_d_backflow_list:s}
 
 port_tube_list = {port_tube_list:s}
 
@@ -726,13 +747,15 @@ RHOtube_list = {RHOtube_list:s}
 
 sim.fixed_scroll_ports = []
 
-for phi,involute,offset,D,parent in zip(phi_list,involute_list,offset_list,D_list,port_tube_list):
+for phi,involute,offset,D,parent,X_d,X_d_backflow in zip(phi_list,involute_list,offset_list,D_list,port_tube_list,X_d_list,X_d_backflow_list):
     p = Port()
     p.phi = phi
     p.involute = involute
     p.offset = offset
     p.D = D
     p.parent = parent
+    p.X_d = X_d
+    p.X_d_backflow = X_d_backflow
     sim.fixed_scroll_ports.append(p)
     
 print mdot_guess*0.1
@@ -779,8 +802,8 @@ for port in sim.fixed_scroll_ports:
         sim.add_flow(FlowPath(key1 = 'VITube'+str(port.parent+1)+'.2',
                               key2 = partner,
                               MdotFcn = sim.INTERPOLATING_NOZZLE_FLOW,
-                              MdotFcn_kwargs = dict(X_d = 0.8,
-                                                    X_d_backflow = 0.0, # No backflow
+                              MdotFcn_kwargs = dict(X_d = port.X_d,
+                                                    X_d_backflow = port.X_d_backflow,
                                                     upstream_key = 'VITube'+str(port.parent+1)+'.2',
                                                     A_interpolator = A_interpolator
                                                     )
@@ -827,9 +850,9 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                 port['phi'] = float(portpanel.phi_inj_port.GetValue())
                 inv = portpanel.involute.GetStringSelection()
                 if inv == 'Inner involute':
-                    port['inner_outer'] = 'i'
+                    port['involute'] = 'i'
                 elif inv == 'Outer involute':
-                    port['inner_outer'] = 'o'
+                    port['involute'] = 'o'
                 else:
                     raise ValueError
                 
@@ -837,6 +860,8 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
                 port['symmetric'] = portpanel.SymmTarget.GetStringSelection()
                 port['D'] = float(portpanel.D_port.GetValue())
                 port['offset'] = float(portpanel.offset_port.GetValue())
+                port['X_d'] = float(portpanel.X_d.GetValue())
+                port['X_d_backflow'] = float(portpanel.X_d_backflow.GetValue())
                 
                 l['ports'].append(port)
             
@@ -874,7 +899,7 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
         """
         
         Ltube_list,IDtube_list,Ttube_list,RHOtube_list = [],[],[],[]
-        phi_list,involute_list,offset_list,check_valve_list, D_list, port_tube_list = [],[],[],[],[],[]
+        phi_list,involute_list,offset_list,check_valve_list, D_list, port_tube_list,X_d_list,X_d_backflow_list = [],[],[],[],[],[],[],[]
             
         #IEPs are children of injection_panel that are instances of InjectionElementPanel class
         IEPs = [child for child in self.injection_panel.scrolled_panel.Children if isinstance(child,InjectionElementPanel)]
@@ -887,13 +912,16 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
             
             Ports = [c for c in IEP.Children if isinstance(c,InjectionPortPanel)]
             for j,child in enumerate(Ports):
-                phi,involute,check_valve,D,offset = child.get_values()
-                phi_list.append(phi)
-                involute_list.append(involute)
-                check_valve_list.append(check_valve)
-                D_list.append(D)                
-                offset_list.append(offset)                
+                v = child.get_values()
+                phi_list.append(v['phi'])
+                involute_list.append(v['involute'])
+                check_valve_list.append(v['check_valve'])
+                D_list.append(v['D'])                
+                offset_list.append(v['offset'])
                 port_tube_list.append(i)
+                X_d_list.append(v['X_d'])
+                X_d_backflow_list.append(v['X_d_backflow'])
+                
                                         
         post_build = VI_template.format(**{k:str(v) for k,v in locals().iteritems()})
         return dict(post_build = post_build)
