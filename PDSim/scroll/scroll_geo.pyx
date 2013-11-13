@@ -572,9 +572,9 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         a=cos(geo.phi_os-geo.phi_is)+1.0
         b=geo.ro*a-dx*(sin(geo.phi_os)-sin(geo.phi_is))+dy*(cos(geo.phi_os)-cos(geo.phi_is))
         c=1.0/2.0*(2.0*dx*sin(geo.phi_is)*geo.ro-2.0*dy*cos(geo.phi_is)*geo.ro-dy**2-dx**2)
-        if geo.phi_os-(geo.phi_is-pi)>1e-12:
+        if geo.phi_os-(geo.phi_is-pi)>1e-8:
             r2max=(-b+sqrt(b**2-4.0*a*c))/(2.0*a)
-        elif geo.phi_os-(geo.phi_is-pi)<1e-12:
+        elif geo.phi_os-(geo.phi_is-pi)<1e-8:
             r2max=-c/b
         else:
             print 'error with starting angles phi_os %.16f phi_is-pi %.16f' %(geo.phi_os,geo.phi_is-pi)
@@ -2470,45 +2470,34 @@ cpdef double phi_s_sa(double theta, geoVals geo):
     B=1.0/2.0*(sqrt(b**2-4.0*D)-b)
     return phi_ie-pi+B-phi_o0
     
-cpdef double phi_d_dd(double theta, geoVals geo):
-    
-    phi_os=geo.phi_os;
-    phi_o0=geo.phi_o0;
-    phi_ie=geo.phi_ie;
-    phi_i0=geo.phi_i0;
-    alpha=pi-phi_i0+phi_o0;
-    
-    # Use secant method to calculate the involute angle at break
-    eps=1e-8;
-    change=999;
-    iter=1;
-    while ((iter<=3 or abs(f)>eps) and iter<100):
-        if (iter==1): x1=geo.phi_is; phi=x1;
-        if (iter==2): x2=geo.phi_is+0.1; phi=x2;
-        if (iter>2): phi=x2;
-
-        f=1+cos(phi-phi_os)-(phi_os-phi_o0)*sin(phi-phi_os)+alpha*sin(phi-phi_ie+theta)
-
-        if (iter==1): y1=f;
-        if (iter==2): y2=f;
-        if (iter>2):
-            y2=f;
-            x3=x2-y2/(y2-y1)*(x2-x1);
-            y1=y2; x1=x2; x2=x3;
+def angle_difference(double angle1, double angle2):
+    # Due to the periodicity of angles, you need to handle the case where the
+    # angles wrap around - suppose theta_d is 6.28 and you are at an angles of 0.1 rad
+    #, the difference should be around 0.1, not -6.27
+    # 
+    # This brilliant method is from http://blog.lexique-du-net.com/index.php?post/Calculate-the-real-difference-between-two-angles-keeping-the-sign
+    # and the comment of user tk
+    return (angle1-angle2+pi)%(2*pi)-pi
             
-        iter+=1
-        
-        # If the value is still less than the starting angle
-        # after 20 iterations
-        if (iter>20 and x3<geo.phi_is):
-            return geo.phi_is;
-
-    if (x3 > geo.phi_is + 2*pi):
-        # Bad solution obtained, we are going to use phi_is
-        return geo.phi_is
-    elif (x3 > geo.phi_is):
-        return x3
-    else: 
+cpdef double phi_d_dd(double theta, geoVals geo):
+    """
+    At theta = theta_d, we know that phi_d_dd must be equal to phi_os+pi
+    At theta = theta_d + DELTAtheta, we know that phi_d_dd must be equal to phi_is
+    where DELTAtheta is given by DELTAtheta = phi_os+pi-phi_is
+    
+    If phi_os+pi = phi_is, there is no offset in the starting angles and 
+    phi_d_dd is always equal to phi_is
+    
+    We are going to assume that the angle varies linearly between theta = theta_d and theta = theta_d+DELTAtheta
+    
+    This is a newer method than that used in the thesis of Bell (2011)
+    """
+    cdef double _theta_d = theta_d(geo)
+    cdef double DELTAtheta = geo.phi_os + pi - geo.phi_is
+    
+    if -1e-10 <= angle_difference(theta, _theta_d) < DELTAtheta:
+        return ((geo.phi_os+pi)-geo.phi_is)/(_theta_d-(_theta_d+DELTAtheta))*(theta-(_theta_d+DELTAtheta))+geo.phi_is
+    else:
         return geo.phi_is
 
 cpdef double Area_d_dd(double theta, geoVals geo):
