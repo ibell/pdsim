@@ -835,20 +835,20 @@ class OutputTreePanel(wx.Panel):
         
     def OnRightUp(self, evt):
         pos = evt.GetPosition()
-        item, flags, col = self.tree.HitTest(pos)
+        item, flags, col = self.tree.HitTest(pos) #col is 1-based for the runs; first run has col index of 1
         #print('Flags: %s, Col:%s, Text: %s' %(flags, col, self.tree.GetItemText(item, col)))
 
         # Make a menu
         menu = wx.Menu()
         
         # If you are in a data column, allow you to remove the column
-        if col > 0:
+        if col > 0: # col == 0 for the name column
             menuitem1 = wx.MenuItem(menu, -1, 'Remove this column')
             self.Bind(wx.EVT_MENU, lambda event: self.OnRemoveCol(event, col), menuitem1)
             menu.AppendItem(menuitem1)
             
             menuitem = wx.MenuItem(menu, -1, 'Plot this simulation')
-            self.Bind(wx.EVT_MENU, lambda event: self.OnPlotSimulation(event, item, col), menuitem)
+            self.Bind(wx.EVT_MENU, lambda event: self.OnPlotSimulation(event, col), menuitem)
             menu.AppendItem(menuitem)
         
         # If 
@@ -876,7 +876,7 @@ class OutputTreePanel(wx.Panel):
             menu.AppendItem(menuitem)
              
         # If you are in a dataset row, allow you to sort based on it
-        values = [self.tree.GetItemText(item, col) for col in range(1, self.tree.ColumnCount)]
+        values = [self.tree.GetItemText(item, c) for c in range(1, self.tree.ColumnCount)]
         if any(values):
             menuitem = wx.MenuItem(menu, -1, 'Sort by this parameter')
             self.Bind(wx.EVT_MENU, lambda event: self.OnSortByRow(event, item), menuitem)
@@ -945,7 +945,7 @@ class OutputTreePanel(wx.Panel):
         frm = ArrayDisplay(val, title = title)
         frm.Show()
     
-    def OnPlotSimulation(self, event, item, col):
+    def OnPlotSimulation(self, event, col):
         """
         Plot the simulation
         """

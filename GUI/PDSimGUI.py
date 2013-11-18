@@ -704,12 +704,6 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         dlg.ShowModal()
         dlg.Destroy()
         
-    def OnOutputRuns(self, event = None):
-        
-        dlg = wx.MessageDialog(None, 'Sorry not working yet')
-        dlg.ShowModal()
-        dlg.Destroy()
-        
     def OnLoadRuns(self, event = None):
         """
         Load a HDF5 of output from PDSimGUI
