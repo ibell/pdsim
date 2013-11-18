@@ -1698,7 +1698,7 @@ class MainFrame(wx.Frame):
             
         # Check whether there are no more results to be processed and threads list is empty
         # This means the manager has completed its work - reset it
-        if self.results_list.empty() and self.WTM is not None and not self.WTM.threadsList:
+        if self.results_list.empty() and self.WTM is not None and not self.WTM.threadsList and not self.WTM.simulations:
             self.WTM = None
     
     def OnAbout(self, event = None):

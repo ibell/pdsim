@@ -199,9 +199,10 @@ class WorkerThreadManager(Thread):
         """
         dlg = wx.MessageDialog(None,"Are you sure you want to kill the current runs?",caption ="Kill Batch?",style = wx.OK|wx.CANCEL)
         if dlg.ShowModal() == wx.ID_OK:
-            message = "Aborting in progress, please wait..."
-            busy = PBI.PyBusyInfo(message, parent = None, title = "Aborting")
-            #Empty the list of simulations to run
+            #message = "Aborting in progress, please wait..."
+            #busy = PBI.PyBusyInfo(message, parent = None, title = "Aborting")
+            
+            # Empty the list of simulations to run
             self.simulations = []
             
             for _thread in self.threadsList:
@@ -209,7 +210,7 @@ class WorkerThreadManager(Thread):
                 _thread.abort()
 #                #Wait for it to finish up
 #                _thread.join()
-            del busy
+            #del busy
             
         dlg.Destroy()
         
