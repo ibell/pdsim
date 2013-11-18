@@ -54,7 +54,7 @@ class PURecip(PDSimCore):
         """
         V = self.Vdead+self.Vdisp/2*(1-cos(theta))
         dVdtheta = self.Vdisp/2*sin(theta)
-        return V,dVdtheta
+        return V, dVdtheta
     
     def Suction(self,FlowPath,**kwargs):
         if FlowPath.key_up=='A':

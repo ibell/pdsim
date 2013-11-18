@@ -726,9 +726,21 @@ class OutputTreePanel(wx.Panel):
             annotation_dict = self.tree.GetItemPyData(item)
             if annotation_dict:
                 ws.write_comment(r,0,annotation_dict['annotation'])
-            
+                
             for c in range(1,len(row)):
-                ws.write(r,c,row[c])
+                
+                # Convert to an int if possible
+                try:
+                    val = int(row[c])
+                except ValueError:
+                    # Convert to a double if possible
+                    try:
+                        val = float(row[c])
+                    except ValueError:
+                        val = row[c]
+                
+                # Write value
+                ws.write(r,c,val)
             
             r += 1
 
