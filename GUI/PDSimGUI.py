@@ -1801,8 +1801,8 @@ if __name__ == '__main__':
         Splash.Show()
         time.sleep(2.0)
     
-    frame = MainFrame() 
-    frame.Show(True) 
+    frame = MainFrame()
+    frame.Show(True)
 
     app.MainLoop()
     

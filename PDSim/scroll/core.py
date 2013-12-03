@@ -1180,7 +1180,7 @@ class Scroll(PDSimCore, _Scroll):
             # and the comment of user tk
             return (angle1-angle2+pi)%(2*pi)-pi
         
-        def IsAtMerge(eps = 0.001, eps_d1_higher = 0.003, eps_dd_higher = 0.00001):
+        def IsAtMerge(eps = 0.001, eps_d1_higher = 0.01, eps_dd_higher = 0.00001):
             pressures = [self.CVs['d1'].State.p,
                          self.CVs['d2'].State.p,
                          self.CVs['dd'].State.p]
@@ -2104,6 +2104,9 @@ class Scroll(PDSimCore, _Scroll):
         
         t = self.t[_slice]
         
+        # Remove control volumes that have no change in volume as they are not "real" control volumes
+        isrealCV_val = (np.max(self.V[:,_slice], axis = 1) - np.min(self.V[:,_slice], axis = 1))
+        
         ####################################################
         #############  Inertial force components ###########
         ####################################################
@@ -2119,17 +2122,27 @@ class Scroll(PDSimCore, _Scroll):
         # It is only the active slice
         self.forces.Fz = self.p[:,_slice]*self.V[:,_slice]/self.geo.h
         
-        #Remove all the NAN placeholders and replace them with zero values
+        # Remove all the NAN placeholders and replace them with zero values
         self.forces.Fz[np.isnan(self.forces.Fz)] = 0
-        #Sum the terms for the applied gas force from each of the control volumes
+        
+        for i, val in enumerate(isrealCV_val):
+            if not np.isnan(val) and val < 1e-14:
+                self.forces.Fz[i,:] = 0
+        
+        # Sum the terms for the applied gas force from each of the control volumes
         self.forces.summed_Fz = np.sum(self.forces.Fz, axis = 0) #kN
 #        
         # The back gas pressure on the orbiting scroll pushes the scroll back down
         # Subtract the back pressure from all the control volumes 
         self.forces.Fbackpressure = orbiting_back_pressure*self.V[:,_slice]/self.geo.h
         
-        #Remove all the NAN placeholders and replace them with zero values
+        # Remove all the NAN placeholders and replace them with zero values
         self.forces.Fbackpressure[np.isnan(self.forces.Fbackpressure)] = 0
+        
+        for i, val in enumerate(isrealCV_val):
+            if not np.isnan(val) and val < 1e-14:
+                self.forces.Fbackpressure[i,:] = 0
+        
         self.forces.summed_Fbackpressure = np.sum(self.forces.Fbackpressure, axis = 0) #kN
         
         self.forces.summed_Fz -= self.forces.summed_Fbackpressure
