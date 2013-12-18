@@ -127,7 +127,9 @@ setup(
   packages = ['PDSim','PDSim.core','PDSim.flow','PDSim.plot','PDSim.scroll','PDSim.misc','PDSim.recip','PDSim.misc.clipper'],
   cmdclass={'build_ext': build_ext},
   ext_modules = ext_module_list,
-  package_data = {'PDSim':pxd_files,'PDSim.include':glob.glob(os.path.join('CoolProp','*.h'))},
+  package_data = {'PDSim' : pxd_files,
+                  'PDSim.include' : glob.glob(os.path.join('CoolProp','*.h'))
+                  },
   include_dirs = [numpy.get_include(),CoolProp.get_include_directory()]
 )
 

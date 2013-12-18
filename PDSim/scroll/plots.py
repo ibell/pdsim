@@ -778,19 +778,25 @@ def polycentroid(xi,yi):
 def CoordsOrbScroll(theta,geo,shaveOn=True, just_involutes = False, Ndict = {}):
     shaveDelta=None
     if shaveOn==True:
-        shaveDelta=pi/2
+        shaveDelta = pi/2
     else:
-        shaveDelta=1e-16
-    (xshave,yshave)=Shave(geo,theta,shaveDelta)
+        shaveDelta = 1e-16
+        
+    if geo.phi_ie_offset > 0.0:
+        offsetDelta = geo.phi_ie_offset - pi
+    else:
+        offsetDelta = 0
+    
+    (xshave, yshave) = Shave(geo, theta, shaveDelta)
     
     Nphi = Ndict.get('phi',500)
     Narc1 = Ndict.get('arc1',100)
     Nline = Ndict.get('line',100)
     Narc2 = Ndict.get('arc2',100)
     
-    phi=np.linspace(geo.phi_is,geo.phi_ie,Nphi)
+    phi = np.linspace(geo.phi_is,geo.phi_ie + offsetDelta, Nphi)
     (x_oi,y_oi)=coords_inv(phi,geo,theta,flag="oi")
-    phi=np.linspace(geo.phi_os,geo.phi_oe-shaveDelta,Nphi)
+    phi = np.linspace(geo.phi_os,geo.phi_oe - shaveDelta + offsetDelta, Nphi)
     (x_oo,y_oo)=coords_inv(phi,geo,theta,flag="oo")
     
     xarc1=geo.xa_arc1+geo.ra_arc1*cos(np.linspace(geo.t2_arc1,geo.t1_arc1,Narc1))
@@ -813,8 +819,13 @@ def CoordsOrbScroll(theta,geo,shaveOn=True, just_involutes = False, Ndict = {}):
         x=np.r_[x_oo,x_oi[::-1]]
         y=np.r_[y_oo,y_oi[::-1]]
     else:
-        x=np.r_[x_oo,xshave,x_oi[::-1],xarc1_o,xline_o,xarc2_o]
-        y=np.r_[y_oo,yshave,y_oi[::-1],yarc1_o,yline_o,yarc2_o]
+        if shaveOn:
+            x=np.r_[x_oo,xshave,x_oi[::-1],xarc1_o,xline_o,xarc2_o]
+            y=np.r_[y_oo,yshave,y_oi[::-1],yarc1_o,yline_o,yarc2_o]
+        else:
+            x=np.r_[x_oo,x_oi[::-1],xarc1_o,xline_o,xarc2_o]
+            y=np.r_[y_oo,y_oi[::-1],yarc1_o,yline_o,yarc2_o]
+            
     
     #Output as a column vector
     x=x.reshape(len(x),1)
@@ -879,8 +890,8 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
         
         # This is the part of the fixed scroll forming the extension for
         # the offset scroll pocket
-        phi  = np.linspace(geo.phi_ie,geo.phi_ie+1.03*pi,1000)
-        x,y = coords_inv(phi,geo,0.0,'fi')
+        phi  = np.linspace(geo.phi_ie, geo.phi_ie+geo.phi_ie_offset,1000)
+        x,y = coords_inv(phi, geo, 0.0, 'fi')
         axis.plot(x,y,'k')
 #        phi  = np.linspace(geo.phi_ie,geo.phi_ie+1.02*pi,1000)
 #        x,y = coords_inv(phi,geo,theta,'oo')

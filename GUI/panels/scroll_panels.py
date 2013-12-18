@@ -384,7 +384,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
             # Add the annotated object to the list of objects
             annotated_values.append(AnnotatedValue(key, config[key], annotation, units))
             
-        self.ScrollWrapAnglesButton = wx.Button(scrolled_panel,label='View Scroll Wrap Angles')
+        self.ScrollWrapAnglesButton = wx.Button(scrolled_panel, label = 'View Scroll Wrap Angles')
         self.ScrollWrapAnglesButton.Bind(wx.EVT_BUTTON,self.OnShowWrapGeo)
         
         # Build the items and return the list of annotated GUI objects

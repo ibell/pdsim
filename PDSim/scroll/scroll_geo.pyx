@@ -179,7 +179,11 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
     y : numpy array 
         Y-coordinates of the outline of the control volume
     """
-    om = geo.phi_ie-pi/2-theta
+    om = geo.phi_ie - pi/2 - theta
+    if abs(geo.phi_ie_offset) < 1e-14:
+        symmetric = True
+    else:
+        symmetric = False
     
     if CVkey == 's1':
         phi1 = np.linspace(geo.phi_ie, geo.phi_ie-theta) #fi
@@ -189,10 +193,21 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
         return np.r_[x1,x2[::-1]],np.r_[y1,y2[::-1]]
     
     elif CVkey == 's2':
-        #  Get the coordinates from the s1 CV
-        x, y = CVcoords('s1', geo, theta)
+        if symmetric:
+            phi_oi = np.linspace(geo.phi_ie, geo.phi_ie - theta) #oi
+            phi_fo = np.linspace(geo.phi_ie - pi, geo.phi_ie - pi - theta) #fo
+        else:
+            phi_oie_actual = geo.phi_oe + geo.phi_ie_offset - pi
+            phi_oi = np.linspace(phi_oie_actual, phi_oie_actual - theta) #oi
+            
+            phi_foe_actual = geo.phi_ie + geo.phi_ie_offset-2*pi
+            phi_fo = np.linspace(phi_foe_actual, phi_foe_actual - theta) #fo
+            
+        x1, y1 = coords_inv(phi_oi, geo, theta, 'oi')
+        x2, y2 = coords_inv(phi_fo, geo, theta, 'fo')
+        
         #  Return the coordinates for the s2 CV
-        return -x + geo.ro*np.cos(om), -y + geo.ro*np.sin(om)
+        return np.r_[x1,x2[::-1]],np.r_[y1,y2[::-1]]
     
     elif CVkey.startswith('c1'):
         #  Go from c1.1 to 1
@@ -526,21 +541,21 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         xarc1 =  x_is-nx_is*r1
         yarc1 =  y_is-ny_is*r1
                 
-        geo.xa_arc2=xarc2
-        geo.ya_arc2=yarc2
-        geo.ra_arc2=r2
-        geo.t1_arc2=atan2(yarc1-yarc2,xarc1-xarc2)
-        geo.t2_arc2=atan2(y_os-yarc2,x_os-xarc2)
-        while geo.t2_arc2<geo.t1_arc2:
-            geo.t2_arc2=geo.t2_arc2+2.0*pi;
+        geo.xa_arc2 = xarc2
+        geo.ya_arc2 = yarc2
+        geo.ra_arc2 = r2
+        geo.t1_arc2 = atan2(yarc1-yarc2,xarc1-xarc2)
+        geo.t2_arc2 = atan2(y_os-yarc2,x_os-xarc2)
+        while geo.t2_arc2 < geo.t1_arc2:
+            geo.t2_arc2 = geo.t2_arc2+2.0*pi;
     
-        geo.xa_arc1=xarc1
-        geo.ya_arc1=yarc1
-        geo.ra_arc1=r1
-        geo.t2_arc1=atan2(y_is-yarc1,x_is-xarc1)
-        geo.t1_arc1=atan2(yarc2-yarc1,xarc2-xarc1)
-        while geo.t2_arc1<geo.t1_arc1:
-            geo.t2_arc1=geo.t2_arc1+2.0*pi;
+        geo.xa_arc1 = xarc1
+        geo.ya_arc1 = yarc1
+        geo.ra_arc1 = r1
+        geo.t2_arc1 = atan2(y_is-yarc1,x_is-xarc1)
+        geo.t1_arc1 = atan2(yarc2-yarc1,xarc2-xarc1)
+        while geo.t2_arc1 < geo.t1_arc1:
+            geo.t2_arc1 = geo.t2_arc1+2.0*pi;
         
         """ 
         line given by y=m*t+b with one element at the intersection
