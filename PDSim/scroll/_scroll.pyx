@@ -113,7 +113,7 @@ cdef class _Scroll(object):
             return 0.0
             
         
-    cpdef double calcHT(self, double theta, bytes key, double HTC_tune, double dT_dphi, double phim):
+    cpdef double calcHT(self, double theta, bytes key, double HTC_tune, double dT_dphi, double phim) except *: 
         cdef scroll_geo.HTAnglesClass angles
         cdef double hc,Q_outer_wrap,Q_inner_wrap,Q_d1,Q_d2,Q_dd,T_CV,T_scroll
         
@@ -143,7 +143,7 @@ cdef class _Scroll(object):
                                                    self.geo.rb, 
                                                    angles.phi_1_i, 
                                                    angles.phi_2_i, 
-                                                   self.geo.phi_i0, 
+                                                   self.geo.phi_fi0, 
                                                    T_scroll,
                                                    T_CV, 
                                                    dT_dphi, 
@@ -156,7 +156,7 @@ cdef class _Scroll(object):
                                                    self.geo.rb, 
                                                    angles.phi_1_o, 
                                                    angles.phi_2_o, 
-                                                   self.geo.phi_o0,
+                                                   self.geo.phi_oo0,
                                                    T_scroll,
                                                    T_CV, 
                                                    dT_dphi, 

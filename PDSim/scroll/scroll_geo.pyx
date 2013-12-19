@@ -135,8 +135,11 @@ cdef class HTAnglesClass(object):
         pass
 
 #This is a list of all the members in geoVals
-geoValsvarlist=['h','phi_i0','phi_is','phi_ie','phi_e',
-                'phi_o0','ro','rb','phi_os','phi_oe','t',
+geoValsvarlist=['h','ro','rb','t',
+                'phi_fi0','phi_fis','phi_fie',
+                'phi_fo0','phi_fos','phi_foe',
+                'phi_oi0','phi_ois','phi_oie',
+                'phi_oo0','phi_oos','phi_ooe',
                 'xa_arc1','ya_arc1','ra_arc1','t1_arc1','t2_arc1',
                 'xa_arc2','ya_arc2','ra_arc2','t1_arc2','t2_arc2',
                 'b_line', 't1_line', 't2_line', 'm_line',
@@ -167,6 +170,18 @@ cdef class geoVals:
             s+=atr+': '+str(getattr(self,atr))+'\n'
         return s
         
+    cpdef bint is_symmetric(self):
+        """
+        Returns true if all the angles for the fixed scroll are the same as for the orbiting scroll
+        """
+        return (abs(self.phi_fi0-self.phi_oi0) < 1e-14
+                and abs(self.phi_fis-self.phi_ois) < 1e-14
+                and abs(self.phi_fie-self.phi_oie) < 1e-14
+                and abs(self.phi_fo0-self.phi_oo0) < 1e-14
+                and abs(self.phi_fos-self.phi_oos) < 1e-14
+                and abs(self.phi_foe-self.phi_ooe) < 1e-14
+                )
+        
 cpdef CVcoords(CVkey, geoVals geo, double theta):
     """ 
     Return a tuple of numpy arrays for x,y coordinates for the lines which determine the 
@@ -179,28 +194,31 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
     y : numpy array 
         Y-coordinates of the outline of the control volume
     """
-    om = geo.phi_ie - pi/2 - theta
+    if geo.is_symmetric():
+        om = geo.phi_fie - pi/2 - theta
+    else:
+        raise ValueError('not supported for asymmetric')
     if abs(geo.phi_ie_offset) < 1e-14:
         symmetric = True
     else:
         symmetric = False
     
     if CVkey == 's1':
-        phi1 = np.linspace(geo.phi_ie, geo.phi_ie-theta) #fi
-        phi2 = np.linspace(geo.phi_ie-pi, geo.phi_ie-pi-theta) #oo
+        phi1 = np.linspace(geo.phi_fie, geo.phi_fie-theta) #fi
+        phi2 = np.linspace(geo.phi_ooe-pi, geo.phi_ooe-pi-theta) #oo
         x1, y1 = coords_inv(phi1, geo, theta, 'fi')
         x2, y2 = coords_inv(phi2, geo, theta, 'oo')
         return np.r_[x1,x2[::-1]],np.r_[y1,y2[::-1]]
     
     elif CVkey == 's2':
         if symmetric:
-            phi_oi = np.linspace(geo.phi_ie, geo.phi_ie - theta) #oi
-            phi_fo = np.linspace(geo.phi_ie - pi, geo.phi_ie - pi - theta) #fo
+            phi_oi = np.linspace(geo.phi_oie, geo.phi_oie - theta) #oi
+            phi_fo = np.linspace(geo.phi_foe - pi, geo.phi_foe - pi - theta) #fo
         else:
-            phi_oie_actual = geo.phi_oe + geo.phi_ie_offset - pi
+            phi_oie_actual = geo.phi_ooe + geo.phi_ie_offset - pi
             phi_oi = np.linspace(phi_oie_actual, phi_oie_actual - theta) #oi
             
-            phi_foe_actual = geo.phi_ie + geo.phi_ie_offset-2*pi
+            phi_foe_actual = geo.phi_fie + geo.phi_ie_offset-2*pi
             phi_fo = np.linspace(phi_foe_actual, phi_foe_actual - theta) #fo
             
         x1, y1 = coords_inv(phi_oi, geo, theta, 'oi')
@@ -218,9 +236,9 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
         if alpha > Nc:
             raise ValueError("c1.{i:d} is an invalid c1.x chamber, currently {Nc:d} pairs in existence".format(i=alpha, Nc = Nc))
         else:
-            phi = np.linspace(geo.phi_ie - theta - 2*pi*alpha, geo.phi_ie-theta-2*pi*(alpha-1), 1000)
+            phi = np.linspace(geo.phi_fie - theta - 2*pi*alpha, geo.phi_fie-theta-2*pi*(alpha-1), 1000)
             (xi, yi) = coords_inv(phi, geo, theta, 'fi')
-            phi = np.linspace(geo.phi_ie - theta - 2*pi*(alpha-1)-pi, geo.phi_ie-theta-2*pi*alpha-pi, 1000)
+            phi = np.linspace(geo.phi_fie - theta - 2*pi*(alpha-1)-pi, geo.phi_fie-theta-2*pi*alpha-pi, 1000)
             (xo, yo) = coords_inv(phi, geo, theta, 'oo')
             return np.r_[xi,xo], np.r_[yi,yo]
     
@@ -235,9 +253,9 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
     elif CVkey == 'd1':
         Nc = getNc(theta,geo)
         
-        phi = np.linspace(geo.phi_os+pi, geo.phi_ie-theta-2.0*pi*Nc, 1000)
+        phi = np.linspace(geo.phi_oos+pi, geo.phi_fie-theta-2.0*pi*Nc, 1000)
         (xi,yi) = coords_inv(phi, geo, theta, "fi")
-        phi = np.linspace(geo.phi_ie-theta-2.0*pi*Nc-pi, geo.phi_os, 1000)
+        phi = np.linspace(geo.phi_fie-theta-2.0*pi*Nc-pi, geo.phi_oos, 1000)
         (xo,yo) = coords_inv(phi, geo, theta, "oo")
 #        plt.plot(np.r_[xi,xo], np.r_[yi,yo])
 #        plt.show()
@@ -266,7 +284,7 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
            -geo.xa_arc2-geo.ra_arc2*np.cos(t)+geo.ro*cos(om),
            -geo.ya_arc2-geo.ra_arc2*np.sin(t)+geo.ro*sin(om)) 
         
-        phi=np.linspace(geo.phi_is, geo.phi_os+pi, 300)
+        phi=np.linspace(geo.phi_fis, geo.phi_fos+pi, 300)
         (x_finv,y_finv)=coords_inv(phi,geo,theta,'fi')
         (x_oinv,y_oinv)=coords_inv(phi,geo,theta,'oi')
         
@@ -295,12 +313,18 @@ cpdef double theta_d(geoVals geo):
     ======  =======================================
     
     """
-    N_c_max=floor((geo.phi_ie-geo.phi_os-pi)/(2*pi))
-    return geo.phi_ie-geo.phi_os-2*pi*N_c_max-pi
+    if geo.is_symmetric():
+        N_c_max = floor((geo.phi_fie-geo.phi_oos-pi)/(2*pi))
+        return geo.phi_fie-geo.phi_oos-2*pi*N_c_max-pi
+    else:
+        raise ValueError('theta_d not supported for asymmetric')
 
 cpdef nC_Max(geo):
-    return int(floor((geo.phi_ie-geo.phi_os-pi)/(2.0*pi)))
-
+    if geo.is_symmetric():
+        return int(floor((geo.phi_fie-geo.phi_oos-pi)/(2.0*pi)))
+    else:
+        raise ValueError('nC_max not supported for asymmetric')
+        
 cpdef int getNc(double theta, geoVals geo):
     """ 
     The number of pairs of compression chambers in existence at a given 
@@ -316,8 +340,10 @@ cpdef int getNc(double theta, geoVals geo):
             Number of pairs of compressions chambers
             
     """
-     
-    return int(floor((geo.phi_ie-theta-geo.phi_os-pi)/(2*pi)))
+    if geo.is_symmetric():
+        return int(floor((geo.phi_fie-theta-geo.phi_oos-pi)/(2*pi)))
+    else:
+        raise ValueError('getNc not supported for asymmetric')
     
 def polyarea(x,y):
     N=len(x)
@@ -346,25 +372,22 @@ cpdef tuple _coords_inv_np(np.ndarray[np.float_t] phi, geoVals geo,double theta,
     """
     Internal function that does the calculation if phi is definitely a 1D numpy vector
     """
-    phi_i0=geo.phi_i0
-    phi_o0=geo.phi_o0
-    phi_ie=geo.phi_ie
-    rb=geo.rb
-    ro=rb*(pi-phi_i0+phi_o0)
-    om=phi_ie-theta+3.0*pi/2.0
+    rb = geo.rb
+    ro = rb*(pi - geo.phi_fi0 + geo.phi_oo0)
+    om = geo.phi_fie - theta + 3.0*pi/2.0
 
     if flag=="fi":
-        x = rb*np.cos(phi)+rb*(phi-phi_i0)*np.sin(phi)
-        y = rb*np.sin(phi)-rb*(phi-phi_i0)*np.cos(phi)
+        x = rb*np.cos(phi)+rb*(phi-geo.phi_fi0)*np.sin(phi)
+        y = rb*np.sin(phi)-rb*(phi-geo.phi_fi0)*np.cos(phi)
     elif flag=="fo":
-        x = rb*np.cos(phi)+rb*(phi-phi_o0)*np.sin(phi)
-        y = rb*np.sin(phi)-rb*(phi-phi_o0)*np.cos(phi)
+        x = rb*np.cos(phi)+rb*(phi-geo.phi_fo0)*np.sin(phi)
+        y = rb*np.sin(phi)-rb*(phi-geo.phi_fo0)*np.cos(phi)
     elif flag=="oi":
-        x = -rb*np.cos(phi)-rb*(phi-phi_i0)*np.sin(phi)+ro*np.cos(om)
-        y = -rb*np.sin(phi)+rb*(phi-phi_i0)*np.cos(phi)+ro*np.sin(om)
+        x = -rb*np.cos(phi)-rb*(phi-geo.phi_oi0)*np.sin(phi)+ro*np.cos(om)
+        y = -rb*np.sin(phi)+rb*(phi-geo.phi_oi0)*np.cos(phi)+ro*np.sin(om)
     elif flag=="oo":
-        x = -rb*np.cos(phi)-rb*(phi-phi_o0)*np.sin(phi)+ro*np.cos(om)
-        y = -rb*np.sin(phi)+rb*(phi-phi_o0)*np.cos(phi)+ro*np.sin(om)
+        x = -rb*np.cos(phi)-rb*(phi-geo.phi_oo0)*np.sin(phi)+ro*np.cos(om)
+        y = -rb*np.sin(phi)+rb*(phi-geo.phi_oo0)*np.cos(phi)+ro*np.sin(om)
     else:
         raise ValueError('flag not valid')
     return (x,y)
@@ -373,25 +396,23 @@ cpdef tuple _coords_inv_d(double phi, geoVals geo,double theta, flag=""):
     """
     Internal function that does the calculation if phi is a double variable 
     """
-    phi_i0=geo.phi_i0
-    phi_o0=geo.phi_o0
-    phi_ie=geo.phi_ie
-    rb=geo.rb
-    ro=rb*(pi-phi_i0+phi_o0)
-    om=phi_ie-theta+3.0*pi/2.0
+
+    rb = geo.rb
+    ro = rb*(pi - geo.phi_fi0 + geo.phi_oo0)
+    om = geo.phi_fie - theta + 3.0*pi/2.0
 
     if flag=="fi":
-        x = rb*cos(phi)+rb*(phi-phi_i0)*sin(phi)
-        y = rb*sin(phi)-rb*(phi-phi_i0)*cos(phi)
+        x = rb*cos(phi)+rb*(phi-geo.phi_fi0)*sin(phi)
+        y = rb*sin(phi)-rb*(phi-geo.phi_fi0)*cos(phi)
     elif flag=="fo":
-        x = rb*cos(phi)+rb*(phi-phi_o0)*sin(phi)
-        y = rb*sin(phi)-rb*(phi-phi_o0)*cos(phi)
+        x = rb*cos(phi)+rb*(phi-geo.phi_fo0)*sin(phi)
+        y = rb*sin(phi)-rb*(phi-geo.phi_fo0)*cos(phi)
     elif flag=="oi":
-        x = -rb*cos(phi)-rb*(phi-phi_i0)*sin(phi)+ro*cos(om)
-        y = -rb*sin(phi)+rb*(phi-phi_i0)*cos(phi)+ro*sin(om)
+        x = -rb*cos(phi)-rb*(phi-geo.phi_oi0)*sin(phi)+ro*cos(om)
+        y = -rb*sin(phi)+rb*(phi-geo.phi_oi0)*cos(phi)+ro*sin(om)
     elif flag=="oo":
-        x = -rb*cos(phi)-rb*(phi-phi_o0)*sin(phi)+ro*cos(om)
-        y = -rb*sin(phi)+rb*(phi-phi_o0)*cos(phi)+ro*sin(om)
+        x = -rb*cos(phi)-rb*(phi-geo.phi_oo0)*sin(phi)+ro*cos(om)
+        y = -rb*sin(phi)+rb*(phi-geo.phi_oo0)*cos(phi)+ro*sin(om)
     else:
         raise ValueError('flag not valid')
     return (x,y)    
@@ -444,9 +465,6 @@ def coords_norm(phi_vec,geo,theta,flag="fi"):
         (nx,ny) : tuple of unit normal coordinates pointing towards scroll wrap
     """
     
-    phi_i0=geo.phi_i0   
-    phi_o0=geo.phi_o0
-    phi_ie=geo.phi_ie
     rb=geo.rb
     if not type(phi_vec) is np.ndarray:
         if type(phi_vec) is list:
@@ -499,30 +517,30 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
     """
     
     #Recalculate the orbiting radius
-    geo.ro=geo.rb*(pi-geo.phi_i0+geo.phi_o0)
+    geo.ro = geo.rb*(pi-geo.phi_fi0+geo.phi_oo0)
     if Type == 'Sanden':
         geo.x0_wall=0.0
         geo.y0_wall=0.0
         geo.r_wall=0.065
         setDiscGeo(geo,Type='ArcLineArc',r2=0.003178893902,r1=0.008796248080)
     elif Type == '2Arc':
-        (x_is,y_is) = coords_inv(geo.phi_is,geo,0,'fi')
-        (x_os,y_os) = coords_inv(geo.phi_os,geo,0,'fo')
-        (nx_is,ny_is) = coords_norm(geo.phi_is,geo,0,'fi')
-        (nx_os,ny_os) = coords_norm(geo.phi_os,geo,0,'fo')
+        (x_is,y_is) = coords_inv(geo.phi_fis,geo,0,'fi')
+        (x_os,y_os) = coords_inv(geo.phi_fos,geo,0,'fo')
+        (nx_is,ny_is) = coords_norm(geo.phi_fis,geo,0,'fi')
+        (nx_os,ny_os) = coords_norm(geo.phi_fos,geo,0,'fo')
         dx=x_is-x_os
         dy=y_is-y_os
         
         r2max=0
-        a=cos(geo.phi_os-geo.phi_is)+1.0
-        b=geo.ro*a-dx*(sin(geo.phi_os)-sin(geo.phi_is))+dy*(cos(geo.phi_os)-cos(geo.phi_is))
-        c=1.0/2.0*(2.0*dx*sin(geo.phi_is)*geo.ro-2.0*dy*cos(geo.phi_is)*geo.ro-dy**2-dx**2)
-        if geo.phi_os-(geo.phi_is-pi)>1e-8:
+        a=cos(geo.phi_fos-geo.phi_fis)+1.0
+        b=geo.ro*a-dx*(sin(geo.phi_fos)-sin(geo.phi_fis))+dy*(cos(geo.phi_fos)-cos(geo.phi_fis))
+        c=1.0/2.0*(2.0*dx*sin(geo.phi_fis)*geo.ro-2.0*dy*cos(geo.phi_fis)*geo.ro-dy**2-dx**2)
+        if geo.phi_fos-(geo.phi_fis-pi)>1e-8:
             r2max=(-b+sqrt(b**2-4.0*a*c))/(2.0*a)
-        elif abs((geo.phi_os)-(geo.phi_is-pi)) < 1e-8:
+        elif abs((geo.phi_fos)-(geo.phi_fis-pi)) < 1e-8:
             r2max=-c/b
         else:
-            raise ValueError('Error, must enforce phi_os > phi_is-pi to avoid scroll crashing :: phi_os %.16f, phi_is-pi %.16f' %(geo.phi_os,geo.phi_is-pi))
+            raise ValueError('Error, must enforce phi_fos > phi_fis-pi to avoid scroll crashing :: phi_os %.16f, phi_is-pi %.16f' %(geo.phi_oos,geo.phi_fis-pi))
             
         if type(r2) is not float and r2=='PMP':
             r2=r2max
@@ -533,8 +551,8 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         xarc2 =  x_os+nx_os*r2
         yarc2 =  y_os+ny_os*r2
         
-        r1=((1.0/2*dy**2+1.0/2*dx**2+r2*dx*sin(geo.phi_os)-r2*dy*cos(geo.phi_os))
-               /(r2*cos(geo.phi_os-geo.phi_is)+dx*sin(geo.phi_is)-dy*cos(geo.phi_is)+r2))
+        r1=((1.0/2*dy**2+1.0/2*dx**2+r2*dx*sin(geo.phi_fos)-r2*dy*cos(geo.phi_fos))
+               /(r2*cos(geo.phi_fos-geo.phi_fis)+dx*sin(geo.phi_fis)-dy*cos(geo.phi_fis)+r2))
         
         
         ## Negative sign since you want the outward pointing unit normal vector
@@ -571,28 +589,28 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         """ 
         Fit the wall to the chamber
         """
-        geo.x0_wall=geo.ro/2.0*cos(geo.phi_ie-pi/2-pi)
-        geo.y0_wall=geo.ro/2.0*sin(geo.phi_ie-pi/2-pi)
-        (x,y)=coords_inv(geo.phi_ie,geo,pi,'fo')
+        geo.x0_wall=geo.ro/2.0*cos(geo.phi_fie-pi/2-pi)
+        geo.y0_wall=geo.ro/2.0*sin(geo.phi_fie-pi/2-pi)
+        (x,y)=coords_inv(geo.phi_fie,geo,pi,'fo')
         geo.r_wall=1.03*sqrt((geo.x0_wall-x)**2+(geo.y0_wall-y)**2)
     elif Type=='ArcLineArc':
-        (x_is,y_is) = coords_inv(geo.phi_is,geo,0,'fi')
-        (x_os,y_os) = coords_inv(geo.phi_os,geo,0,'fo')
-        (nx_is,ny_is) = coords_norm(geo.phi_is,geo,0,'fi')
-        (nx_os,ny_os) = coords_norm(geo.phi_os,geo,0,'fo')
+        (x_is,y_is) = coords_inv(geo.phi_fis,geo,0,'fi')
+        (x_os,y_os) = coords_inv(geo.phi_fos,geo,0,'fo')
+        (nx_is,ny_is) = coords_norm(geo.phi_fis,geo,0,'fi')
+        (nx_os,ny_os) = coords_norm(geo.phi_fos,geo,0,'fo')
         dx=x_is-x_os
         dy=y_is-y_os
         
         r2max=0
-        a=cos(geo.phi_os-geo.phi_is)+1.0
-        b=geo.ro*a-dx*(sin(geo.phi_os)-sin(geo.phi_is))+dy*(cos(geo.phi_os)-cos(geo.phi_is))
-        c=1.0/2.0*(2.0*dx*sin(geo.phi_is)*geo.ro-2.0*dy*cos(geo.phi_is)*geo.ro-dy**2-dx**2)
-        if geo.phi_os-(geo.phi_is-pi)>1e-8:
+        a=cos(geo.phi_fos-geo.phi_fis)+1.0
+        b=geo.ro*a-dx*(sin(geo.phi_fos)-sin(geo.phi_fis))+dy*(cos(geo.phi_fos)-cos(geo.phi_fis))
+        c=1.0/2.0*(2.0*dx*sin(geo.phi_fis)*geo.ro-2.0*dy*cos(geo.phi_fis)*geo.ro-dy**2-dx**2)
+        if geo.phi_fos-(geo.phi_fis-pi)>1e-8:
             r2max=(-b+sqrt(b**2-4.0*a*c))/(2.0*a)
-        elif geo.phi_os-(geo.phi_is-pi)<1e-8:
+        elif geo.phi_fos-(geo.phi_fis-pi)<1e-8:
             r2max=-c/b
         else:
-            print 'error with starting angles phi_os %.16f phi_is-pi %.16f' %(geo.phi_os,geo.phi_is-pi)
+            print 'error with starting angles phi_os %.16f phi_is-pi %.16f' %(geo.phi_os,geo.phi_fis-pi)
             
         if type(r2) is not float and r2=='PMP':
             r2=r2max
@@ -655,9 +673,9 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         """ 
         Fit the wall to the chamber
         """
-        geo.x0_wall=geo.ro/2.0*cos(geo.phi_ie-pi/2-pi)
-        geo.y0_wall=geo.ro/2.0*sin(geo.phi_ie-pi/2-pi)
-        (x,y)=coords_inv(geo.phi_ie,geo,pi,'fo')
+        geo.x0_wall=geo.ro/2.0*cos(geo.phi_fie-pi/2-pi)
+        geo.y0_wall=geo.ro/2.0*sin(geo.phi_fie-pi/2-pi)
+        (x,y)=coords_inv(geo.phi_fie,geo,pi,'fo')
         geo.r_wall=1.03*sqrt((geo.x0_wall-x)**2+(geo.y0_wall-y)**2)
         
     else:
@@ -675,9 +693,9 @@ cpdef tuple scroll_wrap(geoVals geo):
     """
         
     # Initial angle of the midpoint of the scroll wrap
-    phi_0 = (geo.phi_i0 + geo.phi_o0)/2
+    phi_0 = (geo.phi_oi0 + geo.phi_oo0)/2
     # Ending angle of the centerline of the scroll wrap
-    phi_e = (geo.phi_ie + geo.phi_oe)/2
+    phi_e = (geo.phi_oie + geo.phi_ooe)/2
     
     #print 'h', geo.h
     #print 'rb', geo.rb
@@ -798,11 +816,11 @@ cpdef double radial_leakage_area(double theta, geoVals geo, long key1Index, long
     #Get the bounding angles
     radial_leakage_angles(theta,geo,key1Index,key2Index,&phi_min,&phi_max)
     if location == UP:
-        phi_0 = geo.phi_i0
+        phi_0 = geo.phi_fi0
     elif location == DOWN:
-        phi_0 = geo.phi_o0
+        phi_0 = geo.phi_oo0
     elif location == MID:
-        phi_0 = (geo.phi_i0+geo.phi_o0)/2
+        phi_0 = (geo.phi_fi0+geo.phi_oo0)/2
     else:
         raise ValueError
     A = geo.delta_radial*geo.rb*((phi_max**2-phi_min**2)/2-phi_0*(phi_max-phi_min))
@@ -838,27 +856,27 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
     
     #These are always in existence
     if matchpair(key1,key2,keyIs2,keyIsa) or matchpair(key1,key2,keyIs1,keyIsa):
-            phi_max = geo.phi_ie
-            phi_min = max2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0)
+            phi_max = geo.phi_fie
+            phi_min = max2(geo.phi_fie - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0)
     #suction chambers only in contact with each other beyond theta = pi
     elif matchpair(key1,key2,keyIs1,keyIs2):
         if theta > pi:
-            phi_max = phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0
-            phi_min = geo.phi_ie - theta
+            phi_max = phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0
+            phi_min = geo.phi_fie - theta
             #Ensure that at the very least phi_max is greater than  phi_min
             phi_max = max2(phi_min, phi_max)
         else:
             #They are the same so there is no flow area
-            phi_max = geo.phi_ie - theta + 0.0000001
-            phi_min = geo.phi_ie - theta
+            phi_max = geo.phi_fie - theta + 0.0000001
+            phi_min = geo.phi_fie - theta
     
     elif Nc == 0 and phi_max>1e90:
         if matchpair(key1,key2,keyId2,keyIs1) or matchpair(key1,key2,keyId1,keyIs2):
-                phi_max = geo.phi_ie - theta
-                phi_min = geo.phi_ie - theta - pi
+                phi_max = geo.phi_fie - theta
+                phi_min = geo.phi_fie - theta - pi
         elif matchpair(key1, key2, keyId1, keyId2):
-                phi_max = geo.phi_ie - theta - pi
-                phi_min = geo.phi_is
+                phi_max = geo.phi_fie - theta - pi
+                phi_min = geo.phi_fis
         elif theta > theta_d(geo):
             print 'theta = ', theta,theta_d(geo)
             print 'Nc: {Nc:d}'.format(Nc=Nc)
@@ -870,18 +888,18 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
                     phi_min = 0
                     phi_max = 0
                 else:
-                    phi_max = max2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
-                    phi_min = min2(geo.phi_ie - theta, phi_s_sa(theta,geo)+geo.phi_o0-geo.phi_i0 )
+                    phi_max = max2(geo.phi_fie - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0 )
+                    phi_min = min2(geo.phi_fie - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0 )
         elif matchpair(key1,key2,get_compression_chamber_index(2,1),keyIs1) or matchpair(key1,key2,get_compression_chamber_index(1,1),keyIs2):
                 #TODO: this could be improved to take into account the non-perfect separation between s-sa and phi_ie
-                phi_max = geo.phi_ie - theta #this is where the change needs to be made
-                phi_min = geo.phi_ie - theta - pi
+                phi_max = geo.phi_fie - theta #this is where the change needs to be made
+                phi_min = geo.phi_fie - theta - pi
         elif matchpair(key1,key2,get_compression_chamber_index(1,1),get_compression_chamber_index(2,1)):
-                phi_max = geo.phi_ie - theta - pi
-                phi_min = geo.phi_ie - theta - 2*pi
+                phi_max = geo.phi_fie - theta - pi
+                phi_min = geo.phi_fie - theta - 2*pi
         elif Nc == 1 and (matchpair(key1,key2,get_compression_chamber_index(2,1),keyId1) or matchpair(key1,key2,get_compression_chamber_index(1,1),keyId2)):
-                phi_max = geo.phi_ie - theta - 2*pi
-                phi_min = geo.phi_is
+                phi_max = geo.phi_fie - theta - 2*pi
+                phi_min = geo.phi_fis
         elif Nc == 1 and theta > theta_d(geo):
             print 'Nc: {Nc:d} key1: {k1:s} key2: {k2:s} theta: {theta:f} theta_d: {theta_d:f}'.format(Nc=Nc,k1=key1,k2=key2,theta = theta,theta_d = theta_d(geo))
             raise KeyError
@@ -891,17 +909,17 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
         for alpha in range(2, Nc+1):
             if (matchpair(key1,key2,get_compression_chamber_index(2,alpha),get_compression_chamber_index(1,alpha-1)) or
                 matchpair(key1,key2,get_compression_chamber_index(1,alpha),get_compression_chamber_index(2,alpha-1))):
-                phi_max = geo.phi_ie - theta - 2*pi*(alpha-1)
-                phi_min = geo.phi_ie - theta - 2*pi*(alpha-1) - pi
+                phi_max = geo.phi_fie - theta - 2*pi*(alpha-1)
+                phi_min = geo.phi_fie - theta - 2*pi*(alpha-1) - pi
                 break
             elif matchpair(key1,key2,get_compression_chamber_index(2,alpha),get_compression_chamber_index(1,alpha)):
-                phi_max = geo.phi_ie - theta - 2*pi*(alpha-1) - pi
-                phi_min = geo.phi_ie - theta - 2*pi*(alpha)
+                phi_max = geo.phi_fie - theta - 2*pi*(alpha-1) - pi
+                phi_min = geo.phi_fie - theta - 2*pi*(alpha)
                 break
         if phi_max > 1e90:
             if matchpair(key1,key2,get_compression_chamber_index(2,Nc),keyId1) or matchpair(key1,key2,get_compression_chamber_index(1,Nc),keyId2):
-                phi_max = geo.phi_ie - theta - 2*pi*Nc
-                phi_min = geo.phi_is
+                phi_max = geo.phi_fie - theta - 2*pi*Nc
+                phi_min = geo.phi_fis
 
     if phi_min > phi_max:
         raise ValueError ('For the keys ('+key1+','+key2+') @theta = '+str(theta)+' max < min (error because '+str(phi_max)+' < '+str(phi_min)+')')
@@ -1035,27 +1053,27 @@ cpdef HTAnglesClass HT_angles(double theta, geoVals geo, bytes key):
     angles = HTAnglesClass()
     ## TODO: Offset considerations to the angles
     if key == 's1' or key == 's2':
-        angles.phi_1_i = geo.phi_ie
-        angles.phi_2_i = geo.phi_ie-theta
+        angles.phi_1_i = geo.phi_fie
+        angles.phi_2_i = geo.phi_fie-theta
         angles.phi_1_o = phi_s_sa(theta, geo)
-        angles.phi_2_o = geo.phi_oe - geo.phi_o0 - pi - theta
+        angles.phi_2_o = geo.phi_ooe - geo.phi_oo0 - pi - theta
         return angles
     elif key.startswith('c1') or key.startswith('c2'):
         alpha = int(key.split('.')[1])
         if alpha > getNc(theta,geo):
             raise KeyError('CV '+key+' does not exist')
         else:
-            angles.phi_1_i = geo.phi_ie - theta - (alpha-1)*2*pi 
-            angles.phi_2_i = geo.phi_ie - theta - alpha*2*pi
-            angles.phi_1_o = geo.phi_oe - pi - theta - (alpha-1)*2*pi
-            angles.phi_2_o = geo.phi_oe - geo.phi_o0 - pi - theta - alpha*2*pi
+            angles.phi_1_i = geo.phi_fie - theta - (alpha-1)*2*pi 
+            angles.phi_2_i = geo.phi_fie - theta - alpha*2*pi
+            angles.phi_1_o = geo.phi_ooe - pi - theta - (alpha-1)*2*pi
+            angles.phi_2_o = geo.phi_ooe - geo.phi_oo0 - pi - theta - alpha*2*pi
             return angles
     elif key == 'd1' or key == 'd2':
         alpha = getNc(theta,geo)+1
-        angles.phi_1_i = geo.phi_ie - theta - geo.phi_i0 - (alpha-1)*2*pi
-        angles.phi_2_i = geo.phi_is
-        angles.phi_1_o = geo.phi_oe - pi - theta - (alpha-1)*2*pi
-        angles.phi_2_o = geo.phi_os
+        angles.phi_1_i = geo.phi_fie - theta - geo.phi_fi0 - (alpha-1)*2*pi
+        angles.phi_2_i = geo.phi_fis
+        angles.phi_1_o = geo.phi_ooe - pi - theta - (alpha-1)*2*pi
+        angles.phi_2_o = geo.phi_oos
         return angles
     else:
         return None
@@ -1131,13 +1149,8 @@ cpdef tuple SA(double theta, geoVals geo, bint poly=False, bint use_offset = Tru
     """
     h=geo.h
     rb=geo.rb 
-    phi_ie=geo.phi_ie 
-    phi_o0=geo.phi_o0
-    phi_oe=geo.phi_oe
-    phi_i0=geo.phi_i0
-    oe=geo.phi_oe
-    ro=rb*(pi-phi_i0+phi_o0)
-    t= rb*(phi_i0-phi_o0)
+    ro=rb*(pi - geo.phi_fi0 + geo.phi_fo0)
+    t= rb*(geo.phi_fi0 - geo.phi_oo0)
     pt = 2*pi*rb
     
     if not use_offset:
@@ -1146,16 +1159,17 @@ cpdef tuple SA(double theta, geoVals geo, bint poly=False, bint use_offset = Tru
         phi_ie_offset = geo.phi_ie_offset
     
     if abs(phi_ie_offset) < 1e-12:
-        b=(-phi_o0+phi_ie-pi)
-        D=ro/rb*((phi_i0-phi_ie)*sin(theta)-cos(theta)+1)/(phi_ie-phi_i0)
+        b=(-geo.phi_oo0+geo.phi_fie-pi)
+        D=ro/rb*((geo.phi_fi0-geo.phi_fie)*sin(theta)-cos(theta)+1)/(geo.phi_fie-geo.phi_fi0)
         B=1.0/2.0*(sqrt(b*b-4.0*D)-b)
-        B_prime=-ro/rb*(sin(theta)+(phi_i0-phi_ie)*cos(theta))/((phi_ie-phi_i0)*sqrt(b*b-4*D))
-        V_Isa=h*rb**2/6.0*(pow(phi_oe-phi_o0,3)-pow(phi_ie-pi+B-phi_o0,3))
+        B_prime=-ro/rb*(sin(theta)+(geo.phi_fi0-geo.phi_fie)*cos(theta))/((geo.phi_fie-geo.phi_fi0)*sqrt(b*b-4*D))
+        V_Isa=h*rb**2/6.0*(pow(geo.phi_ooe-geo.phi_oo0,3)-pow(geo.phi_fie-pi+B-geo.phi_fo0,3))
         
         V=h*pi*geo.r_wall**2-2*V_Isa
-        dV=h*rb**2*pow(phi_ie-pi+B-phi_o0,2)*B_prime
+        dV=h*rb**2*pow(geo.phi_fie-pi+B-geo.phi_oo0,2)*B_prime
     
     else:
+        raise ValueError('not supported for asymmetric')
         """
         The suction area is a lot smaller in the case of an offset 
         scroll wrap because it is only the part around where the scroll
@@ -1217,10 +1231,10 @@ cpdef dict SA_forces(double theta, geoVals geo, bint poly = False, bint use_offs
     
     h=geo.h
     rb=geo.rb 
-    phi_ie=geo.phi_ie 
-    phi_o0=geo.phi_o0
-    phi_oe=geo.phi_oe
-    phi_i0=geo.phi_i0
+    phi_ie=geo.phi_fie
+    phi_o0=geo.phi_oo0
+    phi_oe=geo.phi_ooe
+    phi_i0=geo.phi_fi0
     ro=rb*(pi-phi_i0+phi_o0)
     t= rb*(phi_i0-phi_o0)
 
@@ -1273,6 +1287,7 @@ cpdef dict SA_forces(double theta, geoVals geo, bint poly = False, bint use_offs
     
     return exact_dict
 
+@cython.cdivision(True)
 cpdef tuple S1(double theta, geoVals geo, bint poly=False, double theta_0_volume=1e-9, bint use_offset = True):
     """
     Volume and derivative of volume of S1 chamber
@@ -1303,12 +1318,13 @@ cpdef tuple S1(double theta, geoVals geo, bint poly=False, double theta_0_volume
     V_poly : float (only if ``poly = True``)
     """
         
-    h=geo.h
-    rb=geo.rb 
-    phi_ie=geo.phi_ie
-    phi_o0=geo.phi_o0
-    phi_i0=geo.phi_i0
-    ro=rb*(pi-phi_i0+phi_o0)
+    h = geo.h
+    rb = geo.rb 
+    phi_fie = geo.phi_fie
+    phi_ooe = geo.phi_ooe
+    phi_oo0 = geo.phi_oo0
+    phi_fi0 = geo.phi_fi0
+    ro = rb*(pi - phi_fi0 + phi_oo0)
 
     if not use_offset:
         phi_ie_offset = 0.0
@@ -1320,15 +1336,15 @@ cpdef tuple S1(double theta, geoVals geo, bint poly=False, double theta_0_volume
         # older method which seems to work pretty well, though imperfectly.
         # Good enough for now
         
-        b = (-phi_o0+phi_ie+phi_ie_offset-pi)    
+        b = (-phi_oo0+phi_fie+phi_ie_offset-pi)    
         B = -ro/rb*sin(theta)/b
         B_prime = -ro/rb/b*cos(theta) 
         
     else:
-        b=(-phi_o0+phi_ie-pi)
-        D=ro/rb*((phi_i0-phi_ie)*sin(theta)-cos(theta)+1)/(phi_ie-phi_i0)
+        b=(-phi_oo0+phi_fie-pi)
+        D=ro/rb*((phi_fi0-phi_fie)*sin(theta)-cos(theta)+1)/(phi_fie-phi_fi0)
         B=1.0/2.0*(-b+sqrt(b**2-4.0*D))
-        B_prime=-ro/rb*(sin(theta)+(phi_i0-phi_ie)*cos(theta))/((phi_ie-phi_i0)*sqrt(b**2-4*D))
+        B_prime=-ro/rb*(sin(theta)+(phi_fi0-phi_fie)*cos(theta))/((phi_fie-phi_fi0)*sqrt(b**2-4*D))
     
     if phi_ie_offset > 0 and theta >= pi:
         
@@ -1341,21 +1357,21 @@ cpdef tuple S1(double theta, geoVals geo, bint poly=False, double theta_0_volume
         # index alpha is zero because this is not a conventional compression chamber
         # but a weird semi-compression chamber formed by the offset pocket
         
-        Vs = -pi*h*rb*ro*(2*theta-2*phi_ie-pi+phi_i0+phi_o0)
+        Vs = -pi*h*rb*ro*(2*theta-2*phi_fie-pi+phi_fi0+phi_oo0)
         dVs = -2.0*pi*h*rb*ro
     
     else:
         
         # This block of code is used whenever 
     
-        VO=h*rb**2/6.0*((phi_ie+phi_ie_offset-phi_i0)**3-(phi_ie-theta-phi_i0)**3)
-        dVO=h*rb**2/2.0*((phi_ie-theta-phi_i0)**2)
+        VO=h*rb**2/6.0*((phi_fie+phi_ie_offset-phi_fi0)**3-(phi_fie-theta-phi_fi0)**3)
+        dVO=h*rb**2/2.0*((phi_fie-theta-phi_fi0)**2)
         
-        VIa=h*rb**2/6.0*((phi_ie+phi_ie_offset-pi+B-phi_o0)**3-(phi_ie-pi-theta-phi_o0)**3)
-        dVIa=h*rb**2/2.0*((phi_ie+phi_ie_offset-pi+B-phi_o0)**2*B_prime+(phi_ie-pi-theta-phi_o0)**2)
+        VIa=h*rb**2/6.0*((phi_fie+phi_ie_offset-pi+B-phi_oo0)**3-(phi_fie-pi-theta-phi_oo0)**3)
+        dVIa=h*rb**2/2.0*((phi_fie+phi_ie_offset-pi+B-phi_oo0)**2*B_prime+(phi_fie-pi-theta-phi_oo0)**2)
             
-        VIb=h*rb*ro/2.0*((phi_ie-pi+B+phi_ie_offset-phi_o0)*sin(B+phi_ie_offset+theta)+cos(B+phi_ie_offset+theta))
-        dVIb=h*rb*ro*(B_prime+1)/2.0*((phi_ie-pi+B+phi_ie_offset-phi_o0)*cos(B+phi_ie_offset+theta)-sin(B+phi_ie_offset+theta))
+        VIb=h*rb*ro/2.0*((phi_fie-pi+B+phi_ie_offset-phi_oo0)*sin(B+phi_ie_offset+theta)+cos(B+phi_ie_offset+theta))
+        dVIb=h*rb*ro*(B_prime+1)/2.0*((phi_fie-pi+B+phi_ie_offset-phi_oo0)*cos(B+phi_ie_offset+theta)-sin(B+phi_ie_offset+theta))
             
         VIc=h*rb*ro/2.0
         dVIc=0.0
@@ -1368,16 +1384,16 @@ cpdef tuple S1(double theta, geoVals geo, bint poly=False, double theta_0_volume
     
     # Add on the ficticious volume to correct for there actually being no volume
     # at theta=0
-    Vs+=theta_0_volume
+    Vs += theta_0_volume
     
     if poly==False:
         return Vs,dVs
     elif poly==True:
         
         ############### Polygon calculations ##################
-        phi=np.linspace(phi_ie-theta,phi_ie+phi_ie_offset,2000)
+        phi=np.linspace(phi_fie-theta,phi_fie+phi_ie_offset,2000)
         (xi,yi)=coords_inv(phi, geo, theta, 'fi')
-        phi=np.linspace(phi_ie-pi+B+phi_ie_offset,phi_ie-pi-theta,2000)
+        phi=np.linspace(phi_ooe-pi+B+phi_ie_offset,phi_ooe-pi-theta,2000)
         (xo,yo)=coords_inv(phi, geo, theta, 'oo')
         V_poly=h*polyarea(np.r_[xi,xo,xi[0]], np.r_[yi,yo,yi[0]])
 
@@ -1426,33 +1442,33 @@ cpdef tuple S1(double theta, geoVals geo, bint poly=False, double theta_0_volume
             
         return Vs,dVs,V_poly
 
+@cython.cdivision(True)
 cpdef dict S1_forces(double theta, geoVals geo, bint poly = False, double theta_0_volume=1e-9, bint use_offset = True):
     
     import warnings
     if geo.phi_ie_offset>1e-12:
         warnings.warn('S1_forces not fixed for offset scroll', RuntimeWarning)
         
-    h=geo.h
-    rb=geo.rb 
-    phi_ie=geo.phi_ie
-    phi_e=geo.phi_ie
-    phi_o0=geo.phi_o0
-    phi_i0=geo.phi_i0
-    ro=rb*(pi-phi_i0+phi_o0)
+    h = geo.h
+    rb = geo.rb 
+    phi_fie = geo.phi_fie
+    phi_fi0 = geo.phi_fi0    
+    phi_oo0 = geo.phi_oo0
+    ro = rb*(pi-phi_fi0+phi_oo0)
     
-    b=(-phi_o0+phi_e-pi)
-    D=ro/rb*((phi_i0-phi_e)*sin(theta)-cos(theta)+1)/(phi_e-phi_i0)
-    B=1.0/2.0*(sqrt(b**2-4.0*D)-b)
-    B_prime=-ro/rb*(sin(theta)+(phi_i0-phi_ie)*cos(theta))/((phi_e-phi_i0)*sqrt(b**2-4*D))
+    b = (-phi_oo0+phi_fie-pi)
+    D = ro/rb*((phi_fi0-phi_fie)*sin(theta)-cos(theta)+1)/(phi_fie-phi_fi0)
+    B = 1.0/2.0*(sqrt(b**2-4.0*D)-b)
+    B_prime = -ro/rb*(sin(theta)+(phi_fi0-phi_fie)*cos(theta))/((phi_fie-phi_fi0)*sqrt(b**2-4*D))
     
-    VO=h*rb**2/6.0*((phi_e-phi_i0)**3-(phi_e-theta-phi_i0)**3)
-    dVO=h*rb**2/2.0*((phi_e-theta-phi_i0)**2)
+    VO=h*rb**2/6.0*((phi_fie-phi_fi0)**3-(phi_fie-theta-phi_fi0)**3)
+    dVO=h*rb**2/2.0*((phi_fie-theta-phi_fi0)**2)
     
-    VIa=h*rb**2/6.0*((phi_e-pi+B-phi_o0)**3-(phi_e-pi-theta-phi_o0)**3)
-    dVIa=h*rb**2/2.0*((phi_e-pi+B-phi_o0)**2*B_prime+(phi_e-pi-theta-phi_o0)**2)
+    VIa=h*rb**2/6.0*((phi_fie-pi+B-phi_oo0)**3-(phi_fie-pi-theta-phi_oo0)**3)
+    dVIa=h*rb**2/2.0*((phi_fie-pi+B-phi_oo0)**2*B_prime+(phi_fie-pi-theta-phi_oo0)**2)
         
-    VIb=h*rb*ro/2.0*((B-phi_o0+phi_e-pi)*sin(B+theta)+cos(B+theta))
-    dVIb=h*rb*ro*(B_prime+1)/2.0*((phi_e-pi+B-phi_o0)*cos(B+theta)-sin(B+theta))
+    VIb=h*rb*ro/2.0*((B-phi_oo0+phi_fie-pi)*sin(B+theta)+cos(B+theta))
+    dVIb=h*rb*ro*(B_prime+1)/2.0*((phi_fie-pi+B-phi_oo0)*cos(B+theta)-sin(B+theta))
     
     VIc=h*rb*ro/2.0
     dVIc=0.0
@@ -1465,32 +1481,32 @@ cpdef dict S1_forces(double theta, geoVals geo, bint poly = False, double theta_
     Vs=VO-(VIa+VIb-VIc)
     dVs=dVO-(dVIa+dVIb-dVIc)
     
-    cx_O=h/VO*(fxA(rb,phi_ie,phi_i0)-fxA(rb,phi_ie-theta,phi_i0))
-    cy_O=h/VO*(fyA(rb,phi_ie,phi_i0)-fyA(rb,phi_ie-theta,phi_i0))
+    cx_O=h/VO*(fxA(rb,phi_fie,phi_fi0)-fxA(rb,phi_fie-theta,phi_fi0))
+    cy_O=h/VO*(fyA(rb,phi_fie,phi_fi0)-fyA(rb,phi_fie-theta,phi_fi0))
     
-    cx_Ia=h/VIa*(fxA(rb,phi_ie-pi+B,phi_o0)-fxA(rb,phi_ie-pi-theta,phi_o0))
-    cy_Ia=h/VIa*(fyA(rb,phi_ie-pi+B,phi_o0)-fyA(rb,phi_ie-pi-theta,phi_o0))
+    cx_Ia=h/VIa*(fxA(rb,phi_fie-pi+B,phi_oo0)-fxA(rb,phi_fie-pi-theta,phi_oo0))
+    cy_Ia=h/VIa*(fyA(rb,phi_fie-pi+B,phi_oo0)-fyA(rb,phi_fie-pi-theta,phi_oo0))
     
-    cx_Ib=1.0/3.0*(-rb*(B-phi_o0+phi_e-pi)*sin(B+phi_e)-rb*cos(B+phi_e)-ro*sin(theta-phi_e))
-    cy_Ib=1.0/3.0*(-rb*sin(B+phi_e)+rb*(B-phi_o0+phi_e-pi)*cos(B+phi_e)-ro*cos(theta-phi_e))
+    cx_Ib=1.0/3.0*(-rb*(B-phi_oo0+phi_fie-pi)*sin(B+phi_fie)-rb*cos(B+phi_fie)-ro*sin(theta-phi_fie))
+    cy_Ib=1.0/3.0*(-rb*sin(B+phi_fie)+rb*(B-phi_oo0+phi_fie-pi)*cos(B+phi_fie)-ro*cos(theta-phi_fie))
     
-    cx_Ic=1.0/3.0*(rb*(-theta-phi_o0+phi_e-pi)*sin(theta-phi_e)-ro*sin(theta-phi_e)-rb*cos(theta-phi_e))
-    cy_Ic=1.0/3.0*(rb*sin(theta-phi_e)+rb*(-theta-phi_o0+phi_e-pi)*cos(theta-phi_e)-ro*cos(theta-phi_e))
+    cx_Ic=1.0/3.0*(rb*(-theta-phi_oo0+phi_fie-pi)*sin(theta-phi_fie)-ro*sin(theta-phi_fie)-rb*cos(theta-phi_fie))
+    cy_Ic=1.0/3.0*(rb*sin(theta-phi_fie)+rb*(-theta-phi_oo0+phi_fie-pi)*cos(theta-phi_fie)-ro*cos(theta-phi_fie))
 
-    cx_I=-(cx_Ia*VIa+cx_Ib*VIb-cx_Ic*VIc)/(VIa+VIb-VIc)+ro*cos(phi_ie-pi/2.0-theta)
-    cy_I=-(cy_Ia*VIa+cy_Ib*VIb-cy_Ic*VIc)/(VIa+VIb-VIc)+ro*sin(phi_ie-pi/2.0-theta)
+    cx_I=-(cx_Ia*VIa+cx_Ib*VIb-cx_Ic*VIc)/(VIa+VIb-VIc)+ro*cos(phi_fie-pi/2.0-theta)
+    cy_I=-(cy_Ia*VIa+cy_Ib*VIb-cy_Ic*VIc)/(VIa+VIb-VIc)+ro*sin(phi_fie-pi/2.0-theta)
     
     cx=(cx_O*VO-cx_I*(VIa+VIb-VIc))/Vs
     cy=(cy_O*VO-cy_I*(VIa+VIb-VIc))/Vs
     
     if not use_offset:
-        fx_p = -rb*h*(sin(B+phi_e)-(B-phi_o0+phi_e-pi)*cos(B+phi_e)+sin(theta-phi_e)-(theta+phi_o0-phi_e+pi)*cos(theta-phi_e))
-        fy_p = rb*h*((B-phi_o0+phi_e-pi)*sin(B+phi_e)+cos(B+phi_e)-(theta+phi_o0-phi_e+pi)*sin(theta-phi_e)-cos(theta-phi_e))
+        fx_p = -rb*h*(sin(B+phi_fie)-(B-phi_oo0+phi_fie-pi)*cos(B+phi_fie)+sin(theta-phi_fie)-(theta+phi_oo0-phi_fie+pi)*cos(theta-phi_fie))
+        fy_p = rb*h*((B-phi_oo0+phi_fie-pi)*sin(B+phi_fie)+cos(B+phi_fie)-(theta+phi_oo0-phi_fie+pi)*sin(theta-phi_fie)-cos(theta-phi_fie))
     else:
-        fx_p = -rb*h*(sin(B+phi_e)-(B-phi_o0+phi_e-pi)*cos(B+phi_e)+sin(theta-phi_e)-(theta+phi_o0-phi_e+pi)*cos(theta-phi_e))
-        fy_p = rb*h*((B-phi_o0+phi_e-pi)*sin(B+phi_e)+cos(B+phi_e)-(theta+phi_o0-phi_e+pi)*sin(theta-phi_e)-cos(theta-phi_e))
+        fx_p = -rb*h*(sin(B+phi_fie)-(B-phi_oo0+phi_fie-pi)*cos(B+phi_fie)+sin(theta-phi_fie)-(theta+phi_oo0-phi_fie+pi)*cos(theta-phi_fie))
+        fy_p = rb*h*((B-phi_oo0+phi_fie-pi)*sin(B+phi_fie)+cos(B+phi_fie)-(theta+phi_oo0-phi_fie+pi)*sin(theta-phi_fie)-cos(theta-phi_fie))
         
-    M_O_p=(h*rb**2*(B-theta-2*phi_o0+2*phi_e-2*pi)*(B+theta))/2
+    M_O_p=(h*rb**2*(B-theta-2*phi_oo0+2*phi_fie-2*pi)*(B+theta))/2
     fz_p = Vs/h
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
@@ -1503,9 +1519,9 @@ cpdef dict S1_forces(double theta, geoVals geo, bint poly = False, double theta_
         return exact_dict
     else:
         ############### Polygon calculations ##################
-        phi=np.linspace(phi_ie-theta,phi_ie,2000)
+        phi=np.linspace(phi_fie-theta,phi_fie,2000)
         (xi,yi)=coords_inv(phi, geo, theta, 'fi')
-        phi=np.linspace(phi_ie-pi+B,phi_ie-pi-theta,2000)
+        phi=np.linspace(phi_fie-pi+B,phi_fie-pi-theta,2000)
         (xo,yo)=coords_inv(phi, geo, theta, 'oo')
         V_poly=h*polyarea(np.r_[xi,xo,xi[0]], np.r_[yi,yo,yi[0]])
         if V_poly>0.0:
@@ -1513,7 +1529,7 @@ cpdef dict S1_forces(double theta, geoVals geo, bint poly = False, double theta_
         else:
             (cx_poly,cy_poly)=(xi[0],yi[0])
         ############### Numerical Force Calculations ###########
-        phi=np.linspace(phi_ie-pi+B,phi_ie-pi-theta,2000)
+        phi=np.linspace(phi_fie-pi+B,phi_fie-pi-theta,2000)
         nx=np.zeros_like(phi)
         ny=np.zeros_like(phi)
         (nx,ny)=coords_norm(phi,geo,theta,'oo')
@@ -1523,9 +1539,9 @@ cpdef dict S1_forces(double theta, geoVals geo, bint poly = False, double theta_
         dfyp_poly=dA*(ny[1:L]+ny[0:L-1])/2.0
         fxp_poly=np.sum(dfxp_poly)
         fyp_poly=np.sum(dfyp_poly)
-        rOx=xo-geo.ro*cos(phi_e-pi/2-theta)
+        rOx=xo-geo.ro*cos(phi_fie-pi/2-theta)
         rOx=(rOx[1:L]+rOx[0:L-1])/2
-        rOy=yo-geo.ro*sin(phi_e-pi/2-theta)
+        rOy=yo-geo.ro*sin(phi_fie-pi/2-theta)
         rOy=(rOy[1:L]+rOy[0:L-1])/2
         MO_poly=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
         poly_dict = dict(MO_poly = MO_poly,
@@ -1558,6 +1574,7 @@ cpdef tuple S2(double theta, geoVals geo, bint poly = False, double theta_0_volu
     """
     return S1(theta, geo, theta_0_volume = theta_0_volume, use_offset = False)
         
+@cython.cdivision(True)        
 cpdef dict S2_forces(double theta, geoVals geo, bint poly=False, double theta_0_volume = 1e-9):
     """
     Force terms for S2 chamber
@@ -1590,10 +1607,9 @@ cpdef dict S2_forces(double theta, geoVals geo, bint poly=False, double theta_0_
                    )
     h=geo.h
     rb=geo.rb
-    phi_ie=geo.phi_ie
-    phi_e=geo.phi_ie
-    phi_o0=geo.phi_o0
-    phi_i0=geo.phi_i0
+    phi_ie=geo.phi_fie
+    phi_o0=geo.phi_oo0
+    phi_i0=geo.phi_fi0
     ro=rb*(pi-phi_i0+phi_o0)
     
     S1_terms = S1_forces(theta,geo, theta_0_volume = theta_0_volume, use_offset = False)
@@ -1602,9 +1618,9 @@ cpdef dict S2_forces(double theta, geoVals geo, bint poly=False, double theta_0_
     
     (cx,cy)=(-cx_s1+ro*cos(phi_ie-pi/2-theta),-cy_s1+ro*sin(phi_ie-pi/2-theta))
 
-    fx_p=-rb*h*(sin(theta-phi_e)-(theta+phi_i0-phi_e)*cos(theta-phi_e)+cos(phi_e)*(phi_i0-phi_e)+sin(phi_e))
-    fy_p=-rb*h*((theta+phi_i0-phi_e)*sin(theta-phi_e)+cos(theta-phi_e)+sin(phi_e)*(phi_i0-phi_e)-cos(phi_e))
-    M_O_p=(h*rb**2*theta*(theta+2*phi_i0-2*phi_e))/2
+    fx_p=-rb*h*(sin(theta-phi_ie)-(theta+phi_i0-phi_ie)*cos(theta-phi_ie)+cos(phi_ie)*(phi_i0-phi_ie)+sin(phi_ie))
+    fy_p=-rb*h*((theta+phi_i0-phi_ie)*sin(theta-phi_ie)+cos(theta-phi_ie)+sin(phi_ie)*(phi_i0-phi_ie)-cos(phi_ie))
+    M_O_p=(h*rb**2*theta*(theta+2*phi_i0-2*phi_ie))/2
     fz_p = S1_terms['fz_p'] #By symmetry
     
     exact_dict = dict(fx_p = fx_p,
@@ -1638,6 +1654,7 @@ cpdef dict S2_forces(double theta, geoVals geo, bint poly=False, double theta_0_
 #        exact_dict.update(poly_dict)
 #        return exact_dict
 
+@cython.cdivision(True)
 cpdef tuple C1(double theta, int alpha, geoVals geo, bint poly=False):
     """
     Volume terms for C1,alpha chamber
@@ -1658,29 +1675,31 @@ cpdef tuple C1(double theta, int alpha, geoVals geo, bint poly=False):
     values : tuple
         A tuple with volume,derivative of volume and volume from polygon(if requested)
     """
-    h=geo.h
-    rb=geo.rb
-    phi_ie=geo.phi_ie
-    phi_e=geo.phi_ie
-    phi_o0=geo.phi_o0
-    phi_i0=geo.phi_i0
-    ro=rb*(pi-phi_i0+phi_o0)
+    h = geo.h
+    rb = geo.rb
+    phi_fi0 = geo.phi_fi0
+    phi_fie = geo.phi_fie
+    phi_oo0 = geo.phi_oo0
+    phi_ooe = geo.phi_ooe
+    
+    ro=rb*(pi - phi_fi0 + phi_oo0)
     
     ##################### Analytic Calculations ####################
-    V=-pi*h*rb*ro*(2*theta+4*alpha*pi-2*phi_ie-pi+phi_i0+phi_o0)
+    V=-pi*h*rb*ro*(2*theta+4*alpha*pi-2*phi_fie-pi+phi_fi0+phi_oo0)
     dV=-2.0*pi*h*rb*ro
     
     if not poly:
         return V,dV
     else:
         ##################### Polygon Calculations #####################
-        phi=np.linspace(geo.phi_ie-theta-2*pi*alpha,geo.phi_ie-theta-2*pi*(alpha-1), 1000)
+        phi=np.linspace(phi_fie-theta-2*pi*alpha, phi_fie-theta-2*pi*(alpha-1), 1000)
         (xi,yi)=coords_inv(phi, geo, theta, 'fi')
-        phi=np.linspace( geo.phi_ie-theta-2*pi*(alpha-1)-pi,geo.phi_ie-theta-2*pi*alpha-pi,1000)
+        phi=np.linspace(phi_fie-theta-2*pi*(alpha-1)-pi, phi_fie-theta-2*pi*alpha-pi,1000)
         (xo,yo)=coords_inv(phi, geo, theta, 'oo')
         V_poly=h*polyarea(np.r_[xi,xo], np.r_[yi,yo])
         return V,dV,V_poly
 
+@cython.cdivision(True)
 cpdef dict C1_forces(double theta, int alpha, geoVals geo, bint poly = False):
     """
     Force terms for C1,alpha chamber
@@ -1702,20 +1721,21 @@ cpdef dict C1_forces(double theta, int alpha, geoVals geo, bint poly = False):
         A dictionary with fields for the analytic and numerical solutions (if requested)
     
     """
-    h=geo.h
-    rb=geo.rb
-    phi_ie=geo.phi_ie
-    phi_e=geo.phi_ie
-    phi_o0=geo.phi_o0
-    phi_i0=geo.phi_i0
-    ro=rb*(pi-phi_i0+phi_o0)
+    h = geo.h
+    rb = geo.rb
+    phi_fi0 = geo.phi_fi0
+    phi_fie = geo.phi_fie
+    phi_oo0 = geo.phi_oo0
+    phi_ooe = geo.phi_ooe
     
-    psi=rb/3.0*(3.0*theta**2+6.0*phi_o0*theta+3.0*phi_o0**2+pi**2-15.0+(theta+phi_o0)*(12.0*pi*alpha-6.0*phi_ie)+3.0*phi_ie**2+12.0*pi*alpha*(pi*alpha-phi_ie))/(2.0*theta+phi_o0-2.0*phi_ie+phi_i0+4.0*pi*alpha-pi)
-    cx=-2.0*rb*cos(theta-phi_ie)-psi*sin(theta-phi_ie)
-    cy=+2.0*rb*sin(theta-phi_ie)-psi*cos(theta-phi_ie) 
-    fx_p= 2.0*pi*rb*h*cos(theta-phi_e)
-    fy_p=-2.0*pi*rb*h*sin(theta-phi_e)
-    M_O_p=-2*pi*h*rb*rb*(theta+phi_o0-phi_e+2*pi*alpha)
+    ro=rb*(pi - phi_fi0 + phi_oo0)
+    
+    psi=rb/3.0*(3.0*theta**2+6.0*phi_oo0*theta+3.0*phi_oo0**2+pi**2-15.0+(theta+phi_oo0)*(12.0*pi*alpha-6.0*phi_fie)+3.0*phi_fie**2+12.0*pi*alpha*(pi*alpha-phi_fie))/(2.0*theta+phi_oo0-2.0*phi_fie+phi_fi0+4.0*pi*alpha-pi)
+    cx=-2.0*rb*cos(theta-phi_fie)-psi*sin(theta-phi_fie)
+    cy=+2.0*rb*sin(theta-phi_fie)-psi*cos(theta-phi_fie) 
+    fx_p= 2.0*pi*rb*h*cos(theta-phi_fie)
+    fy_p=-2.0*pi*rb*h*sin(theta-phi_fie)
+    M_O_p=-2*pi*h*rb*rb*(theta+phi_oo0-phi_fie+2*pi*alpha)
     fz_p = C1(theta,alpha,geo)[0]/h
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
@@ -1729,14 +1749,14 @@ cpdef dict C1_forces(double theta, int alpha, geoVals geo, bint poly = False):
         return exact_dict
     else:
          ##################### Polygon Calculations #####################
-        phi=np.linspace(geo.phi_ie-theta-2*pi*alpha,geo.phi_ie-theta-2*pi*(alpha-1), 1000)
+        phi=np.linspace(phi_fie-theta-2*pi*alpha, phi_fie-theta-2*pi*(alpha-1), 1000)
         (xi,yi)=coords_inv(phi, geo, theta, 'fi')
-        phi=np.linspace( geo.phi_ie-theta-2*pi*(alpha-1)-pi,geo.phi_ie-theta-2*pi*alpha-pi,1000)
+        phi=np.linspace(phi_fie-theta-2*pi*(alpha-1)-pi, phi_fie-theta-2*pi*alpha-pi,1000)
         (xo,yo)=coords_inv(phi, geo, theta, 'oo')
         V_poly=h*polyarea(np.r_[xi,xo], np.r_[yi,yo])
         (cx_poly,cy_poly)=polycentroid(np.r_[xi,xo], np.r_[yi,yo])
         ##################### Force Calculations #########################
-        phi=np.linspace( geo.phi_ie-theta-2*pi*(alpha)-pi,geo.phi_ie-theta-2*pi*(alpha-1)-pi,1000)
+        phi=np.linspace(phi_fie-theta-2*pi*(alpha)-pi, phi_fie-theta-2*pi*(alpha-1)-pi,1000)
         (xo,yo)=coords_inv(phi, geo, theta, 'oo')
         nx=np.zeros_like(phi)
         ny=np.zeros_like(phi)
@@ -1747,9 +1767,9 @@ cpdef dict C1_forces(double theta, int alpha, geoVals geo, bint poly = False):
         dfyp_poly=dA*(ny[1:L]+ny[0:L-1])/2.0
         fxp_poly=np.sum(dfxp_poly)
         fyp_poly=np.sum(dfyp_poly)
-        rOx=xo-geo.ro*cos(phi_e-pi/2-theta)
+        rOx=xo-geo.ro*cos(phi_fie-pi/2-theta)
         rOx=(rOx[1:L]+rOx[0:L-1])/2
-        rOy=yo-geo.ro*sin(phi_e-pi/2-theta)
+        rOy=yo-geo.ro*sin(phi_fie-pi/2-theta)
         rOy=(rOy[1:L]+rOy[0:L-1])/2
         MO_poly=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
         poly_dict = dict(fxp_poly = fxp_poly,
@@ -1785,6 +1805,7 @@ cpdef tuple C2(double theta, int alpha, geoVals geo, bint poly=False):
     #Use the symmetry - chambers have the same volumes and derivative of volume
     return C1(theta,alpha,geo,poly)
     
+@cython.cdivision(True)
 cpdef dict C2_forces(double theta, int alpha, geoVals geo, bint poly=False):
     """
     Force terms for C2,alpha chamber
@@ -1806,21 +1827,22 @@ cpdef dict C2_forces(double theta, int alpha, geoVals geo, bint poly=False):
         A dictionary with fields for the analytic and numerical solutions (if requested)
     """
 
-    h=geo.h
-    rb=geo.rb
-    phi_ie=geo.phi_ie
-    phi_e=geo.phi_ie
-    phi_o0=geo.phi_o0
-    phi_i0=geo.phi_i0
-    ro=geo.ro
+    h = geo.h
+    rb = geo.rb
+    ro = geo.ro
+    phi_fi0 = geo.phi_fi0
+    phi_fie = geo.phi_fie
+    phi_oo0 = geo.phi_oo0
+    phi_ooe = geo.phi_ooe
+    
     
     C1_dict = C1_forces(theta,alpha,geo,poly)
     cxc1 = C1_dict['cx']
     cyc1 = C1_dict['cy']
-    (cx,cy)=(-cxc1+ro*cos(phi_ie-pi/2-theta),-cyc1+ro*sin(phi_ie-pi/2-theta))
-    fx_p= 2.0*pi*rb*h*cos(theta-phi_e)
-    fy_p=-2.0*pi*rb*h*sin(theta-phi_e)
-    M_O_p=2*pi*h*rb*rb*(theta+phi_i0-phi_e+2*pi*alpha-pi)
+    (cx,cy)=(-cxc1+ro*cos(phi_fie-pi/2-theta),-cyc1+ro*sin(phi_fie-pi/2-theta))
+    fx_p= 2.0*pi*rb*h*cos(theta-phi_fie)
+    fy_p=-2.0*pi*rb*h*sin(theta-phi_fie)
+    M_O_p=2*pi*h*rb*rb*(theta+phi_fi0-phi_fie+2*pi*alpha-pi)
     fz_p = C2(theta,alpha,geo)[0]/h 
     
     exact_dict = dict(fx_p = fx_p,
@@ -1877,33 +1899,27 @@ cpdef tuple D1(double theta, geoVals geo, bint poly = False):
     
     hs=geo.h
     rb=geo.rb
-    phi_ie=geo.phi_ie
-    phi_e=geo.phi_ie
-    phi_o0=geo.phi_o0
-    phi_i0=geo.phi_i0
-    phi_is=geo.phi_is
-    phi_os=geo.phi_os
-    ro=rb*(pi-phi_i0+phi_o0)
+    ro=rb*(pi - geo.phi_fi0 + geo.phi_oo0)
     Nc=getNc(theta, geo)
     
-    phi2=phi_ie-theta-2.0*pi*Nc
-    phi1=phi_os+pi
-    VO=hs*rb**2/6.0*((phi2-phi_i0)**3-(phi1-phi_i0)**3)
-    dVO=-hs*rb**2/2.0*((phi2-phi_i0)**2)
+    phi2 = geo.phi_fie-theta-2.0*pi*Nc
+    phi1 = geo.phi_fos+pi
+    VO = hs*rb**2/6.0*((phi2-geo.phi_fi0)**3-(phi1-geo.phi_fi0)**3)
+    dVO = -hs*rb**2/2.0*((phi2-geo.phi_fi0)**2)
     
-    phi2=phi_ie-theta-2.0*pi*Nc-pi
-    phi1=phi_os
-    VIa=hs*rb**2/6.0*((phi2-phi_o0)**3-(phi1-phi_o0)**3)
-    dVIa=-hs*rb**2/2.0*((phi2-phi_o0)**2)
+    phi2 = geo.phi_fie-theta-2.0*pi*Nc-pi
+    phi1 = geo.phi_fos
+    VIa=hs*rb**2/6.0*((phi2-geo.phi_oo0)**3-(phi1-geo.phi_oo0)**3)
+    dVIa=-hs*rb**2/2.0*((phi2-geo.phi_oo0)**2)
     
-    VIb=hs*rb*ro/2.0*((phi_os-phi_o0)*sin(theta+phi_os-phi_ie)+cos(theta+phi_os-phi_ie))
-    dVIb=hs*rb*ro/2.0*((phi_os-phi_o0)*cos(theta+phi_os-phi_ie)-sin(theta+phi_os-phi_ie))
+    VIb=hs*rb*ro/2.0*((geo.phi_oos-geo.phi_fo0)*sin(theta+geo.phi_fos-geo.phi_fie)+cos(theta+geo.phi_oos-geo.phi_fie))
+    dVIb=hs*rb*ro/2.0*((geo.phi_oos-geo.phi_fo0)*cos(theta+geo.phi_fos-geo.phi_fie)-sin(theta+geo.phi_oos-geo.phi_fie))
     
     VIc=hs*rb*ro/2.0
     dVIc=0.0
     
-    VId= hs*rb*ro/2.0*((phi_os-phi_i0+pi)*sin(theta+phi_os-phi_ie)+cos(theta+phi_os-phi_ie)+1)
-    dVId=hs*rb*ro/2.0*((phi_os-phi_i0+pi)*cos(theta+phi_os-phi_ie)-sin(theta+phi_os-phi_ie))
+    VId= hs*rb*ro/2.0*((geo.phi_oos-geo.phi_fi0+pi)*sin(theta+geo.phi_oos-geo.phi_fie)+cos(theta+geo.phi_oos-geo.phi_fie)+1)
+    dVId=hs*rb*ro/2.0*((geo.phi_oos-geo.phi_fi0+pi)*cos(theta+geo.phi_oos-geo.phi_fie)-sin(theta+geo.phi_oos-geo.phi_fie))
     
     VI=VIa+VIb+VIc+VId
     dVI=dVIa+dVIb+dVIc+dVId
@@ -1915,9 +1931,9 @@ cpdef tuple D1(double theta, geoVals geo, bint poly = False):
         return Vd1,dVd1
     else:
         ######################### Polygon calculations ##################
-        phi=np.linspace(phi_os+pi,phi_ie-theta-2.0*pi*Nc,1000)
+        phi=np.linspace(geo.phi_oos+pi,geo.phi_fie-theta-2.0*pi*Nc,1000)
         (xi,yi)=coords_inv(phi, geo, theta, "fi")
-        phi=np.linspace(phi_ie-theta-2.0*pi*Nc-pi,phi_os,1000)
+        phi=np.linspace(geo.phi_fie-theta-2.0*pi*Nc-pi,geo.phi_oos,1000)
         (xo,yo)=coords_inv(phi, geo, theta, "oo")
         V_poly=hs*polyarea(np.r_[xi,xo], np.r_[yi,yo])
         return Vd1,dVd1,V_poly
@@ -1928,12 +1944,11 @@ cpdef dict D1_forces(double theta, geoVals geo, bint poly = False):
     
     hs=geo.h
     rb=geo.rb
-    phi_ie=geo.phi_ie
-    phi_e=geo.phi_ie
-    phi_o0=geo.phi_o0
-    phi_i0=geo.phi_i0
-    phi_is=geo.phi_is
-    phi_os=geo.phi_os
+    phi_ie=geo.phi_fie
+    phi_o0=geo.phi_oo0
+    phi_i0=geo.phi_fi0
+    phi_is=geo.phi_fis
+    phi_os=geo.phi_oos
     ro=rb*(pi-phi_i0+phi_o0)
     Nc=getNc(theta, geo)
     
@@ -1982,9 +1997,9 @@ cpdef dict D1_forces(double theta, geoVals geo, bint poly = False):
     cx=(cx_O*VO-cx_I*VI)/Vd1
     cy=(cy_O*VO-cy_I*VI)/Vd1
     
-    fx_p=rb*hs*(sin(theta-phi_e)+(-theta-phi_o0+phi_e-2*pi*Nc-pi)*cos(theta-phi_e)-sin(phi_os)-(phi_o0-phi_os)*cos(phi_os))
-    fy_p=-rb*hs*((-theta-phi_o0+phi_e-2*pi*Nc-pi)*sin(theta-phi_e)-cos(theta-phi_e)-(phi_os-phi_o0)*sin(phi_os)-cos(phi_os))
-    M_O_p=(hs*rb**2*(theta-phi_os+2*phi_o0-phi_e+2*pi*Nc+pi)*(theta+phi_os-phi_e+2*pi*Nc+pi))/2.0
+    fx_p=rb*hs*(sin(theta-phi_ie)+(-theta-phi_o0+phi_ie-2*pi*Nc-pi)*cos(theta-phi_ie)-sin(phi_os)-(phi_o0-phi_os)*cos(phi_os))
+    fy_p=-rb*hs*((-theta-phi_o0+phi_ie-2*pi*Nc-pi)*sin(theta-phi_ie)-cos(theta-phi_ie)-(phi_os-phi_o0)*sin(phi_os)-cos(phi_os))
+    M_O_p=(hs*rb**2*(theta-phi_os+2*phi_o0-phi_ie+2*pi*Nc+pi)*(theta+phi_os-phi_ie+2*pi*Nc+pi))/2.0
     fz_p = Vd1/hs
     
     exact_dict = dict(fx_p = fx_p,
@@ -2020,9 +2035,9 @@ cpdef dict D1_forces(double theta, geoVals geo, bint poly = False):
         dfyp_poly=dA*(ny[1:L]+ny[0:L-1])/2.0
         fxp_poly=np.sum(dfxp_poly)
         fyp_poly=np.sum(dfyp_poly)
-        rOx=xo-geo.ro*cos(phi_e-pi/2-theta)
+        rOx=xo-geo.ro*cos(phi_ie-pi/2-theta)
         rOx=(rOx[1:L]+rOx[0:L-1])/2
-        rOy=yo-geo.ro*sin(phi_e-pi/2-theta)
+        rOy=yo-geo.ro*sin(phi_ie-pi/2-theta)
         rOy=(rOy[1:L]+rOy[0:L-1])/2
         MO_poly=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
         poly_dict = dict(MO_poly = MO_poly,
@@ -2061,12 +2076,11 @@ cpdef dict D2_forces(double theta, geoVals geo, bint poly = False):
     
     hs=geo.h
     rb=geo.rb
-    phi_ie=geo.phi_ie
-    phi_e=geo.phi_ie
-    phi_o0=geo.phi_o0
-    phi_i0=geo.phi_i0
-    phi_is=geo.phi_is
-    phi_os=geo.phi_os
+    phi_ie=geo.phi_fie
+    phi_o0=geo.phi_oo0
+    phi_i0=geo.phi_fi0
+    phi_is=geo.phi_fis
+    phi_os=geo.phi_oos
     ro=rb*(pi-phi_i0+phi_o0)
     Nc=getNc(theta,geo=geo)
     
@@ -2117,9 +2131,9 @@ cpdef dict D2_forces(double theta, geoVals geo, bint poly = False):
     cxd1=(cx_O*VO-cx_I*VI)/Vd1
     cyd1=(cy_O*VO-cy_I*VI)/Vd1
     
-    fx_p=-hs*rb*(-sin(theta-phi_e)+(theta+phi_i0-phi_e+2*pi*Nc)*cos(theta-phi_e)+sin(phi_os)-(phi_os-phi_i0+pi)*cos(phi_os))
-    fy_p=hs*rb*((theta+phi_i0-phi_e+2*pi*Nc)*sin(theta-phi_e)+cos(theta-phi_e)-(-phi_os+phi_i0-pi)*sin(phi_os)+cos(phi_os))
-    M_O_p=-(hs*rb**2*(theta-phi_os+2*phi_i0-phi_e+2*pi*Nc-pi)*(theta+phi_os-phi_e+2*pi*Nc+pi))/2
+    fx_p=-hs*rb*(-sin(theta-phi_ie)+(theta+phi_i0-phi_ie+2*pi*Nc)*cos(theta-phi_ie)+sin(phi_os)-(phi_os-phi_i0+pi)*cos(phi_os))
+    fy_p=hs*rb*((theta+phi_i0-phi_ie+2*pi*Nc)*sin(theta-phi_ie)+cos(theta-phi_ie)-(-phi_os+phi_i0-pi)*sin(phi_os)+cos(phi_os))
+    M_O_p=-(hs*rb**2*(theta-phi_os+2*phi_i0-phi_ie+2*pi*Nc-pi)*(theta+phi_os-phi_ie+2*pi*Nc+pi))/2
     
     (cx,cy)=(-cxd1+ro*cos(phi_ie-pi/2-theta),-cyd1+ro*sin(phi_ie-pi/2-theta))
     fz_p = Vd1/hs
@@ -2165,15 +2179,15 @@ cpdef tuple DD(double theta, geoVals geo, bint poly=False):
     b_line=geo.b_line
     t1_line=geo.t1_line
     t2_line=geo.t2_line
-    phi_os=geo.phi_os
-    phi_o0=geo.phi_o0
-    phi_i0=geo.phi_i0
-    phi_is=geo.phi_is
-    phi_e=geo.phi_ie
     rb=geo.rb
-    om=geo.phi_ie-pi/2-theta
+    om=geo.phi_fie-pi/2-theta
+    phi_os = geo.phi_oos
+    phi_ie = geo.phi_fie
+    phi_o0 = geo.phi_oo0
+    phi_is = geo.phi_fis
+    phi_i0 = geo.phi_fi0
         
-    (xoos,yoos)=coords_inv(geo.phi_os, geo, theta, 'oo')
+    (xoos,yoos)=coords_inv(geo.phi_oos, geo, theta, 'oo')
     
     #################### Oa portion ####################        
     V_Oa=hs*((-(ra1*(cos(ta1_2)*(ya1-yoos)-sin(ta1_2)*(xa1-xoos)-ra1*ta1_2))/2)-(-(ra1*(cos(ta1_1)*(ya1-yoos)-sin(ta1_1)*(xa1-xoos)-ra1*ta1_1))/2))
@@ -2188,25 +2202,25 @@ cpdef tuple DD(double theta, geoVals geo, bint poly=False):
     
     ##################### Oc portion ###################
     V_Oc=rb*hs/6*(
-          3*ro*(phi_os-phi_i0+pi)*sin(theta+phi_os-phi_e)
-          +3*ro*cos(theta+phi_os-phi_e)
-          +3*(phi_is-phi_i0)*ro*sin(theta+phi_is-phi_e)
-          +3*ro*cos(theta+phi_is-phi_e)
+          3*ro*(phi_os-phi_i0+pi)*sin(theta+phi_os-phi_ie)
+          +3*ro*cos(theta+phi_os-phi_ie)
+          +3*(phi_is-phi_i0)*ro*sin(theta+phi_is-phi_ie)
+          +3*ro*cos(theta+phi_is-phi_ie)
           +3*rb*((phi_is-phi_i0)*(phi_os-phi_o0)+1)*sin(phi_os-phi_is)
           -3*rb*(phi_os-phi_o0-phi_is+phi_i0)*cos(phi_os-phi_is)
           +rb*((phi_os+pi-phi_i0)**3-(phi_is-phi_i0)**3)+3*ro)
     dV_Oc=rb*hs*ro/2*(
-           (phi_os-phi_i0+pi)*cos(theta+phi_os-phi_e)
-          -sin(theta+phi_os-phi_e)
-          +(phi_is-phi_i0)*cos(theta+phi_is-phi_e)
-          -sin(theta+phi_is-phi_e)
+           (phi_os-phi_i0+pi)*cos(theta+phi_os-phi_ie)
+          -sin(theta+phi_os-phi_ie)
+          +(phi_is-phi_i0)*cos(theta+phi_is-phi_ie)
+          -sin(theta+phi_is-phi_ie)
           )
 
     #################### Ia portion ####################
 
     V_Ia=hs*ra2/2.0*(xa2*(sin(ta2_2)-sin(ta2_1))
-                 -ya2*(cos(ta2_2)-cos(ta2_1))
-                 -rb*(sin(ta2_2-phi_os)-sin(ta2_1-phi_os))
+                    -ya2*(cos(ta2_2)-cos(ta2_1))
+                    -rb*(sin(ta2_2-phi_os)-sin(ta2_1-phi_os))
         -rb*(phi_os-phi_o0)*(cos(ta2_2-phi_os)-cos(ta2_1-phi_os))
                  +ra2*(ta2_2-ta2_1)  )
     dV_Ia=0.0
@@ -2273,13 +2287,13 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
     b_line=geo.b_line
     t1_line=geo.t1_line
     t2_line=geo.t2_line
-    phi_os=geo.phi_os
-    phi_o0=geo.phi_o0
-    phi_i0=geo.phi_i0
-    phi_is=geo.phi_is
-    phi_e=geo.phi_ie
+    phi_os=geo.phi_oos
+    phi_o0=geo.phi_oo0
+    phi_i0=geo.phi_fi0
+    phi_is=geo.phi_fis
+    phi_ie=geo.phi_fie
     rb=geo.rb
-    om=geo.phi_ie-pi/2-theta
+    om=phi_ie-pi/2-theta
     
     ################ Force Components #########
     #Arc 1
@@ -2376,9 +2390,9 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
         dfyp_poly=dA*(ny_oarc1[1:L]+ny_oarc1[0:L-1])/2.0
         fxp_poly=np.sum(dfxp_poly)
         fyp_poly=np.sum(dfyp_poly)
-        rOx=x_oarc1-geo.ro*cos(phi_e-pi/2-theta)
+        rOx=x_oarc1-geo.ro*cos(phi_ie-pi/2-theta)
         rOx=(rOx[1:L]+rOx[0:L-1])/2
-        rOy=y_oarc1-geo.ro*sin(phi_e-pi/2-theta)
+        rOy=y_oarc1-geo.ro*sin(phi_ie-pi/2-theta)
         rOy=(rOy[1:L]+rOy[0:L-1])/2
         MO_poly=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
         print 'Arc1',np.sum(dfxp_poly),np.sum(dfyp_poly)
@@ -2389,9 +2403,9 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
         dfyp_poly=dA*(ny_oarc2[1:L]+ny_oarc2[0:L-1])/2.0
         fxp_poly+=np.sum(dfxp_poly)
         fyp_poly+=np.sum(dfyp_poly)
-        rOx=x_oarc2-geo.ro*cos(phi_e-pi/2-theta)
+        rOx=x_oarc2-geo.ro*cos(phi_ie-pi/2-theta)
         rOx=(rOx[1:L]+rOx[0:L-1])/2
-        rOy=y_oarc2-geo.ro*sin(phi_e-pi/2-theta)
+        rOy=y_oarc2-geo.ro*sin(phi_ie-pi/2-theta)
         rOy=(rOy[1:L]+rOy[0:L-1])/2
         MO_poly+=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
         print 'Arc2',np.sum(dfxp_poly),np.sum(dfyp_poly)
@@ -2402,9 +2416,9 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
         dfyp_poly=dA*(ny_oinv[1:L]+ny_oinv[0:L-1])/2.0
         fxp_poly+=np.sum(dfxp_poly)
         fyp_poly+=np.sum(dfyp_poly)
-        rOx=x_oinv-geo.ro*cos(phi_e-pi/2-theta)
+        rOx=x_oinv-geo.ro*cos(phi_ie-pi/2-theta)
         rOx=(rOx[1:L]+rOx[0:L-1])/2
-        rOy=y_oinv-geo.ro*sin(phi_e-pi/2-theta)
+        rOy=y_oinv-geo.ro*sin(phi_ie-pi/2-theta)
         rOy=(rOy[1:L]+rOy[0:L-1])/2
         MO_poly+=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
         print 'Involute',np.sum(dfxp_poly),np.sum(dfyp_poly)
@@ -2455,7 +2469,7 @@ cpdef tuple DDD(double theta, geoVals geo, bint poly=False):
 cpdef dict DDD_forces(double theta, geoVals geo, bint poly=False):
     
     ro=geo.ro
-    om=geo.phi_ie-pi/2-theta
+    om=geo.phi_fie-pi/2-theta
     
     if not poly:
         exact_dict = {}
@@ -2475,9 +2489,9 @@ cpdef double phi_s_sa(double theta, geoVals geo):
     
     h=geo.h
     rb=geo.rb 
-    phi_ie=geo.phi_ie
-    phi_o0=geo.phi_o0
-    phi_i0=geo.phi_i0
+    phi_ie=geo.phi_fie
+    phi_o0=geo.phi_oo0
+    phi_i0=geo.phi_fi0
     ro=rb*(pi-phi_i0+phi_o0)
     
     b=(-phi_o0+phi_ie-pi)
@@ -2508,16 +2522,16 @@ cpdef double phi_d_dd(double theta, geoVals geo):
     This is a newer method than that used in the thesis of Bell (2011)
     """
     cdef double _theta_d = theta_d(geo)
-    cdef double DELTAtheta = geo.phi_os + pi - geo.phi_is
+    cdef double DELTAtheta = geo.phi_oos + pi - geo.phi_fis
     
     if -1e-10 <= angle_difference(theta, _theta_d) < DELTAtheta:
-        return ((geo.phi_os+pi)-geo.phi_is)/(_theta_d-(_theta_d+DELTAtheta))*(theta-(_theta_d+DELTAtheta))+geo.phi_is
+        return ((geo.phi_oos+pi)-geo.phi_fis)/(_theta_d-(_theta_d+DELTAtheta))*(theta-(_theta_d+DELTAtheta))+geo.phi_fis
     else:
-        return geo.phi_is
+        return geo.phi_fis
 
 cpdef double Area_d_dd(double theta, geoVals geo):
-    x_fis,y_fis=coords_inv(phi_d_dd(theta,geo),geo,theta,"fi")
-    x_oos,y_oos=coords_inv(geo.phi_os,geo,theta,"oo")
+    x_fis,y_fis=coords_inv(phi_d_dd(theta,geo), geo, theta, "fi")
+    x_oos,y_oos=coords_inv(geo.phi_oos, geo, theta, "oo")
     return geo.h*((x_fis-x_oos)**2+(y_fis-y_oos)**2)**0.5
 
 cpdef double Area_s_s1_offset(double theta, geoVals geo):

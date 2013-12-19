@@ -14,7 +14,8 @@ cdef class HTAnglesClass(object):
     
 #Take over the geo class with strict typing
 cdef class geoVals:
-    cdef public double h,phi_i0,phi_is,phi_ie,phi_e,phi_o0,ro,rb,phi_os,phi_oe,t
+    cdef public double h,ro,rb,t
+    cdef public double phi_fi0,phi_fis,phi_fie,phi_fo0,phi_fos,phi_foe, phi_oi0,phi_ois,phi_oie, phi_oo0,phi_oos,phi_ooe
     cdef public double xa_arc1,ya_arc1,ra_arc1,t1_arc1,t2_arc1
     cdef public double xa_arc2,ya_arc2,ra_arc2,t1_arc2,t2_arc2
     cdef public double b_line, t1_line, t2_line, m_line
@@ -24,6 +25,8 @@ cdef class geoVals:
     cdef public double cx_scroll, cy_scroll, V_scroll
     cdef public double Vremove
     cdef public np.ndarray xvec_disc_port, yvec_disc_port
+    
+    cpdef bint is_symmetric(self)
     
 cpdef double fxA(double rb, double phi, double phi0)
 cpdef double fyA(double rb, double phi, double phi0)

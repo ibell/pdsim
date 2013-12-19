@@ -26,7 +26,7 @@ cdef class _Scroll(object):
     cpdef double RadialLeakage(self, FlowPath FP, double t = *)
     cpdef double FlankLeakage(self, FlowPath FP, int Ncv_check = *)
     
-    cpdef double calcHT(self, double theta, bytes key, double HTC_tune, double dT_dphi, double phim)
+    cpdef double calcHT(self, double theta, bytes key, double HTC_tune, double dT_dphi, double phim) except *
     
     cpdef double involute_heat_transfer(self, double hc, double hs, double  rb, 
                                   double phi1, double phi2, double phi0, 

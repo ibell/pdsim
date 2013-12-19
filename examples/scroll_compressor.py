@@ -49,7 +49,7 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     #This runs if the module code is run directly 
     
     ScrollComp.set_scroll_geo(83e-6, 3.3, 0.005, 0.006) #Set the scroll wrap geometry
-    ScrollComp.set_disc_geo('2Arc',r2=0)
+    ScrollComp.set_disc_geo('2Arc',r2 = 0)
     ScrollComp.geo.delta_flank = 10e-6
     ScrollComp.geo.delta_radial = 10e-6
     
