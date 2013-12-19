@@ -595,12 +595,18 @@ class Scroll(PDSimCore, _Scroll):
         phi_oe=phi_ie
         self.geo.h=hs
         self.geo.rb=rb
-        self.geo.phi_i0=phi_i0
-        self.geo.phi_is=phi_is
-        self.geo.phi_ie=phi_ie
-        self.geo.phi_o0=phi_o0
-        self.geo.phi_os=phi_os
-        self.geo.phi_oe=phi_oe
+        self.geo.phi_fi0=phi_i0
+        self.geo.phi_fis=phi_is
+        self.geo.phi_fie=phi_ie
+        self.geo.phi_fo0=phi_o0
+        self.geo.phi_fos=phi_os
+        self.geo.phi_foe=phi_oe
+        self.geo.phi_oi0=phi_i0
+        self.geo.phi_ois=phi_is
+        self.geo.phi_oie=phi_ie
+        self.geo.phi_oo0=phi_o0
+        self.geo.phi_oos=phi_os
+        self.geo.phi_ooe=phi_oe
         self.geo.ro=rb*pi-Thickness
         self.geo.t=Thickness
         

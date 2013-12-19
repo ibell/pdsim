@@ -1194,12 +1194,10 @@ cpdef tuple SA(double theta, geoVals geo, bint poly=False, bint use_offset = Tru
             B = -ro/rb*sin(theta)/b
             B_prime = -ro/rb/b*cos(theta)
             
-#            print 'theta',theta 
             #The scroll wrap portion of the outer wall of the chamber
             VO = h*rb**2/6.0*((phi_ie+phi_ie_offset-phi_i0)**3-(phi_ie+phi_ie_offset-(theta-pi)-phi_i0)**3)
             dVO = h*rb**2/2.0*((phi_ie+phi_ie_offset-(theta-pi)-phi_i0)**2)
             
-#            print 'O phi',phi_ie+phi_ie_offset,phi_ie+phi_ie_offset-(theta-pi)
             # From the fixed origin to the fixed scroll using the same bounding angles
             # as for the orbiting scroll
             VIa=h*rb**2/6.0*((phi_ie-phi_o0)**3-(phi_ie-(theta-pi)-phi_o0)**3)

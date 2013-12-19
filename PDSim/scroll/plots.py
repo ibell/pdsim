@@ -1,22 +1,19 @@
 
 fig_size =  [8,10]
 
-import glob
 import math
-from math import atan2
 import numpy as np
 import pylab
 from pylab import arange,pi,sin,cos,sqrt,tan
 import threading
 import wx
 
-import os,subprocess
+import os
 #import scrollCalcs as Calcs
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
 global geo,setDiscGeo,coords_inv,circle,sortAnglesCCW,Shave,plotScrollSet
 global polyarea,theta_d
-import scipy.optimize as optimize
 import matplotlib.pyplot as pyplot
     
 class geoVals:
@@ -280,200 +277,6 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
 #        pylab.show()
     else:
         print 'Type not understood:',Type
-        
-         
-    
-def phi_ssa(theta,**kwargs):
-    """
-    Returns the break angle on the outer involute of
-    the orbiting scroll which defines the line between the 
-    :math:: 'sa' and s1 chambers scroll wrap c
-
-    Arguments:
-        theta : float
-            The crank angle in radians
-
-    Optional Parameters
-    
-    ======  =======================================
-    key     value
-    ======  =======================================
-    geo     The class that defines the geometry of the compressor.
-    ======  =======================================
-
-    """
-    if 'geo' in kwargs:
-        geo=kwargs['geo']
-    else:
-        geo=LoadGeo()
-    #residual function to be minimized to get the intersection line
-    def f(phi_ssa):
-        (xe,ye)=coords_inv(geo.phi_ie, geo, theta, 'fi')
-        (xssa,yssa)=coords_inv(phi_ssa, geo, theta, 'oo')
-        return xssa*ye-yssa*xe
-    phissa=optimize.fsolve(f, geo.phi_ie-pi)
-    return phissa
-
-def Nc(theta,**kwargs):
-    """ 
-    The number of pairs of compression chambers in existence at a given 
-    crank angle 
-    
-    Arguments:
-        theta : float
-            The crank angle in radians.
-
-    Returns:
-        Nc : int
-            Number of pairs of compressions chambers
-
-    Optional Parameters
-    
-    ======  =======================================
-    key     value
-    ======  =======================================
-    geo     The class that defines the geometry of the compressor.
-    ======  =======================================
-        
-    """
-    
-    geo=kwargs.get('geo',LoadGeo())
-    return int(np.floor((geo.phi_ie-theta-geo.phi_os-pi)/(2*pi)))
-    
-def theta_d(**kwargs):  
-    """ 
-    Discharge angle
-    
-    Optional Parameters
-    
-    ======  =======================================
-    key     value
-    ======  =======================================
-    geo     The class that defines the geometry of the compressor.
-    ======  =======================================
-    """
-    geo=kwargs.get('geo',LoadGeo())
-    N_c_max=np.floor((geo.phi_ie-geo.phi_os-pi)/(2*pi))
-    return geo.phi_ie-geo.phi_os-2*pi*N_c_max-pi    
-    
-def Vdisp(geo):
-    """ 
-    Displacement of the compressor in m^3
-    
-    Arguments:
-        geo : geoVals class
-            The class that contains the geometric parameters
-    """
-    return -2.0*pi*geo.h*geo.rb*geo.ro*(3.0*pi-2.0*geo.phi_ie+geo.phi_i0+geo.phi_o0)
-
-def coords_inv(phi_vec,geo,theta,flag="fi"):
-    """ 
-    The involute angles corresponding to the points along the involutes
-    (fixed inner [fi], fixed scroll outer involute [fo], orbiting
-    scroll outer involute [oo], and orbiting scroll inner involute [oi] )
-    
-    Arguments:
-        phi_vec : 1D numpy array
-            vector of involute angles
-        geo : geoVals class
-            scroll compressor geometry
-        theta : float
-            crank angle in the range 0 to :math: `2\pi`
-        flag : string
-            involute of interest, possible values are 'fi','fo','oi','oo'
-            
-    Returns:
-        (x,y) : tuple of coordinates on the scroll
-    """
-    
-    pi=math.pi
-    phi_i0=geo.phi_i0
-    phi_o0=geo.phi_o0
-    phi_ie=geo.phi_ie
-    rb=geo.rb
-    # if a single value is passed in, convert it 
-    # to a one-element array
-    if not type(phi_vec) is np.ndarray:
-        if type(phi_vec) is list:
-            phi_vec=np.array(phi_vec)
-        else:
-            phi_vec=np.array([phi_vec])
-    x=np.zeros(np.size(phi_vec))
-    y=np.zeros(np.size(phi_vec))
-    ro=rb*(pi-phi_i0+phi_o0)
-    om=phi_ie-theta+3.0*pi/2.0
-
-    for i in range(len(phi_vec)):
-        phi=phi_vec[i]
-        if flag=="fi":
-            x[i] = rb*cos(phi)+rb*(phi-phi_i0)*sin(phi)
-            y[i] = rb*sin(phi)-rb*(phi-phi_i0)*cos(phi)
-        elif flag=="fo":
-            x[i] = rb*cos(phi)+rb*(phi-phi_o0)*sin(phi)
-            y[i] = rb*sin(phi)-rb*(phi-phi_o0)*cos(phi)
-        elif flag=="oi":
-            x[i] = -rb*cos(phi)-rb*(phi-phi_i0)*sin(phi)+ro*cos(om)
-            y[i] = -rb*sin(phi)+rb*(phi-phi_i0)*cos(phi)+ro*sin(om)
-        elif flag=="oo":
-            x[i] = -rb*cos(phi)-rb*(phi-phi_o0)*sin(phi)+ro*cos(om)
-            y[i] = -rb*sin(phi)+rb*(phi-phi_o0)*cos(phi)+ro*sin(om)
-        else:
-            print "Uh oh... error in coords_inv"
-    return (x,y)
-
-def coords_norm(phi_vec,geo,theta,flag="fi"):
-    """ 
-    The x and y coordinates of a unit normal vector pointing towards
-    the scroll involute for the the involutes
-    (fixed inner [fi], fixed scroll outer involute [fo], orbiting
-    scroll outer involute [oo], and orbiting scroll inner involute [oi])
-    
-    Arguments:
-        phi_vec : 1D numpy array
-            vector of involute angles
-        geo : geoVals class
-            scroll compressor geometry
-        theta : float
-            crank angle in the range 0 to :math: `2\pi`
-        flag : string
-            involute of interest, possible values are 'fi','fo','oi','oo'
-            
-    Returns:
-        (nx,ny) : tuple of unit normal coordinates pointing towards scroll wrap
-    """
-    
-    pi=math.pi
-    phi_i0=geo.phi_i0
-    phi_o0=geo.phi_o0
-    phi_ie=geo.phi_ie
-    rb=geo.rb
-    if not type(phi_vec) is np.ndarray:
-        if type(phi_vec) is list:
-            phi_vec=np.array(phi_vec)
-        else:
-            phi_vec=np.array([phi_vec])
-    nx=np.zeros(np.size(phi_vec))
-    ny=np.zeros(np.size(phi_vec))
-
-    for i in arange(np.size(phi_vec)):
-        phi=phi_vec[i]
-        if flag=="fi":
-            nx[i] = +sin(phi)
-            ny[i] = -cos(phi)
-        elif flag=="fo":
-            nx[i] = -sin(phi)
-            ny[i] = +cos(phi)
-        elif flag=="oi":
-            nx[i] = -sin(phi)
-            ny[i] = +cos(phi)
-        elif flag=="oo":
-            nx[i] = +sin(phi)
-            ny[i] = -cos(phi)
-        else:
-            print "Uh oh... error in coords_norm"
-    return (nx,ny)
-
-
 
 def circle(xo,yo,r,N=100):
     x=np.zeros(N)
@@ -493,8 +296,6 @@ def CMMarker(x,y,r,lw=1,fill='k',fill2='w',zorder=4):
     pylab.gca().fill(np.r_[x,xc[3*N:4*N+1]],np.r_[y,yc[3*N:4*N+1]],fill2,zorder=zorder)
     pylab.gca().fill(np.r_[x,xc[0:N+1]],np.r_[y,yc[0:N+1]],fill,zorder=zorder)
     pylab.gca().fill(np.r_[x,xc[2*N:3*N+1]],np.r_[y,yc[2*N:3*N+1]],fill,zorder=zorder)
-    
-
 
 def sortAnglesCCW(t1,t2):
     """
@@ -558,13 +359,13 @@ def sortAnglesCW(t1,t2):
     return (t1,t2)
 
 def Shave(geo,theta,shaveDelta):
-    phiShave=geo.phi_oe-shaveDelta;
+    from PDSim.scroll import scroll_geo
     
-    phi=np.linspace(geo.phi_oe-shaveDelta,geo.phi_oe,200)
-    (xo,yo)=coords_inv(phi,geo,theta,"oo")
-    (xi,yi)=coords_inv(phi,geo,theta,"oi")
+    phi=np.linspace(geo.phi_ooe-shaveDelta,geo.phi_ooe,200)
+    (xo,yo)=scroll_geo.coords_inv(phi,geo,theta,"oo")
+    (xi,yi)=scroll_geo.coords_inv(phi,geo,theta,"oi")
     
-    z=(1-0.8*(phi-(geo.phi_oe-shaveDelta))/(shaveDelta))
+    z=(1-0.8*(phi-(geo.phi_ooe-shaveDelta))/(shaveDelta))
     xnew=z*xo+(1-z)*xi
     ynew=z*yo+(1-z)*yi
     return (xnew,ynew)
@@ -773,19 +574,15 @@ def polycentroid(xi,yi):
         sumy=sumy+(y[i]+y[i+1])*(x[i]*y[i+1]-x[i+1]*y[i])
     return sumx/(6*polyarea(x,y)),sumy/(6*polyarea(x,y))
     
-
-
 def CoordsOrbScroll(theta,geo,shaveOn=True, just_involutes = False, Ndict = {}):
+    
+    from PDSim.scroll import scroll_geo
+    
     shaveDelta=None
     if shaveOn==True:
         shaveDelta = pi/2
     else:
         shaveDelta = 1e-16
-        
-    if geo.phi_ie_offset > 0.0:
-        offsetDelta = geo.phi_ie_offset - pi
-    else:
-        offsetDelta = 0
     
     (xshave, yshave) = Shave(geo, theta, shaveDelta)
     
@@ -794,10 +591,10 @@ def CoordsOrbScroll(theta,geo,shaveOn=True, just_involutes = False, Ndict = {}):
     Nline = Ndict.get('line',100)
     Narc2 = Ndict.get('arc2',100)
     
-    phi = np.linspace(geo.phi_is,geo.phi_ie + offsetDelta, Nphi)
-    (x_oi,y_oi)=coords_inv(phi,geo,theta,flag="oi")
-    phi = np.linspace(geo.phi_os,geo.phi_oe - shaveDelta + offsetDelta, Nphi)
-    (x_oo,y_oo)=coords_inv(phi,geo,theta,flag="oo")
+    phi = np.linspace(geo.phi_ois, geo.phi_oie, Nphi)
+    (x_oi,y_oi) = scroll_geo.coords_inv(phi,geo,theta,flag="oi")
+    phi = np.linspace(geo.phi_oos, geo.phi_ooe - shaveDelta, Nphi)
+    (x_oo,y_oo) = scroll_geo.coords_inv(phi,geo,theta,flag="oo")
     
     xarc1=geo.xa_arc1+geo.ra_arc1*cos(np.linspace(geo.t2_arc1,geo.t1_arc1,Narc1))
     yarc1=geo.ya_arc1+geo.ra_arc1*sin(np.linspace(geo.t2_arc1,geo.t1_arc1,Narc1))
@@ -806,8 +603,8 @@ def CoordsOrbScroll(theta,geo,shaveOn=True, just_involutes = False, Ndict = {}):
     xarc2=geo.xa_arc2+geo.ra_arc2*cos(np.linspace(geo.t1_arc2,geo.t2_arc2,Narc2))
     yarc2=geo.ya_arc2+geo.ra_arc2*sin(np.linspace(geo.t1_arc2,geo.t2_arc2,Narc2))
     
-    ro=geo.rb*(pi-geo.phi_i0+geo.phi_o0)
-    om=geo.phi_ie-theta+3.0*pi/2.0
+    ro = geo.rb*(pi-geo.phi_fi0+geo.phi_fo0)
+    om = geo.phi_fie-theta+3.0*pi/2.0
     xarc1_o=-xarc1+ro*cos(om)
     yarc1_o=-yarc1+ro*sin(om)
     xline_o=-xline+ro*cos(om)
@@ -864,6 +661,7 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
         
 
     """
+    from PDSim.scroll import scroll_geo
 
     if axis is None:
         if fig is None:
@@ -888,25 +686,25 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
         #Turn off shaving of the orbiting scroll
         kwargs['shaveOn'] = False
         
-        # This is the part of the fixed scroll forming the extension for
-        # the offset scroll pocket
-        phi  = np.linspace(geo.phi_ie, geo.phi_ie+geo.phi_ie_offset,1000)
-        x,y = coords_inv(phi, geo, 0.0, 'fi')
-        axis.plot(x,y,'k')
+#        # This is the part of the fixed scroll forming the extension for
+#        # the offset scroll pocket
+#        phi  = np.linspace(geo.phi_fie, geo.phi_fie+geo.phi_ie_offset,1000)
+#        x,y = scroll_geo.coords_inv(phi, geo, 0.0, 'fi')
+#        axis.plot(x,y,'k')
 #        phi  = np.linspace(geo.phi_ie,geo.phi_ie+1.02*pi,1000)
 #        x,y = coords_inv(phi,geo,theta,'oo')
 #        axis.plot(x,y,'r--')
         
-        # pitch (involute-involute distance for a given involute) 
-        # for 2*pi radians or one rotation is equal to 2*pi*rb, subtract 
-        # thickness of scroll to get diameter
-        # and divide by two to get radius of closing arc for offset region
+#         pitch (involute-involute distance for a given involute) 
+#         for 2*pi radians or one rotation is equal to 2*pi*rb, subtract 
+#         thickness of scroll to get diameter
+#         and divide by two to get radius of closing arc for offset region
         r = (2*pi*geo.rb-geo.t)/2.0
         
-        xee,yee = coords_inv(phi[-1],geo,0.0,'fi')
-        xse,yse = coords_inv(phi[-1]-2*pi,geo,0.0,'fo')
+        xee,yee = scroll_geo.coords_inv(geo.phi_fie,geo,0.0,'fi')
+        xse,yse = scroll_geo.coords_inv(geo.phi_foe-2*pi,geo,0.0,'fo')
         x0,y0 = (xee+xse)/2,(yee+yse)/2
-        
+
         beta = math.atan2(yee-y0,xee-x0)
         t = np.linspace(beta,beta+pi,1000)
         x,y = x0+r*np.cos(t),y0+r*np.sin(t)
@@ -920,8 +718,8 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
     xarc2=geo.xa_arc2+geo.ra_arc2*cos(np.linspace(geo.t1_arc2,geo.t2_arc2,100))
     yarc2=geo.ya_arc2+geo.ra_arc2*sin(np.linspace(geo.t1_arc2,geo.t2_arc2,100))
     
-    ro=geo.rb*(pi-geo.phi_i0+geo.phi_o0)
-    om=geo.phi_ie-theta+3.0*pi/2.0
+    ro=geo.rb*(pi-geo.phi_fi0+geo.phi_fo0)
+    om=geo.phi_fie-theta+3.0*pi/2.0
     xarc1_o=-xarc1+ro*cos(om)
     yarc1_o=-yarc1+ro*sin(om)
     xline_o=-xline+ro*cos(om)
@@ -930,10 +728,10 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
     yarc2_o=-yarc2+ro*sin(om)
     
     ##Fixed Scroll
-    phi=np.linspace(geo.phi_is,geo.phi_ie,500)
-    (x_fi,y_fi)=coords_inv(phi,geo,theta,flag="fi")
-    phi=np.linspace(geo.phi_os,geo.phi_oe,500)
-    (x_fo,y_fo)=coords_inv(phi,geo,theta,flag="fo")
+    phi=np.linspace(geo.phi_fis,geo.phi_fie,500)
+    (x_fi,y_fi)=scroll_geo.coords_inv(phi,geo,theta,flag="fi")
+    phi=np.linspace(geo.phi_fos,geo.phi_foe,500)
+    (x_fo,y_fo)=scroll_geo.coords_inv(phi,geo,theta,flag="fo")
     
     ## Discharge port
     if 'discOn' in kwargs and kwargs['discOn']==True:
