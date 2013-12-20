@@ -19,7 +19,7 @@ from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo
 from PDSim.core.core import struct
-from PDSim.scroll.core import Scroll
+from PDSim.scroll.asymm import Scroll
 from PDSim.core.containers import ControlVolume
 from PDSim.core.core import Tube
 from PDSim.plot.plots import debug_plots
@@ -36,9 +36,6 @@ import time
 
 Injection = False
 check_valve = False
-
-## CP.enable_TTSE_LUT('Propane')
-## CP.set_TTSE_mode('Propane',"BICUBIC")
 
 def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     if TTSE:

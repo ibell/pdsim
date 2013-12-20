@@ -2,11 +2,7 @@
 from PDSim.flow import flow_models
 from PDSim.flow cimport flow_models
 
-from PDSim.scroll import scroll_geo
-from PDSim.scroll cimport scroll_geo
-
-from PDSim.scroll.scroll_geo import Area_s_sa
-from PDSim.scroll.scroll_geo cimport Area_s_sa
+from PDSim.scroll cimport common_scroll_geo, symm_scroll_geo
 
 from libc.math cimport M_PI as pi
 
@@ -22,7 +18,7 @@ cdef class _Scroll(object):
                     HTC = self.HTC)
     
     cpdef double SA_S(self, FlowPath FP):
-        FP.A = scroll_geo.Area_s_sa(self.theta, self.geo)
+        FP.A = common_scroll_geo.Area_s_sa(self.theta, self.geo)
         try:
             return flow_models.IsentropicNozzle(FP.A,FP.State_up,FP.State_down)
         except ZeroDivisionError:
@@ -54,10 +50,10 @@ cdef class _Scroll(object):
         #Calculate the area
         #Arc length of the upstream part of the flow path
         
-        FP.A = scroll_geo.radial_leakage_area(self.theta,
-                                              self.geo,
-                                              FP.key1Index,
-                                              FP.key2Index)
+        FP.A = common_scroll_geo.radial_leakage_area(self.theta,
+                                                      self.geo,
+                                                      FP.key1Index,
+                                                      FP.key2Index)
         
         if FP.A == 0.0:
             return 0.0
@@ -90,7 +86,7 @@ cdef class _Scroll(object):
         cdef double t = -1.0 #Default (not-provided) value
         
         if Ncv_check > -1:
-            if Ncv_check == scroll_geo.getNc(self.theta, self.geo):
+            if Ncv_check == common_scroll_geo.getNc(self.theta, self.geo):
                 _evaluate = True
             else:
                 _evaluate = False
@@ -114,7 +110,7 @@ cdef class _Scroll(object):
             
         
     cpdef double calcHT(self, double theta, bytes key, double HTC_tune, double dT_dphi, double phim) except *: 
-        cdef scroll_geo.HTAnglesClass angles
+        cdef symm_scroll_geo.HTAnglesClass angles
         cdef double hc,Q_outer_wrap,Q_inner_wrap,Q_d1,Q_d2,Q_dd,T_CV,T_scroll
         
         ## If HT is turned off, no heat transfer
@@ -132,7 +128,7 @@ cdef class _Scroll(object):
         hc = self.HTC #[kW/m2/K]
             
         #Get the bounding angles for the control volume
-        angles = scroll_geo.HT_angles(theta, self.geo, key)
+        angles = symm_scroll_geo.HT_angles(theta, self.geo, key)
         
         T_scroll = self.Tlumps[0]
         T_CV = self.CVs[key].State.T

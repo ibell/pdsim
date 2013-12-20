@@ -15,6 +15,7 @@ from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
 global geo,setDiscGeo,coords_inv,circle,sortAnglesCCW,Shave,plotScrollSet
 global polyarea,theta_d
 import matplotlib.pyplot as pyplot
+from PDSim.scroll import common_scroll_geo
     
 class geoVals:
     """ 
@@ -787,6 +788,83 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
         pylab.show()
         
     return OrbScroll
+    
+def overlay_injection_port(theta, geo, phi, ax, inner_outer, rport = None, offset = None):
+    """
+    Plot the injection ports on an axis - no scroll wrap plot is generated.  Also see
+    plot_injection_ports()
+    
+    Parameters
+    ---------- 
+    theta : float
+        crank angle in the range [0, :math:`2\pi`] 
+    geo : geoVals instance
+    phi : float
+        Involute angle in radians
+    ax : matplotlib axis instance
+    inner_outer : string
+        If ``'i'``, phi is along the inner involute of the fixed scroll
+        
+        If ``'o'``, phi is along the outer involute of the fixed scroll
+        
+    Notes
+    -----
+    If you want symmetric injection ports, the ones on the inner involute 
+    should have a value of phi that is pi radians greater than those on the 
+    outer involute
+    
+    """
+    
+    #Common terms
+    if rport is None:
+        rport = geo.t/2.0
+    if offset is None:
+        offset = rport/2.0
+    t = np.linspace(0,2*pi,100)
+    
+    if inner_outer == 'o':
+        #Involute angle along the outer involute of the scroll wrap
+        x, y = core_scroll_geo.coords_inv(phi, geo, theta, 'fo')
+        nx, ny = core_scroll_geo.coords_norm(phi, geo, theta, 'fo')
+        xc,yc = x-nx*offset,y-ny*offset
+        ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
+    elif inner_outer == 'i':
+        x, y = core_scroll_geo.coords_inv(phi, geo, theta, 'fi')
+        nx, ny = core_scroll_geo.coords_norm(phi, geo, theta, 'fi')
+        xc,yc = x-nx*offset,y-ny*offset
+        ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
+    else:
+        raise KeyError
+    
+def plot_injection_ports(theta, geo, phi, ax, inner_outer):
+    """
+    Plot the injection ports
+    
+    Parameters
+    ---------- 
+    theta : float
+        crank angle in the range [0, :math:`2\pi`] 
+    geo : geoVals instance
+    phi : float
+        Involute angle in radians
+    ax : matplotlib axis instance
+    inner_outer : string
+        If ``'i'``, phi is along the inner involute of the fixed scroll
+        
+        If ``'o'``, phi is along the outer involute of the fixed scroll
+        
+    Notes
+    -----
+    If you want symmetric injection ports, the ones on the inner involute 
+    should have a value of phi that is pi radians greater than those on the 
+    outer involute
+    
+    """
+    #Plot the scrolls (symmetric)
+    plotScrollSet(theta, geo, axis = ax)
+    
+    #Plot the port
+    core_scroll_geo.overlay_injection_port(theta, geo, phi, ax, inner_outer)
 
 
 class PlotPanel(wx.Panel):

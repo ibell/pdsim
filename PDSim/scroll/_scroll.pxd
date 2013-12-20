@@ -9,10 +9,9 @@ from PDSim.flow.flow import FlowPath
 from PDSim.flow.flow cimport FlowPath
 
 from PDSim.scroll import scroll_geo
-from PDSim.scroll cimport scroll_geo
 
-from PDSim.scroll.scroll_geo import geoVals
-from PDSim.scroll.scroll_geo cimport geoVals
+from PDSim.scroll.common_scroll_geo import geoVals
+from PDSim.scroll.common_scroll_geo cimport geoVals
     
 cdef class _Scroll(object):
     cdef public geoVals geo

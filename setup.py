@@ -30,6 +30,13 @@ import sys, shutil, os, glob
 
 version = '2.6.2'
 
+if len(sys.argv) == 1:
+#      sys.argv += ['build_ext','--inplace','install']
+#    sys.argv += ['build','build_ext','install']
+#    sys.argv += ['build','install']
+    sys.argv += ['build','install']
+    
+
 #Modify the __init__ file with this version string
 fName = os.path.join('PDSim','__init__.py')
 lines = open(fName,'r').readlines()
@@ -40,11 +47,7 @@ for line in lines:
     fp.write(line+'\n')
 fp.close()
 
-if len(sys.argv) == 1:
-#      sys.argv += ['build_ext','--inplace','install']
-#    sys.argv += ['build','build_ext','install']
-#    sys.argv += ['build','install']
-    sys.argv += ['build','install']
+
 
 import Cython
 
@@ -65,11 +68,14 @@ pyx_list = [
             "PDSim/flow/flow_models.pyx",
             "PDSim/flow/flow.pyx",
             "PDSim/flow/fanno.pyx",
-            "PDSim/scroll/scroll_geo.pyx",
+            
             "PDSim/misc/stl_utilities.pyx",
             "PDSim/misc/datatypes.pyx",
             "PDSim/misc/clipper/pyclipper.pyx",
             "PDSim/recip/_recip.pyx",
+            "PDSim/scroll/common_scroll_geo.pyx",
+            "PDSim/scroll/symm_scroll_geo.pyx",
+           #"PDSim/scroll/asymm_scroll_geo.pyx",
             "PDSim/scroll/_scroll.pyx"
             ]
 

@@ -60,12 +60,10 @@ class Scroll(PDSimCore, _Scroll):
     This is a python class that implements functionality for a scroll compressor
     
     It is inherited from the PDSimCore class
-    """
     
-    # Bind some of the cython methods from the base class so that they can
-    # pickle properly
-    # To add method to existing instance, see http://stackoverflow.com/questions/972/adding-a-method-to-an-existing-object
-    #RadialLeakage = _Scroll.RadialLeakage
+    This class is only to be used for symmetric scroll wraps, for asymmetric 
+    scroll wraps, use the AsymmetricScroll class
+    """
     
     def __init__(self):
         PDSimCore.__init__(self)
@@ -256,12 +254,12 @@ class Scroll(PDSimCore, _Scroll):
         scaled_xport = xport*scale_factor
         scaled_yport = yport*scale_factor
         
-        xinvi, yinvi = scroll_geo.coords_inv(np.linspace(self.geo.phi_is+pi/2,self.geo.phi_is,75), self.geo, 0, flag="fi")
+        xinvi, yinvi = scroll_geo.coords_inv(np.linspace(self.geo.phi_fis+pi/2,self.geo.phi_fis,75), self.geo, 0, flag="fi")
         xarc1 = self.geo.xa_arc1 + self.geo.ra_arc1*np.cos(np.linspace(self.geo.t2_arc1,self.geo.t1_arc1,75))
         yarc1 = self.geo.ya_arc1 + self.geo.ra_arc1*np.sin(np.linspace(self.geo.t2_arc1,self.geo.t1_arc1,75))
         xarc2 = self.geo.xa_arc2 + self.geo.ra_arc2*np.cos(np.linspace(self.geo.t1_arc2,self.geo.t2_arc2,75))
         yarc2 = self.geo.ya_arc2 + self.geo.ra_arc2*np.sin(np.linspace(self.geo.t1_arc2,self.geo.t2_arc2,75))
-        xinvo, yinvo = scroll_geo.coords_inv(np.linspace(self.geo.phi_os,self.geo.phi_os+3*pi/2,75), self.geo, 0, flag="fo")
+        xinvo, yinvo = scroll_geo.coords_inv(np.linspace(self.geo.phi_fos,self.geo.phi_fos+3*pi/2,75), self.geo, 0, flag="fo")
         
         if plot:
             fig = plt.figure()
@@ -270,7 +268,7 @@ class Scroll(PDSimCore, _Scroll):
         t, A, Add, Ad1, Ac1_N, Ac1_Nm1 = [], [], [], [], [], []
         for i,theta in enumerate(np.linspace(0, 2*pi, 100)):
             
-            THETA = self.geo.phi_ie-pi/2.0-theta
+            THETA = self.geo.phi_fie-pi/2.0-theta
             
             xdd, ydd = scroll_geo.CVcoords('dd',self.geo,theta)
             xd1, yd1 = scroll_geo.CVcoords('d1',self.geo,theta)
@@ -422,14 +420,14 @@ class Scroll(PDSimCore, _Scroll):
     @property
     def Vdisp(self):
         return -2*pi*self.geo.h*self.geo.rb*self.geo.ro*(3*pi
-                                                         -2*self.geo.phi_ie
-                                                         +self.geo.phi_i0
-                                                         +self.geo.phi_o0)
+                                                         -2*self.geo.phi_fie
+                                                         +self.geo.phi_fi0
+                                                         +self.geo.phi_oo0)
     
     @property
     def Vratio(self):
-        return ((3*pi-2*self.geo.phi_ie+self.geo.phi_i0+self.geo.phi_o0)
-                /(-2*self.geo.phi_os-3*pi+self.geo.phi_i0+self.geo.phi_o0))
+        return ((3*pi-2*self.geo.phi_fie+self.geo.phi_fi0+self.geo.phi_oo0)
+                /(-2*self.geo.phi_oos-3*pi+self.geo.phi_fi0+self.geo.phi_oo0))
     
     def V_injection(self, theta, V_tube = None):
         """
@@ -1159,8 +1157,8 @@ class Scroll(PDSimCore, _Scroll):
 
         Tsuction = State_inlet.T
         Tdischarge = State_outlet.T
-        dT_dphi = (Tsuction - Tdischarge) / (self.geo.phi_ie - self.geo.phi_os)
-        phim = 0.5*self.geo.phi_ie + 0.5*self.geo.phi_os
+        dT_dphi = (Tsuction - Tdischarge) / (self.geo.phi_fie - self.geo.phi_oos)
+        phim = 0.5*self.geo.phi_fie + 0.5*self.geo.phi_oos
         
         Q = []
         for key in self.CVs.exists_keys:
@@ -1972,112 +1970,112 @@ class Scroll(PDSimCore, _Scroll):
         except ZeroDivisionError:
             return 0.0
         
-    def _get_injection_CVkey(self,phi,theta,inner_outer):
-        """
-        Find the CV that is in contact with the given injection port location
-        
-        Parameters
-        ----------
-        phi : float
-            Involute angle of the injection port location
-        theta : float
-            Crank angle in radians in the range [:math:`0,2\pi`]
-        inner_outer : string ['i','o']
-            'i' : involute angle corresponds to outer surface of fixed scroll
-            'o' : involute angle corresponds to inner surface of orb. scroll 
-            
-        Notes
-        -----
-        Typically 'i' will require a positive offset in involute angle of 
-        :math:`\pi` radians
-        """
-        if inner_outer == 'i':
-            phi_0 = self.geo.phi_i0
-            phi_s = self.geo.phi_is
-            phi_e = self.geo.phi_ie
-        elif inner_outer == 'o':
-            phi_0 = self.geo.phi_o0
-            phi_s = self.geo.phi_os
-            phi_e = self.geo.phi_oe-pi # The actual part of the wrap that could 
-                                       # have an injection port 
-        
-        Nc = scroll_geo.getNc(theta, self.geo)    
-        #Start at the outside of the given scroll wrap
-        # x1 where x is s,d,c has the inner involute of the fixed scroll as 
-        # its outer surface
-        if phi_e > phi > phi_e-theta:     
-            #It is a suction chamber    
-            return 's1' if inner_outer == 'i' else 's2'
-            
-        elif phi_e-theta > phi > phi_e-theta-2*pi*Nc:
-            #It is one of the compression chambers, figure out which one
-            for I in range(Nc+1):
-                if phi_e - theta - 2*pi*(I-1) > phi > phi_e - theta - 2*pi*I:
-                    i_str = '.'+str(I)
-                    break
-            return 'c1'+i_str if inner_outer == 'i' else 'c2'+i_str
-        
-        else:
-            return 'd1' if inner_outer == 'i' else 'd2'
-        
-    def Injection_to_Comp(self,FlowPath,phi,inner_outer,check_valve = False, A = 7e-6, **kwargs):
-        """
-        Function to calculate flow rate between injection line and chamber
-        
-        Parameters
-        ----------
-        FlowPath : FlowPath instance
-        phi : involute angle where the port is located
-        inner_outer : string ['i','o']
-            'i' : involute angle corresponds to outer surface of fixed scroll
-            'o' : involute angle corresponds to inner surface of orb. scroll 
-        check_valve : boolean
-            If ``True``, there is an idealized check valve and flow can only go 
-            from chambers with key names that start with `injCV` to other chambers.
-            If ``False``, flow can go either direction
-        
-        """
-        #1. Figure out what CV is connected to the port
-        partner_key = self._get_injection_CVkey(phi, self.theta, inner_outer)
-        FlowPath.A = A
-        #2. Based on what CV is connected to the port, maybe quit
-        if partner_key in ['d1', 'd2'] and 'ddd' in [FlowPath.key_up, 
-                                                     FlowPath.key_down]:
-            # Other chamber based on geometry is d1 or d2 but they are not 
-            # defined due to the angle but ddd is, and as a result, use 
-            # ddd
-            #
-            # Don't do anything, just let it go to the next section even though
-            # 'd1' or 'd2 is not key_up or key_down 
-            pass
-        
-        elif partner_key not in [FlowPath.key_up, FlowPath.key_down]:
-            return 0.0
-        # If the pressure in the injection line is below the other chamber and 
-        # you are using a theoretical check valve with instantaneous closing, 
-        # then there is no back flow, and hence no flow at all
-        elif check_valve:
-            if FlowPath.key_down.startswith('inj'):
-                return 0.0
-            
-#                #This will be negative
-#                DELTAp = FlowPath.State_down.p - FlowPath.State_up.p
-#            else:
-#                #This will be positive
-#                DELTAp = FlowPath.State_up.p - FlowPath.State_down.p 
+#    def _get_injection_CVkey(self,phi,theta,inner_outer):
+#        """
+#        Find the CV that is in contact with the given injection port location
+#        
+#        Parameters
+#        ----------
+#        phi : float
+#            Involute angle of the injection port location
+#        theta : float
+#            Crank angle in radians in the range [:math:`0,2\pi`]
+#        inner_outer : string ['i','o']
+#            'i' : involute angle corresponds to outer surface of fixed scroll
+#            'o' : involute angle corresponds to inner surface of orb. scroll 
 #            
-#            # Using an approximation to a Heaviside step function to close off the
-#            # port gradually and improve numerical convergence due to continuous
-#            # first derivative
-#            if -10 < DELTAp < 10.0:
-#                FlowPath.A *=  1/(1+np.exp(-10*(DELTAp-2)))
-#            elif DELTAp < -10.0:
+#        Notes
+#        -----
+#        Typically 'i' will require a positive offset in involute angle of 
+#        :math:`\pi` radians
+#        """
+#        if inner_outer == 'i':
+#            phi_0 = self.geo.phi_i0
+#            phi_s = self.geo.phi_is
+#            phi_e = self.geo.phi_ie
+#        elif inner_outer == 'o':
+#            phi_0 = self.geo.phi_o0
+#            phi_s = self.geo.phi_os
+#            phi_e = self.geo.phi_oe-pi # The actual part of the wrap that could 
+#                                       # have an injection port 
+#        
+#        Nc = scroll_geo.getNc(theta, self.geo)    
+#        #Start at the outside of the given scroll wrap
+#        # x1 where x is s,d,c has the inner involute of the fixed scroll as 
+#        # its outer surface
+#        if phi_e > phi > phi_e-theta:     
+#            #It is a suction chamber    
+#            return 's1' if inner_outer == 'i' else 's2'
+#            
+#        elif phi_e-theta > phi > phi_e-theta-2*pi*Nc:
+#            #It is one of the compression chambers, figure out which one
+#            for I in range(Nc+1):
+#                if phi_e - theta - 2*pi*(I-1) > phi > phi_e - theta - 2*pi*I:
+#                    i_str = '.'+str(I)
+#                    break
+#            return 'c1'+i_str if inner_outer == 'i' else 'c2'+i_str
+#        
+#        else:
+#            return 'd1' if inner_outer == 'i' else 'd2'
+#        
+#    def Injection_to_Comp(self,FlowPath,phi,inner_outer,check_valve = False, A = 7e-6, **kwargs):
+#        """
+#        Function to calculate flow rate between injection line and chamber
+#        
+#        Parameters
+#        ----------
+#        FlowPath : FlowPath instance
+#        phi : involute angle where the port is located
+#        inner_outer : string ['i','o']
+#            'i' : involute angle corresponds to outer surface of fixed scroll
+#            'o' : involute angle corresponds to inner surface of orb. scroll 
+#        check_valve : boolean
+#            If ``True``, there is an idealized check valve and flow can only go 
+#            from chambers with key names that start with `injCV` to other chambers.
+#            If ``False``, flow can go either direction
+#        
+#        """
+#        #1. Figure out what CV is connected to the port
+#        partner_key = self._get_injection_CVkey(phi, self.theta, inner_outer)
+#        FlowPath.A = A
+#        #2. Based on what CV is connected to the port, maybe quit
+#        if partner_key in ['d1', 'd2'] and 'ddd' in [FlowPath.key_up, 
+#                                                     FlowPath.key_down]:
+#            # Other chamber based on geometry is d1 or d2 but they are not 
+#            # defined due to the angle but ddd is, and as a result, use 
+#            # ddd
+#            #
+#            # Don't do anything, just let it go to the next section even though
+#            # 'd1' or 'd2 is not key_up or key_down 
+#            pass
+#        
+#        elif partner_key not in [FlowPath.key_up, FlowPath.key_down]:
+#            return 0.0
+#        # If the pressure in the injection line is below the other chamber and 
+#        # you are using a theoretical check valve with instantaneous closing, 
+#        # then there is no back flow, and hence no flow at all
+#        elif check_valve:
+#            if FlowPath.key_down.startswith('inj'):
 #                return 0.0
-        
-        mdot = flow_models.IsentropicNozzle(FlowPath.A,
-                                            FlowPath.State_up,
-                                            FlowPath.State_down)
-        return mdot
+#            
+##                #This will be negative
+##                DELTAp = FlowPath.State_down.p - FlowPath.State_up.p
+##            else:
+##                #This will be positive
+##                DELTAp = FlowPath.State_up.p - FlowPath.State_down.p 
+##            
+##            # Using an approximation to a Heaviside step function to close off the
+##            # port gradually and improve numerical convergence due to continuous
+##            # first derivative
+##            if -10 < DELTAp < 10.0:
+##                FlowPath.A *=  1/(1+np.exp(-10*(DELTAp-2)))
+##            elif DELTAp < -10.0:
+##                return 0.0
+#        
+#        mdot = flow_models.IsentropicNozzle(FlowPath.A,
+#                                            FlowPath.State_up,
+#                                            FlowPath.State_down)
+#        return mdot
         
     def calculate_force_terms(self,
                               orbiting_back_pressure=None):
@@ -2230,7 +2228,7 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.cx_thrust = np.sum(self.forces.cx*self.forces.Fz, axis = 0) / self.forces.summed_gas_Fz
         self.forces.cy_thrust = np.sum(self.forces.cy*self.forces.Fz, axis = 0) / self.forces.summed_gas_Fz
         
-        self.forces.THETA = self.geo.phi_ie-pi/2-self.t[_slice]
+        self.forces.THETA = self.geo.phi_fie-pi/2-self.t[_slice]
         # Position of the pin as a function of crank angle
         self.forces.xpin = self.geo.ro*np.cos(self.forces.THETA)
         self.forces.ypin = self.geo.ro*np.sin(self.forces.THETA)
@@ -2594,64 +2592,64 @@ class Scroll(PDSimCore, _Scroll):
         
         _slice = range(len(theta))
         
-        #Get the break angle (simplified solution)
-        phi_s_sa = self.geo.phi_oe-pi
+        # Get the break angle (simplified solution)
+        phi_s_sa = self.geo.phi_ooe-pi
         
-        #Get the number of compression chambers in existence at each crank angle
+        # Get the number of compression chambers in existence at each crank angle
         nC = np.array([scroll_geo.getNc(t,self.geo) for t in theta])
         
         F = np.zeros_like(self.p)
         F = F[:,_slice]
         
-        #Parameters for the SA chamber
-        phi2 = self.geo.phi_oe
+        # Parameters for the SA chamber
+        phi2 = self.geo.phi_foe
         phi1 = phi_s_sa
-        ds_SA = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_o0*(phi2-phi1))
+        ds_SA = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oo0*(phi2-phi1))
         I = self.CVs.index('sa')
         F[I,:] = ds_SA*self.geo.t/2*(self.p[I,_slice]-p_backpressure)
         
-        #Parameters for the S1 chamber
+        # Parameters for the S1 chamber
         phi2 = phi_s_sa
         phi1 = phi_s_sa-theta
-        ds_S1 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_o0*(phi2-phi1))
+        ds_S1 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oo0*(phi2-phi1))
         I = self.CVs.index('s1')
         F[I,:] = ds_S1*self.geo.t/2*(self.p[I,_slice]-p_backpressure)
         
         # Parameters for the S2 chamber
-        phi2 = self.geo.phi_ie
-        phi1 = self.geo.phi_ie-theta
-        ds_S2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_i0*(phi2-phi1))
+        phi2 = self.geo.phi_oie
+        phi1 = self.geo.phi_oie-theta
+        ds_S2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oi0*(phi2-phi1))
         I = self.CVs.index('s2')
         F[I,:] = ds_S2*self.geo.t/2*(self.p[I,_slice]-p_backpressure)
         
         for I in range(1, scroll_geo.nC_Max(self.geo)+1):
-            phi2 = self.geo.phi_oe-pi-theta-2*pi*(I-1)
-            phi1 = self.geo.phi_oe-pi-theta-2*pi*(I)
-            ds_C1 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_o0*(phi2-phi1))
+            phi2 = self.geo.phi_ooe-pi-theta-2*pi*(I-1)
+            phi1 = self.geo.phi_ooe-pi-theta-2*pi*(I)
+            ds_C1 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oo0*(phi2-phi1))
             ICV = self.CVs.index('c1.'+str(I))
             F[ICV,:] = ds_C1*self.geo.t/2*(self.p[ICV, _slice]-p_backpressure)
             
-            phi2 = self.geo.phi_ie-theta-2*pi*(I-1)
-            phi1 = self.geo.phi_ie-theta-2*pi*(I)
-            ds_C2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_i0*(phi2-phi1))
+            phi2 = self.geo.phi_oie-theta-2*pi*(I-1)
+            phi1 = self.geo.phi_oie-theta-2*pi*(I)
+            ds_C2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oi0*(phi2-phi1))
             ICV = self.CVs.index('c2.'+str(I))
             F[ICV,:] = ds_C2*self.geo.t/2*(self.p[ICV, _slice]-p_backpressure)
         
-        phi2 = self.geo.phi_oe-pi-theta-2*pi*(nC)
-        phi1 = self.geo.phi_os
-        ds_D1 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_o0*(phi2-phi1))
+        phi2 = self.geo.phi_ooe-pi-theta-2*pi*(nC)
+        phi1 = self.geo.phi_oos
+        ds_D1 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oo0*(phi2-phi1))
         ICV = self.CVs.index('d1')
         F[ICV,:] = ds_D1*self.geo.t/2*(self.p[ICV,_slice]-p_backpressure)
         
-        phi2 = self.geo.phi_ie-theta-2*pi*(nC)
-        phi1 = self.geo.phi_is
-        ds_D2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_i0*(phi2-phi1))
+        phi2 = self.geo.phi_oie-theta-2*pi*(nC)
+        phi1 = self.geo.phi_ois
+        ds_D2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oi0*(phi2-phi1))
         ICV = self.CVs.index('d2')
         F[ICV,:] = ds_D2*self.geo.t/2*(self.p[ICV,_slice]-p_backpressure)
         
-        phi2 = self.geo.phi_is
-        phi1 = self.geo.phi_i0
-        ds_DD = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_i0*(phi2-phi1))
+        phi2 = self.geo.phi_ois
+        phi1 = self.geo.phi_oi0
+        ds_DD = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oi0*(phi2-phi1))
         ICV = self.CVs.index('dd')
         F[ICV,:] = ds_DD*self.geo.t/2*(self.p[ICV,_slice]-p_backpressure)
         

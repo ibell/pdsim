@@ -4,183 +4,10 @@ import numpy as np
 import cython
 
 import matplotlib.pyplot as plt
-from PDSim.scroll.plots import plotScrollSet
 
-cdef enum sides:
-    UP
-    DOWN
-    MID
-    
-cdef enum compressor_CV_indices:
-    keyIsa, keyIs1, keyIs2, keyId1, keyId2, keyIdd, keyIddd
-    keyIc1_1, keyIc2_1, keyIc1_2, keyIc2_2,
-    keyIc1_3, keyIc2_3, keyIc1_4, keyIc2_4,
-    keyIc1_5, keyIc2_5, keyIc1_6, keyIc2_6,
-    keyIc1_7, keyIc2_7, keyIc1_8, keyIc2_8,
-    keyIc1_9, keyIc2_9, keyIc1_10,  keyIc2_10
-    
-cpdef long get_compressor_CV_index(str key) except *:
-    """
-    Returns the index defined in the ``compressor_CV_indices`` enum. 
-    """
-    
-    if key == 'sa':
-        return keyIsa
-    elif key == 's1':
-        return keyIs1
-    elif key == 's2':
-        return keyIs2
-    elif key == 'd1':
-        return keyId1
-    elif key == 'd2':
-        return keyId2
-    elif key == 'dd':
-        return keyIdd
-    elif key == 'ddd':
-        return keyIddd
-    elif key == 'c1.1':
-        return keyIc1_1
-    elif key == 'c2.1':
-        return keyIc2_1
-    elif key == 'c1.2':
-        return keyIc1_2
-    elif key == 'c2.2':
-        return keyIc2_2
-    elif key == 'c1.3':
-        return keyIc1_3
-    elif key == 'c2.3':
-        return keyIc2_3
-    elif key == 'c1.4':
-        return keyIc1_4
-    elif key == 'c2.4':
-        return keyIc2_4
-    elif key == 'c1.5':
-        return keyIc1_5
-    elif key == 'c2.5':
-        return keyIc2_5
-    elif key == 'c1.6':
-        return keyIc1_6
-    elif key == 'c2.6':
-        return keyIc2_6
-    elif key == 'c1.7':
-        return keyIc1_7
-    elif key == 'c2.7':
-        return keyIc2_7
-    elif key == 'c1.8':
-        return keyIc1_8
-    elif key == 'c2.8':
-        return keyIc2_8
-    elif key == 'c1.9':
-        return keyIc1_9
-    elif key == 'c2.9':
-        return keyIc2_9
-    elif key == 'c1.10':
-        return keyIc1_10
-    elif key == 'c2.10':
-        return keyIc2_10
-    else:
-        return -1
-    
-cpdef long get_compression_chamber_index(long path, long alpha):
-    """
-    Return the index for the compression chamber with integers
-    
-    """
-    if path == 1:
-        if alpha == 1:
-            return keyIc1_1
-        elif alpha == 2:
-            return keyIc1_2
-        elif alpha == 3:
-            return keyIc1_3
-        elif alpha == 4:
-            return keyIc1_4
-        elif alpha == 5:
-            return keyIc1_5
-        elif alpha == 6:
-            return keyIc1_6
-        elif alpha == 7:
-            return keyIc1_7
-        elif alpha == 8:
-            return keyIc1_8
-        elif alpha == 9:
-            return keyIc1_9
-        elif alpha == 10:
-            return keyIc1_10
-    elif path == 2:
-        if alpha == 1:
-            return keyIc2_1
-        elif alpha == 2:
-            return keyIc2_2
-        elif alpha == 3:
-            return keyIc2_3
-        elif alpha == 4:
-            return keyIc2_4
-        elif alpha == 5:
-            return keyIc2_5
-        elif alpha == 6:
-            return keyIc2_6
-        elif alpha == 7:
-            return keyIc2_7
-        elif alpha == 8:
-            return keyIc2_8
-        elif alpha == 9:
-            return keyIc2_9
-        elif alpha == 10:
-            return keyIc2_10
-    
-# A container for the values for the heat transfer angles
-cdef class HTAnglesClass(object):
-    def __init__(self):
-        pass
-
-#This is a list of all the members in geoVals
-geoValsvarlist=['h','ro','rb','t',
-                'phi_fi0','phi_fis','phi_fie',
-                'phi_fo0','phi_fos','phi_foe',
-                'phi_oi0','phi_ois','phi_oie',
-                'phi_oo0','phi_oos','phi_ooe',
-                'xa_arc1','ya_arc1','ra_arc1','t1_arc1','t2_arc1',
-                'xa_arc2','ya_arc2','ra_arc2','t1_arc2','t2_arc2',
-                'b_line', 't1_line', 't2_line', 'm_line',
-                'x0_wall','y0_wall','r_wall',
-                'delta_radial', 'delta_flank',
-                'phi_ie_offset','delta_suction_offset',
-                'cx_scroll','cy_scroll','V_scroll','Vremove']
- 
-def rebuild_geoVals(d):
-    geo = geoVals()
-    for atr in geoValsvarlist:
-        setattr(geo,atr,d[atr])
-    return geo 
-    
-cdef class geoVals:
-    
-    def __init__(self):
-        self.phi_ie_offset = 0.0
-        
-    def __reduce__(self):
-        d={}
-        for atr in geoValsvarlist:
-            d[atr]=getattr(self,atr)
-        return rebuild_geoVals,(d,)
-    def __repr__(self):
-        s='geoVals instance at '+str(id(self))+'\n'
-        for atr in geoValsvarlist:
-            s+=atr+': '+str(getattr(self,atr))+'\n'
-        return s
-        
-    cpdef bint is_symmetric(self):
-        """
-        Returns true if all the angles for the fixed scroll are the same as for the orbiting scroll
-        """
-        return (abs(self.phi_fi0-self.phi_oi0) < 1e-14
-                and abs(self.phi_fis-self.phi_ois) < 1e-14
-                and abs(self.phi_fie-self.phi_oie) < 1e-14
-                and abs(self.phi_fo0-self.phi_oo0) < 1e-14
-                and abs(self.phi_fos-self.phi_oos) < 1e-14
-                and abs(self.phi_foe-self.phi_ooe) < 1e-14
-                )
+cimport common_scroll_geo as comm
+from common_scroll_geo cimport sides, compressor_CV_indices, get_compression_chamber_index, geoVals, coords_inv, coords_norm
+from common_scroll_geo import polycentroid, polyarea
         
 cpdef CVcoords(CVkey, geoVals geo, double theta):
     """ 
@@ -198,6 +25,7 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
         om = geo.phi_fie - pi/2 - theta
     else:
         raise ValueError('not supported for asymmetric')
+        
     if abs(geo.phi_ie_offset) < 1e-14:
         symmetric = True
     else:
@@ -211,15 +39,8 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
         return np.r_[x1,x2[::-1]],np.r_[y1,y2[::-1]]
     
     elif CVkey == 's2':
-        if symmetric:
-            phi_oi = np.linspace(geo.phi_oie, geo.phi_oie - theta) #oi
-            phi_fo = np.linspace(geo.phi_foe - pi, geo.phi_foe - pi - theta) #fo
-        else:
-            phi_oie_actual = geo.phi_ooe + geo.phi_ie_offset - pi
-            phi_oi = np.linspace(phi_oie_actual, phi_oie_actual - theta) #oi
-            
-            phi_foe_actual = geo.phi_fie + geo.phi_ie_offset-2*pi
-            phi_fo = np.linspace(phi_foe_actual, phi_foe_actual - theta) #fo
+        phi_oi = np.linspace(geo.phi_oie, geo.phi_oie - theta) #oi
+        phi_fo = np.linspace(geo.phi_foe - pi, geo.phi_foe - pi - theta) #fo
             
         x1, y1 = coords_inv(phi_oi, geo, theta, 'oi')
         x2, y2 = coords_inv(phi_fo, geo, theta, 'fo')
@@ -344,153 +165,6 @@ cpdef int getNc(double theta, geoVals geo):
         return int(floor((geo.phi_fie-theta-geo.phi_oos-pi)/(2*pi)))
     else:
         raise ValueError('getNc not supported for asymmetric')
-    
-def polyarea(x,y):
-    N=len(x)
-    area = 0.0
-    for i in range(N):
-        j = (i+1) % N
-        area = area + x[i]*y[j] - y[i]*x[j]
-    return area/2.0
-    
-def polycentroid(xi,yi):
-    # Add additional element if needed to close polygon
-    if not xi[0]==xi[-1] or not yi[0]==yi[-1]:
-        x=np.r_[xi,xi[-1]]
-        y=np.r_[yi,yi[-1]]
-    else:
-        x=xi
-        y=yi
-    sumx=0.0
-    sumy=0.0
-    for i in range(len(x)-1):
-        sumx=sumx+(x[i]+x[i+1])*(x[i]*y[i+1]-x[i+1]*y[i])
-        sumy=sumy+(y[i]+y[i+1])*(x[i]*y[i+1]-x[i+1]*y[i])
-    return sumx/(6*polyarea(x,y)),sumy/(6*polyarea(x,y))
-    
-cpdef tuple _coords_inv_np(np.ndarray[np.float_t] phi, geoVals geo,double theta, flag=""):
-    """
-    Internal function that does the calculation if phi is definitely a 1D numpy vector
-    """
-    rb = geo.rb
-    ro = rb*(pi - geo.phi_fi0 + geo.phi_oo0)
-    om = geo.phi_fie - theta + 3.0*pi/2.0
-
-    if flag=="fi":
-        x = rb*np.cos(phi)+rb*(phi-geo.phi_fi0)*np.sin(phi)
-        y = rb*np.sin(phi)-rb*(phi-geo.phi_fi0)*np.cos(phi)
-    elif flag=="fo":
-        x = rb*np.cos(phi)+rb*(phi-geo.phi_fo0)*np.sin(phi)
-        y = rb*np.sin(phi)-rb*(phi-geo.phi_fo0)*np.cos(phi)
-    elif flag=="oi":
-        x = -rb*np.cos(phi)-rb*(phi-geo.phi_oi0)*np.sin(phi)+ro*np.cos(om)
-        y = -rb*np.sin(phi)+rb*(phi-geo.phi_oi0)*np.cos(phi)+ro*np.sin(om)
-    elif flag=="oo":
-        x = -rb*np.cos(phi)-rb*(phi-geo.phi_oo0)*np.sin(phi)+ro*np.cos(om)
-        y = -rb*np.sin(phi)+rb*(phi-geo.phi_oo0)*np.cos(phi)+ro*np.sin(om)
-    else:
-        raise ValueError('flag not valid')
-    return (x,y)
-    
-cpdef tuple _coords_inv_d(double phi, geoVals geo,double theta, flag=""):
-    """
-    Internal function that does the calculation if phi is a double variable 
-    """
-
-    rb = geo.rb
-    ro = rb*(pi - geo.phi_fi0 + geo.phi_oo0)
-    om = geo.phi_fie - theta + 3.0*pi/2.0
-
-    if flag=="fi":
-        x = rb*cos(phi)+rb*(phi-geo.phi_fi0)*sin(phi)
-        y = rb*sin(phi)-rb*(phi-geo.phi_fi0)*cos(phi)
-    elif flag=="fo":
-        x = rb*cos(phi)+rb*(phi-geo.phi_fo0)*sin(phi)
-        y = rb*sin(phi)-rb*(phi-geo.phi_fo0)*cos(phi)
-    elif flag=="oi":
-        x = -rb*cos(phi)-rb*(phi-geo.phi_oi0)*sin(phi)+ro*cos(om)
-        y = -rb*sin(phi)+rb*(phi-geo.phi_oi0)*cos(phi)+ro*sin(om)
-    elif flag=="oo":
-        x = -rb*cos(phi)-rb*(phi-geo.phi_oo0)*sin(phi)+ro*cos(om)
-        y = -rb*sin(phi)+rb*(phi-geo.phi_oo0)*cos(phi)+ro*sin(om)
-    else:
-        raise ValueError('flag not valid')
-    return (x,y)    
-  
-cpdef tuple coords_inv(phi,geoVals geo,double theta,flag="fi"):
-    """ 
-    
-    def coords_inv(phi,geo,theta,flag="fi")
-    
-    The involute angles corresponding to the points along the involutes
-    (fixed inner [fi], fixed scroll outer involute [fo], orbiting
-    scroll outer involute [oo], and orbiting scroll inner involute [oi] )
-    
-    Arguments:
-        phi_vec : 1D numpy array or double
-            vector of involute angles
-        geo : geoVals class
-            scroll compressor geometry
-        theta : float
-            crank angle in the range 0 to :math: `2\pi`
-        flag : string
-            involute of interest, possible values are 'fi','fo','oi','oo'
-            
-    Returns:
-        (x,y) : tuple of coordinates on the scroll
-    """
-    if type(phi) is np.ndarray:
-        return _coords_inv_np(phi,geo,theta,flag)
-    else:
-        return _coords_inv_d(phi,geo,theta,flag)
-
-def coords_norm(phi_vec,geo,theta,flag="fi"):
-    """ 
-    The x and y coordinates of a unit normal vector pointing towards
-    the scroll involute for the the involutes
-    (fixed inner [fi], fixed scroll outer involute [fo], orbiting
-    scroll outer involute [oo], and orbiting scroll inner involute [oi])
-    
-    Arguments:
-        phi_vec : 1D numpy array
-            vector of involute angles
-        geo : geoVals class
-            scroll compressor geometry
-        theta : float
-            crank angle in the range 0 to :math: `2\pi`
-        flag : string
-            involute of interest, possible values are 'fi','fo','oi','oo'
-            
-    Returns:
-        (nx,ny) : tuple of unit normal coordinates pointing towards scroll wrap
-    """
-    
-    rb=geo.rb
-    if not type(phi_vec) is np.ndarray:
-        if type(phi_vec) is list:
-            phi_vec=np.array(phi_vec)
-        else:
-            phi_vec=np.array([phi_vec])
-    nx=np.zeros(np.size(phi_vec))
-    ny=np.zeros(np.size(phi_vec))
-
-    for i in xrange(np.size(phi_vec)):
-        phi=phi_vec[i]
-        if flag=="fi":
-            nx[i] = +sin(phi)
-            ny[i] = -cos(phi)
-        elif flag=="fo":
-            nx[i] = -sin(phi)
-            ny[i] = +cos(phi)
-        elif flag=="oi":
-            nx[i] = -sin(phi)
-            ny[i] = +cos(phi)
-        elif flag=="oo":
-            nx[i] = +sin(phi)
-            ny[i] = -cos(phi)
-        else:
-            print "Uh oh... error in coords_norm"
-    return (nx,ny)
 
 def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
     """
@@ -681,119 +355,13 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
     else:
         raise AttributeError('Type not understood, should be one of 2Arc or ArcLineArc')
 
-cdef double x_antideriv(phi, phi_0):
-    return -cos(phi)*((phi_0-phi)**2-3)-3*sin(phi)*(phi_0-phi)
-
-cdef double y_antideriv(phi, phi_0):
-    return +3*cos(phi)*(phi_0-phi)-sin(phi)*((phi_0-phi)**2-3)
-    
-cpdef tuple scroll_wrap(geoVals geo):
-    """
-    Calculate the scroll wrap centroid and volume
-    """
-        
-    # Initial angle of the midpoint of the scroll wrap
-    phi_0 = (geo.phi_oi0 + geo.phi_oo0)/2
-    # Ending angle of the centerline of the scroll wrap
-    phi_e = (geo.phi_oie + geo.phi_ooe)/2
-    
-    #print 'h', geo.h
-    #print 'rb', geo.rb
-    #print 't', geo.t
-    #print 'phi_0', phi_0
-    #print 'phi_e', phi_e
-    #print 'rat', (x_antideriv(phi_e, phi_0)-x_antideriv(phi_0, phi_0))/(phi_e**2/2.0-phi_0**2/2.0-(phi_e-phi_0)*phi_0)
-    
-    Vwrap = geo.h*geo.rb*geo.t*(phi_e**2/2.0-phi_0**2/2.0-(phi_e-phi_0)*phi_0)
-    xstar = geo.h*geo.rb**2*geo.t/Vwrap*(x_antideriv(phi_e, phi_0)-x_antideriv(phi_0, phi_0))
-    ystar = geo.h*geo.rb**2*geo.t/Vwrap*(y_antideriv(phi_e, phi_0)-y_antideriv(phi_0, phi_0))
-    
-    return Vwrap, xstar, ystar
-    
-def overlay_injection_port(theta, geo, phi, ax, inner_outer, rport = None, offset = None):
-    """
-    Plot the injection ports on an axis - no scroll wrap plot is generated.  Also see
-    plot_injection_ports()
-    
-    Parameters
-    ---------- 
-    theta : float
-        crank angle in the range [0, :math:`2\pi`] 
-    geo : geoVals instance
-    phi : float
-        Involute angle in radians
-    ax : matplotlib axis instance
-    inner_outer : string
-        If ``'i'``, phi is along the inner involute of the fixed scroll
-        
-        If ``'o'``, phi is along the outer involute of the fixed scroll
-        
-    Notes
-    -----
-    If you want symmetric injection ports, the ones on the inner involute 
-    should have a value of phi that is pi radians greater than those on the 
-    outer involute
-    
-    """
-    
-    #Common terms
-    if rport is None:
-        rport = geo.t/2.0
-    if offset is None:
-        offset = rport/2.0
-    t = np.linspace(0,2*pi,100)
-    
-    if inner_outer == 'o':
-        #Involute angle along the outer involute of the scroll wrap
-        x, y = coords_inv(phi, geo, theta, 'fo')
-        nx, ny = coords_norm(phi, geo, theta, 'fo')
-        xc,yc = x-nx*offset,y-ny*offset
-        ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
-    elif inner_outer == 'i':
-        x, y = coords_inv(phi, geo, theta, 'fi')
-        nx, ny = coords_norm(phi, geo, theta, 'fi')
-        xc,yc = x-nx*offset,y-ny*offset
-        ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
-    else:
-        raise KeyError
-    
-def plot_injection_ports(theta, geo, phi, ax, inner_outer):
-    """
-    Plot the injection ports
-    
-    Parameters
-    ---------- 
-    theta : float
-        crank angle in the range [0, :math:`2\pi`] 
-    geo : geoVals instance
-    phi : float
-        Involute angle in radians
-    ax : matplotlib axis instance
-    inner_outer : string
-        If ``'i'``, phi is along the inner involute of the fixed scroll
-        
-        If ``'o'``, phi is along the outer involute of the fixed scroll
-        
-    Notes
-    -----
-    If you want symmetric injection ports, the ones on the inner involute 
-    should have a value of phi that is pi radians greater than those on the 
-    outer involute
-    
-    """
-    #Plot the scrolls (symmetric)
-    plotScrollSet(theta, geo, axis = ax)
-    
-    #Plot the port
-    overlay_injection_port(theta, geo, phi, ax, inner_outer)
-
 cpdef inline double min2(double a, double b):
     return a if a<b else b
 
 cpdef inline double max2(double a, double b):
     return a if a>b else b
         
-cpdef double radial_leakage_area(double theta, geoVals geo, long key1Index, long key2Index, int location = UP) except *:
+cpdef double radial_leakage_area(double theta, geoVals geo, long key1Index, long key2Index, int location = comm.UP) except *:
     """
     Get the flow area of the flow path for a given radial flow pair
     
@@ -815,11 +383,11 @@ cpdef double radial_leakage_area(double theta, geoVals geo, long key1Index, long
     cdef double phi_min, phi_max
     #Get the bounding angles
     radial_leakage_angles(theta,geo,key1Index,key2Index,&phi_min,&phi_max)
-    if location == UP:
+    if location == comm.UP:
         phi_0 = geo.phi_fi0
-    elif location == DOWN:
+    elif location == comm.DOWN:
         phi_0 = geo.phi_oo0
-    elif location == MID:
+    elif location == comm.MID:
         phi_0 = (geo.phi_fi0+geo.phi_oo0)/2
     else:
         raise ValueError
@@ -855,11 +423,11 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
     Nc = getNc(theta,geo)
     
     #These are always in existence
-    if matchpair(key1,key2,keyIs2,keyIsa) or matchpair(key1,key2,keyIs1,keyIsa):
+    if matchpair(key1,key2,comm.keyIs2,comm.keyIsa) or matchpair(key1,key2,comm.keyIs1,comm.keyIsa):
             phi_max = geo.phi_fie
             phi_min = max2(geo.phi_fie - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0)
     #suction chambers only in contact with each other beyond theta = pi
-    elif matchpair(key1,key2,keyIs1,keyIs2):
+    elif matchpair(key1,key2,comm.keyIs1,comm.keyIs2):
         if theta > pi:
             phi_max = phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0
             phi_min = geo.phi_fie - theta
@@ -871,10 +439,10 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
             phi_min = geo.phi_fie - theta
     
     elif Nc == 0 and phi_max>1e90:
-        if matchpair(key1,key2,keyId2,keyIs1) or matchpair(key1,key2,keyId1,keyIs2):
+        if matchpair(key1,key2,comm.keyId2,comm.keyIs1) or matchpair(key1,key2,comm.keyId1,comm.keyIs2):
                 phi_max = geo.phi_fie - theta
                 phi_min = geo.phi_fie - theta - pi
-        elif matchpair(key1, key2, keyId1, keyId2):
+        elif matchpair(key1, key2, comm.keyId1, comm.keyId2):
                 phi_max = geo.phi_fie - theta - pi
                 phi_min = geo.phi_fis
         elif theta > theta_d(geo):
@@ -883,21 +451,21 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
             raise KeyError('Nc: {Nc:d} sort {sort:s}'.format(Nc=Nc, sort = str(tuple(key1,key2))))
     
     if Nc >= 1 and phi_max > 1e90:
-        if matchpair(key1,key2,get_compression_chamber_index(2,1),keyIsa) or matchpair(key1,key2,get_compression_chamber_index(1,1),keyIsa):
+        if matchpair(key1,key2,get_compression_chamber_index(2,1),comm.keyIsa) or matchpair(key1,key2,get_compression_chamber_index(1,1),comm.keyIsa):
                 if theta >= pi:
                     phi_min = 0
                     phi_max = 0
                 else:
                     phi_max = max2(geo.phi_fie - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0 )
                     phi_min = min2(geo.phi_fie - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0 )
-        elif matchpair(key1,key2,get_compression_chamber_index(2,1),keyIs1) or matchpair(key1,key2,get_compression_chamber_index(1,1),keyIs2):
+        elif matchpair(key1,key2,get_compression_chamber_index(2,1),comm.keyIs1) or matchpair(key1,key2,get_compression_chamber_index(1,1),comm.keyIs2):
                 #TODO: this could be improved to take into account the non-perfect separation between s-sa and phi_ie
                 phi_max = geo.phi_fie - theta #this is where the change needs to be made
                 phi_min = geo.phi_fie - theta - pi
         elif matchpair(key1,key2,get_compression_chamber_index(1,1),get_compression_chamber_index(2,1)):
                 phi_max = geo.phi_fie - theta - pi
                 phi_min = geo.phi_fie - theta - 2*pi
-        elif Nc == 1 and (matchpair(key1,key2,get_compression_chamber_index(2,1),keyId1) or matchpair(key1,key2,get_compression_chamber_index(1,1),keyId2)):
+        elif Nc == 1 and (matchpair(key1,key2,get_compression_chamber_index(2,1),comm.keyId1) or matchpair(key1,key2,get_compression_chamber_index(1,1),comm.keyId2)):
                 phi_max = geo.phi_fie - theta - 2*pi
                 phi_min = geo.phi_fis
         elif Nc == 1 and theta > theta_d(geo):
@@ -917,7 +485,7 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
                 phi_min = geo.phi_fie - theta - 2*pi*(alpha)
                 break
         if phi_max > 1e90:
-            if matchpair(key1,key2,get_compression_chamber_index(2,Nc),keyId1) or matchpair(key1,key2,get_compression_chamber_index(1,Nc),keyId2):
+            if matchpair(key1,key2,get_compression_chamber_index(2,Nc),comm.keyId1) or matchpair(key1,key2,get_compression_chamber_index(1,Nc),comm.keyId2):
                 phi_max = geo.phi_fie - theta - 2*pi*Nc
                 phi_min = geo.phi_fis
 
