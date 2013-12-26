@@ -7,7 +7,7 @@ from PDSim.core.core import PDSimCore
 from PDSim.flow import flow_models
 from PDSim.plot.plots import debug_plots
 from PDSim.core.bearings import journal_bearing
-from PDSim.scroll import scroll_geo
+from PDSim.scroll import scroll_geo, symm_scroll_geo
 from _scroll import _Scroll
 
 ##--- non-package imports
@@ -215,6 +215,28 @@ class Scroll(PDSimCore, _Scroll):
 #            plt.savefig('Aport.png')
 #            plt.show()  
             
+    def get_discharge_port_blockage_poly(self, theta):
+        xdd, ydd = scroll_geo.CVcoords('dd',self.geo,theta)
+        xd1, yd1 = scroll_geo.CVcoords('d1',self.geo,theta)
+        Ncmax = scroll_geo.nC_Max(self.geo)
+        Nc = scroll_geo.getNc(theta, self.geo)
+        
+        if Nc == Ncmax:
+            xc1_N, yc1_N = scroll_geo.CVcoords('c1.+'+str(Ncmax), self.geo, theta)
+        else:
+            xc1_N, yc1_N = None, None
+            
+        if Nc == Ncmax-1:
+            xc1_Nm1, yc1_Nm1 = scroll_geo.CVcoords('c1.+'+str(Ncmax-1), self.geo, theta)
+        else:
+            xc1_Nm1, yc1_Nm1 = None, None
+            
+        return dict(xdd = xdd, ydd = ydd,
+                    xd1 = xd1, yd1 = yd1,
+                    xc1_N = xc1_N, yc1_N = yc1_N,
+                    xc1_Nm1 = xc1_Nm1, yc1_Nm1 = yc1_Nm1
+                    )
+                
     def cache_discharge_port_blockage(self, xport = None, yport = None, plot = False, N = 100):
         """
         Precalculate the discharge port blockage using the clipper polygon math module
@@ -269,21 +291,13 @@ class Scroll(PDSimCore, _Scroll):
         for i,theta in enumerate(np.linspace(0, 2*pi, 100)):
             
             THETA = self.geo.phi_fie-pi/2.0-theta
-            
-            xdd, ydd = scroll_geo.CVcoords('dd',self.geo,theta)
-            xd1, yd1 = scroll_geo.CVcoords('d1',self.geo,theta)
-            Ncmax = scroll_geo.nC_Max(self.geo)
-            Nc = scroll_geo.getNc(theta, self.geo)
-            
-            if Nc == Ncmax:
-                xc1_N, yc1_N = scroll_geo.CVcoords('c1.+'+str(Ncmax), self.geo, theta)
-            else:
-                xc1_N, yc1_N = None, None
-                
-            if Nc == Ncmax-1:
-                xc1_Nm1, yc1_Nm1 = scroll_geo.CVcoords('c1.+'+str(Ncmax-1), self.geo, theta)
-            else:
-                xc1_Nm1, yc1_Nm1 = None, None
+
+            # Get the polygons from the polygon generation function            
+            poly = self.get_discharge_port_blockage_poly(theta)
+            xdd, ydd = poly['xdd'],poly['ydd']
+            xd1, yd1 = poly['xd1'],poly['yd1']
+            xc1_N, yc1_N = poly['xc1_N'],poly['yc1_N']
+            xc1_Nm1, yc1_Nm1 = poly['xc1_Nm1'],poly['yc1_Nm1']
             
             scaled_xdd = xdd*scale_factor
             scaled_ydd = ydd*scale_factor
@@ -1165,6 +1179,60 @@ class Scroll(PDSimCore, _Scroll):
             Q.append(self.calcHT(theta,key,HTC_tune,dT_dphi,phim))
         return arraym(Q)
         
+    def HT_angles(self, theta, geo, key):
+        return symm_scroll_geo.HT_angles(theta, self.geo, key)
+        
+    def calcHT(self, theta, key, HTC_tune, dT_dphi, phim): 
+        
+        ## If HT is turned off, no heat transfer
+        if HTC_tune <= 0.0 or key.startswith('inj') or key == 'sa' or key == 'dd':
+            return 0.0
+        elif key == 'ddd':
+            # ddd is a combination of the heat transfer in the d1, d2, and
+            # dd chambers
+            Q_d1 = self.calcHT(theta,str('d1'),HTC_tune,dT_dphi,phim)
+            Q_d2 = self.calcHT(theta,str('d2'),HTC_tune,dT_dphi,phim)
+            return Q_d1 + Q_d2
+                
+        #TODO: calculate HTC
+        hc = self.HTC #[kW/m2/K]
+            
+        #Get the bounding angles for the control volume
+        angles = self.HT_angles(theta, self.geo, key)
+        
+        if angles is None:
+            return 0.0
+        
+        T_scroll = self.Tlumps[0]
+        T_CV = self.CVs[key].State.T
+        # The heat transfer rate of the inner involute on 
+        # the outer wrap of the chamber
+        Q_outer_wrap = scroll_geo.involute_heat_transfer(hc, 
+                                                   self.geo.h, 
+                                                   self.geo.rb, 
+                                                   angles.phi_1_i, 
+                                                   angles.phi_2_i, 
+                                                   angles.phi_i0, 
+                                                   T_scroll,
+                                                   T_CV, 
+                                                   dT_dphi, 
+                                                   phim)
+        
+        # The heat transfer rate of the outer involute on 
+        # the inner wrap of the chamber
+        Q_inner_wrap = scroll_geo.involute_heat_transfer(hc, 
+                                                   self.geo.h, 
+                                                   self.geo.rb, 
+                                                   angles.phi_1_o, 
+                                                   angles.phi_2_o, 
+                                                   angles.phi_o0,
+                                                   T_scroll,
+                                                   T_CV, 
+                                                   dT_dphi, 
+                                                   phim)
+        
+        return HTC_tune *(Q_outer_wrap + Q_inner_wrap)
+        
     def step_callback(self,t,h,Itheta):
         """
         Here we test whether the control volumes need to be
@@ -1721,6 +1789,25 @@ class Scroll(PDSimCore, _Scroll):
         #  Call the base class function        
         PDSimCore.pre_run(self)
         
+        self.CVs['sa'].ForceFcn = symm_scroll_geo.SA_forces
+        self.CVs['s1'].ForceFcn = symm_scroll_geo.S1_forces
+        self.CVs['s2'].ForceFcn = symm_scroll_geo.S2_forces
+        self.CVs['d1'].ForceFcn = symm_scroll_geo.D1_forces
+        self.CVs['d2'].ForceFcn = symm_scroll_geo.D2_forces
+        self.CVs['dd'].ForceFcn = symm_scroll_geo.DD_forces
+        self.CVs['ddd'].ForceFcn = symm_scroll_geo.DDD_forces
+        for i in range(10):
+            try:
+                Fcn = lambda theta, geo: symm_scroll_geo.C1_forces(theta, i+1, geo)
+                self.CVs['c1.' + str(i+1)].ForceFcn = Fcn
+            except:
+                pass
+            try:
+                Fcn = lambda theta, geo : symm_scroll_geo.C2_forces(theta, i+1, geo)
+                self.CVs['c2.' + str(i+1)].ForceFcn = Fcn
+            except:
+                pass
+        
     def guess_lump_temps(self, T0):
         """
         Guess the temperature of the lump
@@ -1773,7 +1860,16 @@ class Scroll(PDSimCore, _Scroll):
         Qnet -= sum([Tube.Q for Tube in self.Tubes])
         
         self.Qamb = self.ambient_heat_transfer(self.Tlumps[0])
+        
         self.mech.Wdot_losses = self.mechanical_losses('low:shell') 
+        # Shaft power from forces on the orbiting scroll from the gas in the pockets [kW]
+        self.Wdot_forces = self.omega*self.forces.mean_tau
+#        if self.geo.is_symmetric():
+#            
+#        else:
+#            import warnings
+#            warnings.warn('No ML for asymmetric for now')
+#            self.mech.Wdot_losses = 0.0
         
         # Heat transfer with the ambient; Qamb is positive if heat is being removed, thus flip the sign
         Qnet -= self.Qamb
@@ -1784,8 +1880,7 @@ class Scroll(PDSimCore, _Scroll):
         # sign for the lump
         Qnet -= self.HTProcessed.mean_Q
         
-        #Shaft power from forces on the orbiting scroll from the gas in the pockets [kW]
-        self.Wdot_forces = self.omega*self.forces.mean_tau
+        
         
         self.Wdot_mechanical = self.Wdot_pv + self.mech.Wdot_losses
         
@@ -2175,39 +2270,12 @@ class Scroll(PDSimCore, _Scroll):
         # A map of CVkey to function to be called to get force components
         # All functions in this map use the same call signature and are "boring"
         # Each function returns a dictionary of terms
-        func_map = dict(sa = scroll_geo.SA_forces,
-                        s1 = scroll_geo.S1_forces,
-                        s2 = scroll_geo.S2_forces,
-                        d1 = scroll_geo.D1_forces,
-                        d2 = scroll_geo.D2_forces,
-                        dd = scroll_geo.DD_forces,
-                        ddd = scroll_geo.DDD_forces
-                        )
+
         for CVkey in self.CVs.keys:
-            if CVkey in func_map:
-                #Calculate the force components for each crank angle
-                #Early bind the function
-                func = func_map[CVkey]
-                # Calculate the geometric parts for each chamber
-                # They are divided by the pressure in the chamber
-                geo_components = [func(theta, self.geo) for theta in self.t[_slice]]
-            elif CVkey.startswith('c1'):
-                #Early bind the function
-                func = scroll_geo.C1_forces
-                #Get the key for the CV
-                alpha = int(CVkey.split('.')[1])
-                # Calculate the geometric parts for each chamber
-                # They are divided by the pressure in the chamber
-                geo_components = [func(theta,alpha,self.geo) for theta in self.t[_slice]]
-            elif CVkey.startswith('c2'):
-                #Early bind the function
-                func = scroll_geo.C2_forces
-                #Get the key for the CV
-                alpha = int(CVkey.split('.')[1])
-                # Calculate the geometric parts for each chamber
-                # They are divided by the pressure in the chamber
-                geo_components = [func(theta,alpha,self.geo) for theta in self.t[_slice]]
-            else:
+            try:
+                geo_components = [self.CVs[CVkey].ForceFcn(theta, self.geo) for theta in self.t[_slice]]
+            except:
+                print 'no forces for ', CVkey               
                 geo_components = []
                 
             if geo_components:
@@ -2278,7 +2346,7 @@ class Scroll(PDSimCore, _Scroll):
         #        
         self.forces.summed_Mx += -self.forces.ypin*self.forces.summed_Fbackpressure
         self.forces.summed_My +=  self.forces.xpin*self.forces.summed_Fbackpressure
-#        
+
         # Moment around the x-axis and y-axis from the inertial force of the orbiting scroll
         # They must be added on separately because otherwise they are added in NCV times,
         # which is not the proper behavior
@@ -2288,7 +2356,9 @@ class Scroll(PDSimCore, _Scroll):
         Fcy = self.forces.inertial*np.sin(self.forces.THETA)
         
         # Inertial overturning moment acts through the center of mass of the orbiting scroll
-        # Moment around the x-axis and y-axis from the applied gas load on the orbiting scroll wrap relative to the thrust plane
+        # Moment around the x-axis and y-axis from the applied gas load on the orbiting scroll 
+        # wrap relative to the thrust plane
+        #
         #        |   i      j     k  |  
         #   M =  |   0      0     z  | = - Fcy*z *i + Fcx * z * j
         #        |   Fcx   Fcy    0  |

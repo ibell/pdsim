@@ -36,7 +36,6 @@ if len(sys.argv) == 1:
 #    sys.argv += ['build','install']
     sys.argv += ['build','install']
     
-
 #Modify the __init__ file with this version string
 fName = os.path.join('PDSim','__init__.py')
 lines = open(fName,'r').readlines()
@@ -46,8 +45,6 @@ for line in lines:
         line = "__version__ = '" + version + "'"
     fp.write(line+'\n')
 fp.close()
-
-
 
 import Cython
 
@@ -68,14 +65,13 @@ pyx_list = [
             "PDSim/flow/flow_models.pyx",
             "PDSim/flow/flow.pyx",
             "PDSim/flow/fanno.pyx",
-            
             "PDSim/misc/stl_utilities.pyx",
             "PDSim/misc/datatypes.pyx",
             "PDSim/misc/clipper/pyclipper.pyx",
             "PDSim/recip/_recip.pyx",
             "PDSim/scroll/common_scroll_geo.pyx",
             "PDSim/scroll/symm_scroll_geo.pyx",
-           #"PDSim/scroll/asymm_scroll_geo.pyx",
+            "PDSim/scroll/asymm_scroll_geo.pyx",
             "PDSim/scroll/_scroll.pyx"
             ]
 

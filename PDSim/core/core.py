@@ -1037,10 +1037,10 @@ class PDSimCore(_PDSimCore):
             if key == self.key_outlet:
                  outletState = State
         
-        if callable(self.Vdisp):
-            Vdisp = self.Vdisp()
-        else:
+        try:
             Vdisp = self.Vdisp
+        except:
+            Vdisp = self.Vdisp()
             
         self.eta_v = self.mdot / (self.omega/(2*pi)*Vdisp*inletState.rho)
 
@@ -1921,10 +1921,11 @@ class PDSimCore(_PDSimCore):
         for key in self.CVs.exists_keys:
             # Get the 'becomes' field.  If a list, parse each fork of list. If a single key convert 
             # into a list so you can use the same code below 
-            if not isinstance(self.CVs[key].becomes,list):
-                becomes=[self.CVs[key].becomes]
+            if not isinstance(self.CVs[key].becomes, list):
+                becomes = [self.CVs[key].becomes]
             else:
-                becomes=self.CVs[key].becomes
+                becomes = self.CVs[key].becomes
+                
             Iold = self.CVs.index(key)
 
             for newkey in becomes:

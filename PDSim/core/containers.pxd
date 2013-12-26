@@ -35,6 +35,7 @@ cdef class ControlVolume(object):
     cdef public object becomes
     cdef public object V_dV
     cdef public dict V_dV_kwargs
+    cdef public object ForceFcn
     cdef public bint exists
     cdef public StateClass State
     

@@ -5,18 +5,19 @@ cimport numpy as np
 import cython
 cimport cython
 
+from PDSim.scroll.common_scroll_geo cimport geoVals, HTAnglesClass
+
 from libc.math cimport sqrt,sin,cos,tan,atan2,acos,floor,M_PI as pi,pow
 
-    
 cpdef double fxA(double rb, double phi, double phi0)
 cpdef double fyA(double rb, double phi, double phi0)
 
-cpdef double theta_d(geoVals geo)
+cpdef double theta_d(geoVals geo) except *
 
 cpdef double radial_leakage_area(double theta, geoVals geo, long key1, long key2, int location = *) except *
 cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, double *angle_min, double *angle_max)
 
-cpdef int getNc(double theta, geoVals geo)
+cpdef int getNc(double theta, geoVals geo) except *
 
 cpdef HTAnglesClass HT_angles(double theta, geoVals geo, bytes key)
 

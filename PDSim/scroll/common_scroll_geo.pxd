@@ -7,8 +7,11 @@ cimport cython
 
 from libc.math cimport sqrt,sin,cos,tan,atan2,acos,floor,M_PI as pi,pow
 
-cdef class HTAnglesClass(object):
-    pass
+cdef class VdVstruct:
+    cdef public double V,dV
+
+cdef class HTAnglesClass:
+    cdef public double phi_1_i, phi_2_i, phi_1_o, phi_2_o, phi_i0, phi_o0
     
 cdef enum sides:
     UP
@@ -50,6 +53,17 @@ cpdef tuple _coords_inv_d(double phi, geoVals geo, double theta, flag = *)
 cpdef long get_compressor_CV_index(str key) except *
 cpdef long get_compression_chamber_index(long path, long alpha)
 
-cpdef Gr(phi, geoVals geo, double theta, inv)       
-cpdef dGr_dphi(phi, geoVals geo, double theta, inv)
-cpdef dGr_dtheta(phi, geoVals geo, double theta, inv)
+cpdef coords_inv_dtheta(phi, geoVals geo, double theta, inv = *)
+
+#ctypedef fused double_or_numpy:
+#    cython.double
+#    np.array
+
+cpdef double Gr(double phi, geoVals geo, double theta, inv)
+cpdef double dGr_dphi(double phi, geoVals geo, double theta, inv)
+cpdef double dGr_dtheta(double phi, geoVals geo, double theta, inv)
+
+cpdef double involute_heat_transfer(double hc, double hs, double  rb, 
+                                  double phi1, double phi2, double phi0, 
+                                  double T_scroll, double T_CV, double dT_dphi, 
+                                  double phim)

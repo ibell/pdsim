@@ -121,7 +121,7 @@ cpdef double fxA(double rb, double phi, double phi0):
 cpdef double fyA(double rb, double phi, double phi0):
     return rb**3/3.0*((phi0-phi)*((phi-phi0)**2-8.0)*sin(phi)-4.0*((phi-phi0)**2-2.0)*cos(phi))
 
-cpdef double theta_d(geoVals geo):  
+cpdef double theta_d(geoVals geo) except *:  
     """ 
     Discharge angle
     
@@ -140,13 +140,13 @@ cpdef double theta_d(geoVals geo):
     else:
         raise ValueError('theta_d not supported for asymmetric')
 
-cpdef nC_Max(geo):
+cpdef int nC_Max(geo) except *:
     if geo.is_symmetric():
         return int(floor((geo.phi_fie-geo.phi_oos-pi)/(2.0*pi)))
     else:
         raise ValueError('nC_max not supported for asymmetric')
         
-cpdef int getNc(double theta, geoVals geo):
+cpdef int getNc(double theta, geoVals geo) except *:
     """ 
     The number of pairs of compression chambers in existence at a given 
     crank angle 
@@ -619,7 +619,7 @@ cpdef HTAnglesClass HT_angles(double theta, geoVals geo, bytes key):
     """
     cython.declare(alpha = cython.int)
     angles = HTAnglesClass()
-    ## TODO: Offset considerations to the angles
+
     if key == 's1' or key == 's2':
         angles.phi_1_i = geo.phi_fie
         angles.phi_2_i = geo.phi_fie-theta

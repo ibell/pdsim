@@ -1,11 +1,31 @@
+from __future__ import division
 cimport cython
 import cython
 import numpy as np
 
-cpdef Gr(phi, geoVals geo, double theta, inv):
+cdef class VdVstruct:
+    def __init__(self, V, dV):
+        self.V = V
+        self.dV = dV
+        
+    def __repr__(self):
+        return str(list([self.V,self.dV]))
+
+cdef class HTAnglesClass:
+        
+    def __repr__(self):
+        s = ''
+        for k in ['phi_1_i','phi_2_i','phi_1_o','phi_2_o','phi_i0','phi_o0']:
+            s += k + ' : ' + str(getattr(self,k)) + '\n'
+        return s
+        
+        
+        
     
+cpdef double Gr(double phi, geoVals geo, double theta, inv):
+    """
+    """
     theta_m = geo.phi_fie - theta + 3.0*pi/2.0
-    
     if inv == 'fi':
         return phi*geo.rb**2*(phi**2 - 3*phi*geo.phi_fi0 + 3*geo.phi_fi0**2)/3
     elif inv == 'fo':
@@ -23,7 +43,7 @@ cpdef Gr(phi, geoVals geo, double theta, inv):
                        - 3*geo.phi_oo0*geo.ro*cos(phi - theta_m) 
                        - 3*geo.ro*sin(phi - theta_m))/3
                        
-cpdef dGr_dphi(phi, geoVals geo, double theta, inv):
+cpdef double dGr_dphi(double phi, geoVals geo, double theta, inv):
     
     theta_m = geo.phi_fie - theta + 3.0*pi/2.0
     
@@ -36,7 +56,7 @@ cpdef dGr_dphi(phi, geoVals geo, double theta, inv):
     elif inv == 'oo':
         return geo.rb*(geo.rb*(phi - geo.phi_oo0)**2 - (phi- geo.phi_oo0)*geo.ro*sin(phi - theta_m))
 
-cpdef dGr_dtheta(phi, geoVals geo, double theta, inv):
+cpdef double dGr_dtheta(double phi, geoVals geo, double theta, inv):
     
     theta_m = geo.phi_fie - theta + 3.0*pi/2.0
     
@@ -175,11 +195,6 @@ cpdef long get_compression_chamber_index(long path, long alpha):
             return keyIc2_9
         elif alpha == 10:
             return keyIc2_10
-    
-# A container for the values for the heat transfer angles
-cdef class HTAnglesClass(object):
-    def __init__(self):
-        pass
 
 #This is a list of all the members in geoVals
 geoValsvarlist=['h','ro','rb','t',
@@ -401,3 +416,46 @@ cpdef tuple scroll_wrap(geoVals geo):
     ystar = geo.h*geo.rb**2*geo.t/Vwrap*(y_antideriv(phi_e, phi_0)-y_antideriv(phi_0, phi_0))
     
     return Vwrap, xstar, ystar
+    
+cpdef double involute_heat_transfer(double hc, double hs, double  rb, 
+                                  double phi1, double phi2, double phi0, 
+                                  double T_scroll, double T_CV, double dT_dphi, 
+                                  double phim):
+        """
+        This function evaluates the anti-derivative of 
+        the differential of involute heat transfer, and returns the amount of scroll-
+        wall heat transfer in kW
+        
+        Parameters
+        ----------
+        hc : float
+            Heat transfer coefficient [kW/m2/K]
+        hs : float
+            Scroll wrap height [m]
+        rb : float
+            Base circle radius [m]
+        phi1 : float
+            Larger involute angle [rad]
+        phi2 : float
+            Smaller involute angle [rad]
+        phi0 : float
+            Initial involute angle [rad]
+        T_scroll : float
+            Lump temperature of the scroll wrap [K]
+        T_CV : float
+            Temperature of the gas in the CV [K]
+        dT_dphi : float
+            Derivative of the temperature along the scroll wrap [K/rad]
+        phim : float
+            Mean involute angle of wrap used for heat transfer [rad]
+        
+        Notes
+        -----
+        ``phi1`` and ``phi2`` are defined such that ``phi1`` is always the
+        larger involute angle in value
+        """
+        term1=hc*hs*rb*( (phi1*phi1/2.0-phi0*phi1)*(T_scroll-T_CV)
+            +dT_dphi*(phi1*phi1*phi1/3.0-(phi0+phim)*phi1*phi1/2.0+phi0*phim*phi1))
+        term2=hc*hs*rb*( (phi2*phi2/2.0-phi0*phi2)*(T_scroll-T_CV)
+            +dT_dphi*(phi2*phi2*phi2/3.0-(phi0+phim)*phi2*phi2/2.0+phi0*phim*phi2))
+        return term1-term2;
