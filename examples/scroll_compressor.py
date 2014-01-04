@@ -198,8 +198,8 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     
     ScrollComp.auto_add_CVs(inletState, outletState)
     
-##     ScrollComp.auto_add_leakage(flankFunc = ScrollComp.FlankLeakage, 
-##                                 radialFunc = ScrollComp.RadialLeakage)
+    ScrollComp.auto_add_leakage(flankFunc = ScrollComp.FlankLeakage, 
+                                radialFunc = ScrollComp.RadialLeakage)
     
     FP = FlowPath(key1='inlet.2', 
                   key2='sa', 
