@@ -1,19 +1,15 @@
 from __future__ import division
 
 from math import pi
-import textwrap
-import copy
 from time import clock
-from cPickle import loads, dumps
 import inspect
 
 ##--  Package imports  --
 from PDSim.flow import flow,flow_models
 from containers import STATE_VARS_TM, CVArrays
-from PDSim.flow.flow import FlowPathCollection, FlowPath
-from containers import ControlVolumeCollection,Tube,TubeCollection
+from PDSim.flow.flow import FlowPathCollection
+from containers import ControlVolumeCollection,TubeCollection
 from PDSim.plot.plots import debug_plots
-from PDSim.misc.solvers import Broyden, MultiDimNewtRaph
 from PDSim.misc.datatypes import arraym, empty_arraym
 from _core import delimit_vector, setcol, getcol, _PDSimCore
 import PDSim.core.callbacks
@@ -504,7 +500,7 @@ class PDSimCore(_PDSimCore):
         Parameters
         ----------
         x0 : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
-        """        
+        """
         self.t.fill(np.nan)
         self.T.fill(np.nan)
         self.p.fill(np.nan)
@@ -980,12 +976,12 @@ class PDSimCore(_PDSimCore):
         def Wdot_one_CV(CVindex):
             """ calculate the p-v work for one CV """
             
-            x0_raw = self.V[CVindex, 0:self.Ntheta]
-            y0_raw = self.p[CVindex, 0:self.Ntheta]
+            x0_raw = self.t[0:self.Ntheta]
+            y0_raw = self.p[CVindex, 0:self.Ntheta]*self.dV[CVindex, 0:self.Ntheta]
             
             x0, y0 = delimit_vector(x0_raw, y0_raw)
             
-            summer=0.0
+            summer = 0.0
             for x_chunk, y_chunk in zip(x0, y0):
                 summer += -trapz(y_chunk, x_chunk)*self.omega/(2*pi)
            
@@ -1012,11 +1008,10 @@ class PDSimCore(_PDSimCore):
         """
             
         self.calc_boundary_work()
-            
         self._postprocess_flows()
         self._postprocess_HT()
         
-        #  Calculate the lumped mass energy balance
+        # Calculate the lumped mass energy balance
         if self.callbacks.lumps_energy_balance_callback is not None:
             self.lumps_resid = self.callbacks.lumps_energy_balance_callback()
             #  Convert to an arraym if needed
@@ -1028,7 +1023,7 @@ class PDSimCore(_PDSimCore):
         if not hasattr(self,'Qamb'):
             self.Qamb = 0
         
-        #The total mass flow rate
+        # The total mass flow rate
         self.mdot = self.FlowsProcessed.mean_mdot[self.key_inlet]
         
         for key, State in self.Tubes.Nodes.iteritems():
@@ -1036,7 +1031,7 @@ class PDSimCore(_PDSimCore):
                  inletState = State
             if key == self.key_outlet:
                  outletState = State
-        
+
         try:
             Vdisp = self.Vdisp
         except:
@@ -1057,6 +1052,7 @@ class PDSimCore(_PDSimCore):
         self.Wdot_i = self.mdot*(h2s-h1)
         # self.Qamb is positive if heat is being added to the lumped mass
         self.Wdot = self.mdot*(h2-h1)-self.Qamb
+
     
     def _check_cycle_abort(self, index, I = 100):
         """
