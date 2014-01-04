@@ -1585,6 +1585,10 @@ class Scroll(PDSimCore, _Scroll):
             self.sensors.p.append(np.array(p))
             self.sensors.rho.append(np.array(rho))
         
+    def Nc_max(self):
+        return [scroll_geo.nC_Max(self.geo) for i in range(2)]
+        
+    
     def build_pressure_profile(self):
         """
         Build the pressure profile, tracking along s1,c1.x,d1,ddd and
@@ -1596,31 +1600,37 @@ class Scroll(PDSimCore, _Scroll):
         theta = self.t
 
         # Suction chambers
-        p1 = self.p[self.CVs.index('s1')]
-        p2 = self.p[self.CVs.index('s2')]
+        p1 = self.p[self.CVs.index('s1')].copy()
+        p2 = self.p[self.CVs.index('s2')].copy()
         
-        nCmax = scroll_geo.nC_Max(self.geo)
+        Nc_max1, Nc_max2 = self.Nc_max()
         
-        if nCmax > 1:
-            for alpha in range(1,nCmax):
-                # Compression chambers up to the next-to-innermost set are handled
-                # just like the suction chambers
-                theta = np.append(theta, self.t + 2*pi*alpha)
-                p1 = np.append(p1, self.p[self.CVs.index('c1.'+str(alpha))])
-                p2 = np.append(p2, self.p[self.CVs.index('c2.'+str(alpha))])   
+        for path, Nc_max in zip([1,2],[Nc_max1, Nc_max2]):
+            if Nc_max > 1:
+                for alpha in range(1,Nc_max):
+                    # Compression chambers up to the next-to-innermost set are handled
+                    # just like the suction chambers
+                    theta = np.append(theta, self.t + 2*pi*alpha)
+                    if path == 1:
+                        p1 = np.append(p1, self.p[self.CVs.index('c1.'+str(alpha))])
+                    else:
+                        p2 = np.append(p2, self.p[self.CVs.index('c2.'+str(alpha))])
         
-        # Innermost compression chamber begins to be tricky
-        # By definition innermost compression chamber doesn't make it to the 
-        # end of the rotation
-        next_theta = self.t + 2*pi*nCmax
-        next_p1 = self.p[self.CVs.index('c1.'+str(nCmax))]
-        next_p2 = self.p[self.CVs.index('c2.'+str(nCmax))]
-        next_p1[np.isnan(next_p1)] = 0
-        next_p2[np.isnan(next_p2)] = 0
+            # Innermost compression chamber begins to be tricky
+            # By definition innermost compression chamber doesn't make it to the 
+            # end of the rotation
+            next_theta = self.t + 2*pi*Nc_max
+            if path == 1:
+                next_p1 = self.p[self.CVs.index('c1.'+str(Nc_max))]
+                next_p1[np.isnan(next_p1)] = 0
+            else:
+                next_p2 = self.p[self.CVs.index('c2.'+str(Nc_max))]
+                next_p2[np.isnan(next_p2)] = 0
         
-        pd1 = self.p[self.CVs.index('d1')]
-        pd2 = self.p[self.CVs.index('d2')]
-        pddd = self.p[self.CVs.index('ddd')]
+        pd1 = self.p[self.CVs.index('d1')].copy()
+        pd2 = self.p[self.CVs.index('d2')].copy()
+        pddd = self.p[self.CVs.index('ddd')].copy()
+        
         # Now check if d1 and d2 end before the end of the rotation (they don't 
         # neccessarily)
         if np.isnan(pd1[0]) and np.isnan(pd1[self.Itheta]):
@@ -1658,7 +1668,7 @@ class Scroll(PDSimCore, _Scroll):
             
             pdddB[i::] = np.nan # This is the beginning of the next rotation
             
-            theta = np.append(theta, self.t + 2*pi*(nCmax+1))
+            theta = np.append(theta, self.t + 2*pi*(Nc_max1 + 1))
             p1 = np.append(p1, pdddB)
             p2 = np.append(p2, pdddB)
         
@@ -1685,7 +1695,7 @@ class Scroll(PDSimCore, _Scroll):
             p1 = np.append(p1, next_p1)
             p2 = np.append(p2, next_p2)
             
-            last_theta = self.t + 2*pi*(nCmax+1)
+            last_theta = self.t + 2*pi*(Nc_max1 + 1)
             last_p1 = pddd.copy()
             last_p2 = pddd.copy()
             last_p1[np.isnan(last_p1)] = 0
@@ -1784,7 +1794,7 @@ class Scroll(PDSimCore, _Scroll):
         #  Set the index for each control volume 
         for FP in self.Flows:
             FP.key1Index = scroll_geo.get_compressor_CV_index(FP.key1)
-            FP.key2Index = scroll_geo.get_compressor_CV_index(FP.key2) 
+            FP.key2Index = scroll_geo.get_compressor_CV_index(FP.key2)
         
         #  Call the base class function        
         PDSimCore.pre_run(self)
