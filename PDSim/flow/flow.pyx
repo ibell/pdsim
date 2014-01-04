@@ -282,6 +282,8 @@ cdef class FlowPath(object):
             self.p_down = p2
             self.key_up_exists = self.key1_exists
             self.key_down_exists = self.key2_exists
+            self.key_up_Index = self.key1Index
+            self.key_down_Index = self.key2Index
             self.ikey_up = self.ikey1
             self.ikey_down = self.ikey2
             self.Gas = self.State1.Fluid
@@ -297,6 +299,8 @@ cdef class FlowPath(object):
             self.p_down = p1
             self.key_up_exists = self.key2_exists
             self.key_down_exists = self.key1_exists
+            self.key_up_Index = self.key2Index
+            self.key_down_Index = self.key1Index
             self.ikey_up = self.ikey2
             self.ikey_down = self.ikey1
             self.Gas = self.State2.Fluid

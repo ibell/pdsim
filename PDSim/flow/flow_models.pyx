@@ -61,8 +61,9 @@ cdef class PyFlowFunctionWrapper(FlowFunction):
             val = self.Function(FP, **self.kwargs)
             dval = <double?> val
             return dval
-        except ValueError:
-            raise ValueError("Wrapped function in PyFlowFunctionWrapper did not return a floating point value; returned "+str(val))
+#        except ValueError as VE:
+#            print VE, 
+#            raise ValueError("Wrapped function in PyFlowFunctionWrapper did not return a floating point value; returned "+str(val))
         except:
             raise
     
