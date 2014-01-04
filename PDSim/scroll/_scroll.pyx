@@ -2,6 +2,7 @@
 from PDSim.flow import flow_models
 from PDSim.flow cimport flow_models
 
+from PDSim.scroll import common_scroll_geo, symm_scroll_geo
 from PDSim.scroll cimport common_scroll_geo, symm_scroll_geo
 
 from libc.math cimport M_PI as pi
@@ -18,7 +19,7 @@ cdef class _Scroll(object):
                     HTC = self.HTC)
     
     cpdef double SA_S(self, FlowPath FP):
-        FP.A = common_scroll_geo.Area_s_sa(self.theta, self.geo)
+        FP.A = symm_scroll_geo.Area_s_sa(self.theta, self.geo)
         try:
             return flow_models.IsentropicNozzle(FP.A,FP.State_up,FP.State_down)
         except ZeroDivisionError:
@@ -50,10 +51,10 @@ cdef class _Scroll(object):
         #Calculate the area
         #Arc length of the upstream part of the flow path
         
-        FP.A = common_scroll_geo.radial_leakage_area(self.theta,
-                                                      self.geo,
-                                                      FP.key1Index,
-                                                      FP.key2Index)
+        FP.A = symm_scroll_geo.radial_leakage_area(self.theta,
+                                                   self.geo,
+                                                   FP.key1Index,
+                                                   FP.key2Index)
         
         if FP.A == 0.0:
             return 0.0
@@ -86,7 +87,7 @@ cdef class _Scroll(object):
         cdef double t = -1.0 #Default (not-provided) value
         
         if Ncv_check > -1:
-            if Ncv_check == common_scroll_geo.getNc(self.theta, self.geo):
+            if Ncv_check == symm_scroll_geo.getNc(self.theta, self.geo):
                 _evaluate = True
             else:
                 _evaluate = False
