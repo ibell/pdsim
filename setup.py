@@ -21,7 +21,8 @@ try:
             break
 except ImportError:
     print 'psutil was not found, it is used to kill the python completion server in Eclipse which keeps PDSim from building. psutils can be easy_install-ed or installed using pip'
-    
+   
+import warnings
 from distutils.core import setup, Extension
 from Cython.Build import cythonize
 from Cython.Distutils import build_ext
@@ -93,8 +94,12 @@ if '--inplace' not in sys.argv or '--clean' in sys.argv:
     if '--clean' in sys.argv:
         sys.argv.remove('--clean')
 
+for i in range(len(pyx_list)-1,-1,-1):
+    if not os.path.exists(pyx_list[i]):
+        warnings.warn(pyx_list[i]+' was not found')
+        pyx_list.pop(i)
+    
 pxd_files = []
-
 ext_module_list = []
 for pyx_file in pyx_list:
     sources = [pyx_file]
