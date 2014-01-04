@@ -3,6 +3,9 @@ cimport cython
 import cython
 import numpy as np
 
+cpdef double_or_numpy plus_one(double_or_numpy x):
+    return x + 1.0
+
 cdef class VdVstruct:
     def __init__(self, V, dV):
         self.V = V
@@ -12,62 +15,104 @@ cdef class VdVstruct:
         return str(list([self.V,self.dV]))
 
 cdef class HTAnglesClass:
-        
     def __repr__(self):
         s = ''
         for k in ['phi_1_i','phi_2_i','phi_1_o','phi_2_o','phi_i0','phi_o0']:
             s += k + ' : ' + str(getattr(self,k)) + '\n'
         return s
         
+cdef class CVInvolute:
+    def __init__(self):
+        pass
         
+cdef class CVInvolutes:
+    def __init__(self):
+        self.Inner = CVInvolute.__new__(CVInvolute)
+        self.Outer = CVInvolute.__new__(CVInvolute)
         
-    
-cpdef double Gr(double phi, geoVals geo, double theta, inv):
+    def __repr__(self):
+        s = ''
+        s += "Outer.involute = {i:s}\n".format(i=involute_index_to_key(self.Outer.involute))
+        s += "Outer.phi_0 = {i:g}\n".format(i=self.Outer.phi_0)
+        s += "Outer.phi_max = {i:g}\n".format(i=self.Outer.phi_max)
+        s += "Outer.phi_min = {i:g}\n".format(i=self.Outer.phi_min)
+        s += "Inner.involute = {i:s}\n".format(i=involute_index_to_key(self.Inner.involute))
+        s += "Inner.phi_0 = {i:g}\n".format(i=self.Inner.phi_0)
+        s += "Inner.phi_max = {i:g}\n".format(i=self.Inner.phi_max)
+        s += "Inner.phi_min = {i:g}".format(i=self.Inner.phi_min)
+        return s
+        
+cpdef bytes involute_index_to_key(int index):
     """
+    Return the string associated with a given index from the common_scroll_geo.involute_index enumeration
+    """
+    
+    if index == INVOLUTE_FI:
+        return bytes('fi')
+    elif index == INVOLUTE_FO:
+        return bytes('fo')
+    elif index == INVOLUTE_OI:
+        return bytes('oi')
+    elif index == INVOLUTE_OO:
+        return bytes('oo')
+    else:
+        return bytes('')
+    
+cpdef double Gr(double phi, geoVals geo, double theta, int inv):
+    """
+    The antiderivative of the area integration term, where 
+    
+    .. math::
+    
+        Gr \\equiv \\int\\left[\\left(-y\\frac{dx(\\phi)}{d\\phi}+x\\frac{dy(\\phi)}{d\\phi}\\right)d\\phi\\right]
     """
     theta_m = geo.phi_fie - theta + 3.0*pi/2.0
-    if inv == 'fi':
+    if inv == INVOLUTE_FI:
         return phi*geo.rb**2*(phi**2 - 3*phi*geo.phi_fi0 + 3*geo.phi_fi0**2)/3
-    elif inv == 'fo':
+    elif inv == INVOLUTE_FO:
         return phi*geo.rb**2*(phi**2 - 3*phi*geo.phi_fo0 + 3*geo.phi_fo0**2)/3
-    elif inv == 'oi':
+    elif inv == INVOLUTE_OI:
         return geo.rb*(phi**3*geo.rb - 3*phi**2*geo.phi_oi0*geo.rb 
                        + 3*phi*geo.phi_oi0**2*geo.rb 
-                       + 3*phi*geo.ro*cos(phi - theta_m) 
-                       - 3*geo.phi_oi0*geo.ro*cos(phi - theta_m) 
+                       + 3*(phi-geo.phi_oi0)*geo.ro*cos(phi - theta_m)
                        - 3*geo.ro*sin(phi - theta_m))/3
-    elif inv == 'oo':
+    elif inv == INVOLUTE_OO:
         return geo.rb*(phi**3*geo.rb - 3*phi**2*geo.phi_oo0*geo.rb 
                        + 3*phi*geo.phi_oo0**2*geo.rb 
-                       + 3*phi*geo.ro*cos(phi - theta_m) 
-                       - 3*geo.phi_oo0*geo.ro*cos(phi - theta_m) 
+                       + 3*(phi-geo.phi_oo0)*geo.ro*cos(phi - theta_m) 
                        - 3*geo.ro*sin(phi - theta_m))/3
                        
-cpdef double dGr_dphi(double phi, geoVals geo, double theta, inv):
+cpdef double dGr_dphi(double phi, geoVals geo, double theta, int inv):
+    """
+    The partial derivative of Gr with respect to phi with theta held constant
+    """
     
     theta_m = geo.phi_fie - theta + 3.0*pi/2.0
     
-    if inv == 'fi':
+    if inv == INVOLUTE_FI:
         return geo.rb**2*(phi - geo.phi_fi0)**2
-    elif inv == 'fo':
+    elif inv == INVOLUTE_FO:
         return geo.rb**2*(phi - geo.phi_fo0)**2
-    elif inv == 'oi':
+    elif inv == INVOLUTE_OI:
         return geo.rb*(geo.rb*(phi - geo.phi_oi0)**2 - (phi- geo.phi_oi0)*geo.ro*sin(phi - theta_m))
-    elif inv == 'oo':
+    elif inv == INVOLUTE_OO:
         return geo.rb*(geo.rb*(phi - geo.phi_oo0)**2 - (phi- geo.phi_oo0)*geo.ro*sin(phi - theta_m))
 
-cpdef double dGr_dtheta(double phi, geoVals geo, double theta, inv):
+cpdef double dGr_dtheta(double phi, geoVals geo, double theta, int inv):
+    """
+    The partial derivative of Gr with respect to theta with phi held constant
+    """
     
     theta_m = geo.phi_fie - theta + 3.0*pi/2.0
     
-    if inv in ['fi','fo']:
+    if inv == INVOLUTE_FI or inv == INVOLUTE_FO:
         return 0.0
-    elif inv == 'oi':
+    elif inv == INVOLUTE_OI:
         return geo.rb*geo.ro*(-(phi - geo.phi_oi0)*sin(phi - theta_m) - cos(phi - theta_m))
-    elif inv == 'oo':
+    elif inv == INVOLUTE_OO:
         return geo.rb*geo.ro*(-(phi - geo.phi_oo0)*sin(phi - theta_m) - cos(phi - theta_m))
 
-cpdef coords_inv_dtheta(phi, geoVals geo, double theta, inv=""):
+cdef coords_inv_dtheta(double phi, geoVals geo, double theta, int inv, double *dx, double *dy):
     """
     Internal function that does the calculation if phi is a double variable 
     """
@@ -76,15 +121,14 @@ cpdef coords_inv_dtheta(phi, geoVals geo, double theta, inv=""):
     ro = rb*(pi - geo.phi_fi0 + geo.phi_oo0)
     om = geo.phi_fie - theta + 3.0*pi/2.0
 
-    if inv in ["fi", "fo"] :
-        dx = 0.0
-        dy = 0.0
-    elif inv in ["oi", "oo"]:
-        dx = +ro*sin(om)
-        dy = -ro*cos(om)
+    if inv == INVOLUTE_FI or inv == INVOLUTE_FO:
+        dx[0] = 0.0
+        dy[0] = 0.0
+    elif inv == INVOLUTE_OI or inv == INVOLUTE_OO:
+        dx[0] = +ro*sin(om)
+        dy[0] = -ro*cos(om)
     else:
         raise ValueError('flag not valid')
-    return (dx, dy)
     
 cpdef long get_compressor_CV_index(str key) except *:
     """
@@ -151,50 +195,8 @@ cpdef long get_compressor_CV_index(str key) except *:
 cpdef long get_compression_chamber_index(long path, long alpha):
     """
     Return the index for the compression chamber with integers
-    
     """
-    if path == 1:
-        if alpha == 1:
-            return keyIc1_1
-        elif alpha == 2:
-            return keyIc1_2
-        elif alpha == 3:
-            return keyIc1_3
-        elif alpha == 4:
-            return keyIc1_4
-        elif alpha == 5:
-            return keyIc1_5
-        elif alpha == 6:
-            return keyIc1_6
-        elif alpha == 7:
-            return keyIc1_7
-        elif alpha == 8:
-            return keyIc1_8
-        elif alpha == 9:
-            return keyIc1_9
-        elif alpha == 10:
-            return keyIc1_10
-    elif path == 2:
-        if alpha == 1:
-            return keyIc2_1
-        elif alpha == 2:
-            return keyIc2_2
-        elif alpha == 3:
-            return keyIc2_3
-        elif alpha == 4:
-            return keyIc2_4
-        elif alpha == 5:
-            return keyIc2_5
-        elif alpha == 6:
-            return keyIc2_6
-        elif alpha == 7:
-            return keyIc2_7
-        elif alpha == 8:
-            return keyIc2_8
-        elif alpha == 9:
-            return keyIc2_9
-        elif alpha == 10:
-            return keyIc2_10
+    return 1000*path+alpha
 
 #This is a list of all the members in geoVals
 geoValsvarlist=['h','ro','rb','t',
@@ -290,6 +292,30 @@ cpdef tuple _coords_inv_np(np.ndarray[np.float_t] phi, geoVals geo,double theta,
     else:
         raise ValueError('flag not valid')
     return (x,y)
+    
+cdef _coords_inv_d_int(double phi, geoVals geo,double theta, int flag, double *x, double *y):
+    """
+    Internal function that does the calculation if phi is a double variable 
+    """
+
+    rb = geo.rb
+    ro = rb*(pi - geo.phi_fi0 + geo.phi_oo0)
+    om = geo.phi_fie - theta + 3.0*pi/2.0
+
+    if flag == INVOLUTE_FI:
+        x[0] = rb*cos(phi)+rb*(phi-geo.phi_fi0)*sin(phi)
+        y[0] = rb*sin(phi)-rb*(phi-geo.phi_fi0)*cos(phi)
+    elif flag == INVOLUTE_FO:
+        x[0] = rb*cos(phi)+rb*(phi-geo.phi_fo0)*sin(phi)
+        y[0] = rb*sin(phi)-rb*(phi-geo.phi_fo0)*cos(phi)
+    elif flag == INVOLUTE_OI:
+        x[0] = -rb*cos(phi)-rb*(phi-geo.phi_oi0)*sin(phi)+ro*cos(om)
+        y[0] = -rb*sin(phi)+rb*(phi-geo.phi_oi0)*cos(phi)+ro*sin(om)
+    elif flag == INVOLUTE_OO:
+        x[0] = -rb*cos(phi)-rb*(phi-geo.phi_oo0)*sin(phi)+ro*cos(om)
+        y[0] = -rb*sin(phi)+rb*(phi-geo.phi_oo0)*cos(phi)+ro*sin(om)
+    else:
+        raise ValueError('flag not valid')
     
 cpdef tuple _coords_inv_d(double phi, geoVals geo,double theta, flag=""):
     """
@@ -390,7 +416,6 @@ cpdef tuple coords_norm(phi_vec, geoVals geo, double theta,flag="fi"):
         else:
             print "Uh oh... error in coords_norm"
     return (nx,ny)
-    
     
 cdef double x_antideriv(double phi, double phi_0):
     """ Antiderivative of function for x for scroll_wrap """

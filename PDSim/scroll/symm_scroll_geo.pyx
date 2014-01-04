@@ -6,7 +6,7 @@ import cython
 import matplotlib.pyplot as plt
 
 cimport common_scroll_geo as comm
-from common_scroll_geo cimport sides, compressor_CV_indices, get_compression_chamber_index, geoVals, coords_inv, coords_norm
+from common_scroll_geo cimport sides, compressor_CV_indices, get_compression_chamber_index, geoVals, coords_inv, coords_norm, matchpair, min2, max2
 from common_scroll_geo import polycentroid, polyarea
         
 cpdef CVcoords(CVkey, geoVals geo, double theta):
@@ -354,12 +354,6 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         
     else:
         raise AttributeError('Type not understood, should be one of 2Arc or ArcLineArc')
-
-cpdef inline double min2(double a, double b):
-    return a if a<b else b
-
-cpdef inline double max2(double a, double b):
-    return a if a>b else b
         
 cpdef double radial_leakage_area(double theta, geoVals geo, long key1Index, long key2Index, int location = comm.UP) except *:
     """
@@ -381,8 +375,8 @@ cpdef double radial_leakage_area(double theta, geoVals geo, long key1Index, long
     
     """
     cdef double phi_min, phi_max
-    #Get the bounding angles
-    radial_leakage_angles(theta,geo,key1Index,key2Index,&phi_min,&phi_max)
+    # Get the bounding angles
+    radial_leakage_angles(theta, geo, key1Index, key2Index, &phi_min, &phi_max)
     if location == comm.UP:
         phi_0 = geo.phi_fi0
     elif location == comm.DOWN:
@@ -393,9 +387,6 @@ cpdef double radial_leakage_area(double theta, geoVals geo, long key1Index, long
         raise ValueError
     A = geo.delta_radial*geo.rb*((phi_max**2-phi_min**2)/2-phi_0*(phi_max-phi_min))
     return A
-    
-cdef inline bint matchpair(long key1, long key2, long target1, long target2):
-    return (key1 == target1 and key2 == target2) or (key2 == target1 and key1 == target2)
  
 cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, double *angle_min, double *angle_max):
     """

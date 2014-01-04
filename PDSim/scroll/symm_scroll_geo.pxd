@@ -50,8 +50,6 @@ cpdef dict DDD_forces(double theta, geoVals geo, bint poly=*)
 
 cpdef CVcoords(CVkey, geoVals geo, double theta)
 
-cpdef double min2(double, double)
-cpdef double max2(double, double)
 cpdef double phi_s_sa(double theta, geoVals geo)
 
 @cython.locals(iter=cython.int,phi_os=cython.double,phi_o0=cython.double,phi_ie=cython.double,phi_i0=cython.double,change=cython.double,eps=cython.double,f=cython.double,x1=cython.double,x2=cython.double,x3=cython.double,y1=cython.double,y2=cython.double,phi=cython.double,alpha=cython.double)
