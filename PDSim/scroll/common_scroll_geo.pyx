@@ -87,30 +87,30 @@ cpdef double dGr_dphi(double phi, geoVals geo, double theta, int inv):
     The partial derivative of Gr with respect to phi with theta held constant
     """
     
-    theta_m = geo.phi_fie - theta + 3.0*pi/2.0
+    THETA = geo.phi_fie - theta - pi/2.0
     
     if inv == INVOLUTE_FI:
         return geo.rb**2*(phi - geo.phi_fi0)**2
     elif inv == INVOLUTE_FO:
         return geo.rb**2*(phi - geo.phi_fo0)**2
     elif inv == INVOLUTE_OI:
-        return geo.rb*(geo.rb*(phi - geo.phi_oi0)**2 - (phi- geo.phi_oi0)*geo.ro*sin(phi - theta_m))
+        return geo.rb*(geo.rb*(phi - geo.phi_oi0)**2 + (phi- geo.phi_oi0)*geo.ro*sin(THETA - phi))
     elif inv == INVOLUTE_OO:
-        return geo.rb*(geo.rb*(phi - geo.phi_oo0)**2 - (phi- geo.phi_oo0)*geo.ro*sin(phi - theta_m))
+        return geo.rb*(geo.rb*(phi - geo.phi_oo0)**2 + (phi- geo.phi_oo0)*geo.ro*sin(THETA - phi))
 
 cpdef double dGr_dtheta(double phi, geoVals geo, double theta, int inv):
     """
     The partial derivative of Gr with respect to theta with phi held constant
     """
     
-    theta_m = geo.phi_fie - theta + 3.0*pi/2.0
+    THETA = geo.phi_fie - theta - pi/2.0
     
     if inv == INVOLUTE_FI or inv == INVOLUTE_FO:
         return 0.0
     elif inv == INVOLUTE_OI:
-        return geo.rb*geo.ro*(-(phi - geo.phi_oi0)*sin(phi - theta_m) - cos(phi - theta_m))
+        return geo.rb*geo.ro*((phi - geo.phi_oi0)*sin(THETA - phi) - cos(THETA - phi))
     elif inv == INVOLUTE_OO:
-        return geo.rb*geo.ro*(-(phi - geo.phi_oo0)*sin(phi - theta_m) - cos(phi - theta_m))
+        return geo.rb*geo.ro*((phi - geo.phi_oo0)*sin(THETA - phi) - cos(THETA - phi))
 
 cdef coords_inv_dtheta(double phi, geoVals geo, double theta, int inv, double *dx, double *dy):
     """
@@ -228,12 +228,50 @@ cdef class geoVals:
         for atr in geoValsvarlist:
             d[atr]=getattr(self,atr)
         return rebuild_geoVals,(d,)
+        
     def __repr__(self):
         s='geoVals instance at '+str(id(self))+'\n'
         for atr in geoValsvarlist:
             s+=atr+': '+str(getattr(self,atr))+'\n'
         return s
         
+    cpdef double val_if_symmetric(self, double val):
+        """ Returns the value if symmetric, throws ValueError otherwise """
+        if self.is_symmetric():
+            return val
+        else:
+            raise ValueError('Symmetric angle requested (phi_ie, phi_is, phi_i0, etc.) but the geometry is not symmetric')
+            
+    property phi_ie:
+        """ Inner Ending Angle """
+        def __get__(self):
+            return self.val_if_symmetric(self.phi_fie)        
+    
+    property phi_is:
+        """ Inner Starting Angle """
+        def __get__(self):
+            return self.val_if_symmetric(self.phi_fis)
+            
+    property phi_i0:
+        """ Inner Initial Angle """
+        def __get__(self):
+            return self.val_if_symmetric(self.phi_fi0)
+            
+    property phi_oe:
+        """ Outer Ending Angle """
+        def __get__(self):
+            return self.val_if_symmetric(self.phi_foe)        
+    
+    property phi_os:
+        """ Outer Starting Angle """
+        def __get__(self):
+            return self.val_if_symmetric(self.phi_fos)
+            
+    property phi_o0:
+        """ Outer Initial Angle """
+        def __get__(self):
+            return self.val_if_symmetric(self.phi_fo0)        
+    
     cpdef bint is_symmetric(self):
         """
         Returns true if all the angles for the fixed scroll are the same as for the orbiting scroll

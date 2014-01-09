@@ -2502,7 +2502,7 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.mu_Blower = np.zeros_like(self.forces.F_B0)
         self.forces.M_B0 = self.forces.mu_B*self.mech.D_crank_bearing/2*self.forces.F_B0
         
-        THETA = self.geo.phi_ie-pi/2-theta
+        THETA = self.geo.phi_fie-pi/2-theta
         vOR_xbeta = self.geo.ro*self.omega*(np.sin(THETA)*np.cos(beta)-np.cos(THETA)*np.sin(beta)) #Velocity of the oldham ring in the xbeta direction
         aOR_xbeta = self.geo.ro*self.omega**2*(-np.cos(THETA)*np.cos(beta)-np.sin(THETA)*np.sin(beta))
         UPSILON = vOR_xbeta/np.abs(vOR_xbeta)

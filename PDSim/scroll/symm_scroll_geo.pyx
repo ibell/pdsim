@@ -5,6 +5,8 @@ import cython
 
 import matplotlib.pyplot as plt
 
+
+
 cimport common_scroll_geo as comm
 from common_scroll_geo cimport sides, compressor_CV_indices, get_compression_chamber_index, geoVals, coords_inv, coords_norm, matchpair, min2, max2
 from common_scroll_geo import polycentroid, polyarea
@@ -25,15 +27,24 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
         om = geo.phi_fie - pi/2 - theta
     else:
         raise ValueError('not supported for asymmetric')
-        
-    if abs(geo.phi_ie_offset) < 1e-14:
-        symmetric = True
-    else:
-        symmetric = False
     
     if CVkey == 's1':
+        ro_over_rb = geo.ro/geo.rb
+        A = (geo.phi_fi0-geo.phi_fie)+ro_over_rb*cos(theta)
+        B = 1+ro_over_rb*sin(theta)
+        C = -1
+        delta1 = 2*atan((A - sqrt(A**2 + B**2 - C**2))/(B-C))
+        delta2 = 2*atan((A + sqrt(A**2 + B**2 - C**2))/(B-C))
+
+        if abs(delta1) < 1:
+            phi_ssa = geo.phi_ooe-pi+delta1
+        elif abs(delta2) < 1:
+            phi_ssa = geo.phi_ooe-pi+delta2
+        else:
+            raise ValueError
+            
         phi1 = np.linspace(geo.phi_fie, geo.phi_fie-theta) #fi
-        phi2 = np.linspace(geo.phi_ooe-pi, geo.phi_ooe-pi-theta) #oo
+        phi2 = np.linspace(phi_ssa, geo.phi_ooe-pi-theta) #oo
         x1, y1 = coords_inv(phi1, geo, theta, 'fi')
         x2, y2 = coords_inv(phi2, geo, theta, 'oo')
         return np.r_[x1,x2[::-1]],np.r_[y1,y2[::-1]]

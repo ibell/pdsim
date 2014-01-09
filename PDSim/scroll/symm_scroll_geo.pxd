@@ -7,7 +7,7 @@ cimport cython
 
 from PDSim.scroll.common_scroll_geo cimport geoVals, HTAnglesClass
 
-from libc.math cimport sqrt,sin,cos,tan,atan2,acos,floor,M_PI as pi,pow
+from libc.math cimport sqrt,sin,cos,tan,atan2,acos,floor,M_PI as pi,pow,atan
 
 cpdef double fxA(double rb, double phi, double phi0)
 cpdef double fyA(double rb, double phi, double phi0)

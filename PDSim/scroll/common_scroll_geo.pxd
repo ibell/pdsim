@@ -60,6 +60,7 @@ cdef class geoVals:
     cdef public np.ndarray xvec_disc_port, yvec_disc_port
     
     cpdef bint is_symmetric(self)
+    cpdef double val_if_symmetric(self, double val)
 
 cpdef bytes involute_index_to_key(int index)
 
