@@ -109,10 +109,10 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         geo.r_wall=0.065
         setDiscGeo(geo,Type='ArcLineArc',r2=0.003178893902,r1=0.008796248080)
     elif Type == '2Arc':
-        (x_is,y_is) = coords_inv(geo.phi_is,geo,0,'fi')
-        (x_os,y_os) = coords_inv(geo.phi_os,geo,0,'fo')
-        (nx_is,ny_is) = coords_norm(geo.phi_is,geo,0,'fi')
-        (nx_os,ny_os) = coords_norm(geo.phi_os,geo,0,'fo')
+        (x_is,y_is) = common_scroll_geo.coords_inv(geo.phi_is,geo,0,'fi') 
+        (x_os,y_os) = common_scroll_geo.coords_inv(geo.phi_os,geo,0,'fo')
+        (nx_is,ny_is) = common_scroll_geo.coords_norm(geo.phi_is,geo,0,'fi')
+        (nx_os,ny_os) = common_scroll_geo.coords_norm(geo.phi_os,geo,0,'fo')
         dx=x_is-x_os
         dy=y_is-y_os
         
@@ -120,10 +120,10 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         a=cos(geo.phi_os-geo.phi_is)+1.0
         b=geo.ro*a-dx*(sin(geo.phi_os)-sin(geo.phi_is))+dy*(cos(geo.phi_os)-cos(geo.phi_is))
         c=1.0/2.0*(2.0*dx*sin(geo.phi_is)*geo.ro-2.0*dy*cos(geo.phi_is)*geo.ro-dy**2-dx**2)
-        if geo.phi_os-(geo.phi_is-pi)>1e-12:
-            r2max=(-b+sqrt(b**2-4.0*a*c))/(2.0*a)
-        elif geo.phi_os==geo.phi_is-pi:
+        if abs((geo.phi_os+pi)-geo.phi_is) < 1e-8:
             r2max=-c/b
+        elif geo.phi_os-(geo.phi_is-pi)>1e-12:
+            r2max=(-b+sqrt(b**2-4.0*a*c))/(2.0*a)
         else:
             print 'error with starting angles phi_os %.16f phi_is-pi %.16f' %(geo.phi_os,geo.phi_is-pi)
             
@@ -176,13 +176,13 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         """
         geo.x0_wall=geo.ro/2.0*cos(geo.phi_ie-pi/2-pi)
         geo.y0_wall=geo.ro/2.0*sin(geo.phi_ie-pi/2-pi)
-        (x,y)=coords_inv(geo.phi_ie,geo,pi,'fo')
+        (x,y)=common_scroll_geo.coords_inv(geo.phi_ie,geo,pi,'fo')
         geo.r_wall=1.03*sqrt((geo.x0_wall-x)**2+(geo.y0_wall-y)**2)
     elif Type=='ArcLineArc':
-        (x_is,y_is) = coords_inv(geo.phi_is,geo,0,'fi')
-        (x_os,y_os) = coords_inv(geo.phi_os,geo,0,'fo')
-        (nx_is,ny_is) = coords_norm(geo.phi_is,geo,0,'fi')
-        (nx_os,ny_os) = coords_norm(geo.phi_os,geo,0,'fo')
+        (x_is,y_is) = common_scroll_geo.coords_inv(geo.phi_is,geo,0,'fi')
+        (x_os,y_os) = common_scroll_geo.coords_inv(geo.phi_os,geo,0,'fo')
+        (nx_is,ny_is) = common_scroll_geo.coords_norm(geo.phi_is,geo,0,'fi')
+        (nx_os,ny_os) = common_scroll_geo.coords_norm(geo.phi_os,geo,0,'fo')
         dx=x_is-x_os
         dy=y_is-y_os
         
@@ -260,7 +260,7 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         """
         geo.x0_wall=geo.ro/2.0*cos(geo.phi_ie-pi/2-pi)
         geo.y0_wall=geo.ro/2.0*sin(geo.phi_ie-pi/2-pi)
-        (x,y)=coords_inv(geo.phi_ie,geo,pi,'fo')
+        (x,y)=common_scroll_geo.coords_inv(geo.phi_ie,geo,pi,'fo')
         geo.r_wall=1.03*sqrt((geo.x0_wall-x)**2+(geo.y0_wall-y)**2)
         
 #        f=pylab.Figure
@@ -1315,202 +1315,7 @@ if __name__== "__main__":
     app.MainLoop()
     
     
-#      import textwrap
-#      geo = geoVals()
-#      
-#      def remove_duplicate_vertices(x,y):
-#          x = x.squeeze()
-#          y = y.squeeze()
-#          xgood,ygood = [x[0]],[y[0]]
-#          
-#          for i in range(1,len(x)):
-#              if ((x[i]-x[i-1])**2+(y[i]-y[i-1])**2)**(0.5)>1e-6:
-#                  xgood.append(x[i])
-#                  ygood.append(y[i])
-#                  
-#          xgood.append(x[0])
-#          ygood.append(y[0])
-#          
-#          return xgood, ygood
-#      
-#      def vertices_to_string(x,y):
-#          """ convert lists for x, and y to a string in the format '[x,y],' """
-#          s = ''
-#          for _x,_y in zip(x,y):
-#              s += '[{x:g},{y:g}],\n'.format(x = _x*1000, y = _y*1000)
-#          return s
-#              
-#      x, y = CoordsOrbScroll(0, geo, shaveOn = False, Ndict = {'phi':100, 'arc1':10, 'arc2':10, 'line':0})
-#  
-#      xo = x - geo.ro*cos(geo.phi_ie-pi/2)
-#      yo = y - geo.ro*sin(geo.phi_ie-pi/2)
-#      xf = geo.ro*cos(geo.phi_ie-pi/2) - x
-#      yf = geo.ro*sin(geo.phi_ie-pi/2) - y
-#      
-#      ##----------------------------
-#      ##       Orbiting scroll
-#      ##----------------------------
-#      
-#      xo,yo = remove_duplicate_vertices(xo, yo)
-#      polydata = vertices_to_string(xo, yo)
-#      
-#      template = textwrap.dedent(
-#      """module scroll()
-#      {{
-#          linear_extrude(height = {hs:g})
-#          {{
-#              polygon([
-#          
-#                  {polygondata:s}
-#                  
-#              ]);
-#          }}
-#      }}
-#      
-#      union()
-#      {{
-#          scroll();
-#          translate([0,0,-10]){{cylinder(r = 75, h = 10, $fn = 100);}}
-#      }}""")
-#      
-#      with open('OSscad.scad','w') as f:
-#          f.write(template.format(polygondata = polydata, hs = geo.h*1000))
-#         
-#         
-#      ##----------------------------
-#      ##       Fixed scroll
-#      ##----------------------------
-#          
-#      xf, yf = remove_duplicate_vertices(xf, yf)
-#      polydata = vertices_to_string(xf, yf)
-#      
-#      template = textwrap.dedent(
-#      """module scroll()
-#      {{
-#          linear_extrude(height = {hs:g})
-#          {{
-#              polygon([
-#          
-#                  {polygondata:s}
-#                  
-#              ]);
-#          }}
-#      }}
-#      
-#      union()
-#      {{
-#          scroll();
-#          translate([0,0,+90+{hs:g}]){{cylinder(r = 75, h = 10, $fn = 100);}}
-#      }}""")
-#      
-#      with open('FSscad.scad','w') as f:
-#          f.write(template.format(polygondata = polydata, hs = geo.h*1000))
-#          
-#      ##----------------------------
-#      ##       Oldham ring
-#      ##----------------------------
-#      
-#      template = textwrap.dedent(
-#      """
-#      hring = {hring:g};
-#      wkey = {wkey:g};
-#      hkey = {hkey:g};
-#      ro = {ro:g};
-#      ri = {ri:g};
-#      
-#      htotal = 2*hkey + hring;
-#      
-#      translate([0,0,-hkey]){{
-#          difference()
-#          {{
-#              cylinder(r = ro, h = htotal, $fn = 100);
-#              cylinder(r = ri, h = htotal, $fn = 100);
-#               translate([-0.6*2*ro,wkey/2,hkey+hring]){{cube([1.2*ro*2,2*ro,htotal*1.1]);}}
-#               translate([-0.6*2*ro,-wkey/2-2*ro,hkey+hring]){{cube([1.2*ro*2,2*ro,htotal*1.1]);}}
-#               translate([wkey/2,-0.6*2*ro,]){{cube([2*ro,1.2*ro*2,hkey]);}}
-#               translate([-wkey/2-2*ro,-0.6*2*ro,]){{cube([2*ro,1.2*ro*2,hkey]);}}
-#          }}
-#      }}""")
-#      
-#      ro = 70
-#      t = geo.rb*(geo.phi_i0-geo.phi_o0)
-#      with open('Oldham.scad','w') as f:
-#          f.write(template.format(ro = ro, ri = ro - t*1000, hring = 2*t*1000, hkey = t*1000, wkey = t*1000))
-#          
-#      ##----------------------------
-#      ##       Shell
-#      ##----------------------------
-#      
-#      template = textwrap.dedent(
-#      """
-#      hbody = {h:g};
-#      ro = {ro:g};
-#      ri = {ri:g};
-#      xcap = {xcap:g};
-#      
-#      htotal = 2*hkey + hring;
-#      
-#      module curved_cylinder(r,h,rcap)
-#      {{
-#          union()
-#          {{
-#              translate([0,0,h]){{scale([1.0,1.0,rcap/r]){{sphere(r, $fn = 100);}}}}
-#             cylinder(r = r,h = h, $fn = 100);
-#          }}
-#      }};
-#      
-#      difference()
-#      {{
-#          curved_cylinder(ro,hbody,xcap*ro);
-#          curved_cylinder(ri,hbody,xcap*ri);
-#      }}""")
-#      
-#      ro = 100
-#      with open('Shell.scad','w') as f:
-#          f.write(template.format(ro = ro, ri = ro - 5, h = 300, xcap = 0.5))
-#  
-#      for root in ['FSscad','OSscad','Oldham','Shell']:
-#          subprocess.check_call(['C:\Program Files (x86)\OpenSCAD\openscad.exe','-o', root + '.off', root + '.scad'])
-#          subprocess.check_call(['C:\Program Files\VCG\MeshLab\meshlabserver.exe','-i', root + '.off','-o', root + '.x3d'])
-#      
-#          def inject(fName, diffuse, specular, MatDEF):
-#              """
-#              Inject material information into the x3d scene so that it can be referenced 
-#              and doesn't appear as a solid white object
-#              
-#              Parameters
-#              ----------
-#              fName : string
-#              diffuse : string
-#              specular : string
-#              """
-#              
-#              injected_string = textwrap.dedent(
-#              """
-#              <Appearance>
-#                  <Material id='{MatDEF:s}' DEF='{MatDEF:s}' diffuseColor='{diffuse:s}' specularColor='{specular:s}' />
-#              </Appearance>
-#              """.format(MatDEF = MatDEF,
-#                                      diffuse = diffuse, 
-#                                      specular = specular)
-#              )
-#              
-#              lines = open(fName,'r').readlines()
-#              
-#              iLine = -1
-#              for i,line in enumerate(lines):
-#                  if line.find('<Shape>') > -1:
-#                      iLine = i
-#                      break
-#              
-#              lines.insert(iLine+1, injected_string.strip())
-#              
-#              with open(fName,'w') as f:
-#                  f.write(''.join(lines))
-#              
-#          inject(root + '.x3d', diffuse = '0.8 0.8 0.8', specular = '0.2 0.2 0.2', MatDEF = 'Mat')
-#          
-#      os.startfile('OS.xhtml')
+
         
 #    pylab.fill(x,y)
 #    pylab.show()

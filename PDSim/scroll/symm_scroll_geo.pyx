@@ -33,13 +33,14 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
         A = (geo.phi_fi0-geo.phi_fie)+ro_over_rb*cos(theta)
         B = 1+ro_over_rb*sin(theta)
         C = -1
-        delta1 = 2*atan((A - sqrt(A**2 + B**2 - C**2))/(B-C))
-        delta2 = 2*atan((A + sqrt(A**2 + B**2 - C**2))/(B-C))
+        S = sqrt(A**2 + B**2 - C**2)
+        delta1 = 2*atan((A - S)/(B - C))
+        delta2 = 2*atan((A + S)/(B - C))
 
         if abs(delta1) < 1:
-            phi_ssa = geo.phi_ooe-pi+delta1
+            phi_ssa = geo.phi_ooe - pi + delta1
         elif abs(delta2) < 1:
-            phi_ssa = geo.phi_ooe-pi+delta2
+            phi_ssa = geo.phi_ooe - pi + delta2
         else:
             raise ValueError
             
@@ -68,9 +69,9 @@ cpdef CVcoords(CVkey, geoVals geo, double theta):
         if alpha > Nc:
             raise ValueError("c1.{i:d} is an invalid c1.x chamber, currently {Nc:d} pairs in existence".format(i=alpha, Nc = Nc))
         else:
-            phi = np.linspace(geo.phi_fie - theta - 2*pi*alpha, geo.phi_fie-theta-2*pi*(alpha-1), 1000)
+            phi = np.linspace(geo.phi_fie - theta - 2*pi*alpha, geo.phi_fie-theta-2*pi*(alpha-1), 200)
             (xi, yi) = coords_inv(phi, geo, theta, 'fi')
-            phi = np.linspace(geo.phi_fie - theta - 2*pi*(alpha-1)-pi, geo.phi_fie-theta-2*pi*alpha-pi, 1000)
+            phi = np.linspace(geo.phi_fie - theta - 2*pi*(alpha-1)-pi, geo.phi_fie-theta-2*pi*alpha-pi, 200)
             (xo, yo) = coords_inv(phi, geo, theta, 'oo')
             return np.r_[xi,xo], np.r_[yi,yo]
     

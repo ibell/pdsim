@@ -198,6 +198,31 @@ cdef class FlowPathCollection(list):
 cdef class FlowPath(object):
     
     def __init__(self, key1='', key2='', MdotFcn=None, MdotFcn_kwargs={}):
+        """
+        
+        Parameters
+        ----------
+        key1 : string
+            The key for the first flow node connected to this path
+        key2 : string
+            The key for the second flow node connected to this path
+        MdotFcn : function
+            Two options, either an instance of :class:`FlowFunction <PDSim.flow.FlowFunction>', or a 
+            function with a prototype like ``f(double A,FlowPath FP, **kwargs)``.  
+            See also :class:`FlowFunction <PDSim.flow.FlowFunction>'.  
+            
+            Any function
+            passed in for ``MdotFcn`` will be wrapped into an instance of 
+            :class:`FlowFunction <PDSim.flow.FlowFunction>'.  Using an instance of
+            :class:`FlowFunction <PDSim.flow.FlowFunction>' is more computationally 
+            efficient because the Cython code doesn't need to pass back through 
+            the python level and can all stay at the C/C++ level.
+            
+        MdotFcn_kwargs : dictionary
+            A dictionary of terms that will be passed along to the call to 
+            ``MdotFcn`` when it is called
+        
+        """
         self.key1 = key1
         self.key2 = key2
         

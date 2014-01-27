@@ -4,7 +4,7 @@ sys.path.append('..')
 import pdsim_plugins
 from panels import pdsim_panels
 from PDSim.flow.flow import FlowPath
-from PDSim.core.core import Tube
+from PDSim.core.containers import Tube
 from PDSim.core.containers import ControlVolume
 from PDSim.scroll import scroll_geo
 from math import pi

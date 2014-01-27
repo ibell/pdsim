@@ -1045,8 +1045,7 @@ class MainFrame(wx.Frame):
             # Imports from PDSim that are needed for all families of machines
             from PDSim.flow.flow import FlowPath
             from PDSim.flow.flow_models import IsentropicNozzleWrapper
-            from PDSim.core.containers import ControlVolume
-            from PDSim.core.core import Tube
+            from PDSim.core.containers import ControlVolume, Tube
             from PDSim.core.motor import Motor
             from PDSim.plot.plots import debug_plots
             
