@@ -1,2 +1,3 @@
+Cython
 sphinxcontrib-napoleon
 CoolProp
