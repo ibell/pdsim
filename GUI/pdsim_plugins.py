@@ -1,7 +1,8 @@
-#import abc
 
 class PDSimPlugin(object):
-    #__metaclass__ = abc.ABCMeta
+    """
+    This is the base class that represents the 
+    """
      
     def __init__(self):
         """
@@ -32,7 +33,7 @@ class PDSimPlugin(object):
         """
         Get the chunks for the script from the plugin
         
-        Return a dictionary of chunks (strings) for the script, the keys that are allowed are:
+        Return a dictionary of strings for the script, the keys that are allowed are:
         
         * ``pre_import`` (goes before all the standard imports)
         * ``post_import`` (goes after all the standard imports)
@@ -45,6 +46,8 @@ class PDSimPlugin(object):
         
         * ``pre_run`` (goes at the beginning of the run function)
         * ``post_run`` (goes at the end of the run function)
+        
+        
         
         """
         return {}

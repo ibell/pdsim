@@ -22,7 +22,7 @@ Step-By-Step on Windows
     '0.11.0'
     >>>
 
-#. Ok, python has been successfully installed.
+#. Ok, python has been successfully installed. 
     
 #. Now we are going to collect the source code for PDSim and CoolProp.  In Windows Explorer, go to a folder where you want to put the source code for PDSim and CoolProp.  Right-click and select "Git Clone..."
 
@@ -32,13 +32,13 @@ Step-By-Step on Windows
 
     python setup_coolprop.py
     
-#. Install PDSim using
+#. Install PDSim using::
 
     python setup.py install
 
-#. Now go into the examples folder, and try to run the file PURecip.py, you should get output like::
+#. Now go into the examples folder, and try to run the file simple_example.py, you should get output like::
 
-    C:\Users\Belli\Documents\Code\pdsim-git\examples>python PUrecip.py
+    C:\Users\Belli\Documents\Code\pdsim-git\examples>python simple_example.py
     Number of steps taken 7000
     Elapsed time for cycle is 0.4413 s
     Mass flow difference 2.03524833559  %
@@ -126,6 +126,11 @@ I use a couple of different tools for profiling.  One is RunSnakeRun.  Install R
 and line_profiler, which can be obtained from http://pypi.python.org/pypi/line_profiler .  Open the zip file, go to the folder and run::
 
     python setup.py install
+
+Uninstallation
+==============
+
+To uninstall, go to the folder where python is installed (probably c:\\Python27\\Lib\\site-packages), delete the folder CoolProp
 
 .. _Use-PDSim:
 

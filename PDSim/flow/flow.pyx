@@ -19,7 +19,7 @@ cpdef tuple sumterms_given_CV(bytes key, list Flows):
     Parameters
     ----------
     key: string
-    Flows: FlowPathCollection instance 
+    Flows: :class:`FlowPathCollection <PDSim.core.containers.FlowPathCollection>` instance 
     """
     cdef int i
     cdef FlowPath Flow
@@ -123,11 +123,11 @@ cdef class FlowPathCollection(list):
         
         Parameters
         ----------
-        harray : :class:`arraym <PDSim.misc.datatypes.arraym>' instance
+        harray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
             arraym that maps index to enthalpy - CVs+Tubes
-        parray : :class:`arraym <PDSim.misc.datatypes.arraym>' instance
+        parray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
             arraym that maps index to pressure - CVs+Tubes
-        Tarray : :class:`arraym <PDSim.misc.datatypes.arraym>' instance
+        Tarray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
             arraym that maps index to temperature - CVs+Tubes
         """
         cdef FlowPath FP
@@ -150,8 +150,8 @@ cdef class FlowPathCollection(list):
         
         Parameters
         ----------
-        summerdT : :class:`arraym <PDSim.misc.datatypes.arraym>' instance
-        summerdm : :class:`arraym <PDSim.misc.datatypes.arraym>' instance
+        summerdT : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
+        summerdm : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
             
         """
         cdef double mdot, h_up
@@ -207,14 +207,14 @@ cdef class FlowPath(object):
         key2 : string
             The key for the second flow node connected to this path
         MdotFcn : function
-            Two options, either an instance of :class:`FlowFunction <PDSim.flow.FlowFunction>', or a 
+            Two options, either an instance of :class:`FlowFunction <PDSim.flow.FlowFunction>`, or a 
             function with a prototype like ``f(double A,FlowPath FP, **kwargs)``.  
-            See also :class:`FlowFunction <PDSim.flow.FlowFunction>'.  
+            See also :class:`FlowFunction <PDSim.flow.FlowFunction>`.  
             
             Any function
             passed in for ``MdotFcn`` will be wrapped into an instance of 
-            :class:`FlowFunction <PDSim.flow.FlowFunction>'.  Using an instance of
-            :class:`FlowFunction <PDSim.flow.FlowFunction>' is more computationally 
+            :class:`FlowFunction <PDSim.flow.FlowFunction>`.  Using an instance of
+            :class:`FlowFunction <PDSim.flow.FlowFunction>` is more computationally 
             efficient because the Cython code doesn't need to pass back through 
             the python level and can all stay at the C/C++ level.
             
@@ -286,9 +286,9 @@ cdef class FlowPath(object):
         
         Parameters
         ----------
-        harray : :class:`arraym <PDSim.misc.datatypes.arraym>' instance of enthalpies of CV+Tubes
-        parray : :class:`arraym <PDSim.misc.datatypes.arraym>' instance of pressures of CV+Tubes
-        Tarray : :class:`arraym <PDSim.misc.datatypes.arraym>' instance of temperatures of CV+Tubes
+        harray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance of enthalpies of CV+Tubes
+        parray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance of pressures of CV+Tubes
+        Tarray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance of temperatures of CV+Tubes
         """
         cdef FlowFunction FF
         cdef double p1 = parray.data[self.ikey1], p2 = parray.data[self.ikey2]

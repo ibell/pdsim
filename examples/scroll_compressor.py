@@ -20,8 +20,7 @@ from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo
 from PDSim.core.core import struct
 from PDSim.scroll.asymm import Scroll
-from PDSim.core.containers import ControlVolume
-from PDSim.core.core import Tube
+from PDSim.core.containers import ControlVolume, Tube
 from PDSim.plot.plots import debug_plots
 from PDSim.scroll.plots import plotScrollSet
 from PDSim.core.motor import Motor
@@ -80,70 +79,9 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     ScrollComp.motor = Motor()
     ScrollComp.motor.set_eta(0.9)
     ScrollComp.motor.suction_fraction = 1.0
-    
-#    print ScrollComp.V_s1(0)[0]
-#    print ScrollComp.V_sa(2*pi)[0]-ScrollComp.V_sa(0)[0]
-#    
-#    plotScrollSet(2*pi,ScrollComp.geo,shaveOn=False,offsetScroll=ScrollComp.geo.phi_ie_offset>0,show=True)
-#    theta = np.linspace(0,2*pi,101)
-#    _Vs1 = []
-#    _Vs2 = []
-#    _Vs3 = [] 
-#    for th in theta:
-#        _Vs1.append(scroll_geo.S1(th,ScrollComp.geo)[0])
-#    ScrollComp.geo.phi_ie_offset = pi
-#    for th in theta:
-#        _Vs2.append(scroll_geo.S1(th,ScrollComp.geo)[0])
-#    _theta = np.linspace(0,pi,101)
-##    for th in _theta:
-##        _Vs3.append(scroll_geo.S1(th,ScrollComp.geo,poly=True)[2])
-#
-#    import pylab
-#    if len(_Vs3)>0:
-#        pylab.plot(theta,_Vs1,theta,_Vs2,_theta,_Vs3)
-#    else:
-#        pylab.plot(theta,_Vs1,theta,_Vs2)
-#    pylab.show()
-#    return
-#        
-    
-#    ScrollComp.geo.phi_ie_offset = pi
-#    for th in np.linspace(0,2*pi,11):
-#        plotScrollSet(th,ScrollComp.geo,shaveOn=False,offsetScroll=ScrollComp.geo.phi_ie_offset>0,show=True)
-#        print scroll_geo.S1(th,ScrollComp.geo,poly=True)
-#    return
-    
-#    import pylab
-#    pylab.plot(fx,fy,'-',fxp,fyp,'s',mfc='none')
-#    pylab.show()
-#    return
-#    radial_pairs = scroll_geo.radial_leakage_pairs(ScrollComp.geo)
-#    th = 0.55*2*pi
-#    
-#    plotScrollSet(th,ScrollComp.geo)
-#    ax = plt.gca()
-#    for key1, key2 in radial_pairs:
-#        try:
-#            phi_min, phi_max = scroll_geo.radial_leakage_angles(th, ScrollComp.geo,key1,key2)
-#            phi = np.linspace(phi_min, phi_max, 50)
-#            print key1, key2, phi_min, phi_max
-#            
-#            x,y = scroll_geo.coords_inv(phi, ScrollComp.geo, th, flag="fi")
-#            ax.plot(x,y)
-#            ax.plot(x[0],y[0],'o')
-#            ax.plot(x[-1],y[-1],'o')
-#            x,y = scroll_geo.coords_inv(phi[len(phi)//2], ScrollComp.geo, th, flag="fi")
-#            ax.text(x,y,key1+'-'+key2,ha='center',va='center')
-#            
-#        except KeyError:
-#            print 'no match for',key1,key2
-#            pass
-#    plt.show()
-    
-    if f is None:
-        Injection = False
         
-    Ref='Propane'
+    #Ref = 'REFPROP-Propane'
+    Ref = 'REFPROP-MIX:Propane[0.5]&R32[0.5]'
     
     Te = -20 + 273.15
     Tc = 20 + 273.15
@@ -155,11 +93,6 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
 
     T2s = ScrollComp.guess_outlet_temp(inletState,pc)
     outletState = State.State(Ref,{'T':T2s,'P':pc})
-
-#    inletState = State.State(Ref,{'T':300.0,'P':300.0})
-#    p_outlet = inletState.p*3.0
-#    T2s = ScrollComp.guess_outlet_temp(inletState,p_outlet)
-#    outletState = State.State(Ref,{'T':T2s,'P':p_outlet})
     
     mdot_guess = inletState.rho*ScrollComp.Vdisp*ScrollComp.omega/(2*pi)
     
@@ -179,22 +112,6 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
                              State2=outletState.copy(),
                              fixed=2,
                              TubeFcn=ScrollComp.TubeCode))
-             
-    if Injection:
-        phi = ScrollComp.geo.phi_oe-pi-2*pi+0.01
-        #Tube is a meter long with ID of 0.01 m
-        p = f*outletState.p+(1-f)*inletState.p
-        Tsat = CP.Props('T', 'P', p, 'Q', 1.0, Ref)
-        T = Tsat + 3.0
-        rho = CP.Props('D', 'T', T, 'P',p, Ref)
-        injState1 = State.State(Ref, dict(T=T, D=rho))
-        V_tube = 1.0*pi*0.01**2/4.0
-        ScrollComp.add_CV(ControlVolume(key ='injCV.1',
-                                        VdVFcn = ScrollComp.V_injection,
-                                        VdVFcn_kwargs = dict(V_tube = V_tube),
-                                        initialState = injState1
-                                        )
-                          )
     
     ScrollComp.auto_add_CVs(inletState, outletState)
     
@@ -296,15 +213,6 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
         
         ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
         print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
-    
-    #debug_plots(ScrollComp)
-
-    Edot_flow = sum([FP['Edot_average'] for FP in ScrollComp.FlowsProcessed.collected_data])
-    print 'Total Losses', ScrollComp.Wdot_electrical-ScrollComp.Wdot_i, 'kW'
-    print 'Motor Losses', ScrollComp.motor.losses, 'kW'
-    print 'Mech. Losses', ScrollComp.losses.bearings, 'kW'
-    print 'Flow Losses', Edot_flow, 'kW'
-    print 'Added Losses (should equal total losses)', Edot_flow+ScrollComp.motor.losses+ScrollComp.losses.bearings,'kW'
     
     del ScrollComp.FlowStorage
     from PDSim.misc.hdf5 import HDF5Writer

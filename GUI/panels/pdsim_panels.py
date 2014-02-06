@@ -70,7 +70,7 @@ temperature_units = {
                      'Fahrenheit' : np.nan,
                      'Rankine': np.nan
                      }
-
+print temperature_units
 
 class InputsToolBook(wx.Toolbook):
     
