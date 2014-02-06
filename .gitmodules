@@ -1,3 +1,6 @@
 [submodule "externals/coolprop"]
 	path = externals/coolprop
 	url = https://github.com/ibell/coolprop
+[submodule "externals/quantities"]
+	path = externals/quantities
+	url = https://github.com/python-quantities/python-quantities.git

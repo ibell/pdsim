@@ -140,3 +140,11 @@ setup(
   include_dirs = [numpy.get_include(),CoolProp.get_include_directory()]
 )
 
+try:
+    import quantities
+    print('quantities package found, no need to install from source')
+except ImportError:
+    print('quantities package not found, will install from sources in externals/quantities.  Please hold on.')
+    import subprocess
+    subprocess.check_output('python setup.py install', shell = True, cwd=os.path.join('externals','quantities'))
+    
