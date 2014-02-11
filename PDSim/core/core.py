@@ -1265,15 +1265,15 @@ class PDSimCore(_PDSimCore):
             if cycle_integrator == 'Euler':
                 # Default to 7000 steps if not provided
                 N = getattr(self,'EulerN', 7000)
-                aborted = self.cycle_SimpleEuler(N,X)
+                aborted = self.cycle_SimpleEuler(N,X,**integrator_options)
             elif cycle_integrator == 'Heun':
                 # Default to 7000 steps if not provided
                 N = getattr(self,'HeunN', 7000)
-                aborted = self.cycle_Heun(N,X)
+                aborted = self.cycle_Heun(N,X,**integrator_options)
             elif cycle_integrator == 'RK45':
                 # Default to tolerance of 1e-8 if not provided
                 eps_allowed = getattr(self,'RK45_eps', 1e-8)
-                aborted = self.cycle_RK45(X,eps_allowed = eps_allowed)
+                aborted = self.cycle_RK45(X,eps_allowed = eps_allowed,**integrator_options)
             else:
                 raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
         except ValueError as VE:

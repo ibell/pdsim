@@ -19,7 +19,7 @@ from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo
 from PDSim.core.core import struct
-from PDSim.scroll.asymm import Scroll
+from PDSim.scroll.core import Scroll
 from PDSim.core.containers import ControlVolume, Tube
 from PDSim.plot.plots import debug_plots
 from PDSim.scroll.plots import plotScrollSet
@@ -80,8 +80,8 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     ScrollComp.motor.set_eta(0.9)
     ScrollComp.motor.suction_fraction = 1.0
         
-    #Ref = 'REFPROP-Propane'
-    Ref = 'REFPROP-MIX:Propane[0.5]&R32[0.5]'
+    Ref = 'Propane'
+    #Ref = 'REFPROP-MIX:R410A.mix'
     
     Te = -20 + 273.15
     Tc = 20 + 273.15

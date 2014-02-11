@@ -30,8 +30,8 @@ import os, sys
 from PDSim.flow.flow import FlowPath
 from PDSim.flow import flow_models
 from PDSim.misc.datatypes import arraym
-from PDSim.core.containers import ControlVolume
-from PDSim.core.core import Tube,PDSimCore
+from PDSim.core.containers import ControlVolume, Tube
+from PDSim.core.core import PDSimCore
 from PDSim.plot.plots import debug_plots
 
 #Imports from CoolProp (fluid property database)
@@ -143,7 +143,7 @@ class PURecip(PDSimCore):
         
 def Compressor():
 
-    recip=PURecip()                     #Instantiate the 
+    recip=PURecip()                     #Instantiate the model
     recip.Vdead = 0.5e-6                #Dead volume [m3]
     recip.Vdisp = 8e-6                  #Displacement/rev [m3]
     recip.omega = 377                   #Frequency, rad/sec (60Hz)
