@@ -1,7 +1,7 @@
 
 class PDSimPlugin(object):
     """
-    This is the base class that represents the 
+    This is the base class that represents plugins for the GUI
     """
      
     def __init__(self):

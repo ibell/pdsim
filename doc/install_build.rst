@@ -99,10 +99,6 @@ Step-By-Step on Windows
     Volumetric efficiency is 88.6166506787 %
 
 #. Ok good, PDSim is working!
-
-#. Now we will install pre-requisites for the graphical interface.  Install a dependency of PDSim GUI using the command::
-
-    pip install -U quantities
     
 #. Install PyYAML using the installer for win32-py2.7 at `PyYAML installers <http://pyyaml.org/wiki/PyYAML>`_
     
@@ -115,6 +111,8 @@ Step-By-Step on Windows
 Update source code
 ===========
 When the code for PDSim is updated, all that you have to do to update the code is to go to the top-level folder where you installed PDSim, right-click and select "TortoiseGit->Pull..." and then OK
+
+If you want to update CoolProp to the most recent code (XXXXXXXXXXXXXXXXXXX)
 
 Profiling
 ---------
@@ -130,7 +128,7 @@ and line_profiler, which can be obtained from http://pypi.python.org/pypi/line_p
 Uninstallation
 ==============
 
-To uninstall, go to the folder where python is installed (probably c:\\Python27\\Lib\\site-packages), delete the folder CoolProp
+To uninstall PDSim, go to the site-packages folder corrresponding to the installation of python (probably c:\\Python27\\Lib\\site-packages), delete the folder PDSim.  You might want to also delete any files like ```PDSim-x.x.x-py2.7.egg-info``` where ``x`` are numbers.  For a thorough uninstallation, you might also want to remove the ``build`` folder in the directory where you cloned the git files
 
 .. _Use-PDSim:
 
