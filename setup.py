@@ -23,7 +23,7 @@ except ImportError:
     print 'psutil was not found, it is used to kill the python completion server in Eclipse which keeps PDSim from building. psutils can be easy_install-ed or installed using pip'
    
 import warnings
-from distutils.core import setup, Extension
+from distutils.core import setup
 from Cython.Build import cythonize
 from Cython.Distutils import build_ext
 from Cython.Distutils.extension import Extension as CyExtension
@@ -72,7 +72,6 @@ pyx_list = [
             "PDSim/recip/_recip.pyx",
             "PDSim/scroll/common_scroll_geo.pyx",
             "PDSim/scroll/symm_scroll_geo.pyx",
-            "PDSim/scroll/asymm_scroll_geo.pyx",
             "PDSim/scroll/_scroll.pyx"
             ]
 
@@ -101,6 +100,7 @@ for i in range(len(pyx_list)-1,-1,-1):
     
 pxd_files = []
 ext_module_list = []
+package_pxd_files = {}
 for pyx_file in pyx_list:
     sources = [pyx_file]
     #Try to find a PXD backpack if possible
@@ -115,6 +115,14 @@ for pyx_file in pyx_list:
     
     #Build an extension with the sources
     ext_name = pyx_file.rsplit('.',1)[0].replace('/','.')
+    
+    name = ext_name.rsplit('.',1)[0]
+    pxd = pxd_file.split('PDSim/',1)[1].split('/')[1]
+    
+    if name in package_pxd_files:
+        package_pxd_files[name].append(pxd)
+    else:
+        package_pxd_files[name] = [pxd]
 
     ext_module_list.append(CyExtension(ext_name,
                                        sources,
@@ -123,6 +131,10 @@ for pyx_file in pyx_list:
                                                               embed_signature = True)
                                        )
                            )
+
+package_data = package_pxd_files
+
+print package_data
 
 setup(
   name = 'PDSim',
@@ -134,10 +146,10 @@ setup(
   packages = ['PDSim','PDSim.core','PDSim.flow','PDSim.plot','PDSim.scroll','PDSim.misc','PDSim.recip','PDSim.misc.clipper'],
   cmdclass={'build_ext': build_ext},
   ext_modules = ext_module_list,
-  package_data = {'PDSim' : pxd_files,
-                  'PDSim.include' : glob.glob(os.path.join('CoolProp','*.h'))
-                  },
-  include_dirs = [numpy.get_include(),CoolProp.get_include_directory()]
+  package_dir = {'PDSim':'PDSim',},
+  package_data = package_data,
+  include_dirs = [numpy.get_include(),CoolProp.get_include_directory()],
+
 )
 
 try:
