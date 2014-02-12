@@ -109,10 +109,22 @@ Step-By-Step on Windows
 #. Wait about 80 seconds for it to finish
 
 Update source code
-===========
+==================
 When the code for PDSim is updated, all that you have to do to update the code is to go to the top-level folder where you installed PDSim, right-click and select "TortoiseGit->Pull..." and then OK
 
-If you want to update CoolProp to the most recent code (XXXXXXXXXXXXXXXXXXX)
+If you want to update CoolProp to the most recent code, you can use TortoiseGit.  Go to the root folder of the cloned git files, right click and select "TortoiseGit->Submodule update...". Make sure the following options are selected::
+
+* Initialize submodules(--init)
+* Merge
+* Remote tracking branch
+
+Press Ok button.
+
+Alternatively, you can do the update from the command line::
+
+    git.exe submodule update --init --merge --remote "externals/coolprop"
+    
+See also `StackOverflow question <http://stackoverflow.com/questions/16058917/pulling-git-submodules-with-tortoisegit>`_
 
 Profiling
 ---------
@@ -128,9 +140,11 @@ and line_profiler, which can be obtained from http://pypi.python.org/pypi/line_p
 Uninstallation
 ==============
 
-To uninstall PDSim, go to the site-packages folder corrresponding to the installation of python (probably c:\\Python27\\Lib\\site-packages), delete the folder PDSim.  You might want to also delete any files like ```PDSim-x.x.x-py2.7.egg-info``` where ``x`` are numbers.  For a thorough uninstallation, you might also want to remove the ``build`` folder in the directory where you cloned the git files
+To uninstall PDSim, go to the site-packages folder corrresponding to the installation of python (probably c:\\Python27\\Lib\\site-packages), delete the folder PDSim.  You might want to also delete any files like ``PDSim-x.x.x-py2.7.egg-info`` where ``x`` are numbers.  For a thorough uninstallation, you might also want to remove the ``build`` folder in the directory where you cloned the git files
 
 .. _Use-PDSim:
+
+
 
 Use PDSim
 =========
