@@ -1272,8 +1272,10 @@ class MainFrame(wx.Frame):
             try:
                 #  Try to import the file as a module
                 mod = __import__(root)
-            except IOError:
-                print 'could not import module', root
+            except Exception as E:
+                import traceback
+                print 'Error importing module', py_file, '::'
+                print traceback.print_exc()
                 continue
             
             for term in dir(mod):
