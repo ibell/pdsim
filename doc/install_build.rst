@@ -26,9 +26,9 @@ Step-By-Step on Windows
     
 #. Now we are going to collect the source code for PDSim and CoolProp.  In Windows Explorer, go to a folder where you want to put the source code for PDSim and CoolProp.  Right-click and select "Git Clone..."
 
-#. Use the URL ``https://github.com/ibell/pdsim``, and select the recursive option (which will force it to also install CoolProp as a submodule of the PDSim repository)
+#. Use the URL ``https://github.com/ibell/pdsim``, and select the recursive option (which will force it to also install CoolProp and quantities as submodules of the PDSim repository)
 
-#. Go into the folder you just created.  Run the script setup_coolprop.py (double-click on it, or at the command prompt::
+#. Go into the folder you just created.  Run the script setup_coolprop.py (double-click on it), or at the command prompt::
 
     python setup_coolprop.py
     

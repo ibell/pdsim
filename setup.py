@@ -134,8 +134,6 @@ for pyx_file in pyx_list:
 
 package_data = package_pxd_files
 
-print package_data
-
 setup(
   name = 'PDSim',
   version = version,

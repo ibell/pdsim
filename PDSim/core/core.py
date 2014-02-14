@@ -1240,7 +1240,7 @@ class PDSimCore(_PDSimCore):
     def one_cycle(self, 
                   X, 
                   cycle_integrator = 'RK45',
-                  integrator_options = None):
+                  cycle_integrator_options = None):
         """
         Only run one cycle
         
@@ -1248,9 +1248,13 @@ class PDSimCore(_PDSimCore):
         ----------
         cycle_integrator : string
             One of 'RK45','Euler','Heun'
-        integrator_options : dictionary
-            options to be passed to the constructor for the solver
+        cycle_integrator_options : dictionary
+            options to be passed to the solver function (RK45, Euler, etc.)
         """
+        # Make cycle_integrator_options an empty dictionary if not provided
+        if cycle_integrator_options is None:
+            cycle_integrator_options = {}
+            
         X = arraym(X)
                 
         # (1). First, run all the tubes
@@ -1265,15 +1269,15 @@ class PDSimCore(_PDSimCore):
             if cycle_integrator == 'Euler':
                 # Default to 7000 steps if not provided
                 N = getattr(self,'EulerN', 7000)
-                aborted = self.cycle_SimpleEuler(N,X,**integrator_options)
+                aborted = self.cycle_SimpleEuler(N,X,**cycle_integrator_options)
             elif cycle_integrator == 'Heun':
                 # Default to 7000 steps if not provided
                 N = getattr(self,'HeunN', 7000)
-                aborted = self.cycle_Heun(N,X,**integrator_options)
+                aborted = self.cycle_Heun(N,X,**cycle_integrator_options)
             elif cycle_integrator == 'RK45':
                 # Default to tolerance of 1e-8 if not provided
                 eps_allowed = getattr(self,'RK45_eps', 1e-8)
-                aborted = self.cycle_RK45(X,eps_allowed = eps_allowed,**integrator_options)
+                aborted = self.cycle_RK45(X,eps_allowed = eps_allowed,**cycle_integrator_options)
             else:
                 raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
         except ValueError as VE:
@@ -1310,7 +1314,7 @@ class PDSimCore(_PDSimCore):
         # We put it in kW by multiplying by flow rate
         self.resid_Td = mdot_out * (h_outlet_Tube - h_outlet)
         
-    def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45', OneCycle = False, integrator_options = None, plot_every_cycle = False):
+    def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45', OneCycle = False, cycle_integrator_options = None, plot_every_cycle = False):
         """
         The Objective function for the energy balance solver
         
@@ -1326,6 +1330,8 @@ class PDSimCore(_PDSimCore):
             If ``True``, stop after one cycle
         plot_every_cycle : boolean
             If ``True``, make the debug plots at every cycle
+        cycle_integrator_options : dictionary
+            Options to be passed to cycle integrator
         """
         
         # Consume the first element as the discharge temp 
@@ -1346,7 +1352,7 @@ class PDSimCore(_PDSimCore):
             #  sets the parameter lumps_resid in this class
             self.one_cycle(X, 
                            cycle_integrator = cycle_integrator,
-                           integrator_options = integrator_options)
+                           cycle_integrator_options = cycle_integrator_options)
             
             if self.Abort():
                 return
@@ -1491,7 +1497,7 @@ class PDSimCore(_PDSimCore):
               timeout = 3600,
               eps_cycle = 0.001,
               eps_energy_balance = 0.01,
-              integrator_options = None,
+              cycle_integrator_options = None,
               **kwargs):
         """
         This is the driving function for the PDSim model.  It can be extended through the 
@@ -1532,7 +1538,7 @@ class PDSimCore(_PDSimCore):
             Cycle-cycle convergence criterion
         eps_energy_balance : float
             Energy balance convergence criterion
-        integrator_options : dictionary
+        cycle_integrator_options : dictionary
             A dictionary of options to be passed to the cycle integrator
         
         Notes
@@ -1617,9 +1623,9 @@ class PDSimCore(_PDSimCore):
                              cycle_integrator = solver_method, 
                              OneCycle = OneCycle,
                              epsilon = eps_energy_balance,
-                             integrator_options = integrator_options,
+                             cycle_integrator_options = cycle_integrator_options,
                              plot_every_cycle = plot_every_cycle
-                             )
+                             ) 
                 
         if not self.Abort() and not OneCycle: 
             self.post_solve()
