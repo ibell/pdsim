@@ -1031,7 +1031,7 @@ class MainFrame(wx.Frame):
                        time_generation = time_generation)
             )
         
-    def script_default_imports(self, plugin_paths):
+    def script_default_imports(self, plugin_paths = None):
         
         s = textwrap.dedent(
             """
@@ -1056,7 +1056,7 @@ class MainFrame(wx.Frame):
             """
             )
         
-        if plugin_paths:
+        if plugin_paths is not None:
             s += textwrap.dedent(
             """
             # Add the paths for any additional plugin folders (hard-coded absolute paths)
@@ -1093,16 +1093,21 @@ class MainFrame(wx.Frame):
         """
         self.script = []
         
+        def add_plugin_chunk(name, indent = 1):
+            if plugin_chunks[name]:
+                c = '# BEGIN PLUGIN ({name:s})\n{chunk:s}# END PLUGIN ({name:s}) \n'.format(name = name, chunk = plugin_chunks[name])
+            else:
+                c = '# NO PLUGIN ({name:s}) \n'.format(name = name)
+            self.script.append(indent_chunk(c,indent))
+        
         def indent_chunk(chunks, N):
             if isinstance(chunks,(list,tuple)):
                 lines = '\n'.join(chunks)
                 lines = lines.split('\n')
             else:
-                lines = [chunks]
+                lines = chunks.split('\n')
             
-            new_lines = []
-            for line in lines:
-                new_lines.append('    '*N+line)
+            new_lines = ['    '*N+line for line in lines]
             return '\n'.join(new_lines)+'\n'
         
         plugin_chunks = dict(pre_import = '',
@@ -1140,70 +1145,37 @@ class MainFrame(wx.Frame):
                             else:
                                 plugin_chunks['plugin_injected_chunks'][key] = chunks['plugin_injected_chunks'][key]
             
-        if hasattr(self,'plugins_list') and any([plugin.is_activated() for plugin in self.plugins_list]):
-            #  Get the paths for all the plugin folders if at least one plugin is enabled
-            plugin_paths = str(GUIconfig.get('plugin_dirs', default = []))
-        else:
-            plugin_paths = []
-            
         #Get the header for the script
-        self.script.append(self.script_header())
-        if plugin_chunks['pre_import']:
-            self.script.append('####### BEGIN PLUGIN INJECTED CODE (pre_import) ############### \n'+plugin_chunks['pre_import']+'################ END PLUGIN INJECTED CODE ############### \n')
-        else:
-            self.script.append('####### NO PLUGIN INJECTED CODE (pre_import) ############### \n')
-            
-        self.script.append(self.script_default_imports(plugin_paths))
+        self.script.append(self.script_header())        
+        add_plugin_chunk('post_import', indent = 0)            
+        self.script.append(self.script_default_imports())
         if hasattr(self,'family_module'):
             self.script.extend(self.family_module.additional_imports_string)
-            
-        if plugin_chunks['post_import']:
-            self.script.append('####### BEGIN PLUGIN INJECTED CODE (post_import) ############### \n'+plugin_chunks['post_import']+'################ END PLUGIN INJECTED CODE ############### \n')
-        else:
-            self.script.append('####### NO PLUGIN INJECTED CODE (post_import) ############### \n')
+        add_plugin_chunk('post_import', indent = 0)
         
+        # ------------------- The build function  ------------------------------
         self.script.extend(['def build():\n'])
-        if plugin_chunks['pre_build']:
-            self.script.extend('####### BEGIN PLUGIN INJECTED CODE (pre_build) ############### \n'+indent_chunk([plugin_chunks['pre_build']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
-        else:
-            self.script.extend('####### NO PLUGIN INJECTED CODE (pre_build) ############### \n')
-            
+        add_plugin_chunk('pre_build')            
         self.script.extend([indent_chunk(self.family_module.import_string,1)])
-        if plugin_chunks['pre_build_instantiation']:
-            self.script.extend('####### BEGIN PLUGIN INJECTED CODE (pre_build_instantiation) ############### \n'+indent_chunk([plugin_chunks['pre_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
-        else:
-            self.script.extend('####### NO PLUGIN INJECTED CODE (pre_build_instantiation) ############### \n')
+        add_plugin_chunk('pre_build_instantiation')
         self.script.extend([indent_chunk(self.family_module.instantiation_string,1)])
         run_index = GUIconfig.get('run_index', run_index-1)+1
         GUIconfig.set('run_index',run_index)
         self.script.extend(['    sim.run_index = {run_index:s}\n'.format(run_index = str(run_index))])
         if description:
             self.script.extend(['    sim.description = {description:s}\n'.format(description = description)])
-        if plugin_chunks['post_build_instantiation']:
-            self.script.extend('####### BEGIN PLUGIN INJECTED CODE (post_build_instantiation) ############### \n'+indent_chunk([plugin_chunks['post_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
-        else:
-            self.script.extend('####### NO PLUGIN INJECTED CODE (post_build_instantiation) ############### \n')
-        
+        add_plugin_chunk('post_build_instantiation')
         inputs_chunks = self.MTB.InputsTB.get_script_chunks(plugin_chunks = plugin_chunks['plugin_injected_chunks'])
         self.script.extend(indent_chunk(inputs_chunks,1))
-        if plugin_chunks['post_build']:
-            self.script.extend('####### BEGIN PLUGIN INJECTED CODE (post_build) ############### \n'+indent_chunk([plugin_chunks['post_build']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
-        else:
-            self.script.extend('####### NO PLUGIN INJECTED CODE (post_build) ############### \n')
-            
+        add_plugin_chunk('post_build')
         self.script.extend(['    return sim\n\n'])
 
+        # --------------------- The run function  ------------------------------
         self.script.extend(['def run(sim, pipe_abort = None):\n'])
-        if plugin_chunks['pre_run']:
-            self.script.extend('####### BEGIN PLUGIN INJECTED CODE (pre_run) ############### \n'+indent_chunk([plugin_chunks['pre_run']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
-        else:
-            self.script.extend('####### NO PLUGIN INJECTED CODE (pre_run) ############### \n')
+        add_plugin_chunk('pre_run')
         solver_chunks = self.MTB.SolverTB.get_script_chunks()
         self.script.extend(indent_chunk(solver_chunks,1))
-        if plugin_chunks['post_run']:
-            self.script.extend('####### BEGIN PLUGIN INJECTED CODE (post_run) ############### \n'+indent_chunk([plugin_chunks['post_run']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
-        else:
-            self.script.extend('####### NO PLUGIN INJECTED CODE (post_run) ############### \n')
+        add_plugin_chunk('post_run')
         
         self.script.extend(["if __name__ == '__main__':\n    sim = build()\n    run(sim)"])
         
