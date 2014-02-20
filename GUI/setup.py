@@ -16,10 +16,10 @@ if len(sys.argv)==1:
 # Process the includes, excludes and packages first
 
 include_files = []
-includes = ['numpy','scipy.sparse.csgraph._validation','scipy.special._ufuncs_cxx']
+includes = ['numpy','scipy.sparse.csgraph._validation','scipy.special._ufuncs_cxx','scipy.sparse.linalg.isolve._iterative']
 excludes = ['_gtkagg', '_tkagg', 'bsddb', 'curses', 'email', 'PyQt4',
             'pywin.debugger', 'pywin.debugger.dbgcon', 'pywin.dialogs',
-            'tcl', 'Tkconstants', 'Tkinter','sympy']
+            'tcl', 'Tkconstants', 'Tkinter','sympy','IPython']
 packages = ['h5py','CoolProp','scipy','scipy.special','scipy.interpolate','scipy.integrate','scipy.optimize']
 path = []
 
@@ -87,22 +87,22 @@ setup(
 # to clean up your folders or to do some particular post-compilation
 # actions.
 
+import subprocess
+# Further windows packaging things
 if sys.platform.startswith('win'):
     if not os.path.exists(os.path.join('PDSimGUI','configs')):
         os.mkdir(os.path.join('PDSimGUI','configs'))
-    shutil.copy2('C:\\Python27\\Lib\\site-packages\\h5py\\zlib1.dll','PDSimGUI\\zlib1.dll')
-    #Further windows packaging things
-    import subprocess
-    #Compress the files if UPX is found on the system path
-    subprocess.call(['upx','PDSimGUI/*.*'])
-    #Make an installer using InnoSetup
-    subprocess.call(['C:\Program Files (x86)\Inno Setup 5\Compil32.exe','/cc','package_gui.iss'])
-    #Rename the installer to include the PDSim version
-    old_name = os.path.join('Output','SetupPDSimGUI.exe')
-    import PDSim
-    new_name = os.path.join('Output','SetupPDSimGUI_version-'+PDSim.__version__+'.exe')
-    if os.path.exists(new_name):
-        os.remove(new_name)
-    os.rename(old_name, new_name)
+
+#     #Compress the files if UPX is found on the system path
+#     subprocess.call(['upx','PDSimGUI/*.*'])
+#     #Make an installer using InnoSetup
+#     subprocess.call(['C:\Program Files (x86)\Inno Setup 5\Compil32.exe','/cc','package_gui.iss'])
+#     #Rename the installer to include the PDSim version
+#     old_name = os.path.join('Output','SetupPDSimGUI.exe')
+#     import PDSim
+#     new_name = os.path.join('Output','SetupPDSimGUI_version-'+PDSim.__version__+'.exe')
+#     if os.path.exists(new_name):
+#         os.remove(new_name)
+#     os.rename(old_name, new_name)
 # And we are done. That's a setup script :-D
 

@@ -137,7 +137,8 @@ class IntegratorChoices(wx.Choicebook):
 class SolverInputsPanel(pdsim_panels.PDPanel):
     
     desc_map = {'eps_cycle' : ('Cycle-cycle convergence criterion','-',0.003),
-                'eps_energy_balance' : ('Energy balance convergence criterion','kW',0.01)
+                'eps_energy_balance' : ('Energy balance convergence criterion','kW',0.01),
+                'timeout': ('Timeout for a run [s]','-',3600)
                 }
     
     def __init__(self, parent, configdict,**kwargs):
@@ -151,7 +152,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         annotated_values = []
         self.keys_for_config = []
         
-        keys = ['eps_cycle', 'eps_energy_balance']
+        keys = ['eps_cycle', 'eps_energy_balance', 'timeout']
         annotated_values = self.get_annotated_values(keys, config = configdict)
         
         # Build the items and return the list of annotated GUI objects
@@ -218,6 +219,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         IC_type, kwargs = self.IC.get_script_chunk()
         eps_cycle = self.main.get_GUI_object('eps_cycle').GetValue()
         eps_energy_balance = self.main.get_GUI_object('eps_energy_balance').GetValue()
+        timeout = self.main.get_GUI_object('timeout').GetValue()
         
         return textwrap.dedent(
             """
@@ -233,7 +235,8 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
                               solver_method = \"{IC_type:s}\",
                               OneCycle = {OneCycle:s},
                               plot_every_cycle = {plot_every_cycle:s},
-                              hmin = 1e-8, # hard-coded
+                              hmin = 1e-8, # hard-coded,
+                              timeout = {timeout:s},
                               eps_energy_balance = {eps_energy_balance:s},
                               eps_cycle = {eps_cycle:s},
                               )
@@ -241,6 +244,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
             """.format(RK_eps = self.IC.RK45_eps.GetValue(),
                        eps_cycle = str(eps_cycle),
                        eps_energy_balance = str(eps_energy_balance),
+                       timeout = str(timeout),
                        OneCycle = str(self.OneCycle.GetValue()),
                        plot_every_cycle = str(self.plot_every_cycle.GetValue()),
                        IC_type = str(IC_type)
@@ -1120,6 +1124,12 @@ class MainFrame(wx.Frame):
                              post_run = '',
                              plugin_injected_chunks = {}
                              )
+                             
+        if hasattr(self,'plugins_list') and any([plugin.is_activated() for plugin in self.plugins_list]):
+            #  Get the paths for all the plugin folders if at least one plugin is enabled
+            plugin_paths = str(GUIconfig.get('plugin_dirs', default = []))
+        else:
+            plugin_paths = []
         
         #Apply any plugins in use - this is the last step in the building process
         if hasattr(self,'plugins_list'):
@@ -1148,7 +1158,7 @@ class MainFrame(wx.Frame):
         #Get the header for the script
         self.script.append(self.script_header())        
         add_plugin_chunk('post_import', indent = 0)            
-        self.script.append(self.script_default_imports())
+        self.script.append(self.script_default_imports(plugin_paths))
         if hasattr(self,'family_module'):
             self.script.extend(self.family_module.additional_imports_string)
         add_plugin_chunk('post_import', indent = 0)
