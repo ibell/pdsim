@@ -71,23 +71,29 @@ temperature_units = {
                      'Rankine': np.nan
                      }
 
-class InputsToolBook(wx.Toolbook):
+class InputsToolBook(wx.Listbook):
     
-    def get_script_chunks(self):
+    def get_script_chunks(self, plugin_chunks = None):
         """
         Pull all the values out of the child panels, using the values in 
         self.items and the function get_script_chunks if the panel implements
         it
         
         The values are written into the script file that will be execfile-d
+        
+        Parameters
+        ----------
+        plugin_chunks : dictionary, optional
+            Dictionary mapping panel name to chunk to be added to script
+        
         """
         chunks = []
         for panel in self.panels:
             chunks.append('#############\n# From '+panel.Name+'\n############\n')
             if hasattr(panel,'get_script_params'):
-                chunks.append(panel.get_script_params())
+                chunks.append(panel.get_script_params(plugin_chunks = plugin_chunks))
             if hasattr(panel,'get_script_chunks'):
-                chunks.append(panel.get_script_chunks())
+                chunks.append(panel.get_script_chunks(plugin_chunks = plugin_chunks))
         return chunks
 
 class UnitConvertor(wx.Dialog):
@@ -337,7 +343,7 @@ class PDPanel(wx.Panel):
             except ValueError:
                 return value
              
-    def get_script_params(self):
+    def get_script_chunks(self, plugin_chunks = None):
         if not hasattr(self,'items'):
             return ''
         else:
@@ -2317,7 +2323,7 @@ class StateInputsPanel(PDPanel):
         
         return configdict
         
-    def get_script_chunks(self):
+    def get_script_chunks(self, plugin_chunks = None):
         """
         Get a string for the script file that will be run
         """

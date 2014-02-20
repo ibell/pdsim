@@ -247,9 +247,9 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
                        )
                    )
         
-class SolverToolBook(wx.Toolbook):
+class SolverToolBook(wx.Listbook):
     def __init__(self, parent, configdict, id=-1):
-        wx.Toolbook.__init__(self, parent, -1, style=wx.BK_LEFT)
+        wx.Listbook.__init__(self, parent, -1, style=wx.BK_LEFT)
         il = wx.ImageList(32, 32)
         indices=[]
         for imgfile in ['Geometry.png','MassFlow.png']:
@@ -722,9 +722,9 @@ class OutputDataPanel(pdsim_panels.PDPanel):
     def OnRefresh(self, event):
         self.rebuild()
         
-class OutputsToolBook(wx.Toolbook):
+class OutputsToolBook(wx.Listbook):
     def __init__(self, parent, configdict):
-        wx.Toolbook.__init__(self, parent, wx.ID_ANY, style=wx.BK_LEFT)
+        wx.Listbook.__init__(self, parent, wx.ID_ANY, style=wx.BK_LEFT)
         il = wx.ImageList(32, 32)
         indices=[]
         for imgfile in ['Geometry.png','MassFlow.png']:
@@ -783,6 +783,7 @@ class MainToolBook(wx.Toolbook):
         self.panels=(self.InputsTB,self.SolverTB,self.RunTB,self.OutputsTB)
         for Name,index,panel in zip(['Inputs','Solver','Run','Output'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
+            
 
 class MainFrame(wx.Frame):
     def __init__(self, configfile = None, position = None, size = None):
@@ -1112,6 +1113,7 @@ class MainFrame(wx.Frame):
                              post_build_instantiation = '',
                              pre_run = '',
                              post_run = '',
+                             plugin_injected_chunks = {}
                              )
         
         #Apply any plugins in use - this is the last step in the building process
@@ -1126,8 +1128,17 @@ class MainFrame(wx.Frame):
                     
                     # Append the keys
                     for key in plugin_chunks.keys():
-                        if key in chunks:
+                        if key in chunks and not isinstance(plugin_chunks[key],dict):
                             plugin_chunks[key] += chunks[key]
+                            
+                    # If it has chunks to be injected in the toolbook function,
+                    # add them
+                    if 'plugin_injected_chunks' in chunks:
+                        for key in chunks['plugin_injected_chunks']:
+                            if key in plugin_chunks['plugin_injected_chunks']:
+                                plugin_chunks['plugin_injected_chunks'][key] += chunks['plugin_injected_chunks'][key]
+                            else:
+                                plugin_chunks['plugin_injected_chunks'][key] = chunks['plugin_injected_chunks'][key]
             
         if hasattr(self,'plugins_list') and any([plugin.is_activated() for plugin in self.plugins_list]):
             #  Get the paths for all the plugin folders if at least one plugin is enabled
@@ -1172,7 +1183,8 @@ class MainFrame(wx.Frame):
             self.script.extend('####### BEGIN PLUGIN INJECTED CODE (post_build_instantiation) ############### \n'+indent_chunk([plugin_chunks['post_build_instantiation']],1)+'################ END PLUGIN INJECTED CODE ############### \n')
         else:
             self.script.extend('####### NO PLUGIN INJECTED CODE (post_build_instantiation) ############### \n')
-        inputs_chunks = self.MTB.InputsTB.get_script_chunks()
+        
+        inputs_chunks = self.MTB.InputsTB.get_script_chunks(plugin_chunks = plugin_chunks['plugin_injected_chunks'])
         self.script.extend(indent_chunk(inputs_chunks,1))
         if plugin_chunks['post_build']:
             self.script.extend('####### BEGIN PLUGIN INJECTED CODE (post_build) ############### \n'+indent_chunk([plugin_chunks['post_build']],1)+'################ END PLUGIN INJECTED CODE ############### \n')

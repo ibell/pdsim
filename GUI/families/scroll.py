@@ -168,8 +168,8 @@ class InputsToolBook(pdsim_panels.InputsToolBook):
         config : yaml config file
             The top-level configuration file
         """
-        wx.Toolbook.__init__(self, parent, -1, style=wx.BK_LEFT)
-        il = wx.ImageList(32, 32)
+        wx.Listbook.__init__(self, parent, -1, style=wx.NB_LEFT)
+        self.il = wx.ImageList(32, 32)
         indices=[]
         for imgfile in ['Geometry.png',
                         'StatePoint.png',
@@ -177,8 +177,8 @@ class InputsToolBook(pdsim_panels.InputsToolBook):
                         'MechanicalLosses.png',
                         'Sensor.png']:
             ico_path = os.path.join('ico',imgfile)
-            indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
-        self.AssignImageList(il)
+            indices.append(self.il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
+        self.AssignImageList(self.il)
         
         Main = wx.GetTopLevelParent(self)
         # Make the scroll panels.  
@@ -189,11 +189,12 @@ class InputsToolBook(pdsim_panels.InputsToolBook):
                      scroll_panels.VirtualSensorsPanel(self,{}, name='VirtualSensorsPanel')
                      )
         
-        for Name, index, panel in zip(['Geometry','State Points','Mass Flow - Valves','Mechanical','Sensors'],indices,self.panels):
+        for Name, index, panel in zip(['Geometry','States','Flow','Mechanical','Sensors'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
             
         #: A dictionary that maps name to panel 
         self.panels_dict = {panel.Name:panel for panel in self.panels}
+        
     
     def get_config_chunks(self):
         chunks = {}
@@ -261,7 +262,6 @@ MechanicalLossesPanel:
   thrust_friction_coefficient : 0.03 # Thrust bearing friction coefficient [-]
   thrust_ID : 0.08 # Thrust bearing inner diameter [m]
   thrust_OD : 0.3 # Thrust bearing outer diameter [m]
-  orbiting_scroll_mass : 2.0 # Orbiting scroll mass [kg]
   L_ratio_bearings : 3.0 # Ratio of lengths for bearings [-]
   HTC : 0.0 # Heat transfer coefficient in scrolls [-]
   journal_tune_factor : 1.0 # Journal loss tune factor [-]

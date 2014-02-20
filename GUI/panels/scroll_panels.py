@@ -654,7 +654,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
             d.update(dict(disc_xy_coords = self.disc_xy_coords))
         return d
         
-    def get_script_chunks(self):
+    def get_script_chunks(self, plugin_chunks = None):
         
         def get(key):
             # Compact code to get a parameter from the main database
@@ -707,7 +707,17 @@ class GeometryPanel(pdsim_panels.PDPanel):
                           disc_xy_coords_string = disc_xy_coords_string
                           )
 
-        return textwrap.dedent(geometry_template.format(**str_params))
+        core = textwrap.dedent(geometry_template.format(**str_params))
+        
+        # Add plugin injected chunks
+        allowed = ['ScrollGeometryPanel_After', 'ScrollGeometryPanel_Before']
+        if isinstance(plugin_chunks,dict):
+            for key,chunk in plugin_chunks.iteritems():
+                if key in allowed:
+                    core += chunk
+                    
+        return core
+        
         
 class FlowOptions(pdsim_panels.PDPanel):
     """
@@ -832,7 +842,7 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         
         return configdict
         
-    def get_script_chunks(self):
+    def get_script_chunks(self, plugin_chunks = None):
         
         Xd_dict = dict(Xd_sa_s1 = str(self.main.get_GUI_object_value('flow pathsa-s1|Xd')),
                        Xd_sa_s2 = str(self.main.get_GUI_object_value('flow pathsa-s2|Xd')),
@@ -1236,7 +1246,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
             
         return configdict
                            
-    def get_script_chunks(self):
+    def get_script_chunks(self, plugin_chunks = None):
         """
         Returns a formatted string for the script that will be execfile-d
         """
@@ -1532,7 +1542,7 @@ class VirtualSensorsPanel(pdsim_panels.PDPanel):
             
         dlg.Destroy()
     
-    def get_script_chunks(self):
+    def get_script_chunks(self, plugin_chunks = None):
         """ Chunk for the script file """
         chunk = ''
         for button in self.sensor_sizer.Children:

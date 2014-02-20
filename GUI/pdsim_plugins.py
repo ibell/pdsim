@@ -25,9 +25,10 @@ class PDSimPlugin(object):
     def _check_plugin_chunks(self, chunks):
         """ Check whether the script chunks are valid """
         
-        allowed = ['pre_import','post_import','pre_build','pre_build_instantiation','post_build_instantiation','post_build','pre_run','post_run']
-        if not all([key in allowed for key in chunks.keys()]):
-            raise ValueError(key+' is an invalid key to be returned in dictionary from get_script_chunks')
+        allowed = ['pre_import','post_import','pre_build','pre_build_instantiation','post_build_instantiation','post_build','pre_run','post_run','plugin_injected_chunks']
+        for key in chunks.keys():
+            if key not in allowed:
+                raise ValueError(key+' is an invalid key to be returned in dictionary from get_script_chunks')
         
     def get_script_chunks(self):
         """
@@ -47,7 +48,7 @@ class PDSimPlugin(object):
         * ``pre_run`` (goes at the beginning of the run function)
         * ``post_run`` (goes at the end of the run function)
         
-        
+        * ``plugin_injected_chunks`` (a dictionary of chunks that is passed to the ``InputToolBook.get_script_chunks()`` function 
         
         """
         return {}

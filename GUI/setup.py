@@ -16,11 +16,11 @@ if len(sys.argv)==1:
 # Process the includes, excludes and packages first
 
 include_files = []
-includes = ['numpy','scipy.sparse.csgraph._validation']
+includes = ['numpy','scipy.sparse.csgraph._validation','scipy.special._ufuncs_cxx']
 excludes = ['_gtkagg', '_tkagg', 'bsddb', 'curses', 'email', 'PyQt4',
             'pywin.debugger', 'pywin.debugger.dbgcon', 'pywin.dialogs',
             'tcl', 'Tkconstants', 'Tkinter','sympy']
-packages = ['h5py','CoolProp','scipy','PDSim']
+packages = ['h5py','CoolProp','scipy','scipy.special','scipy.interpolate','scipy.integrate','scipy.optimize']
 path = []
 
 # This is a place where the user custom code may go. You can do almost
