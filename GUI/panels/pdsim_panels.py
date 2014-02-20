@@ -1928,18 +1928,22 @@ class StateChooser(wx.Dialog):
                 TextCtrl.SetValue(dlg.get_value())
                 dlg.Destroy()
         
-        sizer=wx.BoxSizer(wx.VERTICAL)
+        sizer = wx.BoxSizer(wx.VERTICAL)
         self.Fluidslabel = wx.StaticText(self,-1,'Fluid: ')
         self.Fluids = wx.ComboBox(self,-1)
         self.Fluids.AppendItems(sorted(CoolProp.__fluids__))
         self.Fluids.SetEditable(False)
         self.Fluids.SetValue(Fluid)
+        self.AddFluid = wx.Button(self, label = '+')
+        hs = wx.BoxSizer(wx.HORIZONTAL)
+        hs.Add(self.Fluidslabel,0,wx.EXPAND)
+        hs.Add(self.Fluids,0,wx.EXPAND)
+        hs.Add(self.AddFluid,0,wx.EXPAND)
         if Fluid_fixed:
             self.Fluids.Enable(False)
-        
-        hs = wx.BoxSizer(wx.HORIZONTAL)
-        hs.AddMany([self.Fluidslabel,self.Fluids])
-        sizer.Add(hs)
+            self.AddFluid.Disable()
+            
+        sizer.Add(hs,0,wx.ALIGN_CENTER_HORIZONTAL)
         
         sizer.Add((5,5))
         
@@ -1982,6 +1986,7 @@ class StateChooser(wx.Dialog):
         self.SC.DTsh1.Bind(wx.EVT_KEY_UP,self.OnUpdateVals)
         self.SC.T1.Bind(wx.EVT_KEY_UP,self.OnUpdateVals)
         self.SC.p1.Bind(wx.EVT_KEY_UP,self.OnUpdateVals)
+        self.AddFluid.Bind(wx.EVT_BUTTON,self.OnAddFluid)
         
         self.Fluids.Bind(wx.EVT_COMBOBOX, self.OnFlushVals)
         self.Bind(wx.EVT_CLOSE,self.CancelValues)
@@ -2002,6 +2007,13 @@ class StateChooser(wx.Dialog):
         self.p.SetValue("")
         self.rho.SetValue("")
         
+    def OnAddFluid(self, event = None):
+        dlg = wx.TextEntryDialog(None,"Enter the name of a fluid to add, e.g. REFPROP-WATER")
+        dlg.SetValue("REFPROP-R134A")
+        if dlg.ShowModal() == wx.ID_OK:
+            self.Fluids.AppendItems([dlg.GetValue()])
+        dlg.Destroy()
+        
     def OnKeyPress(self,event=None):
         """ cancel if Escape key is pressed """
         event.Skip()
@@ -2016,6 +2028,8 @@ class StateChooser(wx.Dialog):
         Fluid = str(self.Fluids.GetStringSelection())
         T=float(self.T.GetValue())
         p=float(self.p.GetValue())
+        rho=float(self.rho.GetValue())
+        State(Fluid,dict(T = T, D = rho))
         if CP.Phase(Fluid,T,p) not in ['Gas','Supercritical']:
             dlg = wx.MessageDialog(None, message = "The phase is not gas or supercritical, cannot accept this state",caption='Invalid state')
             dlg.ShowModal()
