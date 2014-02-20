@@ -59,6 +59,7 @@ class PDSimCore(_PDSimCore):
     This class is not intended to be run on its own.  It must be subclassed and extended to provide functions for mass flow, etc. 
     
     The basic order of steps that should be followed can be summarized as
+    
     #. Instantiate the subclass of PDSimCore
     #. Add each of the control volumes
     #. Add each of the tubes
@@ -66,7 +67,7 @@ class PDSimCore(_PDSimCore):
     #. Add valves (if applicable)
     #. Connect the callbacks for heat transfer, step, etc.
     #. Run the model
-    
+
     """
     def __init__(self,stateVariables=None):
         """
@@ -1085,7 +1086,7 @@ class PDSimCore(_PDSimCore):
         finds one, it will set the Scroll._want_abort value to ``True`` which 
         will be read by the main execution thread
         
-        Once self._want_abort is ``True``, it will stay latched True until the 
+        Once ``self._want_abort`` is ``True``, it will stay latched ``True`` until the 
         run is terminated
         """
         
@@ -1318,9 +1319,11 @@ class PDSimCore(_PDSimCore):
         """
         The Objective function for the energy balance solver
         
+        Parameters
+        ----------
         Td_Tlumps0 : list
             Discharge temperature and lump temperatures
-        X: :class:`<PDSim.misc.datatypes.arraym> arraym` instance
+        X : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
             Contains the state variables for all the control volumes in existence, as well as any other integration variables
         epsilon : float
             Convergence criterion applied to all of the solvers
@@ -1757,12 +1760,12 @@ class PDSimCore(_PDSimCore):
         ----------
         theta : float
             The value of the independent variable
-        x : ``arraym`` instance
+        x : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
             The array of the state variables (plus valve parameters)
         
         Returns
         -------
-        dfdt : ``arraym`` instance
+        dfdt : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
         
         """
 
@@ -1816,7 +1819,7 @@ class PDSimCore(_PDSimCore):
         This is the default valves_callback function that builds the list of 
         derivatives of position and velocity with respect to the crank angle
         
-        It returns a ``list`` instance with the valve return values in order 
+        It returns a :class:`list` instance with the valve return values in order 
         """
         #Run each valve model in turn to calculate the derivatives of the valve parameters
         # for each valve
@@ -1831,7 +1834,7 @@ class PDSimCore(_PDSimCore):
         
         Parameters
         ----------
-        FlowPath : FlowPath instance
+        FlowPath : :class:`FlowPath <PDSim.flow.flow.FlowPath>` instance
             A fully-instantiated flow path model
         A : float
             throat area for isentropic nozzle model [:math:`m^2`]
@@ -1860,7 +1863,7 @@ class PDSimCore(_PDSimCore):
         
         Parameters
         ----------
-        FlowPath : FlowPath instance
+        FlowPath : :class:`FlowPath <PDSim.flow.flow.FlowPath>`
             A fully-instantiated flow path model
         A : float
             throat area for isentropic nozzle model [:math:`m^2`]

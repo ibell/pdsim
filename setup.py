@@ -29,7 +29,7 @@ from Cython.Distutils import build_ext
 from Cython.Distutils.extension import Extension as CyExtension
 import sys, shutil, os, glob
 
-version = '2.6.2'
+version = '2.7'
 
 if len(sys.argv) == 1:
 #      sys.argv += ['build_ext','--inplace','install']
@@ -128,7 +128,7 @@ for pyx_file in pyx_list:
                                        sources,
                                        language='c++',
                                        cython_directives=dict(profile = True,
-                                                              embed_signature = True)
+                                                              embedsignature = True)
                                        )
                            )
 

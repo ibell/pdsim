@@ -16,7 +16,7 @@ import sys, os
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath('sphinxext'))
+#sys.path.insert(0, os.path.abspath('sphinxext'))
 
 # -- General configuration -----------------------------------------------------
 
@@ -27,28 +27,34 @@ sys.path.insert(0, os.path.abspath('sphinxext'))
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 
-              'sphinx.ext.intersphinx', 
-              'sphinx.ext.todo', 
-              'sphinx.ext.coverage', 
-              'sphinx.ext.pngmath', 
-              'sphinx.ext.ifconfig', 
-              'sphinx.ext.viewcode',
-              'sphinx.ext.inheritance_diagram',
-              'sphinxcontrib.napoleon',
-              'sphinx.ext.autosummary',
-              'matplotlib.sphinxext.plot_directive',
-              'matplotlib.sphinxext.ipython_directive',
-              ]
+# extensions = ['sphinx.ext.autodoc', 
+#               'sphinx.ext.intersphinx', 
+#               #'sphinx.ext.todo', 
+#               'sphinx.ext.coverage', 
+#               'sphinx.ext.pngmath', 
+#               'sphinx.ext.ifconfig', 
+#               #'sphinx.ext.viewcode',
+#               #'sphinx.ext.inheritance_diagram',
+#               'sphinx.ext.autosummary',
+#               #'sphinxcontrib.napoleon',
+#               'numpydoc',
+#               #'sphinx.ext.napoleon',
+#               'matplotlib.sphinxext.plot_directive',
+#               'matplotlib.sphinxext.ipython_directive',
+#               ]
+              
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.pngmath', 'numpydoc',
+              'sphinx.ext.intersphinx', 'sphinx.ext.coverage',
+              'sphinx.ext.autosummary', 'matplotlib.sphinxext.plot_directive']              
 
-autodoc_default_flags = ['members','no-inherited-members','show-inheritance','private-members']
+#autodoc_default_flags = ['members','no-inherited-members','show-inheritance','private-members']
 
-intersphinx_mapping = {'CoolProp': ('http://coolprop.sourceforge.net', None),
-                       'matplotlib':('http://matplotlib.sourceforge.net', None),
-                       'wx': ('http://xoomer.virgilio.it/infinity77/wxPython/', None),
-                       'python': ('http://docs.python.org/',None),
-                       'numpy':('http://docs.scipy.org/doc/numpy',None)
-                       }
+# intersphinx_mapping = {'CoolProp': ('http://coolprop.sourceforge.net', None),
+#                        'matplotlib':('http://matplotlib.sourceforge.net', None),
+#                        'wx': ('http://xoomer.virgilio.it/infinity77/wxPython/', None),
+#                        'python': ('http://docs.python.org/',None),
+#                        'numpy':('http://docs.scipy.org/doc/numpy',None)
+#                        }
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -114,18 +120,16 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-## html_theme = 'haiku'
-#html_theme = 'sphinxdoc'
 
-#html_style = 'scipy.css'
-
-# Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
-# documentation.
-#html_theme_options = {}
-
-# Add any paths that contain custom themes here, relative to this directory.
-#html_theme_path = []
+html_theme = 'scipy'
+html_theme_path = ['../externals/scipy-sphinx-theme/_theme']
+html_theme_options = {
+    "edit_link": "true",
+    "sidebar": "right",
+    "scipy_org_logo": "false",
+    "rootlinks": [("http://scipy.org/", "Scipy.org"),
+                  ("http://docs.scipy.org/", "Docs")]
+}
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".

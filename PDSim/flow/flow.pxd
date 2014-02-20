@@ -15,26 +15,81 @@ from PDSim.misc.datatypes import arraym
 from PDSim.misc.datatypes cimport arraym
 
 cdef class FlowPathCollection(list):
-    cdef int N, Nexists
+    
+    
+    cdef int N
+    
+    cdef int Nexists
+    
+    # The rotational speed [rad/s]
     cdef double omega
+    
     cpdef update_existence(self, Core)
     cpdef calculate(self, arraym harray, arraym parray, arraym Tarray)
     cpdef get_deepcopy(self)
     cpdef sumterms(self, arraym summerdT, arraym summerdm)
     cpdef list flow_paths
-    #cpdef FlowPath get_index(self, int i)
-    #cpdef set_index(self, int i, FlowPath FP)
         
 #Make a stripped down class with the necessary terms included
 cdef class FlowPath(object):
+    
+    cdef public bytes key_up
+    """The string key corresponding to the upstream node"""
+    
+    cdef public bytes key_down
+    """ The string key corresponding to the downstream node """
+    
+    cdef public bytes key1
+    """ The string key corresponding to the first node """
+    
+    cdef public bytes key2
+    """ The string key corresponding to the second node """
+    
     cdef public bint exists, key1_exists, key2_exists, key_up_exists, key_down_exists
-    cdef public bytes key_up, key_down, key1, key2, Gas
+    
     cdef public long key1Index, key2Index, key_up_Index, key_down_Index
     cdef public int ikey1, ikey2, ikey_up, ikey_down
-    cdef public double mdot, h_up, h_down, T_up, p_up, p_down, A, edot
+    
+    cdef public double mdot
+    """ The mass flow rate [kg/s]"""
+    
+    cdef public double h_up
+    """ The upstream enthalpy [kJ/kg] """ 
+    
+    cdef public double h_down
+    """ The downstream enthalpy [kJ/kg] """
+    
+    cdef public double T_up
+    """ The upstream temperature [K] """
+    
+    cdef public double p_up
+    """ The upstream pressure [kPa] """
+    
+    cdef public double p_down
+    """ The downstream pressure [kPa] """
+    
+    cdef public double A
+    """ The flow area [m^2] """
+    
+    cdef public double edot
+    """ The rate of irreversibility generation in this flow path [kW]"""
+    
     cdef public FlowFunction MdotFcn
+    """ The function that will return the mass flow rate """
+    
     cdef public bytes MdotFcn_str
-    cdef public State State1,State2,State_up,State_down
+    
+    cdef public State State1
+    """ The first state """
+    
+    cdef public State State2
+    """ The second state """
+    
+    cdef public State State_up
+    """ The upstream state """
+    
+    cdef public State State_down
+    """ The downstream state """
     
     cpdef dict __cdict__(self, AddStates = *)
     cpdef FlowPath get_deepcopy(self)

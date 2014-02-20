@@ -1,13 +1,5 @@
-PDSim Package
+PDSim package
 =============
-
-:mod:`PDSim` Package
---------------------
-
-.. automodule:: PDSim.__init__
-    :members:
-    :undoc-members:
-    :show-inheritance:
 
 Subpackages
 -----------
@@ -20,6 +12,11 @@ Subpackages
     PDSim.plot
     PDSim.recip
     PDSim.scroll
-    PDSim.callbacks
-    PDSim.cycleintegrators
 
+Module contents
+---------------
+
+.. automodule:: PDSim
+    :members:
+    :undoc-members:
+    :show-inheritance:

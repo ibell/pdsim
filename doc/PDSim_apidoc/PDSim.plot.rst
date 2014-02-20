@@ -1,11 +1,17 @@
-plot Package
-============
+PDSim.plot package
+==================
 
-:mod:`plots` Module
--------------------
+Submodules
+----------
 
-.. automodule:: PDSim.plot.plots
+.. toctree::
+
+   PDSim.plot.plots
+
+Module contents
+---------------
+
+.. automodule:: PDSim.plot
     :members:
     :undoc-members:
     :show-inheritance:
-

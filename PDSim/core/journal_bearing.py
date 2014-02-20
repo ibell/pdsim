@@ -96,7 +96,8 @@ def OBJECTIVE(phi_star, epsilon, plot = False, output = False):
     
     return np.sum(3*P[N-1,N//2+1]-4*P[N-2,N//2+1]+P[N-3,N//2+1])/(2*dPHI)
         
-#print scipy.optimize.newton.__doc__; quit()
-phi_star = scipy.optimize.newton(OBJECTIVE, pi, args = (0.6,), tol = 0.004)
-
-OBJECTIVE(phi_star,0.6,plot = True, output = True)
+if __name__=='__main__':
+    #print scipy.optimize.newton.__doc__; quit()
+    phi_star = scipy.optimize.newton(OBJECTIVE, pi, args = (0.6,), tol = 0.004)
+    
+    OBJECTIVE(phi_star,0.6,plot = True, output = True)

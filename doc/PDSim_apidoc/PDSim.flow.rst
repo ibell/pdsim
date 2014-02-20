@@ -1,18 +1,10 @@
-flow Package
-============
+PDSim.flow package
+==================
 
-:mod:`flow` Module
-------------------
+Module contents
+---------------
 
-.. automodule:: PDSim.flow.flow
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-:mod:`flow_models` Module
--------------------------
-
-.. automodule:: PDSim.flow.flow_models
+.. automodule:: PDSim.flow
     :members:
     :undoc-members:
     :show-inheritance:

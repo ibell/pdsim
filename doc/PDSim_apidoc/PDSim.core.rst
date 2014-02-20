@@ -1,36 +1,21 @@
-core Package
-============
+PDSim.core package
+==================
 
-:mod:`containers` Module
-------------------------
+Submodules
+----------
 
-.. automodule:: PDSim.core.containers
-    :members:
-    :undoc-members:
-    :show-inheritance:
+.. toctree::
 
-:mod:`core` Module
-------------------
+   PDSim.core.bearings
+   PDSim.core.core
+   PDSim.core.journal_bearing
+   PDSim.core.mobility
+   PDSim.core.motor
 
-.. automodule:: PDSim.core.core
-    :members:
-    :undoc-members:
-    :show-inheritance:
+Module contents
+---------------
 
-
-:mod:`motor` Module
-------------------- 
-
-.. automodule:: PDSim.core.motor
-    :members:
-    :undoc-members:
-    :show-inheritance:
-    
-
-:mod:`bearings` Module
-----------------------
-
-.. automodule:: PDSim.core.bearings
+.. automodule:: PDSim.core
     :members:
     :undoc-members:
     :show-inheritance:

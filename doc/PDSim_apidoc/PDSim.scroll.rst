@@ -1,35 +1,21 @@
-scroll Package
-==============
+PDSim.scroll package
+====================
 
-:mod:`core` Module
-------------------
+Submodules
+----------
 
-.. automodule:: PDSim.scroll.core
+.. toctree::
+
+   PDSim.scroll.core
+   PDSim.scroll.expander
+   PDSim.scroll.plots
+   PDSim.scroll.scroll_geo
+   PDSim.scroll.scroll_to_scad
+
+Module contents
+---------------
+
+.. automodule:: PDSim.scroll
     :members:
     :undoc-members:
     :show-inheritance:
-
-:mod:`plots` Module
--------------------
-
-.. automodule:: PDSim.scroll.plots
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-:mod:`scroll_geo` Module
-------------------------
-
-.. automodule:: PDSim.scroll.scroll_geo
-    :members:
-    :undoc-members:
-    :show-inheritance:
-    
-:mod:`_scroll` Module
----------------------
-
-.. automodule:: PDSim.scroll._scroll
-    :members:
-    :undoc-members:
-    :show-inheritance:
-

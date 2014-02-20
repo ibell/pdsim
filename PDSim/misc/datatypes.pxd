@@ -8,6 +8,7 @@ cdef class AnnotatedValue(object):
     
 cdef class Collector(object):
     cdef public list vec
+    """ The list that contains the values """
     
     cpdef v(self, int ndmin = *)
     
@@ -20,6 +21,7 @@ cdef class arraym(object):
 
     cdef double* data
     cdef readonly int N
+    """ The number of entries in this arraym instance """
     
     cdef void set_data(self, double *data, int N)
     cpdef set_size(self, int N)

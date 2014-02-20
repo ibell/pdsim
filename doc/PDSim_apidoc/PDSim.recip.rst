@@ -1,11 +1,17 @@
-recip Package
-=============
+PDSim.recip package
+===================
 
-:mod:`core` Module
-------------------
+Submodules
+----------
 
-.. automodule:: PDSim.recip.core
+.. toctree::
+
+   PDSim.recip.core
+
+Module contents
+---------------
+
+.. automodule:: PDSim.recip
     :members:
     :undoc-members:
     :show-inheritance:
-

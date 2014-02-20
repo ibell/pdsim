@@ -1,36 +1,20 @@
-misc Package
-============
+PDSim.misc package
+==================
 
-:mod:`solvers` Module
----------------------
+Submodules
+----------
 
-.. automodule:: PDSim.misc.solvers
+.. toctree::
+
+   PDSim.misc.error_bar
+   PDSim.misc.hdf5
+   PDSim.misc.polymath_sample
+   PDSim.misc.solvers
+
+Module contents
+---------------
+
+.. automodule:: PDSim.misc
     :members:
     :undoc-members:
     :show-inheritance:
-    
-    
-:mod:`dataytypes` Module
-------------------------
-
-.. automodule:: PDSim.misc.datatypes
-    :members:
-    :undoc-members:
-    :show-inheritance:
-    
-:mod:`hdf5` Module
-------------------------
-
-.. automodule:: PDSim.misc.hdf5
-    :members:
-    :undoc-members:
-    :show-inheritance:
-    
-:mod:`polymath` Module
-------------------------
-
-.. automodule:: PDSim.misc.polymath
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
