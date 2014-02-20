@@ -2011,7 +2011,15 @@ class StateChooser(wx.Dialog):
         dlg = wx.TextEntryDialog(None,"Enter the name of a fluid to add, e.g. REFPROP-WATER")
         dlg.SetValue("REFPROP-R134A")
         if dlg.ShowModal() == wx.ID_OK:
-            self.Fluids.AppendItems([dlg.GetValue()])
+            # Check that you can get the molar mass of this fluid
+            Fluid = dlg.GetValue().encode('ascii')
+            try:
+                CP.Props(Fluid,'M')
+                self.Fluids.Append(Fluid)
+            except ValueError:
+                dlg2 = wx.MessageDialog(None,"Unable to add this fluid (cannot retrieve its molar mass).  Did you type it properly?")
+                dlg2.ShowModal()
+                dlg2.Destroy()
         dlg.Destroy()
         
     def OnKeyPress(self,event=None):
