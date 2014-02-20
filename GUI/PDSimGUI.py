@@ -1,5 +1,8 @@
 # -*- coding: latin-1 -*-
 
+import matplotlib
+matplotlib.use('WXAgg')
+
 import sys,os
 sys.path.append(os.path.abspath('panels'))
 sys.path.append(os.path.abspath('plugins'))

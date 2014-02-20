@@ -16,7 +16,7 @@ if len(sys.argv)==1:
 # Process the includes, excludes and packages first
 
 include_files = []
-includes = ['numpy','scipy.sparse.csgraph._validation','scipy.special._ufuncs_cxx','scipy.sparse.linalg.isolve._iterative']
+includes = ['numpy','scipy.sparse.csgraph._validation']
 excludes = ['_gtkagg', '_tkagg', 'bsddb', 'curses', 'email', 'PyQt4',
             'pywin.debugger', 'pywin.debugger.dbgcon', 'pywin.dialogs',
             'tcl', 'Tkconstants', 'Tkinter','sympy','IPython']
@@ -59,6 +59,18 @@ GUI2Exe_Target_1 = Executable(
     icon = None
     )
 
+import os, glob2, numpy, scipy
+explore_dirs = [os.path.dirname(numpy.__file__), os.path.dirname(scipy.__file__)]
+
+files = []
+for d in explore_dirs:
+    files.extend( glob2.glob( os.path.join(d, '**', '*.pyd') ) )
+
+# Now we have a list of .pyd files; iterate to build a list of tuples into 
+# include files containing the source path and the basename
+for f in files:
+    fn = f.split('c:\\Python27\\lib\\site-packages\\',1)[1].replace('\\','.').split('.pyd',1)[0]
+    includes.append(fn)
 
 # That's serious now: we have all (or almost all) the options cx_Freeze
 # supports. I put them all even if some of them are usually defaulted
@@ -93,16 +105,16 @@ if sys.platform.startswith('win'):
     if not os.path.exists(os.path.join('PDSimGUI','configs')):
         os.mkdir(os.path.join('PDSimGUI','configs'))
 
-#     #Compress the files if UPX is found on the system path
-#     subprocess.call(['upx','PDSimGUI/*.*'])
-#     #Make an installer using InnoSetup
-#     subprocess.call(['C:\Program Files (x86)\Inno Setup 5\Compil32.exe','/cc','package_gui.iss'])
-#     #Rename the installer to include the PDSim version
-#     old_name = os.path.join('Output','SetupPDSimGUI.exe')
-#     import PDSim
-#     new_name = os.path.join('Output','SetupPDSimGUI_version-'+PDSim.__version__+'.exe')
-#     if os.path.exists(new_name):
-#         os.remove(new_name)
-#     os.rename(old_name, new_name)
+    #Compress the files if UPX is found on the system path
+    subprocess.call(['upx','PDSimGUI/*.*'])
+    #Make an installer using InnoSetup
+    subprocess.call(['C:\Program Files (x86)\Inno Setup 5\Compil32.exe','/cc','package_gui.iss'])
+    #Rename the installer to include the PDSim version
+    old_name = os.path.join('Output','SetupPDSimGUI.exe')
+    import PDSim
+    new_name = os.path.join('Output','SetupPDSimGUI_version-'+PDSim.__version__+'.exe')
+    if os.path.exists(new_name):
+        os.remove(new_name)
+    os.rename(old_name, new_name)
 # And we are done. That's a setup script :-D
 
