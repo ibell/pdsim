@@ -121,6 +121,13 @@ class PDSimCore(_PDSimCore):
         
         self.summary = dummy()
     
+    def _check(self):
+        
+        if self.inlet_state.get_visc() < 0:
+            raise ValueError('Your inlet state viscosity is less than zero. Invalid fluid: ' +self.inlet_state.Fluid)
+        if self.inlet_state.get_cond() < 0:
+            raise ValueError('Your inlet state conductivity is less than zero. Invalid fluid: '+self.inlet_state.Fluid)
+            
     def _get_from_matrices(self,i):
         """
         Get values back from the matrices and reconstruct the state variable list
@@ -1555,6 +1562,14 @@ class PDSimCore(_PDSimCore):
         if any(cb in kwargs for cb in ['step_callback','endcycle_callback','heat_transfer_callback','lump_energy_balance_callback','valves_callback']):
             raise NotImplementedError('callback functions are no longer passed to solve() function, rather they are passed to connect_callbacks() function prior to calling solve()')
         
+        #  Save copies of the inlet and outlet states at the root of the HDF5 file
+        #  for ease of retrieval
+        self.inlet_state = self.Tubes.Nodes[key_inlet] 
+        self.outlet_state = self.Tubes.Nodes[key_outlet]
+        
+        # Carry out some pre-run checks
+        self._check()
+        
         from time import clock
         
         self.start_time = clock()
@@ -1636,13 +1651,12 @@ class PDSimCore(_PDSimCore):
         if hasattr(self,'resid_Td'):
             del self.resid_Td
         
-        #  Save copies of the inlet and outlet states at the root of the HDF5 file
-        #  for ease of retrieval
-        self.inlet_state = self.Tubes.Nodes[key_inlet] 
-        self.outlet_state = self.Tubes.Nodes[key_outlet]
+        
             
         #  Save the elapsed time for simulation
         self.elapsed_time = clock() - t1
+        
+        
         
     def get_prune_keys(self):
         """
