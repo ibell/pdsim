@@ -11,7 +11,7 @@ from PDSim.flow.flow import FlowPathCollection
 from containers import ControlVolumeCollection,TubeCollection
 from PDSim.plot.plots import debug_plots
 from PDSim.misc.datatypes import arraym, empty_arraym
-from _core import delimit_vector, setcol, getcol, _PDSimCore
+from _core import setcol, getcol
 import PDSim.core.callbacks
 
 ##-- Non-package imports  --
@@ -52,7 +52,7 @@ copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 class struct(object):
     pass    
 
-class PDSimCore(_PDSimCore):
+class PDSimCore(object):
     """
     This is the main driver class for the model
     
@@ -987,13 +987,16 @@ class PDSimCore(_PDSimCore):
             x0_raw = self.t[0:self.Ntheta]
             y0_raw = self.p[CVindex, 0:self.Ntheta]*self.dV[CVindex, 0:self.Ntheta]
             
-            x0, y0 = delimit_vector(x0_raw, y0_raw)
-            
-            summer = 0.0
-            for x_chunk, y_chunk in zip(x0, y0):
-                summer += -trapz(y_chunk, x_chunk)*self.omega/(2*pi)
-           
-            return summer
+            # Convert into chunks that are delimited by nan, if any
+            isnotnan_indices = np.flatnonzero(~np.isnan(y0_raw))
+            breaks = np.flatnonzero(np.diff(isnotnan_indices) > 1)
+
+            if len(breaks) != 0:
+                chunks = np.split(isnotnan_indices, np.array(breaks))
+            else:
+                chunks = [isnotnan_indices]
+                
+            return -sum([trapz(y0_raw[ii], x0_raw[ii]) for ii in chunks])*self.omega/(2*pi)
             
         self.Wdot_pv = 0.0
         for CVindex in range(self.p.shape[0]):
