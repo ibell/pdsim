@@ -3,15 +3,16 @@ virtualenv:
   system_site_packages: true
 python:
   - "2.7"
+  
 # command to install dependencies
 install: 
   - pip -q install cython --install-option="--no-cython-compile"
   - python setup_coolprop.py install
-  - sudo apt-get install python-numpy python-numpy-dev python-scipy python-matplotlib
+  - sudo apt-get install python-numpy python-numpy-dev python-scipy python-matplotlib python-wxgtk2.8 python-wxtools wx2.8-i18n
+  - python setup.py install # Install PDSim
   
 # command to run tests
 script: 
-  - python setup.py install # Install PDSim
   - cd examples
   - python simple_example.py
   - python scroll_compressor.py
