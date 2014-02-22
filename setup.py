@@ -58,7 +58,6 @@ import numpy
 #Each of the Pure-Python or PYX files in this list will be compiled to a python module       
 pyx_list = [
             "PDSim/core/_bearings.pyx",
-            "PDSim/core/_core.pyx",
             "PDSim/core/containers.pyx",
             "PDSim/core/callbacks.pyx",
             "PDSim/core/cycleintegrators.pyx",
