@@ -218,7 +218,7 @@ cdef class CVArrays(object):
             Crank angle [radians]
         state_vars : int
             Flag for the set of input variables - one of STATE_VARS_TM or STATE_VARS_TD defined in this module
-        x : arraym
+        x : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
             List of state variables corresponding to the state_vars flag
         """
         cdef StateClass State

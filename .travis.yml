@@ -10,6 +10,10 @@ install:
 # command to run tests
 script: 
   - python setup.py install # Install PDSim
+  - cd examples
+  - python simple_example.py
+  - python scroll_compressor.py
+  - python piston_expander.py
 
 notifications:
   email:

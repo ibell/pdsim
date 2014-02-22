@@ -42,7 +42,8 @@ cdef class ControlVolume(object):
 cdef class ControlVolumeCollection(object):
     cdef readonly list keys, CVs, indices, exists_keys, exists_indices, exists_CV
     cdef readonly dict Nodes
-    cdef readonly int N, Nexist 
+    cdef readonly int N, Nexist
+    cdef public CVArrays internal
     
     cpdef add(self, ControlVolume CV)
     cpdef rebuild_exists(self)
