@@ -11,7 +11,6 @@ from PDSim.flow.flow import FlowPathCollection
 from containers import ControlVolumeCollection,TubeCollection
 from PDSim.plot.plots import debug_plots
 from PDSim.misc.datatypes import arraym, empty_arraym
-from _core import setcol, getcol
 import PDSim.core.callbacks
 
 ##-- Non-package imports  --
@@ -122,6 +121,13 @@ class PDSimCore(object):
         self.summary = dummy()
     
     def _check(self):
+        """
+        Do some checking before we start the run.
+        
+        Here we check:
+        
+        * Inlet state viscosity and conductivity must be greater than zero
+        """
         
         if self.inlet_state.get_visc() < 0:
             raise ValueError('Your inlet state viscosity is less than zero. Invalid fluid: ' +self.inlet_state.Fluid)
@@ -132,20 +138,19 @@ class PDSimCore(object):
         """
         Get values back from the matrices and reconstruct the state variable list
         """
-        
         if self.__hasLiquid__==True:
             raise NotImplementedError
             #return np.hstack([self.T[:,i],self.m[:,i],self.xL[:,i]])
         else:
-            VarList=[]
-            exists_indices = self.CVs.exists_indices
+            VarList=np.array([])
+            exists_indices = np.array(self.CVs.exists_indices)
             for s in self.stateVariables:
                 if s=='T':
-                    VarList+=getcol(self.T,i,exists_indices)
+                    VarList = np.append(VarList, self.T[exists_indices,i])
                 elif s=='D':
-                    VarList+=getcol(self.rho,i,exists_indices)
+                    VarList = np.append(VarList, self.rho[exists_indices,i])
                 elif s=='M':
-                    VarList+=getcol(self.m,i,exists_indices)
+                    VarList = np.append(VarList, self.m[exists_indices,i])
                 else:
                     raise KeyError
             if self.__hasValves__:
@@ -174,37 +179,33 @@ class PDSimCore(object):
         Ns = len(self.stateVariables)
         if self.__hasLiquid__==True:
             raise NotImplementedError
-            self.T[:,i]=x[0:self.NCV]
-            self.m[:,i]=x[self.NCV:2*self.NCV]
-            self.xL[:,i]=x[2*self.NCV:3*self.NCV]
+#             self.T[:,i]=x[0:self.NCV]
+#             self.m[:,i]=x[self.NCV:2*self.NCV]
+#             self.xL[:,i]=x[2*self.NCV:3*self.NCV]
         else: # self.__hasLiquid__==False
             for iS, s in enumerate(self.stateVariables):
-                x_=arraym(x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)])
                 if s=='T':
-                    setcol(self.T, i, exists_indices, x_)
+                    self.T[exists_indices, i] = x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)]
                 elif s=='D':
-                    setcol(self.rho, i, exists_indices, x_)
+                    self.rho[exists_indices, i] = x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)]
                 elif s=='M':
-                    setcol(self.m, i, exists_indices, x_)
+                    self.m[exists_indices, i] = x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)]
             #Left over terms are for the valves
             if self.__hasValves__:
-                setcol(self.xValves, i, 
-                       range(len(self.Valves)*2), 
-                       arraym(x[Ns*Nexist:len(x)])
-                       )
+                self.xValves[range(len(self.Valves)*2), i] = arraym(x[Ns*Nexist:len(x)])
             
             # In the first iteration, self.core has not been filled, so do not 
             # overwrite with the values in self.core.m and self.core.rho
             if self.core.m[0] > 0.0 :
-                setcol(self.m, i, exists_indices, self.core.m)
+                self.m[exists_indices, i] = self.core.m
             if self.core.rho[0] > 0.0 :
-                setcol(self.rho, i, exists_indices, self.core.rho)
+                self.rho[exists_indices, i] = self.core.rho
             
-            setcol(self.V, i, exists_indices, self.core.V)
-            setcol(self.dV, i, exists_indices, self.core.dV)
-            setcol(self.p, i, exists_indices, self.core.p)
-            setcol(self.h, i, exists_indices, self.core.h)    
-            setcol(self.Q, i, exists_indices, self.core.Q)
+            self.V[exists_indices, i] = self.core.V
+            self.dV[exists_indices, i] = self.core.dV
+            self.p[exists_indices, i] = self.core.p
+            self.h[exists_indices, i] = self.core.h
+            self.Q[exists_indices,i] = self.core.Q
     
     def _postprocess_flows(self):
         """
