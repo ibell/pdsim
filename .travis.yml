@@ -3,7 +3,8 @@ python:
   - "2.7"
 # command to install dependencies
 install: 
-  - pip install Cython --use-mirrors
+  - pip -q install cython --install-option="--no-cython-compile"
+  - python setup_coolprop.py install
   - sudo apt-get install python-numpy python-numpy-dev python-scipy python-matplotlib
   
 # command to run tests
