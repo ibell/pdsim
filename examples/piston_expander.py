@@ -23,8 +23,8 @@ import os, sys
 from PDSim.flow.flow import FlowPath
 from PDSim.flow import flow_models
 from PDSim.misc.datatypes import empty_arraym
-from PDSim.core.containers import ControlVolume
-from PDSim.core.core import Tube,PDSimCore
+from PDSim.core.containers import ControlVolume, Tube
+from PDSim.core.core import PDSimCore
 from PDSim.plot.plots import debug_plots
 
 #Imports from CoolProp (fluid property database)

@@ -205,15 +205,6 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
 
     print 'time taken',clock()-t1
     
-    if Injection:
-        print ScrollComp.FlowsProcessed.mean_mdot
-        ha = CP.Props('H','T',Tc-DT_sc,'P',pc,'R404A')
-        hb = CP.Props('H','T',Tsat,'Q',0.0,'R404A')
-        hc = CP.Props('H','T',Tsat,'Q',1.0,'R404A')
-        
-        ScrollComp.injection_massflow_ratio = (ha-hb)/(hc-ha)
-        print 'enthalpies',ha,hb,hc,'x',ScrollComp.injection_massflow_ratio
-    
     del ScrollComp.FlowStorage
     from PDSim.misc.hdf5 import HDF5Writer
     h5 = HDF5Writer()
@@ -223,22 +214,5 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     return ScrollComp
     
 if __name__=='__main__':
-    profile=False
-    if profile==True:
-        import line_profiler as LP
-        profiler=LP.LineProfiler(Scroll.cycle_RK45)
-        profiler.run("Compressor()")
-        profiler.print_stats()
-    else:
-        if Injection:
-            FP = open('results-checkvalve-'+str(check_valve)+'.csv','w')
-            FP.write('f,mdot_injection,mdot_suction,x_sim,x_cycle\n')
-            for f in np.linspace(0.2,0.8,7):
-                S = Compressor(f)
-                x_sim = str(S.FlowsProcessed.mean_mdot['injection.1']/S.FlowsProcessed.mean_mdot['inlet.1']) 
-                x_cycle = str(S.injection_massflow_ratio)
-                FP.write(str(f)+','+str(S.FlowsProcessed.mean_mdot['injection.1'])+','+str(S.FlowsProcessed.mean_mdot['inlet.1'])+','+x_sim+','+x_cycle+'\n')
-            FP.close()       
-        else:
-            Compressor()
+    Compressor()
 

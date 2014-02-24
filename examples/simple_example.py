@@ -201,7 +201,7 @@ def Compressor():
     print 'time taken',clock()-t1,'s'
     
     
-    debug_plots(recip)
+    #debug_plots(recip)
     
 if __name__=='__main__':    
     #If this file is run directly, this code will be run
