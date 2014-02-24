@@ -205,7 +205,7 @@ def Expander():
                    )
     print 'time taken',clock()-t1,'s'
     
-    debug_plots(expander)
+    #debug_plots(expander)
     
 if __name__=='__main__':    
     #If this file is run directly, this code will be run
