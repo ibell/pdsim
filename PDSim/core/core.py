@@ -1435,8 +1435,7 @@ class PDSimCore(object):
                 
                 #  Update the inlet state of the outlet tube based on the output of
                 #  the pump set
-                self.Tubes.Nodes[key_outtube_inlet].update({'H' : self.h_outlet_pump_set,
-                                                            'P' : self.Tubes.Nodes[self.key_outlet].p})
+                self.Tubes.Nodes[key_outtube_inlet].update_ph(self.Tubes.Nodes[self.key_outlet].p,self.h_outlet_pump_set)
                 
                 #  Run the outlet tube
                 outlet_tube.TubeFcn(outlet_tube)
@@ -1445,8 +1444,7 @@ class PDSimCore(object):
                 h_outlet = self.Tubes[self.key_outlet].State2.get_h()
                 
                 #  Reset the outlet enthalpy of the outlet tube
-                self.Tubes.Nodes[self.key_outlet].update({'H' : h_outlet,
-                                                          'P' : self.Tubes.Nodes[self.key_outlet].p})
+                self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, h_outlet)
                 
             else:
                 
@@ -1462,8 +1460,7 @@ class PDSimCore(object):
                 
                 #  Reset the outlet enthalpy of the outlet tube based on our new
                 #  value for it
-                self.Tubes.Nodes[self.key_outlet].update({'H' : hdnew,
-                                                          'P' : self.Tubes.Nodes[self.key_outlet].p})
+                self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, hdnew)
                 
             if OneCycle:
                 print 'Quitting due to OneCycle being set to True'
@@ -1485,7 +1482,7 @@ class PDSimCore(object):
             print '|| # {i:03d} ||'.format(i=i)
             print '==========='
             print error_ascii_bar(abs(self.lumps_resid[0]),epsilon), 'energy balance ', self.lumps_resid[0], ' Tlumps: ',self.Tlumps,'K'
-            print error_ascii_bar(abs(self.resid_Td),epsilon), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg'
+            print error_ascii_bar(abs(self.resid_Td),epsilon), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg', self.Tubes.Nodes[key_outtube_inlet].h, 'kJ/kg'
             print error_ascii_bar(np.sqrt(np.sum(np.power(errors, 2))),epsilon), 'cycle-cycle    ',np.sqrt(np.sum(np.power(errors, 2)))
             
             worst_error = max(abs(self.lumps_resid[0]), abs(self.resid_Td), np.sqrt(np.sum(np.power(errors, 2))))

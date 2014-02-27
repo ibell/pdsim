@@ -192,14 +192,6 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
             print 'fixed not provided'
             #raise AttributeError
         
-    if State1.hasLiquid:
-        raise ValueError('Fill in here')
-#        Pr=Pr_mix(Ref,Liq,T_in,p_in,xL_in) #[-]
-#        Re=4.0*mdot/(PI*mu_mix(Ref,Liq,T_in,p_in,xL_in)*D) #[-]
-#        k=k_mix(Ref,Liq,T_in,p_in,xL_in) #[kW/m-K]
-#        cp=cp_mix(Ref,Liq,T_in,p_in,xL_in) #[kJ/kg-K]
-#        hc=0.023*k/D*pow(Re,0.8)*pow(Pr,0.4) #[kW/m^2-K]
-    else:
         if fixed==1:
             p=State1.p
             T1=State1.T
