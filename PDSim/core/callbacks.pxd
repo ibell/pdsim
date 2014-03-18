@@ -21,9 +21,9 @@ cdef class WrappedLumpsEnergyBalanceCallback(LumpsEnergyBalanceCallback):
     
 ########## Step callbacks ##########
 cdef class StepCallback(object):
-    cdef readonly bint disable_adaptive
+    cdef readonly object disable_adaptive
     cdef readonly double h
-    cdef object core 
+    cdef object core
     cpdef double call(self, double t, double h, int i) except *
     
 cdef class WrappedStepCallback(StepCallback):

@@ -819,7 +819,7 @@ class PDSimCore(object):
                     disableAdaptive = True
                     h = tmax - t0
             
-                if self.callbacks.step_callback is not None and not disableAdaptive:
+                if self.callbacks.step_callback is not None and disableAdaptive == False:
                     #The user has provided a disabling function for the adaptive method
                     #Call it to figure out whether to use the adaptive method or not
                     #Pass it a copy of the compressor class and the current step size
@@ -833,88 +833,98 @@ class PDSimCore(object):
                 else:
                     disableAdaptive=False
                     
-                if h < hmin and not disableAdaptive:
-                    #Step is too small, just use the minimum step size
-                    h = 1.0*hmin
-                    disableAdaptive = True
-                    
-                if not UseCashKarp:
-                    ## Using RKF constants ##
-                    
-                    # Step 1: derivatives evaluated at old values
-                    f1=self.derivs(t0,xold)
-                    xnew1=xold+h*(+1.0/4.0*f1)
-                    
-                    #Store a copy of the flows for future use as well as a buffered set of state variables
-                    Flows_temporary = self.Flows.get_deepcopy()
-                    core_temporary = self.core.copy()
-                    
-                    f2=self.derivs(t0+1.0/4.0*h,xnew1)
-                    xnew2=xold+h*(+3.0/32.0*f1+9.0/32.0*f2)
-    
-                    f3=self.derivs(t0+3.0/8.0*h,xnew2)
-                    xnew3=xold+h*(+1932.0/2197.0*f1-7200.0/2197.0*f2+7296.0/2197.0*f3)
-    
-                    f4=self.derivs(t0+12.0/13.0*h,xnew3)
-                    xnew4=xold+h*(+439.0/216.0*f1-8.0*f2+3680.0/513.0*f3-845.0/4104.0*f4)
-                    
-                    f5=self.derivs(t0+h,xnew4)
-                    xnew5=xold+h*(-8.0/27.0*f1+2.0*f2-3544.0/2565.0*f3+1859.0/4104.0*f4-11.0/40.0*f5)
-                    
-                    #Updated values at the next step
-                    f6=self.derivs(t0+h/2.0,xnew5)
-                    
-                    xnew=xold+h*(gamma1*f1 + gamma2*f2 + gamma3*f3 + gamma4*f4 + gamma5*f5 + gamma6*f6)
-                        
-                    error=h*(1.0/360.0*f1-128.0/4275.0*f3-2197.0/75240.0*f4+1.0/50.0*f5+2.0/55.0*f6)
-                else:
-                    # Step 1: derivatives evaluated at old values
-                    f1=self.derivs(t0,xold)
-                    xnew1=xold+h*(1.0/5.0)*f1   
-                    
-                    #Store a copy of the flows for future use as well as a buffered set of state variables
-                    Flows_temporary = self.Flows.get_deepcopy()
-                    core_temporary = self.core.copy()
-                    
-                    f2=self.derivs(t0+1.0/5.0*h,xnew1)
-                    xnew2=xold+h*(+3.0/40.0*f1+9.0/40.0*f2)
-    
-                    f3=self.derivs(t0+3.0/10.0*h,xnew2)
-                    xnew3=xold+h*(3.0/10.0*f1-9.0/10.0*f2+6.0/5.0*f3)
-    
-                    f4=self.derivs(t0+3.0/5.0*h,xnew3)
-                    xnew4=xold+h*(-11.0/54.0*f1+5.0/2.0*f2-70/27.0*f3+35.0/27.0*f4)
-                    
-                    f5=self.derivs(t0+h,xnew4)
-                    xnew5=xold+h*(1631.0/55296*f1+175.0/512.0*f2+575.0/13824.0*f3+44275.0/110592.0*f4+253.0/4096.0*f5)
-                    
-                    f6=self.derivs(t0+7/8*h,xnew5)
-                    
-                    #Updated values at the next step using 5-th order
-                    xnew=xold+h*(37/378*f1 + 250/621*f3 + 125/594*f4 + 512/1771*f6)
-                    
-                    error = h*(-277/64512*f1+6925/370944*f3-6925/202752*f4-277.0/14336*f5+277/7084*f6)
-
-                max_error=np.sqrt(np.sum(np.power(error,2)))
-                
-                # If the error is too large, make the step size smaller and try
-                # the step again
-                if (max_error > eps_allowed):
-                    if not disableAdaptive:
-                        # Take a smaller step next time, try again on this step
-                        # But only if adaptive mode is on
-#                        print 'downsizing', h,
-                        h *= step_relax*(eps_allowed/max_error)**(0.3)
-#                        print h, eps_allowed, max_error
-                        stepAccepted=False
-                    else:
-                        # Accept the step regardless of whether the error 
-                        # is too large or not
-                        stepAccepted = True
-                else:
+                if disableAdaptive == 'no_integrate':
                     stepAccepted = True
+                    # Updates the state, calculates the volumes, prepares all the things needed for derivatives
+                    self.core.properties_and_volumes(self.CVs.exists_CV, t0+h+1e-10, STATE_VARS_TM, xold)
+                    # Store a copy of the flows for future use as well as a buffered set of state variables
+                    Flows_temporary = self.Flows.get_deepcopy()
+                    core_temporary = self.core.copy()
+                    xnew = xold.copy()
+                else:
+                    
+                    if h < hmin and not disableAdaptive:
+                        # Step is too small, just use the minimum step size
+                        h = 1.0*hmin
+                        disableAdaptive = True
                 
-            #This block is for saving of values
+                    if not UseCashKarp:
+                        ## Using RKF constants ##
+                        
+                        # Step 1: derivatives evaluated at old values
+                        f1=self.derivs(t0,xold)
+                        xnew1=xold+h*(+1.0/4.0*f1)
+                        
+                        #Store a copy of the flows for future use as well as a buffered set of state variables
+                        Flows_temporary = self.Flows.get_deepcopy()
+                        core_temporary = self.core.copy()
+                        
+                        f2=self.derivs(t0+1.0/4.0*h,xnew1)
+                        xnew2=xold+h*(+3.0/32.0*f1+9.0/32.0*f2)
+        
+                        f3=self.derivs(t0+3.0/8.0*h,xnew2)
+                        xnew3=xold+h*(+1932.0/2197.0*f1-7200.0/2197.0*f2+7296.0/2197.0*f3)
+        
+                        f4=self.derivs(t0+12.0/13.0*h,xnew3)
+                        xnew4=xold+h*(+439.0/216.0*f1-8.0*f2+3680.0/513.0*f3-845.0/4104.0*f4)
+                        
+                        f5=self.derivs(t0+h,xnew4)
+                        xnew5=xold+h*(-8.0/27.0*f1+2.0*f2-3544.0/2565.0*f3+1859.0/4104.0*f4-11.0/40.0*f5)
+                        
+                        #Updated values at the next step
+                        f6=self.derivs(t0+h/2.0,xnew5)
+                        
+                        xnew=xold+h*(gamma1*f1 + gamma2*f2 + gamma3*f3 + gamma4*f4 + gamma5*f5 + gamma6*f6)
+                            
+                        error=h*(1.0/360.0*f1-128.0/4275.0*f3-2197.0/75240.0*f4+1.0/50.0*f5+2.0/55.0*f6)
+                    else:
+                        # Step 1: derivatives evaluated at old values
+                        f1=self.derivs(t0,xold)
+                        xnew1=xold+h*(1.0/5.0)*f1   
+                        
+                        #Store a copy of the flows for future use as well as a buffered set of state variables
+                        Flows_temporary = self.Flows.get_deepcopy()
+                        core_temporary = self.core.copy()
+                        
+                        f2=self.derivs(t0+1.0/5.0*h,xnew1)
+                        xnew2=xold+h*(+3.0/40.0*f1+9.0/40.0*f2)
+        
+                        f3=self.derivs(t0+3.0/10.0*h,xnew2)
+                        xnew3=xold+h*(3.0/10.0*f1-9.0/10.0*f2+6.0/5.0*f3)
+        
+                        f4=self.derivs(t0+3.0/5.0*h,xnew3)
+                        xnew4=xold+h*(-11.0/54.0*f1+5.0/2.0*f2-70/27.0*f3+35.0/27.0*f4)
+                        
+                        f5=self.derivs(t0+h,xnew4)
+                        xnew5=xold+h*(1631.0/55296*f1+175.0/512.0*f2+575.0/13824.0*f3+44275.0/110592.0*f4+253.0/4096.0*f5)
+                        
+                        f6=self.derivs(t0+7/8*h,xnew5)
+                        
+                        #Updated values at the next step using 5-th order
+                        xnew=xold+h*(37/378*f1 + 250/621*f3 + 125/594*f4 + 512/1771*f6)
+                        
+                        error = h*(-277/64512*f1+6925/370944*f3-6925/202752*f4-277.0/14336*f5+277/7084*f6)
+    
+                    max_error=np.sqrt(np.sum(np.power(error,2)))
+                    
+                    # If the error is too large, make the step size smaller and try
+                    # the step again
+                    if (max_error > eps_allowed):
+                        if not disableAdaptive:
+                            # Take a smaller step next time, try again on this step
+                            # But only if adaptive mode is on
+    #                        print 'downsizing', h,
+                            h *= step_relax*(eps_allowed/max_error)**(0.3)
+    #                        print h, eps_allowed, max_error
+                            stepAccepted=False
+                        else:
+                            # Accept the step regardless of whether the error 
+                            # is too large or not
+                            stepAccepted = True
+                    else:
+                        stepAccepted = True
+                
+            #This block is for saving of values at the end of the step
             #
             #Store crank angle at the current index (first run at Itheta=0)
             self.t[Itheta] = t0

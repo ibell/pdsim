@@ -125,7 +125,7 @@ cdef class StepCallback(object):
         #: The flag which determines whether to enable or disable the adaptive method
         #: If true and the adaptive method is being used, the adaptive solver will
         #: be turned off 
-        self.disable_adaptive = False
+        self.disable_adaptive = False 
         self.core = Core
         
     cpdef double call(self, double t, double h, int i) except *:

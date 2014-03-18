@@ -173,6 +173,7 @@ cpdef int getNc(double theta, geoVals geo) except *:
             Number of pairs of compressions chambers
             
     """
+    # TODO: figure out a better way to allow this to get to numerical precision for theta_d + eps
     if geo.is_symmetric():
         return int(floor((geo.phi_fie-theta-geo.phi_oos-pi)/(2*pi)))
     else:

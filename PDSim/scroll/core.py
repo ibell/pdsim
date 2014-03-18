@@ -77,8 +77,7 @@ class Scroll(PDSimCore, _Scroll):
         ## Set flags
         self.__Setscroll_geo__=False
         self.__SetDiscGeo__=False
-        self.__before_discharge1__=False #Step bridging theta_d
-        self.__before_discharge2__=False #Step up to theta_d
+        self.__before_discharge__=False #Step bridging theta_d
 
     def __getstate__(self):
         """
@@ -516,13 +515,7 @@ class Scroll(PDSimCore, _Scroll):
         theta: angle in range [0,2*pi]
         """
         
-        if self.__before_discharge1__==True and theta<self.theta_d:
-                #Get the number of compression chambers in existence
-                alpha=scroll_geo.getNc(theta,self.geo)
-                #Use the innermost compression chamber 
-                return scroll_geo.C1(theta,alpha,self.geo)[0:2]
-        else:
-            return scroll_geo.D1(theta,self.geo)[0:2]
+        return scroll_geo.D1(theta,self.geo)[0:2]
     
     def V_d2(self,theta,full_output=False):
         """
@@ -531,13 +524,7 @@ class Scroll(PDSimCore, _Scroll):
         theta: angle in range [0,2*pi]
         """
 
-        if self.__before_discharge1__==True and theta<self.theta_d:
-                #Get the number of compression chambers in existence
-                alpha=scroll_geo.getNc(theta,self.geo)
-                #Use the innermost compression chamber 
-                return scroll_geo.C2(theta,alpha,self.geo)[0:2]
-        else:
-            return scroll_geo.D2(theta,self.geo)[0:2]
+        return scroll_geo.D2(theta,self.geo)[0:2]
     
     def V_dd(self,theta,full_output=False):
         """
@@ -550,10 +537,7 @@ class Scroll(PDSimCore, _Scroll):
             HTangles = {'1_i':None,'2_i':None,'1_o':None,'2_o':None}
             return scroll_geo.DD(theta,self.geo)[0:2],HTangles
         else:
-            if self.__before_discharge1__==True and theta<self.theta_d:
-                return scroll_geo.DDD(theta,self.geo)[0:2]
-            else:
-                return scroll_geo.DD(theta,self.geo)[0:2]
+            return scroll_geo.DD(theta,self.geo)[0:2]
         
     def V_ddd(self,theta,alpha=1,full_output=False):
         """
@@ -1270,13 +1254,15 @@ class Scroll(PDSimCore, _Scroll):
             
         disable=False
         
-        if t<self.theta_d<t+h and self.__before_discharge2__==False:
-            #Take a step almost up to the discharge angle
-            disable=True
-            h=self.theta_d-t-1e-10
-            self.__before_discharge2__=True
-        elif self.__before_discharge2__==True:
-            #At the discharge angle
+        if t<self.theta_d<t+h and self.__before_discharge__==False:
+            # Take a step almost up to the discharge angle
+            #print 'almost to discharge'
+            disable = True
+            h = self.theta_d-t-1e-15
+            self.__before_discharge__ = True
+            
+        elif self.__before_discharge__ == True:
+            # At the discharge angle
             #print 'At the discharge angle'
             ########################
             #Reassign chambers
@@ -1291,27 +1277,25 @@ class Scroll(PDSimCore, _Scroll):
                         newCV.State.update({'T':oldCV.State.T,'D':oldCV.State.rho})
                         oldCV.exists=False
                         newCV.exists=True
+                        
                     else:
                         raise AttributeError("old CV doesn't exist")
             
-            self.__before_discharge2__=False
-            self.__before_discharge1__=True
+            self.__before_discharge__=False
             
             self.update_existence()
             
             #Re-calculate the CV volumes
-            V,dV = self.CVs.volumes(t)
+            V,dV = self.CVs.volumes(self.theta_d+1e-10)
             #Update the matrices using the new CV definitions
-            self.T[self.CVs.exists_indices,Itheta]=self.CVs.T
-            self.p[self.CVs.exists_indices,Itheta]=self.CVs.p
-            self.m[self.CVs.exists_indices,Itheta]=arraym(self.CVs.rho)*V
-            self.rho[self.CVs.exists_indices,Itheta]=arraym(self.CVs.rho)
+            self.T[self.CVs.exists_indices,Itheta] = self.CVs.T
+            self.p[self.CVs.exists_indices,Itheta] = self.CVs.p
+            self.m[self.CVs.exists_indices,Itheta] = arraym(self.CVs.rho)*V
+            self.rho[self.CVs.exists_indices,Itheta] = arraym(self.CVs.rho)
             
-            # Adaptive makes steps of h/4 3h/8 12h/13 and h/2 and h
-            # Make sure step does not hit any *right* at theta_d
-            # That is why it is 2.2e-8 rather than 2.0e-8
-            h=2.2e-10
-            disable=True
+            # This has to be quite large - why?
+            h = 2e-10
+            disable='no_integrate'
        
         elif self.CVs['d1'].exists and IsAtMerge():
             
@@ -1381,7 +1365,7 @@ class Scroll(PDSimCore, _Scroll):
             disable=True 
               
         elif t>self.theta_d:
-            self.__before_discharge1__=False
+            self.__before_discharge__=False
             disable=False
             
         return disable,h
@@ -1962,10 +1946,8 @@ class Scroll(PDSimCore, _Scroll):
             return flankFunc(FlowPath)
             
     def D_to_DD(self,FlowPath,X_d =1.0,**kwargs):
-        if self.__before_discharge1__:
-            FlowPath.A = 0.0
-        else:
-            FlowPath.A=scroll_geo.Area_d_dd(self.theta,self.geo)
+        
+        FlowPath.A=scroll_geo.Area_d_dd(self.theta,self.geo)
         try:
             return flow_models.IsentropicNozzle(FlowPath.A,
                                                 FlowPath.State_up,
