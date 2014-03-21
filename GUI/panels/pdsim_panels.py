@@ -1198,7 +1198,7 @@ class ParametricOption(wx.Panel):
         Update the values when the term is changed if a structured table
         """
         if self.GetParent().Structured.GetValue():
-            annotation = self.Terms.GetStringSelection()
+            annotation = self.Terms.GetStringSelection().encode('latin-1')
             
             # Get the key of the registered object
             key = self.GUI_map[annotation]
@@ -1676,7 +1676,7 @@ class ParametricPanel(PDPanel):
                 # Loop over the columns for this row 
                 for Icol in range(self.ParaList.GetColumnCount()-1):
                     vals.append(self.ParaList.GetFloatCell(Irow, Icol))
-                    names.append(self.ParaList.GetColumn(Icol+1).Text)
+                    names.append(self.ParaList.GetColumn(Icol+1).Text.encode('latin-1'))
                     
                 # The attributes corresponding to the names
                 keys = [self.GUI_map[name] for name in names]
