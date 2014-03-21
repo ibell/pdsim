@@ -1634,8 +1634,8 @@ class MainFrame(wx.Frame):
             #Do all the "conventional" panels
             for TB in self.MTB.Children:
                 
-                #Skip anything that isnt a toolbook
-                if not isinstance(TB, wx.Toolbook):
+                # Skip anything that isnt a toolbook
+                if not isinstance(TB, wx.Listbook):
                     continue
                 
                 if hasattr(TB, 'get_config_chunks'):
