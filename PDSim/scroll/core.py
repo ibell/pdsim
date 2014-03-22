@@ -1540,7 +1540,7 @@ class Scroll(PDSimCore, _Scroll):
         
     def build_sensor_profile(self):
         """
-        Build the themo data for each point along the process
+        Build the thermo data for each point along the process
         """
         
         # First check if this run uses any virtual sensors
@@ -1589,17 +1589,19 @@ class Scroll(PDSimCore, _Scroll):
         
         Nc_max1, Nc_max2 = self.Nc_max()
         
+        assert len(theta) == len(p1) == len(p2)
+        
         for path, Nc_max in zip([1,2],[Nc_max1, Nc_max2]):
             if Nc_max > 1:
                 for alpha in range(1,Nc_max):
                     # Compression chambers up to the next-to-innermost set are handled
                     # just like the suction chambers
-                    theta = np.append(theta, self.t + 2*pi*alpha)
                     if path == 1:
+                        theta = np.append(theta, self.t + 2*pi*alpha)
                         p1 = np.append(p1, self.p[self.CVs.index('c1.'+str(alpha))])
                     else:
                         p2 = np.append(p2, self.p[self.CVs.index('c2.'+str(alpha))])
-        
+                    
             # Innermost compression chamber begins to be tricky
             # By definition innermost compression chamber doesn't make it to the 
             # end of the rotation
@@ -1614,6 +1616,8 @@ class Scroll(PDSimCore, _Scroll):
         pd1 = self.p[self.CVs.index('d1')].copy()
         pd2 = self.p[self.CVs.index('d2')].copy()
         pddd = self.p[self.CVs.index('ddd')].copy()
+        
+        assert len(theta) == len(p1) == len(p2)
         
         # Now check if d1 and d2 end before the end of the rotation (they don't 
         # neccessarily)
@@ -1705,6 +1709,8 @@ class Scroll(PDSimCore, _Scroll):
         self.summary.theta_profile = theta
         self.summary.p1_profile = p1
         self.summary.p2_profile = p2
+        
+        assert len(theta) == len(p1) == len(p2)
         
     def ambient_heat_transfer(self, Tshell):
         """
