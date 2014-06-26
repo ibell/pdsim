@@ -1,6 +1,6 @@
 """
 A convenience script for building CoolProp from the PDSim source directory
 """
-import subprocess, os
+import subprocess, os, sys
 
-print subprocess.check_output(['python','setup.py','build','--force','install'], cwd = os.path.join('externals','coolprop','wrappers','Python'))
+print subprocess.check_call(['python','setup.py','build','--force','install'], cwd = os.path.join('externals','coolprop','wrappers','Python'), stdout = sys.stdout)
