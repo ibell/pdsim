@@ -1272,14 +1272,12 @@ class Scroll(PDSimCore, _Scroll):
                 if self.CVs[key].discharge_becomes in self.CVs.keys:
                     #Set the state of the "new" chamber to be the old chamber
                     oldCV=self.CVs[key]
-                    if oldCV.exists==True:
-                        newCV=self.CVs[oldCV.discharge_becomes]
-                        newCV.State.update({'T':oldCV.State.T,'D':oldCV.State.rho})
-                        oldCV.exists=False
-                        newCV.exists=True
-                        
-                    else:
-                        raise AttributeError("old CV doesn't exist")
+                    if not oldCV.exists==True: raise AttributeError("old CV doesn't exist")
+                    
+                    newCV=self.CVs[oldCV.discharge_becomes]
+                    newCV.State.update({'T':oldCV.State.T,'D':oldCV.State.rho})
+                    oldCV.exists=False
+                    newCV.exists=True
             
             self.__before_discharge__=False
             
