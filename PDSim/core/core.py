@@ -1003,7 +1003,7 @@ class PDSimCore(object):
             breaks = np.flatnonzero(np.diff(isnotnan_indices) > 1)
 
             if len(breaks) != 0:
-                chunks = np.split(isnotnan_indices, np.array(breaks))
+                chunks = np.split(isnotnan_indices, np.array(breaks)+1)
             else:
                 chunks = [isnotnan_indices]
                 
@@ -1129,7 +1129,7 @@ class PDSimCore(object):
         """
             
         import warnings
-        msg = 'precond_solve is deprecated and will be removed in a future version'
+        msg = 'precond_solve is deprecated and will be removed in a future version. Please use solve instead'
         warnings.warn(msg, DeprecationWarning)
         self.solve(**kwargs)
        
@@ -1325,16 +1325,17 @@ class PDSimCore(object):
             key_outtube_inlet = Tube.key1
             
         # This is the so-called hd' state at the outlet of the pump set
-        h_outlet = (self.FlowsProcessed.integrated_mdoth[key_outtube_inlet]
-                    /self.FlowsProcessed.integrated_mdot[key_outtube_inlet])
+        self.h_outlet_pump_set = (self.FlowsProcessed.integrated_mdoth[key_outtube_inlet]
+                                 /self.FlowsProcessed.integrated_mdot[key_outtube_inlet])
         
-        self.h_outlet_pump_set = h_outlet
         # It should be equal to the enthalpy of the fluid at the inlet
         # to the outlet tube at the current Td value
         h_outlet_Tube = self.Tubes.Nodes[key_outtube_inlet].h
         # Residual is the difference of these two terms
         # We put it in kW by multiplying by flow rate
-        self.resid_Td = mdot_out * (h_outlet_Tube - h_outlet)
+        print 'h_outlet_Tube',h_outlet_Tube
+        print 'self.h_outlet_pump_set',self.h_outlet_pump_set
+        self.resid_Td = mdot_out * (h_outlet_Tube - self.h_outlet_pump_set)
         
     def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45', OneCycle = False, cycle_integrator_options = None, plot_every_cycle = False):
         """
@@ -1374,6 +1375,7 @@ class PDSimCore(object):
             
             #  Actually run the cycle, runs post_cycle at the end,
             #  sets the parameter lumps_resid in this class
+            #  Also sets resid_Td
             self.one_cycle(X, 
                            cycle_integrator = cycle_integrator,
                            cycle_integrator_options = cycle_integrator_options)
@@ -1415,7 +1417,6 @@ class PDSimCore(object):
                 #  Update the lump temperatures    
                 self.Tlumps = Tnew.tolist()
             
-            
             ###  -----------------------------------
             ###        The discharge enthalpy
             ###  -----------------------------------
@@ -1425,23 +1426,30 @@ class PDSimCore(object):
             #  The outlet tube
             outlet_tube = self.Tubes[self.key_outlet]
             
-            #  Calculate the outlet enthalpy
+            #  Get the keys for the elements of the outlet tube
+            if outlet_tube.key1 == self.key_outlet:
+                key_outtube_inlet = outlet_tube.key2
+                key_outtube_outlet = outlet_tube.key1
+            elif outlet_tube.key2 == self.key_outlet:
+                key_outtube_inlet = outlet_tube.key1
+                key_outtube_outlet = outlet_tube.key2
+            
+            #  Get the current value for the outlet enthalpy
             h_outlet = self.Tubes[self.key_outlet].State2.get_h()
                 
             self.solvers.hdisc_history.append([h_outlet,self.resid_Td])
             
-            if max(np.abs(self.lumps_resid)) > epsilon or len(self.solvers.hdisc_history) == 1:
+            if True: #max(np.abs(self.lumps_resid)) > epsilon or len(self.solvers.hdisc_history) == 1:
+                
+                #  Here we are going to solve the tube in the flow direction
+                #  since the energy balance on the lumps 
+                print 'Solving outlet tube in the flow direction'
+                
                 #  Save the old state of the outlet tube
                 old_fixed = outlet_tube.fixed
                 
+                #  Set the inlet state to be fixed
                 outlet_tube.fixed = 1
-                
-                if outlet_tube.key1 == self.key_outlet:
-                    key_outtube_inlet = outlet_tube.key2
-                    key_outtube_outlet = outlet_tube.key1
-                elif outlet_tube.key2 == self.key_outlet:
-                    key_outtube_inlet = outlet_tube.key1
-                    key_outtube_outlet = outlet_tube.key2
                 
                 #  Update the inlet state of the outlet tube based on the output of
                 #  the pump set
@@ -1456,10 +1464,10 @@ class PDSimCore(object):
                 #  Reset the outlet enthalpy of the outlet tube
                 self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, h_outlet)
                 
-            else:
+                #  Reset which state is fixed
+                outlet_tube.fixed = old_fixed
                 
-                #  Calculate the outlet enthalpy
-                h_outlet = self.Tubes[self.key_outlet].State2.get_h()
+            else:
                 
                 #  Get the values from the history
                 hdn1, EBn1 = self.solvers.hdisc_history[-1]
@@ -1754,7 +1762,7 @@ class PDSimCore(object):
         """
         Do some post-processing to calculate flow rates, efficiencies, etc.  
         """      
-        
+
         #Resize all the matrices to keep only the real data
         print 'Ntheta is', self.Ntheta
         self.t = self.t[  0:self.Ntheta]
