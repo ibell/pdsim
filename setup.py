@@ -23,6 +23,11 @@ try:
 except ImportError:
     print 'psutil was not found, it is used to kill the python completion server in Eclipse which keeps PDSim from building. psutils can be easy_install-ed or installed using pip'
    
+#try:
+#    import setuptools
+#except ImportError:
+#    print 'Could not load setuptools'
+    
 import warnings
 from distutils.core import setup
 from Cython.Build import cythonize
@@ -30,13 +35,13 @@ from Cython.Distutils import build_ext
 from Cython.Distutils.extension import Extension as CyExtension
 import sys, shutil, os, glob
 
-version = '2.7'
+version = '2.8'
 
 if len(sys.argv) == 1:
 #      sys.argv += ['build_ext','--inplace','install']
 #    sys.argv += ['build','build_ext','install']
-#    sys.argv += ['build','install']
-    sys.argv += ['build','install']
+   sys.argv += ['build','--force','install']
+#     sys.argv += ['install']
     
 #Modify the __init__ file with this version string
 fName = os.path.join('PDSim','__init__.py')
