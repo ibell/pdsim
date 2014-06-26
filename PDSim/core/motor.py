@@ -111,10 +111,6 @@ class Motor(object):
         omega_interp = scipy.interpolate.splrep(self.tau_coeffs, self.omega_coeffs, k=2, s=0)
         omega = scipy.interpolate.splev(tau, omega_interp)
         
-        #Do the 1D interpolation
-        #eta = float(interp1d(self.tau_coeffs, self.eta_coeffs, kind = kind)(tau))
-        #omega = float(interp1d(self.tau_coeffs, self.omega_coeffs, kind = kind)(tau))
-        
         #Return the values
         return eta, omega
         
