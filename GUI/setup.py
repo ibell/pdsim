@@ -16,7 +16,7 @@ if len(sys.argv)==1:
 # Process the includes, excludes and packages first
 
 include_files = []
-includes = ['numpy','scipy.sparse.csgraph._validation']
+includes = ['numpy','scipy.sparse.csgraph._validation','PDSim']
 excludes = ['_gtkagg', '_tkagg', 'bsddb', 'curses', 'email', 'PyQt4',
             'pywin.debugger', 'pywin.debugger.dbgcon', 'pywin.dialogs',
             'tcl', 'Tkconstants', 'Tkinter','sympy','IPython']
