@@ -7,6 +7,11 @@ class StubClass():
         self.__dict__.update(d)
         
 class HDF5Writer(object):
+    """
+    This class contains the logic for writing a nested structure to a file.  The structure to be written could include dictionaries, lists, numpy arrays, classes, and combinations thereof.  The recursive writer function will walk through the tree, writing all the elements into the HDF5 file in the same general structure as was laid out in the object passed.
+    
+    Some small modifications are needed - for instance, lists are written in a slighltly different manner.  Otherwise, the structure should be pretty much exactly the same.
+    """
     
     def _recursive_write(self, f, struct):
         
