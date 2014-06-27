@@ -1019,6 +1019,7 @@ class PDSimCore(object):
         not meant to be called externally
         
         The following things are done:
+        
         #. The boundary work is calculated
         #. The flows are post-processed
         #. The heat transfer is post-processed
@@ -1784,9 +1785,9 @@ class PDSimCore(object):
         
         # Restructure the history for easier writing to file and more clear description of what the things are
         hdisc_history = zip(*self.solvers.hdisc_history)
-        self.solvers.hdisc_history = dict(Td = hdisc_history[0], herror = hdisc_history[1])
+        self.solvers.hdisc_history = dict(Td = np.array(hdisc_history[0]), hd_error = np.array(hdisc_history[1]))
         lump_eb_history = zip(*self.solvers.lump_eb_history)
-        self.solvers.lump_eb_history = dict(Tlumps = lump_eb_history[0], Tlumperror_kW = lump_eb_history[1])
+        self.solvers.lump_eb_history = dict(Tlumps = np.array(lump_eb_history[0]), lump_eb_error = np.array(lump_eb_history[1]))
         
     def derivs(self,theta,x):
         """
