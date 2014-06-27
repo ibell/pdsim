@@ -1782,6 +1782,12 @@ class PDSimCore(object):
         print 'Volumetric efficiency is',self.eta_v*100,'%'
         print 'Adiabatic efficiency is',self.eta_a*100,'%'
         
+        # Restructure the history for easier writing to file and more clear description of what the things are
+        hdisc_history = zip(*self.solvers.hdisc_history)
+        self.solvers.hdisc_history = dict(Td = hdisc_history[0], herror = hdisc_history[1])
+        lump_eb_history = zip(*self.solvers.lump_eb_history)
+        self.solvers.lump_eb_history = dict(Tlumps = lump_eb_history[0], Tlumperror_kW = lump_eb_history[1])
+        
     def derivs(self,theta,x):
         """
         Evaluate the derivatives of the state variables
