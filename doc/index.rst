@@ -10,16 +10,16 @@ Contents:
 .. toctree::
    :maxdepth: 1
    
-   tutorial/tutorial
    install_build
    API
+   command_line_options
     
 PDSim is a software package developed to enable quasi-steady simulation of positive displacement compressors and expanders.  
 
 It was written in Python by `Ian Bell <http://www.BellThermal.com>`_ with assistance from Craig Bradshaw.  Development is ongoing, particularly of functionality for scroll compressors and expanders.
 
 Windows users can download a graphical user interface by going here: `PDSim GUI <https://sourceforge.net/projects/pdsim/files/>`_
-
+    
 PDSim is an open-source project and welcomes the assistance of other researchers, developers, or anyone generally interested in compressors.
 
 Indices and tables

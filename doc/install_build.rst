@@ -1,8 +1,8 @@
-Building and Using PDSim modules
-********************************
+Installation and Configuration
+******************************
 
-Step-By-Step on Windows
-=======================
+Windows
+=======
 
 #. Run the web installer for Microsoft Visual Studio 2008 Express from `VS2008Express <http://go.microsoft.com/?linkid=7729279>`_
 
@@ -10,9 +10,9 @@ Step-By-Step on Windows
 
 #. Install TortoiseGit from `TortoiseGit installs <http://code.google.com/p/tortoisegit/wiki/Download>`_ (pick the right version for your operating system)
 
-#. Install python using Python (x,y) python installer.  Download the full installer from `Python(x,y) <https://code.google.com/p/pythonxy/wiki/Downloads?tm=2>`_ website.  In the installer, make sure to check Cython in the python section
+#. Download python using Anaconda package: `Download link <http://continuum.io/downloads>`_.  Download the python 2.7 64-bit version of anaconda - the python 2.7 32-bit version should be fine too.  Do not use a python 3.x version!!  Run the installer.
 
-#. Check that when you go to a command prompt, you get output like::
+#. Check that when you go to a command prompt, you get output something like::
 
     C:\Users\Belli>python
     Python 2.7.2 (default, Jun 12 2011, 15:08:59) [MSC v.1500 32 bit (Intel)] on win32
@@ -35,6 +35,32 @@ Step-By-Step on Windows
 #. Install PDSim using::
 
     python setup.py install
+    
+#. There are a few other dependencies that must be met before the GUI can be used that do not come standard with Anaconda distribution.  At the command line do::
+
+    conda install wxpython h5py pyyaml
+    
+#. If you start a command prompt and run the command ``python``, you can try to import each of the required python packages using the code below.  This will allow you to check whether all the necessary files are included, and where they have been installed to.  If none of the following commands give you errors, you are ready to proceed.
+
+.. ipython::
+
+    In [0]: import CoolProp,matplotlib,Cython,PDSim,wx,numpy,scipy,yaml
+    
+    In [0]: print CoolProp.__file__; print CoolProp.__version__
+    
+    In [0]: print matplotlib.__file__; print matplotlib.__version__
+    
+    In [0]: print Cython.__file__; print Cython.__version__
+    
+    In [0]: print PDSim.__file__; print PDSim.__version__
+    
+    In [0]: print wx.__file__; print wx.version()
+    
+    In [0]: print numpy.__file__; print numpy.__version__
+    
+    In [0]: print scipy.__file__; print scipy.__version__
+    
+    In [0]: print yaml.__file__; print yaml.__version__
 
 #. Now go into the examples folder, and try to run the file simple_example.py, you should get output like::
 
@@ -100,13 +126,16 @@ Step-By-Step on Windows
 
 #. Ok good, PDSim is working!
     
-#. Install PyYAML using the installer for win32-py2.7 at `PyYAML installers <http://pyyaml.org/wiki/PyYAML>`_
-    
 #. Go to the GUI folder from the root of the source.  Double-click on PDSimGUI.py to start
 
 #. Press F5 to run the default scroll compressor
 
 #. Wait about 80 seconds for it to finish
+
+Linux and OSX
+=============
+
+The procedure is nearly identical on linux and OSX, apart from the fact that you do not need to install git or Microsoft Visual Studio.  Use the anaconda installer to get python 2.7 64-bit, follow the windows instructions otherwise
 
 Update source code
 ==================
@@ -144,8 +173,6 @@ To uninstall PDSim, go to the site-packages folder corrresponding to the install
 
 .. _Use-PDSim:
 
-
-
 Use PDSim
 =========
 It is recommended to use `Eclipse <http://www.eclipse.org/downloads/>`_ (pick the Eclipse IDE for C/C++ development because it is the smallest) to do the development.  Once Eclipse is installed, you will want the Pydev plugin.  Once Eclipse is open, go to the menu Help-->Install New Software... Click *Add...* and add http://pydev.org/updates to the sources.  Then go back and you should be able to install pydev.  Don't install mylyn integration.
@@ -160,6 +187,17 @@ SciTE is also nice for doing python development.  Here are the user options I us
     open.dialog.in.file.directory=1
     buffers=40
     statusbar.visible=1
+    split.vertical=0
     title.full.path=1
-    
-Once PDSim is set up, run the setup.py in the ``trunk`` folder.  This will compile some of the python files using Cython in order to get large improvements in speed.  There is stil more work to be done on this front. 
+    # one instance of SciTE only
+    check.if.already.open=1
+    are.you.sure.on.reload=1
+
+    font.base=$(font.monospace)
+    font.small=$(font.monospace)
+    font.comment=$(font.monospace)
+    font.text=$(font.monospace)
+    font.text.comment=$(font.monospace)
+    font.embedded.base=$(font.monospace)
+    font.embedded.comment=$(font.monospace)
+    font.vbs=$(font.monospace) 

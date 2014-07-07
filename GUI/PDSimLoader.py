@@ -5,7 +5,7 @@ from math import pi
 from PDSim.core.containers import ControlVolume,ControlVolumeCollection
 from PDSim.flow.flow import FlowPath
 from PDSim.flow.flow_models import ValveModel
-from PDSim.core.core import Tube
+from PDSim.core import Tube
 from time import clock
 import threading
 

@@ -1,51 +1,33 @@
-GUI Package
+GUI package
 ===========
 
-:mod:`PDSimGUI` Module
-----------------------
+Subpackages
+-----------
 
-.. automodule:: GUI.PDSimGUI
+.. toctree::
+
+    GUI.families
+    GUI.panels
+    GUI.plugins
+
+Submodules
+----------
+
+.. toctree::
+
+   GUI.PDSimGUI
+   GUI.PDSimLoader
+   GUI.datatypes
+   GUI.default_configs
+   GUI.pdsim_plugins
+   GUI.processes
+   GUI.setup
+   GUI.testvisit
+
+Module contents
+---------------
+
+.. automodule:: GUI
     :members:
     :undoc-members:
     :show-inheritance:
-
-:mod:`PDSimLoader` Module
--------------------------
-
-.. automodule:: GUI.PDSimLoader
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-:mod:`default_configs` Module
------------------------------
-
-.. automodule:: GUI.default_configs
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-:mod:`pdsim_panels` Module
---------------------------
-
-.. automodule:: GUI.pdsim_panels
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-:mod:`recip_panels` Module
---------------------------
-
-.. automodule:: GUI.recip_panels
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-:mod:`scroll_panels` Module
----------------------------
-
-.. automodule:: GUI.scroll_panels
-    :members:
-    :undoc-members:
-    :show-inheritance:
-

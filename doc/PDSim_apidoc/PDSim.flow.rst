@@ -1,6 +1,15 @@
 PDSim.flow package
 ==================
 
+Submodules
+----------
+
+.. toctree::
+
+   PDSim.flow.fanno
+   PDSim.flow.flow
+   PDSim.flow.flow_models
+
 Module contents
 ---------------
 

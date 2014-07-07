@@ -4,6 +4,13 @@ import matplotlib
 matplotlib.use('WXAgg')
 
 import sys,os
+
+# The path to the home folder that will hold everything
+home = os.getenv('USERPROFILE') or os.getenv('HOME')
+pdsim_home_folder = os.path.join(home,'.pdsim-temp')
+if not os.path.exists(pdsim_home_folder):
+    os.mkdir(pdsim_home_folder)
+    
 sys.path.append(os.path.abspath('panels'))
 sys.path.append(os.path.abspath('plugins'))
 
@@ -37,11 +44,7 @@ import default_configs
 import panels.pdsim_panels as pdsim_panels
 import datatypes
 
-# The path to the home folder that will hold everything
-home = os.getenv('USERPROFILE') or os.getenv('HOME')
-pdsim_home_folder = os.path.join(home,'.pdsim-temp')
-if not os.path.exists(pdsim_home_folder):
-    os.mkdir(pdsim_home_folder)
+
     
 class ConfigurationManager(object):
     def __init__(self):

@@ -24,37 +24,29 @@ import sys, os
 #needs_sphinx = '1.0'
 
 #sys.path.insert(0,os.path.abspath('..'))
-
-# Add any Sphinx extension module names here, as strings. They can be extensions
-# coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-# extensions = ['sphinx.ext.autodoc', 
-#               'sphinx.ext.intersphinx', 
-#               #'sphinx.ext.todo', 
-#               'sphinx.ext.coverage', 
-#               'sphinx.ext.pngmath', 
-#               'sphinx.ext.ifconfig', 
-#               #'sphinx.ext.viewcode',
-#               #'sphinx.ext.inheritance_diagram',
-#               'sphinx.ext.autosummary',
-#               #'sphinxcontrib.napoleon',
-#               'numpydoc',
-#               #'sphinx.ext.napoleon',
-#               'matplotlib.sphinxext.plot_directive',
-#               'matplotlib.sphinxext.ipython_directive',
-#               ]
+sys.path.append(os.path.abspath('..'))
+sys.path.append(os.path.abspath(os.path.join('..','GUI')))
               
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.pngmath', 'numpydoc',
-              'sphinx.ext.intersphinx', 'sphinx.ext.coverage',
-              'sphinx.ext.autosummary', 'matplotlib.sphinxext.plot_directive']              
+extensions = ['sphinx.ext.autodoc', 
+              'sphinx.ext.napoleon',
+              'sphinx.ext.intersphinx', 
+              #~ 'sphinx.ext.coverage',
+              'sphinx.ext.autosummary', 
+              'sphinx.ext.viewcode',
+              'sphinx.ext.mathjax',
+              'matplotlib.sphinxext.plot_directive',
+              'IPython.sphinxext.ipython_console_highlighting',
+              'IPython.sphinxext.ipython_directive'
+              ]              
 
 #autodoc_default_flags = ['members','no-inherited-members','show-inheritance','private-members']
 
-# intersphinx_mapping = {'CoolProp': ('http://coolprop.sourceforge.net', None),
-#                        'matplotlib':('http://matplotlib.sourceforge.net', None),
-#                        'wx': ('http://xoomer.virgilio.it/infinity77/wxPython/', None),
-#                        'python': ('http://docs.python.org/',None),
-#                        'numpy':('http://docs.scipy.org/doc/numpy',None)
-#                        }
+intersphinx_mapping = {'CoolProp': ('http://coolprop.sourceforge.net', None),
+                       'matplotlib':('http://matplotlib.sourceforge.net', None),
+                       'wx': ('http://wxpython.org/Phoenix/docs/html/', None),
+                       'python': ('http://docs.python.org/',None),
+                       'numpy':('http://docs.scipy.org/doc/numpy',None)
+                       }
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -122,22 +114,93 @@ pygments_style = 'sphinx'
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 
-# import Cloud
-import cloud_sptheme as csp
+import sphinx_bootstrap_theme
+# Activate the theme.
+html_theme = 'bootstrap'
+html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
+# Theme options are theme-specific and customize the look and feel of a
+# theme further.
+html_theme_options = {
+    # Navigation bar title. (Default: ``project`` value)
+    'navbar_title': "PDSim",
 
-# ... some contents omitted ...
+    # Tab name for entire site. (Default: "Site")
+    'navbar_site_name': "Site",
 
-# set the html theme
-html_theme = "cloud"
-    # NOTE: there is also a red-colored version named "redcloud"
+    # A list of tuples containing pages or urls to link to.
+    # Valid tuples should be in the following forms:
+    #    (name, page)                 # a link to a page
+    #    (name, "/aa/bb", 1)          # a link to an arbitrary relative url
+    #    (name, "http://example.com", True) # arbitrary absolute url
+    # Note the "1" or "True" value above as the third argument to indicate
+    # an arbitrary url.
+    'navbar_links': [
+        ("API", "PDSim_apidoc/PDSim"),
+        #("Link", "http://example.com", True),
+    ],
 
-# ... some contents omitted ...
+    # Render the next and previous page links in navbar. (Default: true)
+    'navbar_sidebarrel': True,
 
-# set the theme path to point to cloud's theme data
-html_theme_path = [csp.get_theme_dir()]
+    # Render the current pages TOC in the navbar. (Default: true)
+    'navbar_pagenav': True,
 
-# [optional] set some of the options listed above...
-html_theme_options = { "roottarget": "index" }
+    # Global TOC depth for "site" navbar tab. (Default: 1)
+    # Switching to -1 shows all levels.
+    'globaltoc_depth': 2,
+
+    # Include hidden TOCs in Site navbar?
+    #
+    # Note: If this is "false", you cannot have mixed ``:hidden:`` and
+    # non-hidden ``toctree`` directives in the same page, or else the build
+    # will break.
+    #
+    # Values: "true" (default) or "false"
+    'globaltoc_includehidden': "true",
+
+    # HTML navbar class (Default: "navbar") to attach to <div> element.
+    # For black navbar, do "navbar navbar-inverse"
+    'navbar_class': "navbar navbar-inverse",
+
+    # Fix navigation bar to top of page?
+    # Values: "true" (default) or "false"
+    'navbar_fixed_top': "true",
+
+    # Location of link to source.
+    # Options are "nav" (default), "footer" or anything else to exclude.
+    'source_link_position': "nav",
+
+    # Bootswatch (http://bootswatch.com/) theme.
+    #
+    # Options are nothing with "" (default) or the name of a valid theme
+    # such as "amelia" or "cosmo".
+    'bootswatch_theme': "yeti",
+
+    # Choose Bootstrap version.
+    # Values: "3" (default) or "2" (in quotes)
+    'bootstrap_version': "3",
+}
+
+#~ import sphinx_rtd_theme
+#~ html_theme = "sphinx_rtd_theme"
+#~ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+
+#~ sys.path.append(os.path.abspath('_themes'))
+#~ html_theme_path = ['_themes']
+#~ html_theme = 'kr'
+
+#~ import sphinx_readable_theme
+#~ html_theme_path = [sphinx_readable_theme.get_html_theme_path()]
+#~ html_theme = 'readable'
+
+#~ # import Cloud
+#~ import cloud_sptheme as csp
+#~ # set the html theme
+#~ html_theme = "cloud" # NOTE: there is also a red-colored version named "redcloud"
+#~ # set the theme path to point to cloud's theme data
+#~ html_theme_path = [csp.get_theme_dir()]
+#~ # [optional] set some of the options listed above...
+#~ html_theme_options = { "roottarget": "index" }
 
 
 #html_theme = 'Cloud'
