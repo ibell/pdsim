@@ -92,10 +92,10 @@ class PDSimCore(object):
         #: at each crank angle
         self.FlowStorage=[]
         
-        self.Tubes=TubeCollection()
-        self.Tlumps=np.zeros((1,1))
-        self.steps=[]
-        self.__hasValves__=False
+        self.Tubes = TubeCollection()
+        self.Tlumps = np.zeros((1,1))
+        self.steps = []
+        self.__hasValves__ = False
         
         #  A storage of the initial state vector
         self.xstate_init = None
@@ -1789,7 +1789,7 @@ class PDSimCore(object):
         lump_eb_history = zip(*self.solvers.lump_eb_history)
         self.solvers.lump_eb_history = dict(Tlumps = np.array(lump_eb_history[0]), lump_eb_error = np.array(lump_eb_history[1]))
         
-    def derivs(self,theta,x):
+    def derivs(self, theta, x):
         """
         Evaluate the derivatives of the state variables
         
@@ -1801,7 +1801,7 @@ class PDSimCore(object):
         theta : float
             The value of the independent variable
         x : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
-            The array of the state variables (plus valve parameters)
+            The array of the independent variables (state variables plus valve parameters)
         
         Returns
         -------
