@@ -3,6 +3,7 @@ virtualenv:
   system_site_packages: true
 python:
   - "2.7"
+  - "3.2"
   
 # command to install dependencies
 install: 
