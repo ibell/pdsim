@@ -396,7 +396,7 @@ cdef class ControlVolume(object):
         exists : bool
             ``True`` if control volume exists, ``False`` otherwise
         VdVFcn_kwargs : dict
-            Keyword arguments that can be passed to the VdVFcn 
+            Dictionary of keyword arguments that can be passed to the VdVFcn
         discharge_becomes : str
             The key of the chamber that this control volume becomes at the 
             discharge angle (scroll compressor only)
@@ -410,7 +410,7 @@ cdef class ControlVolume(object):
         self.V_dV = VdVFcn
         self.State = initialState
         self.exists = exists
-        self.V_dV_kwargs = VdVFcn_kwargs #Keyword-arguments that can get passed to volume function
+        self.V_dV_kwargs = VdVFcn_kwargs
         self.discharge_becomes = discharge_becomes.encode('ascii') if discharge_becomes is not None else key.encode('ascii')
         self.becomes = becomes if becomes is not None else key.encode('ascii')
         
@@ -463,7 +463,6 @@ cdef class ControlVolumeCollection(object):
         Parameters
         ----------
         CV : :class:`ControlVolume <PDSim.core.containers.ControlVolume>' instance
-        
         """
         if CV.key in self.keys:
             raise ValueError('Your CV key [{key:s}] is already in use'.format(CV.key))

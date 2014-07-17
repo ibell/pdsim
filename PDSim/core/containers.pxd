@@ -38,18 +38,6 @@ cdef class ControlVolume(object):
     cdef public object ForceFcn
     cdef public bint exists
     cdef public StateClass State
-    
-cdef class ControlVolumeCollection(object):
-    cdef readonly list keys, CVs, indices, exists_keys, exists_indices, exists_CV
-    cdef readonly dict Nodes
-    cdef readonly int N, Nexist
-    cdef public CVArrays internal
-    
-    cpdef add(self, ControlVolume CV)
-    cpdef rebuild_exists(self)
-    cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2)
-    cpdef volumes(self, double theta, bint as_dict = *)
-    cpdef at(self, int i)
 
 cdef class CVScore(object):
     cdef list array_list
@@ -68,11 +56,21 @@ cdef class CVArrays(CVScore):
     cdef public arraym drhodtheta, dTdtheta, dmdtheta, dxLdtheta, summerdm, summerdT, summerdxL, property_derivs
     
     # Other variables
-    cdef int state_vars,N
+    cdef int state_vars, N
     cdef double omega
     
     cpdef just_volumes(self, list CVs, double theta)
     cpdef properties_and_volumes(self, list CVs, double theta, int state_vars, arraym x)
-
     cpdef calculate_derivs(self, double omega, bint has_liquid)
 
+cdef class ControlVolumeCollection(object):
+    cdef readonly list keys, CVs, indices, exists_keys, exists_indices, exists_CV
+    cdef readonly dict Nodes
+    cdef readonly int N, Nexist
+    cdef public CVArrays arrays
+
+    cpdef add(self, ControlVolume CV)
+    cpdef rebuild_exists(self)
+    cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2)
+    cpdef volumes(self, double theta, bint as_dict = *)
+    cpdef at(self, int i)
