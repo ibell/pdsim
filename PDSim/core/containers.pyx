@@ -147,8 +147,48 @@ cdef class TubeCollection(list):
             if Tube.key1 == key or Tube.key2 == key:
                 return Tube
         raise KeyError
-    
-cdef class CVArrays(object):
+
+cdef class CVScore(object):
+    """
+    The base class for all control volumes
+
+    In the derived class, before anything is done, you must set the parameter array_list as a list of strings, each
+    entry in the list should be the name of an arraym instance that will be stored in the class
+    """
+
+    cdef build_all(self, int N):
+        """
+        Allocate the arrays, each the length of the number of CV in existence
+        """
+        for array_name in self.array_list:
+            arr = arraym()
+            arr.set_size(N)
+            setattr(self,array_name,arr)
+
+    cdef free_all(self):
+        """
+        Free all the arrays allocated
+        """
+        for array_name in self.array_list:
+            if hasattr(self,array_name):
+                delattr(self,array_name)
+
+    cpdef update_size(self, int N):
+        self.free_all()
+        self.build_all(N)
+
+    cpdef copy(self):
+        CVA = CVScore(self.T.N)
+        #Loop over the names of the arrays
+        for array_name in self.array_list:
+            #Get the array from this class
+            arr = getattr(self,array_name)
+            #Put a copy of it into the new class
+            setattr(CVA,array_name,<arraym>arr.copy())
+
+        return CVA
+
+cdef class CVArrays(CVScore):
     """
     A stub class that contains the arraym arrays of the state variables for
     all the control volumes that are passed into the instantiator
@@ -160,27 +200,6 @@ cdef class CVArrays(object):
                            'dTdtheta', 'dmdtheta', 'dxLdtheta', 'summerdm', 
                            'summerdT', 'summerdxL', 'property_derivs']
         
-        self.build_all(N)
-        
-    cdef build_all(self, int N):
-        """
-        Allocate the arrays, each the length of the number of CV in existence
-        """
-        for array_name in self.array_list:
-            arr = arraym()
-            arr.set_size(N)
-            setattr(self,array_name,arr)
-        
-    cdef free_all(self):
-        """
-        Free all the arrays allocated
-        """
-        for array_name in self.array_list:
-            if hasattr(self,array_name):
-                delattr(self,array_name)
-        
-    cpdef update_size(self, int N):
-        self.free_all()
         self.build_all(N)
          
     cpdef just_volumes(self, list CVs, double theta):
@@ -347,16 +366,7 @@ cdef class CVArrays(object):
             elif self.state_vars == STATE_VARS_TD:
                 self.property_derivs.set_index(i + self.N, self.drhodtheta.data[i])
             
-    cpdef copy(self):
-        CVA = CVArrays(self.T.N)
-        #Loop over the names of the arrays
-        for array_name in self.array_list:
-            #Get the array from this class
-            arr = getattr(self,array_name)
-            #Put a copy of it into the new class
-            setattr(CVA,array_name,<arraym>arr.copy())
-        
-        return CVA
+
         
 cdef class ControlVolume(object):
     """
