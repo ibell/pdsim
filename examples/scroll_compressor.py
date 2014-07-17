@@ -199,8 +199,8 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
                                  #hmin = 1e-3
                                  eps_cycle = 3e-3
                                  )
-    except:
-        debug_plots(ScrollComp)
+    except BaseException as E:
+        print(E)
         raise
 
     print 'time taken',clock()-t1
