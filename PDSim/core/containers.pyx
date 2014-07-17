@@ -323,8 +323,6 @@ cdef class CVArrays(CVScore):
         self.N = N
         self.state_vars = state_vars
     
-
-    
     @cython.cdivision(True)
     cpdef calculate_derivs(self, double omega, bint has_liquid):
         
@@ -384,9 +382,9 @@ cdef class ControlVolume(object):
                  str key, 
                  object VdVFcn, 
                  StateClass initialState, 
-                 bint exists=True,
-                 dict VdVFcn_kwargs={}, 
-                 str discharge_becomes=None, 
+                 bint exists = True,
+                 dict VdVFcn_kwargs = {},
+                 str discharge_becomes = None,
                  object becomes = None):
         """
         Parameters
@@ -415,32 +413,6 @@ cdef class ControlVolume(object):
         self.V_dV_kwargs = VdVFcn_kwargs #Keyword-arguments that can get passed to volume function
         self.discharge_becomes = discharge_becomes.encode('ascii') if discharge_becomes is not None else key.encode('ascii')
         self.becomes = becomes if becomes is not None else key.encode('ascii')
-    
-    def __reduce__(self):
-        #TODO: fix me
-        return rebuildCV,(self.__getstate__().copy(),)
-    
-    def __getstate__(self):
-        #TODO: fix me
-        d= dict(key = self.key, discharge_becomes = self.discharge_becomes,
-                becomes = self.becomes, V_dV = self.V_dV, V_dV_kwargs = self.V_dV_kwargs,
-                exists = self.exists, State = self.State)
-        return d.copy()
-    
-    def __setstate__(self, d):
-        for item in d:
-            setattr(self,item,d[item])
-        
-    def __deepcopy__(self):
-        #TODO: fix me
-        import copy
-        return copy.deepcopy(self)
-    
-def rebuildCV(dict d):
-    CV = ControlVolume(d.pop('key'),d.pop('V_dV'),d.pop('State'))
-    for item in d:
-        setattr(CV,item,d[item])
-    return CV
         
 cdef class ControlVolumeCollection(object):
     """
