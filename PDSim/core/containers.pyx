@@ -184,7 +184,7 @@ cdef class CVScore(object):
         """
         Make copies of all of the arraym instances in this class
         """
-        CVA = CVScore(self.T.N)
+        CVA = type(self)(self.T.N) #type(self) gets the derived class' type
         # Loop over the names of the arrays
         for array_name in self.array_list:
             # Get the array from this class
