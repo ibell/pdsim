@@ -53,11 +53,11 @@ cdef class ControlVolumeCollection(object):
 
 cdef class CVScore(object):
     cdef list array_list
-
     cpdef update_size(self, int N)
     cdef build_all(self, int N)
     cdef free_all(self)
     cpdef copy(self)
+    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, arraym parray, arraym Tarray)
 
 cdef class CVArrays(CVScore):
 
@@ -73,6 +73,6 @@ cdef class CVArrays(CVScore):
     
     cpdef just_volumes(self, list CVs, double theta)
     cpdef properties_and_volumes(self, list CVs, double theta, int state_vars, arraym x)
-    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, arraym parray, arraym Tarray)
+
     cpdef calculate_derivs(self, double omega, bint has_liquid)
 

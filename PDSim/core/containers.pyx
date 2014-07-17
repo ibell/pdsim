@@ -174,19 +174,57 @@ cdef class CVScore(object):
                 delattr(self,array_name)
 
     cpdef update_size(self, int N):
+        """
+        Update the size of the arraym instances in this class
+        """
         self.free_all()
         self.build_all(N)
 
     cpdef copy(self):
+        """
+        Make copies of all of the arraym instances in this class
+        """
         CVA = CVScore(self.T.N)
-        #Loop over the names of the arrays
+        # Loop over the names of the arrays
         for array_name in self.array_list:
-            #Get the array from this class
+            # Get the array from this class
             arr = getattr(self,array_name)
-            #Put a copy of it into the new class
-            setattr(CVA,array_name,<arraym>arr.copy())
-
+            # Put a copy of it into the new class
+            setattr(CVA, array_name, <arraym>arr.copy())
         return CVA
+
+    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, arraym parray, arraym Tarray):
+        """
+        Calculate the flows between tubes and control volumes and sum up the
+        flow-related terms
+
+        Loads the arraym instances ``summerdT`` and ``summerdm`` of this class
+
+        These terms are defined by
+
+        .. math::
+
+            \\mathrm{summerdm} = \\sum  \\frac{\\dot m}{\\omega}
+
+        and
+
+        .. math::
+
+            \\mathrm{summerdT} = \\sum  \\frac{\\dot m h}{\\omega}
+
+        where the signs are dependent on whether the flow is into or out of the
+        given control volume
+
+        Parameters
+        ----------
+        Flows : :class:`FlowPathCollection <PDSim.flow.flow.FlowPathCollection>` instance
+        harray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
+        parray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
+        Tarray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
+        """
+
+        Flows.calculate(harray, parray, Tarray)
+        Flows.sumterms(self.summerdT, self.summerdm)
 
 cdef class CVArrays(CVScore):
     """
@@ -285,38 +323,7 @@ cdef class CVArrays(CVScore):
         self.N = N
         self.state_vars = state_vars
     
-    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, arraym parray, arraym Tarray):
-        """
-        Calculate the flows between tubes and control volumes and sum up the 
-        flow-related terms
-        
-        Loads the arraym instances ``summerdT`` and ``summerdm`` of this class
-        
-        These terms are defined by
-        
-        .. math::
-        
-            \\mathrm{summerdm} = \\sum  \\frac{\\dot m}{\\omega}
-            
-        and 
-        
-        .. math::
-        
-            \\mathrm{summerdT} = \\sum  \\frac{\\dot m h}{\\omega}
-        
-        where the signs are dependent on whether the flow is into or out of the 
-        given control volume
-        
-        Parameters
-        ----------
-        Flows : :class:`FlowPathCollection <PDSim.flow.flow.FlowPathCollection>` instance
-        harray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
-        parray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
-        Tarray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
-        """
-        
-        Flows.calculate(harray, parray, Tarray)
-        Flows.sumterms(self.summerdT, self.summerdm)
+
     
     @cython.cdivision(True)
     cpdef calculate_derivs(self, double omega, bint has_liquid):
@@ -365,8 +372,6 @@ cdef class CVArrays(CVScore):
                 self.property_derivs.set_index(i + self.N, self.dmdtheta.data[i])
             elif self.state_vars == STATE_VARS_TD:
                 self.property_derivs.set_index(i + self.N, self.drhodtheta.data[i])
-            
-
         
 cdef class ControlVolume(object):
     """
