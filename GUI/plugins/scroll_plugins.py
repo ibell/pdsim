@@ -955,6 +955,9 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
 #                
 #        #Save a local copy of a pointer to the simulation
 #        self.simulation = sim
+
+if __name__=='__main__':
+    print 'I am not meant to be run directly'
         
         
         

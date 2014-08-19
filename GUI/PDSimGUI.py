@@ -1269,6 +1269,12 @@ class MainFrame(wx.Frame):
             # Hack the path to include the directory
             sys.path = [path]
             
+            # Do not try to import files that do not have a "if __name__ == '__main__': " - this helps to avoid (but not completely) issues with scripts being run that should not be
+            lines = open(py_file, 'r').read()
+            if not '__name__' in lines or not '__main__' in lines:
+                print py_file + ": could not be loaded because it does not contain 'if __name__ == __main__:' (this guards against scripts being run on import)"
+                continue
+            
             try:
                 #  Try to import the file as a module
                 mod = __import__(root)
