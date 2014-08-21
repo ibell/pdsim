@@ -18,6 +18,7 @@ AllowNoIcons=yes
 OutputBaseFilename=SetupPDSimGUI
 Compression=lzma
 SolidCompression=yes
+SourceDir=.
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

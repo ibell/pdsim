@@ -1,4 +1,4 @@
-import json, os, glob
+import json, os, glob, sys
     
 def get_defaults():
     this_folder = os.path.dirname(__file__)
@@ -11,6 +11,16 @@ def pack(options, argv = None):
 
     if len(sys.argv) == 1 and argv is None:
         sys.argv += ['build','--build-exe=PDSimGUI']
+    else:
+        if '--more_options' in sys.argv:
+            i = sys.argv.index('--more_options')
+            sys.argv.pop(i)
+            
+            # Merge options with the dictionary coming from JSON file
+            js = json.load(open(sys.argv.pop(i),'r'))
+            for k in options:
+                if k in js:
+                    options[k] += js[k]
     
     includes = options['includes']
 
@@ -56,7 +66,7 @@ def pack(options, argv = None):
     # That's serious now: we have all (or almost all) the options cx_Freeze
     # supports. I put them all even if some of them are usually defaulted
     # and not used. Some of them I didn't even know about.
-
+    
     import PDSim
     setup(
         

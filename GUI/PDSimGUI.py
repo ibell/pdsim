@@ -44,7 +44,16 @@ import default_configs
 import panels.pdsim_panels as pdsim_panels
 import datatypes
 
-
+def recursively_find_files(root, extensions = ['.py'], skip_files = None):
+    file_listing = []
+    for path, dirs, files in os.walk(root):
+        for file in files:
+            n,ext = os.path.splitext(file)
+            fname = os.path.relpath(os.path.join(path, file))
+            if skip_files is not None and fname in skip_files: continue
+            if ext in extensions:
+                file_listing.append(fname)
+    return file_listing
     
 class ConfigurationManager(object):
     def __init__(self):
@@ -1248,11 +1257,11 @@ class MainFrame(wx.Frame):
         self.plugins_list = []
         
         #  Collect all the .py files in the plugins folder (for standard plugins)
-        #  as well as the user-specified plugin folders 
-        py_files = []
-        for file in glob.glob(os.path.join('plugins','*.py')):
-            py_files.append(file)
+        py_files = recursively_find_files('plugins',extensions = ['.py'])
         
+        print py_files
+        
+        # Collect from the user-specified plugin folders 
         for directory in GUIconfig.get('plugin_dirs', default = []):
             for file in glob.glob(os.path.join(directory,'*.py')):
                 py_files.append(file)
@@ -1269,7 +1278,8 @@ class MainFrame(wx.Frame):
             # Hack the path to include the directory
             sys.path = [path]
             
-            # Do not try to import files that do not have a "if __name__ == '__main__': " - this helps to avoid (but not completely) issues with scripts being run that should not be
+            # Do not try to import files that do not have a "if __name__ == '__main__': " - this helps to avoid (but not completely) 
+            # issues with scripts being run that should not be when they are attempted to be imported
             lines = open(py_file, 'r').read()
             if not '__name__' in lines or not '__main__' in lines:
                 print py_file + ": could not be loaded because it does not contain 'if __name__ == __main__:' (this guards against scripts being run on import)"
