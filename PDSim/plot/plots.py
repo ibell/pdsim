@@ -296,8 +296,8 @@ class PlotNotebook(wx.Panel):
             p = self.Sim.p
             
         #Saturation curve
-        Tsat = np.linspace(Props(Fluid,'Tmin')+0.1, Props(Fluid,'Tcrit')-1e-6)
-        psat = np.array([Props('P', 'T', T_, 'Q', 1.0, Fluid) for T_ in Tsat])
+        Tsat = np.linspace(PropsSI(Fluid,'Tmin')+0.1, PropsSI(Fluid,'Tcrit')-1e-6)
+        psat = np.array([PropsSI('P', 'T', T_, 'Q', 1.0, Fluid)/1000 for T_ in Tsat])
         axes.plot(Tsat, psat, lw = 1.5)
         axes.plot(T,p,'.')
         axes.set_xlabel('Temperature [K]')

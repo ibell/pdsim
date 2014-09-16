@@ -142,7 +142,7 @@ class ScrollExpander(core.Scroll):
                 rho2 = rho1 * V1 / V2
                 # Now don't know temperature or pressure, but you can assume
                 # it is isentropic to find the temperature
-                T2 = newton(lambda T: Props('S','T',T,'D',rho2,inletState.Fluid)-s1, T1)
+                T2 = newton(lambda T: PropsSI('S','T',T,'D',rho2,inletState.Fluid)-s1*1000, T1)
                 initState = CPState(inletState.Fluid,dict(T=T2,D=rho2)).copy()
             
             # Expansion chambers do not change definition at discharge angle

@@ -13,7 +13,7 @@ from _scroll import _Scroll
 ##--- non-package imports
 import warnings
 from scipy.optimize import fsolve, newton
-from CoolProp.CoolProp import Props
+from CoolProp.CoolProp import PropsSI
 from CoolProp import State
 from math import pi
 import numpy as np
@@ -893,7 +893,7 @@ class Scroll(PDSimCore, _Scroll):
                 rho2 = rho1 * V1 / V2
                 # Now don't know temperature or pressure, but you can assume
                 # it is isentropic to find the temperature
-                T2 = newton(lambda T: Props('S','T',T,'D',rho2,inletState.Fluid)-s1, T1)
+                T2 = newton(lambda T: PropsSI('S','T',T,'D',rho2,inletState.Fluid)-s1*1000, T1)
                 initState=State.State(inletState.Fluid,dict(T=T2,D=rho2)).copy()
             if alpha<nCmax:
                 # Does not change definition at discharge angle
@@ -1335,7 +1335,7 @@ class Scroll(PDSimCore, _Scroll):
                 p=(pd1*Vd1+pd2*Vd2+pdd*Vdd)/Vddd
                 #Must conserve mass and internal energy (instantaneous mixing process)
                 Fluid = self.CVs['ddd'].State.Fluid
-                T_u = newton(lambda x: Props('U','T',x,'D',rhoddd,Fluid)-U_before/m,T)
+                T_u = newton(lambda x: PropsSI('U','T',x,'D',rhoddd,Fluid)-U_before*1000/m,T)
                 
                 self.CVs['ddd'].State.update({'T':T_u,'D':rhoddd})
                 U_after=self.CVs['ddd'].State.u*self.CVs['ddd'].State.rho*Vddd
@@ -1729,7 +1729,7 @@ class Scroll(PDSimCore, _Scroll):
         outletState = self.Tubes.Nodes[self.key_outlet]
         s1 = inletState.s
         h1 = inletState.h
-        h2s = Props('H', 'S', s1, 'P', outletState.p, inletState.Fluid)
+        h2s = PropsSI('H', 'S', s1*1000, 'P', outletState.p*1000, inletState.Fluid)/1000
         
         if outletState.p > inletState.p:
             #Compressor Mode

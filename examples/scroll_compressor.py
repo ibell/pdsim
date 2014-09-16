@@ -87,8 +87,8 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     Tc = 20 + 273.15
     Tin = Te + 11.1
     DT_sc = 7
-    pe = CP.Props('P','T',Te,'Q',1.0,Ref)
-    pc = CP.Props('P','T',Tc,'Q',1.0,Ref)
+    pe = CP.PropsSI('P','T',Te,'Q',1.0,Ref)/1000.0
+    pc = CP.PropsSI('P','T',Tc,'Q',1.0,Ref)/1000.0
     inletState = State.State(Ref,{'T':Tin,'P':pe})
 
     T2s = ScrollComp.guess_outlet_temp(inletState,pc)

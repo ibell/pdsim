@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 import pylab
 
 ## Coolprop imports
-from CoolProp.CoolProp import Props
+from CoolProp.CoolProp import PropsSI
 from CoolProp.State import State
 
 def _pickle_method(method):
@@ -339,7 +339,7 @@ class PDSimCore(object):
         self.HTProcessed.mean_Q = trapz(self.HTProcessed.summed_Q[r], self.t[r])/(self.t[self.Ntheta-1]-self.t[0])
     
     
-    def guess_outlet_temp(self, inletState, p_outlet, eta_a = 0.7):
+    def guess_outlet_temp(self, inlet_state, p_outlet, eta_a=0.7):
         """ 
         Function to guess outlet temperature
         
@@ -360,16 +360,16 @@ class PDSimCore(object):
         implement a different guess method
         """
         
-        h1 = inletState.h
-        h2s = Props('H','S',inletState.s,'P',p_outlet, inletState.Fluid)
-        if p_outlet > inletState.p:
-            #Compressor Mode
+        h1 = inlet_state.h
+        h2s = PropsSI('H','S',inlet_state.s*1000,'P',p_outlet*1000, inlet_state.Fluid)/1000
+        if p_outlet > inlet_state.p:
+            # Compressor Mode
             h2 = h1 + (h2s-h1)/eta_a
-            return Props('T','H',h2,'P',p_outlet, inletState.Fluid)
+            return PropsSI('T','H',h2*1000,'P',p_outlet*1000, inlet_state.Fluid)
         else:
-            #Expander Mode
+            # Expander Mode
             h2 = h1 + (h2s-h1)*eta_a
-            return Props('T','H',h2,'P',p_outlet, inletState.Fluid)
+            return PropsSI('T','H',h2*1000,'P',p_outlet*1000, inlet_state.Fluid)
     
     def reset_initial_state(self):
         """
@@ -1069,7 +1069,7 @@ class PDSimCore(object):
         # Can't use intermediate temperature because the state might be two-phase
         # for some conditions and you are better off just calculating the enthalpy
         # directly
-        h2s = Props('H','P',outletState.p,'S',s1,outletState.Fluid)
+        h2s = PropsSI('H','P',outletState.p*1000,'S',s1*1000,outletState.Fluid)/1000
         
         self.eta_a = (h2s-h1)/(h2-h1)
         self.Wdot_i = self.mdot*(h2s-h1)
@@ -1135,10 +1135,10 @@ class PDSimCore(object):
         self.solve(**kwargs)
        
     def connect_callbacks(self,
-                          step_callback = None,
-                          heat_transfer_callback = None,
-                          lumps_energy_balance_callback = None,
-                          endcycle_callback = None
+                          step_callback=None,
+                          heat_transfer_callback=None,
+                          lumps_energy_balance_callback=None,
+                          endcycle_callback=None
                           ):
         """ 
         Connect up the callbacks for the simulation
@@ -1292,15 +1292,15 @@ class PDSimCore(object):
             if cycle_integrator == 'Euler':
                 # Default to 7000 steps if not provided
                 N = getattr(self,'EulerN', 7000)
-                aborted = self.cycle_SimpleEuler(N,X,**cycle_integrator_options)
+                aborted = self.cycle_SimpleEuler(N, X, **cycle_integrator_options)
             elif cycle_integrator == 'Heun':
                 # Default to 7000 steps if not provided
                 N = getattr(self,'HeunN', 7000)
-                aborted = self.cycle_Heun(N,X,**cycle_integrator_options)
+                aborted = self.cycle_Heun(N, X, **cycle_integrator_options)
             elif cycle_integrator == 'RK45':
                 # Default to tolerance of 1e-8 if not provided
                 eps_allowed = getattr(self,'RK45_eps', 1e-8)
-                aborted = self.cycle_RK45(X,eps_allowed = eps_allowed,**cycle_integrator_options)
+                aborted = self.cycle_RK45(X, eps_allowed=eps_allowed, **cycle_integrator_options)
             else:
                 raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
         except ValueError as VE:
@@ -1670,13 +1670,9 @@ class PDSimCore(object):
             
         if hasattr(self,'resid_Td'):
             del self.resid_Td
-        
-        
             
         #  Save the elapsed time for simulation
         self.elapsed_time = clock() - t1
-        
-        
         
     def get_prune_keys(self):
         """
@@ -1941,7 +1937,7 @@ class PDSimCore(object):
         """
         return False,h
         
-    def endcycle_callback(self,eps_wrap_allowed=0.0001):
+    def endcycle_callback(self, eps_wrap_allowed=0.0001):
         """
         This function can be called at the end of the cycle if so desired.
         Its primary use is to determine whether the cycle has converged for a 
