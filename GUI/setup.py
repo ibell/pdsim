@@ -52,16 +52,16 @@ def pack(options, argv = None):
     import os, glob2, numpy, scipy
     explore_dirs = [os.path.dirname(numpy.__file__), os.path.dirname(scipy.__file__)]
 
-    files = []
-    for d in explore_dirs:
-        files.extend( glob2.glob( os.path.join(d, '**', '*.pyd') ) )
+    for directory in explore_dirs:
+        # Recursively find all .pyd files
+        files = glob2.glob( os.path.join(d, '**', '*.pyd') )
 
-    # Now we have a list of .pyd files; iterate to build a list of tuples into 
-    # include files containing the source path and the basename
-    for f in files:
-        packages_folder = os.path.normpath(os.path.join(os.path.dirname(numpy.__file__),'..'))+os.sep
-        fn = f.split(packages_folder, 1)[1].replace('\\', '.').split('.pyd', 1)[0]
-        includes.append(fn)
+        # Now we have a list of .pyd files; iterate to build a list of tuples into 
+        # include files containing the source path and the basename
+        for f in files:
+            packages_folder = os.path.normpath(os.path.join(directory,'..')) + os.sep
+            fn = f.split(packages_folder, 1)[1].replace('\\', '.').split('.pyd', 1)[0]
+            includes.append(fn)
 
     # That's serious now: we have all (or almost all) the options cx_Freeze
     # supports. I put them all even if some of them are usually defaulted
