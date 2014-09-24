@@ -10,7 +10,15 @@ Windows
 
 #. Install TortoiseGit from `TortoiseGit installs <http://code.google.com/p/tortoisegit/wiki/Download>`_ (pick the right version for your operating system)
 
-#. Download python using Anaconda package: `Download link <http://continuum.io/downloads>`_.  Download the python 2.7 64-bit version of anaconda - the python 2.7 32-bit version should be fine too.  Do not use a python 3.x version!!  Run the installer.
+#. Download python using miniconda package: `Download link <http://conda.pydata.org/miniconda.html>`_.  Download the python 2.7 32-bit version of miniconda - the python 2.7 64-bit version should be fine too, but to compile you will require the professional version of Visual Studio.  So just stick with the 32-bit version of miniconda.  Do not use a python 3.x version!!  
+
+#. Run the installer. In the setup, if you are doing a clean install, it is safe to select the option "Add Anaconda to the system PATH environmental variable".  Otherwise, selecting this option will make this the default conda installation on your computer, which may or may not be what you want.  If you want Miniconda to live peaceably with an existing miniconda (64-bit?), make sure this option is unselected.
+
+#. Populate the python installation with necessary packages.  At the command prompt, do::
+
+    conda install matplotlib numpy scipy h5py cython pip wxpython pyyaml
+  
+  If you installed Miniconda somewhere else (and/or Miniconda/Scripts is not on the PATH), you might need to give the full path to ``conda``, which would be something like ``c:\Miniconda32bit\Scripts\conda`` on my machine
 
 #. Check that when you go to a command prompt, you get output something like::
 
@@ -20,9 +28,8 @@ Windows
     >>> import scipy
     >>> scipy.__version__
     '0.11.0'
-    >>>
 
-#. Ok, python has been successfully installed. 
+#. Ok, python has been successfully installed.
     
 #. Now we are going to collect the source code for PDSim and CoolProp.  In Windows Explorer, go to a folder where you want to put the source code for PDSim and CoolProp.  Right-click and select "Git Clone..."
 
@@ -35,10 +42,6 @@ Windows
 #. Install PDSim using::
 
     python setup.py install
-    
-#. There are a few other dependencies that must be met before the GUI can be used that do not come standard with Anaconda distribution.  At the command line do::
-
-    conda install wxpython h5py pyyaml
     
 #. If you start a command prompt and run the command ``python``, you can try to import each of the required python packages using the code below.  This will allow you to check whether all the necessary files are included, and where they have been installed to.  If none of the following commands give you errors, you are ready to proceed.
 
@@ -176,7 +179,7 @@ Using conda environments
 
 If you have multiple versions of python or PDSim floating around, it can be useful to use conda to create virtual environments that encapsulate the desired versions of each of the pieces.  This can be easily carried out at the command line.  For instance, we might create an environment (named ``pdsim_stable``) with the most up to date version of PDSim and CoolProp version 4.2.5.  This can be achieved using a command like::
     
-    C:\Users\XXXX>c:\Miniconda32bit\Scripts\conda.exe create -n pdsim_stable python=2.7 matplotlib numpy scipy h5py cython pip wxpython
+    C:\Users\XXXX>c:\Miniconda32bit\Scripts\conda.exe create -n pdsim_stable python=2.7 matplotlib numpy scipy h5py cython pip wxpython pyyaml
     Fetching package metadata: ..
     Solving package specifications: .............
     Package plan for installation in environment c:\Miniconda32bit\envs\pdsim_stable:

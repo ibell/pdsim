@@ -22,7 +22,6 @@ Submodules
    GUI.pdsim_plugins
    GUI.processes
    GUI.setup
-   GUI.testvisit
 
 Module contents
 ---------------
