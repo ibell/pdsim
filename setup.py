@@ -28,6 +28,7 @@ except ImportError:
 #except ImportError:
 #    print 'Could not load setuptools'
     
+import setuptools
 import warnings
 from distutils.core import setup
 from Cython.Build import cythonize
@@ -38,10 +39,7 @@ import sys, shutil, os, glob
 version = '2.8'
 
 if len(sys.argv) == 1:
-#      sys.argv += ['build_ext','--inplace','install']
-#    sys.argv += ['build','build_ext','install']
-   sys.argv += ['build','--force','install']
-#     sys.argv += ['install']
+   sys.argv += ['clean','develop']
     
 #Modify the __init__ file with this version string
 fName = os.path.join('PDSim','__init__.py')
