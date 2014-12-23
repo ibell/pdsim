@@ -54,7 +54,7 @@ def pack(options, argv = None):
 
     for directory in explore_dirs:
         # Recursively find all .pyd files
-        files = glob2.glob( os.path.join(d, '**', '*.pyd') )
+        files = glob2.glob( os.path.join(directory, '**', '*.pyd') )
 
         # Now we have a list of .pyd files; iterate to build a list of tuples into 
         # include files containing the source path and the basename
