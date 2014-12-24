@@ -49,8 +49,8 @@ def pack(options, argv = None):
         icon = None
         )
 
-    import os, glob2, numpy, scipy
-    explore_dirs = [os.path.dirname(numpy.__file__), os.path.dirname(scipy.__file__)]
+    import os, glob2, numpy, scipy, PDSim
+    explore_dirs = [os.path.dirname(numpy.__file__), os.path.dirname(scipy.__file__), os.path.dirname(PDSim.__file__)]
 
     for directory in explore_dirs:
         # Recursively find all .pyd files
@@ -67,7 +67,6 @@ def pack(options, argv = None):
     # supports. I put them all even if some of them are usually defaulted
     # and not used. Some of them I didn't even know about.
     
-    import PDSim
     setup(
         
         version = PDSim.__version__,
