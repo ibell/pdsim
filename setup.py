@@ -13,16 +13,6 @@ except ImportError as IE:
     print IE
     raise ImportError('The required python package CoolProp was not found or could not be imported.  Please go to coolprop.sf.net to obtain a copy')
     
-try:
-    import psutil
-    for proc in psutil.get_process_list():
-        cmdline = proc.cmdline
-        if cmdline and ''.join(cmdline).find('pycompletionserver.py') > 0:
-            proc.terminate()
-            break
-except ImportError:
-    print 'psutil was not found, it is used to kill the python completion server in Eclipse which keeps PDSim from building. psutils can be easy_install-ed or installed using pip'
-    
 import warnings
 from distutils.core import setup
 from Cython.Build import cythonize
