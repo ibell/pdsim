@@ -28,7 +28,7 @@ cdef class PyFlowFunctionWrapper(FlowFunction):
     cpdef double call(self, FlowPath FP) except *
     
 cdef class IsentropicNozzleWrapper(FlowFunction):
-    cpdef double call(self, FlowPath FP)
+    cpdef double call(self, FlowPath FP) except *
     
 cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State State_down, double delta, int Type, double t = *, double ro = *)
 
