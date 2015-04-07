@@ -164,7 +164,8 @@ cdef class arraym(object):
     def __add__(x, y):
         cdef int i, N
         cdef bint isarray_x, isarray_y
-        cdef double *zdata,*ydata
+        cdef double *zdata
+        cdef double *ydata
         cdef double yd
         cdef arraym z
         
@@ -207,7 +208,8 @@ cdef class arraym(object):
     def __mul__(x, y):
         cdef int i, N
         cdef bint isarray_x, isarray_y
-        cdef double *zdata,*ydata
+        cdef double *zdata
+        cdef double *ydata
         cdef double yd
         cdef arraym z
         
@@ -250,7 +252,8 @@ cdef class arraym(object):
     def __truediv__(x, y):
         cdef int i, N
         cdef bint isarray_x, isarray_y
-        cdef double *zdata, *ydata
+        cdef double *zdata
+        cdef double *ydata
         cdef double yd,xd
         cdef arraym z
         
@@ -305,7 +308,8 @@ cdef class arraym(object):
     def __sub__(x, y):
         cdef int i, N
         cdef bint isarray_x, isarray_y
-        cdef double *zdata, *ydata
+        cdef double *zdata
+        cdef double *ydata
         cdef double yd,xd
         cdef arraym z
         
