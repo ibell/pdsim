@@ -6,6 +6,9 @@ cimport cython
 cdef public enum STATE_VARS:
     STATE_VARS_TD
     STATE_VARS_TM
+    #TODO: not sure if it is a good idea
+    STATE_VARS_TDxL
+    STATE_VARS_TMxL
     
 cdef class Tube(object):
     """

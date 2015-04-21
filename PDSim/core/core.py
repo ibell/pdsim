@@ -685,14 +685,22 @@ class PDSimCore(object):
         self.derivs(t0,xold)
         self.FlowStorage.append(self.Flows.get_deepcopy())
         
-        if sorted(self.stateVariables) == ['D','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
-        elif sorted(self.stateVariables) == ['M','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
+        if self.__hasLiquid__=True:
+            if sorted(self.stateVariables) == ['D','T','xL']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+            elif sorted(self.stateVariables) == ['M','T','xL']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,]/V,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+            else:      
+                raise NotImplementedError            
+        
+        elif self.__hasLiquid__=False:
+            if sorted(self.stateVariables) == ['D','T']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+            elif sorted(self.stateVariables) == ['M','T']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
+            else:      
+                raise NotImplementedError
         else:
-            
-            #add ['M','T','xL']
-            
             raise NotImplementedError
         
         # last index is Itheta, number of entries in FlowStorage is Ntheta
@@ -766,14 +774,22 @@ class PDSimCore(object):
         self.derivs(t0,xold)
         self._put_to_matrices(xnew,N)
         self.FlowStorage.append(self.Flows.get_deepcopy())
-        if sorted(self.stateVariables) == ['D','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
-        elif sorted(self.stateVariables) == ['M','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
+        if self.__hasLiquid__=True:
+            if sorted(self.stateVariables) == ['D','T','xL']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+            elif sorted(self.stateVariables) == ['M','T','xL']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,]/V,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+            else:      
+                raise NotImplementedError            
+        
+        elif self.__hasLiquid__=False:
+            if sorted(self.stateVariables) == ['D','T']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+            elif sorted(self.stateVariables) == ['M','T']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
+            else:      
+                raise NotImplementedError
         else:
-            
-            #update also 'xL'
-            
             raise NotImplementedError
         
         print 'Number of steps taken', N,'len(FlowStorage)',len(self.FlowStorage)
@@ -1026,12 +1042,21 @@ class PDSimCore(object):
         # Store the flows for the end
         self.FlowStorage.append(self.Flows.get_deepcopy())
 
-        if sorted(self.stateVariables) == ['D','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
-        elif sorted(self.stateVariables) == ['M','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/self.core.V)
-        elif sorted(self.stateVariables) == ['T','M','xL']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/self.core.V,'xL',x[2*self.CVs.Nexist:3*self.CVs.Nexist])    #Need to change
+        if self.__hasLiquid__=True:
+            if sorted(self.stateVariables) == ['D','T','xL']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+            elif sorted(self.stateVariables) == ['M','T','xL']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,]/V,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+            else:      
+                raise NotImplementedError            
+        
+        elif self.__hasLiquid__=False:
+            if sorted(self.stateVariables) == ['D','T']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+            elif sorted(self.stateVariables) == ['M','T']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
+            else:      
+                raise NotImplementedError
         else:
             raise NotImplementedError
         
@@ -1076,7 +1101,9 @@ class PDSimCore(object):
         self.Wdot_pv = 0.0
         for CVindex in range(self.p.shape[0]):
             self.Wdot_pv = abs(Wdot_one_CV(CVindex))
-        
+    
+    
+    #TODO: still not worked on post_cycle    
     def post_cycle(self):
         
         """
@@ -2074,9 +2101,14 @@ class PDSimCore(object):
         assert self.Ntheta - 1 == self.Itheta
         #old and new CV keys
         LHS,RHS=[],[]
-        errorT,error_rho,error_mass,newT,new_rho,new_mass,oldT,old_rho,old_mass={},{},{},{},{},{},{},{},{}
         
-        #TODO: errorT,error_rho,error_mass,error_xL,newT,new_rho,new_mass,new_xL,oldT,old_rho,old_mass,old_xL={},{},{},{},{},{},{},{},{},{},{},{}
+        
+        if self.__hasLiquid__ == True:
+            errorT,error_rho,error_mass,error_xL,newT,new_rho,new_mass,new_xL,oldT,old_rho,old_mass,old_xL={},{},{},{},{},{},{},{},{},{},{},{}
+        elif self.__hasLiquid__ == False:
+            errorT,error_rho,error_mass,newT,new_rho,new_mass,oldT,old_rho,old_mass={},{},{},{},{},{},{},{},{}
+        else:
+            NotImplementedError
         
         for key in self.CVs.exists_keys:
             # Get the 'becomes' field.  If a list, parse each fork of list. If a single key convert 
@@ -2087,7 +2119,8 @@ class PDSimCore(object):
                 becomes = self.CVs[key].becomes
                 
             Iold = self.CVs.index(key)
-
+            
+            #TODO: add error_xL_list and new_xL_list
             for newkey in becomes:
                 #  If newkey is 'none', the control volume will die at the end
                 #  of the cycle, so just keep going
