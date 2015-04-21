@@ -2,6 +2,7 @@
 from __future__ import division
 cimport cython
 
+
 cdef public enum STATE_VARS:
     STATE_VARS_TD
     STATE_VARS_TM
@@ -224,7 +225,8 @@ cdef class CVScore(object):
         """
 
         Flows.calculate(harray, parray, Tarray)
-        Flows.sumterms(self.summerdT, self.summerdm)
+        #TODO: self.summerdxL ?
+        Flows.sumterms(self.summerdT, self.summerdm)    
 
 cdef class CVArrays(CVScore):
     """
@@ -279,6 +281,8 @@ cdef class CVArrays(CVScore):
             List of state variables corresponding to the state_vars flag
         """
         cdef StateClass State
+        #TODO: cdef StateFloodClass StateFlood
+        
         cdef int N = len(CVs)
         cdef int iCV, iVar, i
         
@@ -286,6 +290,29 @@ cdef class CVArrays(CVScore):
         self.just_volumes(CVs,theta)
         
         # Split the state variable array into chunks
+        #TODO: split also xL. maybe using __hasLiquid__ == True or False instance
+        """
+        An idea could be:
+        
+        if self.__hasLiquid__ == True
+            
+            {}
+            
+            # Update the CV state variables using temperature and density
+            State.update_Trho(self.T.data[iCV], self.rho.data[iCV])
+            
+            self.p.data[iCV] = StateFlooded.get_p()
+            self.h.data[iCV] = StateFlooded.get_h()
+            self.cp.data[iCV] = StateFlooded.get_cp()
+            self.cv.data[iCV] = StateFlooded.get_cv()
+            self.dpdT_constV.data[iCV] = StateFlooded.get_dpdT()
+            
+            #There should be also xL and dudxL
+        else:
+            same code as original
+        """
+        
+        
         for i in range(N):
             self.T.data[i] = x.data[i]
             
@@ -334,6 +361,10 @@ cdef class CVArrays(CVScore):
         #Actually calculate the derivatives
         self.dmdtheta = self.summerdm
         self.property_derivs = arraym()
+        #TODO: only self.N*2 is used; it should be self.N*3 with flooding; dm,dT,dxL
+        """
+        self.property_derivs.set_size(self.N*3)
+        """
         self.property_derivs.set_size(self.N*2)
         
         #Loop over the control volumes
@@ -363,14 +394,46 @@ cdef class CVArrays(CVScore):
             self.drhodtheta.data[i] = 1.0/V*(dmdtheta-rho*dV)
         
         #  Create the array of output values
+        """
+        if self.__hasLiquid__ == True:
+            for i in range(self.N):
+                self.property_derivs.set_index(i, self.dTdtheta.data[i])
+                
+                if self.state_vars == STATE_VARS_TM:
+                    self.property_derivs.set_index(i + self.N, self.dmdtheta.data[i])
+                    self.property_derivs.set_index(i + self.N, self.dxLdtheta.data[i])
+                
+                elif self.state_vars == STATE_VARS_TD:
+                    self.property_derivs.set_index(i + self.N, self.drhodtheta.data[i])
+                    self.property_derivs.set_index(i + self.N, self.dxLdtheta.data[i]) 
+        
+        elif self.__hasLiquid__ == False:
+            for i in range(self.N):
+                self.property_derivs.set_index(i, self.dTdtheta.data[i])
+                
+                if self.state_vars == STATE_VARS_TM:
+                    self.property_derivs.set_index(i + self.N, self.dmdtheta.data[i])
+                elif self.state_vars == STATE_VARS_TD:
+                    self.property_derivs.set_index(i + self.N, self.drhodtheta.data[i])         
+        
+        else:
+            raise(ValueError)
+        
+        """
+        
+        
         for i in range(self.N):
             self.property_derivs.set_index(i, self.dTdtheta.data[i])
             
             if self.state_vars == STATE_VARS_TM:
                 self.property_derivs.set_index(i + self.N, self.dmdtheta.data[i])
             elif self.state_vars == STATE_VARS_TD:
-                self.property_derivs.set_index(i + self.N, self.drhodtheta.data[i])
-        
+                self.property_derivs.set_index(i + self.N, self.drhodtheta.data[i]) 
+            elif self.state_vars == STATE_VARS_TMxL:                                 
+                #TODO: Need to include something
+                self.property_derivs.set_index(i + self.N, self.dmdtheta.data[i])
+                self.property_derivs.set_index(i + self.N, self.dxLdtheta.data[i])
+                
 cdef class ControlVolume(object):
     """
     This is a class that contains all the code for a given control volume.  
@@ -486,6 +549,8 @@ cdef class ControlVolumeCollection(object):
             return
         
         self.Nodes = dict([(CV.key, CV.State) for CV in self.exists_CV])
+        #TODO: CV.StateFlood
+        
         self.N = len(self.CVs)
         self.Nexist = len(self.exists_CV)
     
@@ -547,15 +612,99 @@ cdef class ControlVolumeCollection(object):
         """
         cdef ControlVolume CV
         return [CV.State.get_dpdT() for CV in self.exists_CV]
+        
+    #TODO: missing xL, dudxL and the properties as mixture
+    """
+    For example:
+    
+    @property
+    def rho_m(self):
+        """
+            Density for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.StateFlood.get_rho_m() for CV in self.exists_CV]
+    
+    @property
+    def h_m(self):
+        """
+        Enthalpy for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.StateFlood.get_h_m() for CV in self.exists_CV]
+    
+    @property
+    def cp_m(self):
+        """
+        Specific heat at constant volume for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.StateFlood.get_cp_m() for CV in self.exists_CV]
+    
+    @property
+    def cv(self):
+        """
+        Specific heat at constant volume for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.StateFlood.get_cv_m() for CV in self.exists_CV]
+    
+    @property
+    def dpdT_m(self):
+        """
+        Derivative of pressure with respect to temperature at constant volume for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.StateFlood.get_dpdT_m() for CV in self.exists_CV]    
+    
+    @property
+    def xL(self):
+        """
+        Liquid mass fraction for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.StateFlood.get_xL() for CV in self.exists_CV]    
+
+    @property
+    def dudxL(self):
+        """
+        Liquid mass fraction for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.StateFlood.get_dudxL() for CV in self.exists_CV]
+    
+    
+    """
+    
+    
+    
+    #TODO: update the FloodStates
+    """
+    cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2, str name3, arraym array3):
+
+        keys = self.exists_keys
+        # Update each of the states of the control volume
+
+        for CV,v1,v2,v3 in zip(self.exists_CV, array1, array2, array3):
+            CV.FloodState.update({name1:v1,name2:v2,name3:v3})
+    
+    
+    """
+    
     
     cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2):
 #        if not len(array1) == len(array2) or not len(array2)==len(self.exists_CV):
 #            raise AttributeError('length of arrays must be the same and equal number of CV in existence')
         keys = self.exists_keys
         # Update each of the states of the control volume
+
         for CV,v1,v2 in zip(self.exists_CV, array1, array2):
             CV.State.update({name1:v1,name2:v2})
-     
+        
+    
+    
+    
+    
     cpdef volumes(self, double theta, bint as_dict = False):
         """
         Each control volume class must define a function V_dV (through a pointer) 
@@ -595,6 +744,14 @@ def rebuildCVCollection(CVs):
         CVC.add(CV)
     CVC.rebuild_exists()
     return CVC
+
+
+#TODO: collect state h for StateFlood
+"""
+cpdef list collect_StateFlood_h(list CVList):
+    cdef ControlVolume CV
+    return [CV.StateFlood.get_h_m() for CV in CVList]
+"""
 
 cpdef list collect_State_h(list CVList):
     cdef ControlVolume CV
