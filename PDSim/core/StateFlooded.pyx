@@ -26,7 +26,36 @@ cdef class State_Flooded(State):
         self.T = T
         self.xL = xL
     
-    
+    cpdef update(self, dict params):
+        """
+        Parameters
+        params, dictionary
+            A dictionary of terms to be updated, with keys equal to single-char inputs to the Props function,
+            for instance ``dict(T=298, P = 101.325)`` would be one standard atmosphere
+        """
+        #TODO: we have to pass also xL so just add one more parameter to the standard dictionary which only includes temperature and mass (dict(T,p,xL))
+        # Convert to integer_pair input
+
+        cdef double p, val1, val2, o1 = 0, o2 = 0
+        cdef long iInput1, iInput2
+        cdef bytes errstr
+        cdef constants_header.input_pairs input_pair
+
+        # Convert inputs to input pair
+        items = list(params.items())
+        key1 = paras_inverse[items[0][0]]
+        key2 = paras_inverse[items[1][0]]
+        # Convert to SI units
+        val1 = toSI(key1, items[0][1])
+        val2 = toSI(key2, items[1][1])
+
+        input_pair = _generate_update_pair(key1, val1, key2, val2, o1, o2)
+        self.pAS.update(input_pair, o1, o2);
+
+        self.T_ = self.pAS.T()
+        self.p_ =  self.pAS.p()/1000;
+        self.rho_ = self.pAS.rhomass()
+        
     #Properties in PDSim - KSI & in CoolProp - SI
     ## Entropy        
     def s_gas(self,Ref,T,P):
