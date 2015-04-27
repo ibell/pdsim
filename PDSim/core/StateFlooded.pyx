@@ -2,19 +2,24 @@ from __future__ import division
 
 cimport cython
 
+cdef dict paras = {iDmass : 'D',
+                   iQ : 'Q',
+                   imolar_mass : 'M',
+                   iT : 'T',
+                   iHmass : 'H',
+                   iP : 'P',
+                   iCpmass : 'C',
+                   iCp0mass : 'C0',
+                   iCvmass : 'O',
+                   iviscosity : 'V',
+                   iconductivity : 'L',
+                   ispeed_sound: 'A',
+                   iSmass : 'S',
+                   iUmass : 'U'
+                   ixLmass : 'xL'
+}
 
-
-"""
-State_Flooded should receive   set_Fluid and set_Liquid as well as T,P from the 
-refrigerant, meaning the State class of CoolProp
-
-To add as inputs by the user:
-
-__hasLiquid__ == True/False
-set_Liquid()
-
-
-"""
+cdef dict paras_inverse = {v:k for k,v in paras.iteritems()}
 
 cdef class State_Flooded(State):
     
@@ -26,6 +31,41 @@ cdef class State_Flooded(State):
         self.T = T
         self.xL = xL
     
+    ##    
+    cpdef update(self, constants_header.input_pairs ipair, double Value1, double Value2, double Value3):
+        """ Update function - wrapper of c++ function :cpapi:`CoolProp::AbstractState::update` """
+        self.thisptr.update(ipair, Value1, Value2)
+    cpdef update_with_guesses(self, constants_header.input_pairs ipair, double Value1, double Value2, double Value3, PyGuessesStructure guesses):
+        """ Update function - wrapper of c++ function :cpapi:`CoolProp::AbstractState::update` """
+        cdef cAbstractState.GuessesStructure _guesses
+        _guesses.T = guesses.T
+        _guesses.p = guesses.p
+        _guesses.rhomolar_liq = guesses.rhomolar_liq
+        _guesses.rhomolar_vap = guesses.rhomolar_vap
+        _guesses.x = guesses.x
+        _guesses.y = guesses.y
+        self.thisptr.update_with_guesses(ipair, Value1, Value2, Value3, _guesses)
+
+    ##
+    cpdef update_TrhoxL(self, double T, double rho, double xL):
+        """
+        Just use the temperature, density and liquid fraction directly for speed
+
+        Parameters
+        ----------
+        T: float
+            Temperature [K]
+        rho: float
+            Density [kg/m^3]
+        xL: float
+            liquid mass fraction [-]
+        """
+        self.T_ = T
+        self.rho_ = rho
+        self.xL_ = xL
+        self.pAS.update(DmassTxL_INPUTS, rho, T, xL)
+    
+    ##
     cpdef update(self, dict params):
         """
         Parameters
@@ -45,10 +85,11 @@ cdef class State_Flooded(State):
         items = list(params.items())
         key1 = paras_inverse[items[0][0]]
         key2 = paras_inverse[items[1][0]]
+        
         # Convert to SI units
         val1 = toSI(key1, items[0][1])
         val2 = toSI(key2, items[1][1])
-
+        
         input_pair = _generate_update_pair(key1, val1, key2, val2, o1, o2)
         self.pAS.update(input_pair, o1, o2);
 
@@ -56,10 +97,9 @@ cdef class State_Flooded(State):
         self.p_ =  self.pAS.p()/1000;
         self.rho_ = self.pAS.rhomass()
         
-    #Properties in PDSim - KSI & in CoolProp - SI
     ## Entropy        
     def s_gas(self,Ref,T,P):
-        self.s_g = PropsSI('S','T',float(T),'P',float(P)*1000,Ref)  #J/Kg-K
+        self.s_g = self.pAS.keyed_output('S','T',float(T),'P',float(P)*1000,Ref)  #J/Kg-K
         return self.s_g
     
     def s_liq(self,Liq,T):
@@ -110,7 +150,7 @@ cdef class State_Flooded(State):
     ## Internal Energy
     def u_gas(self,Ref,T,P):
         
-        self.u_g = PropsSI('U','T',float(T),'P',float(P)*1000,Ref)   #J/kgK
+        self.u_g = self.pAS.keyed_output('U','T',float(T),'P',float(P)*1000,Ref)   #J/kgK
         return self.u_g
         
     def u_liq(self,Liq,T):
@@ -147,7 +187,7 @@ cdef class State_Flooded(State):
     ## Enthalpy
     def h_gas(self,Ref,T,P):
 
-        self.h_g = PropsSI('H','T',float64(T),'P',float64(P)*1000,Ref)   #J/kg
+        self.h_g = self.pAS.keyed_output('H','T',float64(T),'P',float64(P)*1000,Ref)   #J/kg
         return self.h_g
     
     def h_liq(self,Liq,T,P):  # Enthalpy of the mixture as a function of temperature [K] and pressure [kPa].  Output in kJ/kg
@@ -196,7 +236,7 @@ cdef class State_Flooded(State):
     
     ## Density
     def rho_gas(self,Ref,T,P):    
-        self.rho_g = PropsSI('D','T',float(T),'P',float(P)*1000,Ref)    
+        self.rho_g = self.pAS.keyed_output('D','T',float(T),'P',float(P)*1000,Ref)    
         return self.rho_g
         
     def rho_liq(self,Liq,T):
@@ -255,7 +295,7 @@ cdef class State_Flooded(State):
     ## Specific Heat        
     def cp_gas(self,Ref,T,P):
     
-        self.cp_g = PropsSI('C','T',float(T),'P',float(P)*1000,Ref)   #J/kgK
+        self.cp_g = self.pAS.keyed_output('C','T',float(T),'P',float(P)*1000,Ref)   #J/kgK
         return self.cp_g
 
     def cp_liq(self,Liq,T):
@@ -301,7 +341,7 @@ cdef class State_Flooded(State):
     ##        
     def cv_gas(self,Ref,T,P):
         
-        self.cv_g = PropsSI('O','T',float(T),'P',float(P)*1000,Ref)   #J/kgK
+        self.cv_g = self.pAS.keyed_output('O','T',float(T),'P',float(P)*1000,Ref)   #J/kgK
         return self.cv_g
     
     def cv_mix(self,Ref,Liq,T,P,xL):
@@ -344,7 +384,7 @@ cdef class State_Flooded(State):
         
     def mu_mix(self,Ref,Liq,T,P,xL):
         self.mu_l = self.mu_liq(Liq,T)
-        self.mu_g = PropsSI('V','T',float(T),'P',float(P)*1000,Ref)
+        self.mu_g = self.pAS.keyed_output('V','T',float(T),'P',float(P)*1000,Ref)
         self.mu_m = 1/(xL/self.mu_l + (1-xL)/self.mu_g )
         if isnan(self.mu_m) == True:
             print 'mu_m is a NaN'
@@ -368,7 +408,7 @@ cdef class State_Flooded(State):
     
     ## Thermal Conductivity [W/m-K]
     def k_gas(self,Ref,T,P):
-        self.k_g = PropsSI('L','T',float(T),'P',float(P)*1000,Ref)
+        self.k_g = self.pAS.keyed_output('L','T',float(T),'P',float(P)*1000,Ref)
         return self.k_g
     
     def k_liq(self,Liq,T):
@@ -523,8 +563,8 @@ cdef class State_Flooded(State):
         """
         
         print 'h',h
-        self.h_l = PropsSI('H','T',T,'Q',0,Ref)
-        self.h_v = PropsSI('H','T',T,'Q',1,Ref)
+        self.h_l = self.pAS.keyed_output('H','T',T,'Q',0,Ref)
+        self.h_v = self.pAS.keyed_output('H','T',T,'Q',1,Ref)
         self.Qth = (h - self.h_l)/(self.h_v - self.h_l)
         return self.Qth
     
@@ -542,7 +582,7 @@ cdef class State_Flooded(State):
         is a 64-bit float
         """
         
-        self.f = lambda Q : PropsSI('S','T',T,'Q',Q[0],Ref) - s
+        self.f = lambda Q : self.pAS.keyed_output('S','T',T,'Q',Q[0],Ref) - s
         self.Q = optimize.fsolve(self.f,Q_guess)
         return float(self.Q)
     
@@ -550,17 +590,17 @@ cdef class State_Flooded(State):
     def T_crit(self,Ref):    # Critical Temperature of the refrigerant [K] - From coolprop  ->  Props(Fluid,PropName)
         
         if Ref=='R245fa':
-            self.T = PropsSI('R245fa', 'Tcrit')
+            self.T = self.pAS.keyed_output('R245fa', 'Tcrit')
         elif Ref=='R410A':
-            self.T = PropsSI('R410A', 'Tcrit')
+            self.T = self.pAS.keyed_output('R410A', 'Tcrit')
         elif Ref=='R744':
             self.T = 304.128
         elif Ref=='R404A':
-            self.T = PropsSI('R404A', 'Tcrit')
+            self.T = self.pAS.keyed_output('R404A', 'Tcrit')
         elif Ref=='R134a':
-            self.T = PropsSI('R134a', 'Tcrit')      #Tcr=374.2
+            self.T = self.pAS.keyed_output('R134a', 'Tcrit')      #Tcr=374.2
         elif Ref=='SES36':
-            self.T = PropsSI('SES36', 'Tcrit')
+            self.T = self.pAS.keyed_output('SES36', 'Tcrit')
         elif Ref=='R290':
             self.T = 369.82
         elif Ref=='R717':
@@ -571,17 +611,17 @@ cdef class State_Flooded(State):
     
     def p_crit(self,Ref):    # Critical pressure of the refrigerant [kPa] - From coolprop  ->  Props(Fluid,PropName)
         if Ref=='R245fa':
-            self.p = PropsSI('R245fa', 'pcrit')
+            self.p = self.pAS.keyed_output('R245fa', 'pcrit')
         elif Ref=='R410A':
-            self.p = PropsSI('R410A', 'pcrit')
+            self.p = self.pAS.keyed_output('R410A', 'pcrit')
         elif Ref=='R744':
             self.p = 304.128
         elif Ref=='R404A':
-            self.p = PropsSI('R404A', 'pcrit')
+            self.p = self.pAS.keyed_output('R404A', 'pcrit')
         elif Ref=='R134a':
-            self.p = PropsSI('R134a', 'pcrit')      #Tcr=374.2
+            self.p = self.pAS.keyed_output('R134a', 'pcrit')      #Tcr=374.2
         elif Ref=='SES36':
-            self.p = PropsSI('SES36', 'pcrit')
+            self.p = self.pAS.keyed_output('SES36', 'pcrit')
         elif Ref=='R290':
             self.p = 369.82
         elif Ref=='R717':
@@ -590,7 +630,119 @@ cdef class State_Flooded(State):
             print 'Uh oh...  Refrigerant not found T_crit'
         return self.p
         
-        
+        ##
+    cpdef double get_Q(self) except *:
+        """ Get the quality [-] """
+        return self.Q_Th
+    property Q:
+        """ The quality [-] """
+        def __get__(self):
+            return self.get_Q()
+
+    ##
+    cpdef double get_rho(self) except *:
+        """ Get the density [kg/m^3] """
+        return self.rho_mix
+    property rho:
+        """ The density [kg/m^3] """
+        def __get__(self):
+            return self.get_rho()
+
+    ##
+    cpdef double get_p(self) except *:
+        """ Get the pressure [kPa] """
+        return self.P
+    property p:
+        """ The pressure [kPa] """
+        def __get__(self):
+            return self.get_p()
+
+    ##
+    cpdef double get_T(self) except *:
+        """ Get the temperature [K] """
+        return self.T
+    property T:
+        """ The temperature [K] """
+        def __get__(self):
+            return self.get_T()
+
+    ##
+    cpdef double get_h(self) except *:
+        """ Get the specific enthalpy [kJ/kg] """
+        return self.h_mix
+    property h:
+        """ The specific enthalpy [kJ/kg] """
+        def __get__(self):
+            return self.get_h()
+
+    ##
+    cpdef double get_u(self) except *:
+        """ Get the specific internal energy [kJ/kg] """
+        return self.u_mix
+    property u:
+        """ The internal energy [kJ/kg] """
+        def __get__(self):
+            return self.get_u()
+
+    ##
+    cpdef double get_s(self) except *:
+        """ Get the specific enthalpy [kJ/kg/K] """
+        return self.s_mix
+    property s:
+        """ The specific enthalpy [kJ/kg/K] """
+        def __get__(self):
+            return self.get_s()
+
+    ##
+    cpdef double get_cp(self) except *:
+        """ Get the specific heat at constant pressure  [kJ/kg/K] """
+        return self.cp_mix
+    property cp:
+        """ The specific heat at constant pressure  [kJ/kg/K] """
+        def __get__(self):
+            return self.get_cp()
+
+    ##
+    cpdef double get_cv(self) except *:
+        """ Get the specific heat at constant volume  [kJ/kg/K] """
+        return self.cv_mix
+    property cv:
+        """ The specific heat at constant volume  [kJ/kg/K] """
+        def __get__(self):
+            return self.get_cv()
+
+    ##
+    cpdef double get_visc(self) except *:
+        """ Get the viscosity, in [Pa-s]"""
+        return self.mu_mix
+    property visc:
+        """ The viscosity, in [Pa-s]"""
+        def __get__(self):
+            return self.get_visc()
+
+    ##
+    cpdef double get_cond(self) except *:
+        """ Get the thermal conductivity, in [kW/m/K]"""
+        return self.k_mix
+    property k:
+        """ The thermal conductivity, in [kW/m/K]"""
+        def __get__(self):
+            return self.get_cond()
+
+    ##
+    cpdef double get_dpdT(self) except *:
+        return self.dpdT_const_V
+    property dpdT:
+        def __get__(self):
+            return self.get_dpdT()
+            
+    ##    
+    cpdef double get_dudxL(self) except *:
+        return self.dudxL_mix
+    property dudxL:
+        def __get__(self):
+            return self.get_dudxL()
+            
 """
 #In Cython we would do something equivalent to CoolProp.pxd 
 # This class inheritate from State_Flooded which calculates the mixture properties 
