@@ -1,6 +1,13 @@
 from __future__ import division
 
 cimport cython
+import CoolProp.CoolProp
+import math
+from math import floor
+from math import log
+import warnings
+from scipy import optimize
+from numpy import float64,isnan,isinf
 
 cdef dict paras = {iDmass : 'D',
                    iQ : 'Q',
@@ -16,7 +23,6 @@ cdef dict paras = {iDmass : 'D',
                    ispeed_sound: 'A',
                    iSmass : 'S',
                    iUmass : 'U'
-                   ixLmass : 'xL'
 }
 
 cdef dict paras_inverse = {v:k for k,v in paras.iteritems()}
@@ -73,7 +79,7 @@ cdef class State_Flooded(State):
             A dictionary of terms to be updated, with keys equal to single-char inputs to the Props function,
             for instance ``dict(T=298, P = 101.325)`` would be one standard atmosphere
         """
-        #TODO: we have to pass also xL so just add one more parameter to the standard dictionary which only includes temperature and mass (dict(T,p,xL))
+       
         # Convert to integer_pair input
 
         cdef double p, val1, val2, o1 = 0, o2 = 0
@@ -99,7 +105,9 @@ cdef class State_Flooded(State):
         
     ## Entropy        
     def s_gas(self,Ref,T,P):
-        self.s_g = self.pAS.keyed_output('S','T',float(T),'P',float(P)*1000,Ref)  #J/Kg-K
+        HEOS = CoolProp.AbstractState('HEOS',Ref)
+        HEOS.update.(CoolProp.TP_INPUTS,T,P*1000)
+        self.s_g = HEOS.keyed_output(CoolProp.iSmass)
         return self.s_g
     
     def s_liq(self,Liq,T):
@@ -149,8 +157,9 @@ cdef class State_Flooded(State):
     
     ## Internal Energy
     def u_gas(self,Ref,T,P):
-        
-        self.u_g = self.pAS.keyed_output('U','T',float(T),'P',float(P)*1000,Ref)   #J/kgK
+        HEOS = CoolProp.AbstractState('HEOS',Ref)
+        HEOS.update.(CoolProp.TP_INPUTS,T,P*1000)
+        self.u_g = HEOS.keyed_output(CoolProp.iUmass)
         return self.u_g
         
     def u_liq(self,Liq,T):
@@ -186,8 +195,9 @@ cdef class State_Flooded(State):
     
     ## Enthalpy
     def h_gas(self,Ref,T,P):
-
-        self.h_g = self.pAS.keyed_output('H','T',float64(T),'P',float64(P)*1000,Ref)   #J/kg
+        HEOS = CoolProp.AbstractState('HEOS',Ref)
+        HEOS.update.(CoolProp.TP_INPUTS,T,P*1000)
+        self.h_g = HEOS.keyed_output(CoolProp.iHmass) 
         return self.h_g
     
     def h_liq(self,Liq,T,P):  # Enthalpy of the mixture as a function of temperature [K] and pressure [kPa].  Output in kJ/kg
@@ -236,7 +246,9 @@ cdef class State_Flooded(State):
     
     ## Density
     def rho_gas(self,Ref,T,P):    
-        self.rho_g = self.pAS.keyed_output('D','T',float(T),'P',float(P)*1000,Ref)    
+        HEOS = CoolProp.AbstractState('HEOS',Ref)
+        HEOS.update.(CoolProp.TP_INPUTS,T,P*1000)
+        self.rho_g = HEOS.keyed_output(CoolProp.iDmass)   
         return self.rho_g
         
     def rho_liq(self,Liq,T):
@@ -294,8 +306,9 @@ cdef class State_Flooded(State):
      
     ## Specific Heat        
     def cp_gas(self,Ref,T,P):
-    
-        self.cp_g = self.pAS.keyed_output('C','T',float(T),'P',float(P)*1000,Ref)   #J/kgK
+        HEOS = CoolProp.AbstractState('HEOS',Ref)
+        HEOS.update.(CoolProp.TP_INPUTS,T,P*1000)
+        self.cp_g = HEOS.keyed_output(CoolProp.iCpmass)
         return self.cp_g
 
     def cp_liq(self,Liq,T):
@@ -340,8 +353,9 @@ cdef class State_Flooded(State):
             
     ##        
     def cv_gas(self,Ref,T,P):
-        
-        self.cv_g = self.pAS.keyed_output('O','T',float(T),'P',float(P)*1000,Ref)   #J/kgK
+        HEOS = CoolProp.AbstractState('HEOS',Ref)
+        HEOS.update.(CoolProp.TP_INPUTS,T,P*1000)
+        self.cv_g = HEOS.keyed_output(CoolProp.iCvmass) 
         return self.cv_g
     
     def cv_mix(self,Ref,Liq,T,P,xL):
@@ -384,7 +398,11 @@ cdef class State_Flooded(State):
         
     def mu_mix(self,Ref,Liq,T,P,xL):
         self.mu_l = self.mu_liq(Liq,T)
-        self.mu_g = self.pAS.keyed_output('V','T',float(T),'P',float(P)*1000,Ref)
+        
+        HEOS = CoolProp.AbstractState('HEOS',Ref)
+        HEOS.update.(CoolProp.TP_INPUTS,T,P*1000)
+        self.mu_g = HEOS.keyed_output(CoolProp.iviscosity)
+        
         self.mu_m = 1/(xL/self.mu_l + (1-xL)/self.mu_g )
         if isnan(self.mu_m) == True:
             print 'mu_m is a NaN'
@@ -408,7 +426,9 @@ cdef class State_Flooded(State):
     
     ## Thermal Conductivity [W/m-K]
     def k_gas(self,Ref,T,P):
-        self.k_g = self.pAS.keyed_output('L','T',float(T),'P',float(P)*1000,Ref)
+        HEOS = CoolProp.AbstractState('HEOS',Ref)
+        HEOS.update.(CoolProp.TP_INPUTS,T,P*1000)
+        self.k_g = HEOS.keyed_output(CoolProp.iconductivity)
         return self.k_g
     
     def k_liq(self,Liq,T):
@@ -563,8 +583,14 @@ cdef class State_Flooded(State):
         """
         
         print 'h',h
-        self.h_l = self.pAS.keyed_output('H','T',T,'Q',0,Ref)
-        self.h_v = self.pAS.keyed_output('H','T',T,'Q',1,Ref)
+        HEOS = CoolProp.AbstractState('HEOS',Ref)
+        HEOS.update.(CoolProp.TQ_INPUTS,T,0)
+        self.h_l = HEOS.keyed_output(CoolProp.iHmass) 
+        
+        HEOS = CoolProp.AbstractState('HEOS',Ref)
+        HEOS.update.(CoolProp.TQ_INPUTS,T,1)
+        self.h_v = HEOS.keyed_output(CoolProp.iHmass) 
+        
         self.Qth = (h - self.h_l)/(self.h_v - self.h_l)
         return self.Qth
     
@@ -581,8 +607,10 @@ cdef class State_Flooded(State):
         so take the first element of the 1-element array, which
         is a 64-bit float
         """
+        HEOS = CoolProp.AbstractState('HEOS',Ref)
+        HEOS.update.(CoolProp.TQ_INPUTS,T,Q[0])
         
-        self.f = lambda Q : self.pAS.keyed_output('S','T',T,'Q',Q[0],Ref) - s
+        self.f = lambda Q : HEOS.keyed_output(CoolProp.iSmass) - s
         self.Q = optimize.fsolve(self.f,Q_guess)
         return float(self.Q)
     
@@ -590,17 +618,22 @@ cdef class State_Flooded(State):
     def T_crit(self,Ref):    # Critical Temperature of the refrigerant [K] - From coolprop  ->  Props(Fluid,PropName)
         
         if Ref=='R245fa':
-            self.T = self.pAS.keyed_output('R245fa', 'Tcrit')
+            HEOS = CoolProp.AbstractState('HEOS',Ref)
+            self.T = HEOS.keyed_output(CoolProp.Tcrit) 
         elif Ref=='R410A':
-            self.T = self.pAS.keyed_output('R410A', 'Tcrit')
+            HEOS = CoolProp.AbstractState('HEOS',Ref)
+            self.T = HEOS.keyed_output(CoolProp.Tcrit)
         elif Ref=='R744':
             self.T = 304.128
         elif Ref=='R404A':
-            self.T = self.pAS.keyed_output('R404A', 'Tcrit')
+            HEOS = CoolProp.AbstractState('HEOS',Ref)
+            self.T = HEOS.keyed_output(CoolProp.Tcrit)
         elif Ref=='R134a':
-            self.T = self.pAS.keyed_output('R134a', 'Tcrit')      #Tcr=374.2
+            HEOS = CoolProp.AbstractState('HEOS',Ref)
+            self.T = HEOS.keyed_output(CoolProp.Tcrit)      #Tcr=374.2
         elif Ref=='SES36':
-            self.T = self.pAS.keyed_output('SES36', 'Tcrit')
+            HEOS = CoolProp.AbstractState('HEOS',Ref)
+            self.T = HEOS.keyed_output(CoolProp.Tcrit)
         elif Ref=='R290':
             self.T = 369.82
         elif Ref=='R717':
@@ -611,17 +644,22 @@ cdef class State_Flooded(State):
     
     def p_crit(self,Ref):    # Critical pressure of the refrigerant [kPa] - From coolprop  ->  Props(Fluid,PropName)
         if Ref=='R245fa':
-            self.p = self.pAS.keyed_output('R245fa', 'pcrit')
+            HEOS = CoolProp.AbstractState('HEOS',Ref)
+            self.p = HEOS.keyed_output(CoolProp.pcrit)
         elif Ref=='R410A':
-            self.p = self.pAS.keyed_output('R410A', 'pcrit')
+            HEOS = CoolProp.AbstractState('HEOS',Ref)
+            self.p = HEOS.keyed_output(CoolProp.pcrit)
         elif Ref=='R744':
             self.p = 304.128
         elif Ref=='R404A':
-            self.p = self.pAS.keyed_output('R404A', 'pcrit')
+            HEOS = CoolProp.AbstractState('HEOS',Ref)
+            self.p = HEOS.keyed_output(CoolProp.pcrit)
         elif Ref=='R134a':
-            self.p = self.pAS.keyed_output('R134a', 'pcrit')      #Tcr=374.2
+            HEOS = CoolProp.AbstractState('HEOS',Ref)
+            self.p = HEOS.keyed_output(CoolProp.pcrit)      #Tcr=374.2
         elif Ref=='SES36':
-            self.p = self.pAS.keyed_output('SES36', 'pcrit')
+            HEOS = CoolProp.AbstractState('HEOS',Ref)
+            self.p = HEOS.keyed_output(CoolProp.pcrit)
         elif Ref=='R290':
             self.p = 369.82
         elif Ref=='R717':
