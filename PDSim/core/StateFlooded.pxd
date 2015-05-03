@@ -54,6 +54,7 @@ cdef class State_Flooded:
     cpdef double get_visc_m(self) except *
     cpdef double get_cond_m(self) except *
     cpdef double get_cp_m(self) except *
-    cpdef double get_cp0(self) except *   # TO CHECK
+    cpdef double get_cp0(self) except *   #TODO: not sure if we need this one
     cpdef double get_cv_m(self) except *
     cpdef double get_dpdT(self) except *
+    cpdef double get_dudxL(self) except*
