@@ -669,22 +669,22 @@ cdef class State_Flooded(State):
         return self.p
         
         ##
-    cpdef double get_Q(self) except *:
+    cpdef double get_Q_m(self) except *:
         """ Get the quality [-] """
         return self.Q_Th
     property Q:
         """ The quality [-] """
         def __get__(self):
-            return self.get_Q()
+            return self.get_Q_m()
 
     ##
-    cpdef double get_rho(self) except *:
+    cpdef double get_rho_m(self) except *:
         """ Get the density [kg/m^3] """
         return self.rho_mix
     property rho:
         """ The density [kg/m^3] """
         def __get__(self):
-            return self.get_rho()
+            return self.get_rho_m()
 
     ##
     cpdef double get_p(self) except *:
@@ -705,67 +705,67 @@ cdef class State_Flooded(State):
             return self.get_T()
 
     ##
-    cpdef double get_h(self) except *:
+    cpdef double get_h_m(self) except *:
         """ Get the specific enthalpy [kJ/kg] """
         return self.h_mix
     property h:
         """ The specific enthalpy [kJ/kg] """
         def __get__(self):
-            return self.get_h()
+            return self.get_h_m()
 
     ##
-    cpdef double get_u(self) except *:
+    cpdef double get_u_m(self) except *:
         """ Get the specific internal energy [kJ/kg] """
         return self.u_mix
     property u:
         """ The internal energy [kJ/kg] """
         def __get__(self):
-            return self.get_u()
+            return self.get_u_m()
 
     ##
-    cpdef double get_s(self) except *:
+    cpdef double get_s_m(self) except *:
         """ Get the specific enthalpy [kJ/kg/K] """
         return self.s_mix
     property s:
         """ The specific enthalpy [kJ/kg/K] """
         def __get__(self):
-            return self.get_s()
+            return self.get_s_m()
 
     ##
-    cpdef double get_cp(self) except *:
+    cpdef double get_cp_m(self) except *:
         """ Get the specific heat at constant pressure  [kJ/kg/K] """
         return self.cp_mix
     property cp:
         """ The specific heat at constant pressure  [kJ/kg/K] """
         def __get__(self):
-            return self.get_cp()
+            return self.get_cp_m()
 
     ##
-    cpdef double get_cv(self) except *:
+    cpdef double get_cv_m(self) except *:
         """ Get the specific heat at constant volume  [kJ/kg/K] """
         return self.cv_mix
     property cv:
         """ The specific heat at constant volume  [kJ/kg/K] """
         def __get__(self):
-            return self.get_cv()
+            return self.get_cv_m()
 
     ##
-    cpdef double get_visc(self) except *:
+    cpdef double get_visc_m(self) except *:
         """ Get the viscosity, in [Pa-s]"""
         return self.mu_mix
     property visc:
         """ The viscosity, in [Pa-s]"""
         def __get__(self):
-            return self.get_visc()
+            return self.get_visc_m()
 
     ##
-    cpdef double get_cond(self) except *:
+    cpdef double get_cond_m(self) except *:
         """ Get the thermal conductivity, in [kW/m/K]"""
         return self.k_mix
     property k:
         """ The thermal conductivity, in [kW/m/K]"""
         def __get__(self):
-            return self.get_cond()
+            return self.get_cond_m()
 
     ##
     cpdef double get_dpdT(self) except *:
