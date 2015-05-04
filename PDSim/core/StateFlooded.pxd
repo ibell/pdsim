@@ -40,13 +40,13 @@ cdef class State_Flooded:
     cpdef speed_test(self, int N)
     cpdef update(self, dict params)
     cpdef update_ph(self, double p, double h)
-    cpdef update_Trho(self, double T, double rho)
+    cpdef update_TrhoxL(self, double T, double rho, double xL)
     cpdef State copy(self)
     cpdef double Props(self, constants_header.parameters iOutput) except *
     cpdef long Phase(self) except *
-    cpdef double get_Q(self) except *
     cpdef double get_T(self) except *
     cpdef double get_p(self) except *
+    cpdef double get_Q_m(self) except *
     cpdef double get_h_m(self) except *
     cpdef double get_rho_m(self) except *
     cpdef double get_s_m(self) except *
