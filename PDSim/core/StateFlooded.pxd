@@ -13,17 +13,9 @@ cdef extern from "Python.h":
     int __LINE__
 
 
+#TODO: we make sure StateFlooded derives from State class
 
-
-"""
-#In Cython we would do something equivalent to CoolProp.pxd 
-# This class inheritate from State_Flooded which calculates the mixture properties 
-# and returns the values in a similar way of State class in CoolProp.pxd
-"""
-
-#TODO:  check consistency with StateFlooded.pyx   get_h_m or get_h. Maybe we should differentiate from standard State class and use _m to indicate mixture properties
-
-cdef class State_Flooded:
+cdef class StateFlooded(State):
     cdef AbstractState pAS
     cdef readonly bytes Fluid, phase
     cdef int iFluid,iParam1,iParam2,iOutput
