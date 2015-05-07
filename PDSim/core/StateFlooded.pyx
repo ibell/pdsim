@@ -27,7 +27,7 @@ cdef dict paras = {iDmass : 'D',
 
 cdef dict paras_inverse = {v:k for k,v in paras.iteritems()}
 
-cdef class State_Flooded(State):
+cdef class StateFlooded(State):
     
     def __init__(self, Ref = None,Liq = None,P,T,xL):
         
@@ -678,6 +678,15 @@ cdef class State_Flooded(State):
             return self.get_Q_m()
 
     ##
+    cpdef double get_rho(self) except *:
+        """ Get the density [kg/m^3] """
+        return self.rho_gas
+    property rho:
+        """ The density [kg/m^3] """
+        def __get__(self):
+            return self.get_rho_gas()
+
+    ##
     cpdef double get_rho_m(self) except *:
         """ Get the density [kg/m^3] """
         return self.rho_mix
@@ -705,11 +714,20 @@ cdef class State_Flooded(State):
             return self.get_T()
 
     ##
+    cpdef double get_h(self) except *:
+        """ Get the specific enthalpy of refrigerant [kJ/kg] """
+        return self.h_gas
+    property rho:
+        """ The specific enthalpy [kJ/kg] """
+        def __get__(self):
+            return self.get_h_gas()
+
+    ##
     cpdef double get_h_m(self) except *:
-        """ Get the specific enthalpy [kJ/kg] """
+        """ Get the specific enthalpy of mixture [kJ/kg] """
         return self.h_mix
     property h:
-        """ The specific enthalpy [kJ/kg] """
+        """ The specific enthalpy of mixture [kJ/kg] """
         def __get__(self):
             return self.get_h_m()
 
