@@ -153,7 +153,7 @@ cdef class StateFlooded(State):
         Entropy of the mixture as a function of temperature [K] and pressure [kPa].  Output in kJ/kg-K
         """
         cdef double s_g, s_l
-        s_g = self.pAS.keyed_output(CoolProp.iSmass)/1000.0
+        s_g = self.pAS.keyed_output(constants_header.iSmass)/1000.0
         s_m = self.xL_*self.s_liq() + (1-self.xL_)*s_g
         return s_m
         
@@ -163,9 +163,9 @@ cdef class StateFlooded(State):
         cdef double T = self.T_
         if self.Liq == b"Duratherm_LT":
             #internal energy [kJ/kg] of Duratherm LT given T in K
-            u_l = (3.4014/2*pow(T, 2)+1094.3*T)/1000  #LT
+            u_l = (3.4014/2*T**2+1094.3*T)/1000  #LT
         elif self.Liq == b"Zerol60":
-            u_l = (5.186/2*pow(T,2)+337.116*T)/1000  #Zerol60
+            u_l = (5.186/2*T**2+337.116*T)/1000  #Zerol60
         elif self.Liq == b"POE":
             u_l = (2.0935/2*T**2 + 1186.7*T)/1000 #POE 150 SUS
         else:
@@ -179,7 +179,7 @@ cdef class StateFlooded(State):
         """
         cdef double u_l, u_g, u_m
         u_l = self.u_liq()
-        u_g = self.pAS.keyed_output(CoolProp.iUmass)/1000.0
+        u_g = self.pAS.keyed_output(constants_header.iUmass)/1000.0
         u_m = self.xL_*u_l + (1-self.xL_)*u_g
         return u_m
     
@@ -211,7 +211,7 @@ cdef class StateFlooded(State):
         
     cpdef double h_mix(self) except *:
         cdef double h_g, h_m
-        h_g = self.pAS.keyed_output(CoolProp.iHmass)/1000.0
+        h_g = self.pAS.keyed_output(constants_header.iHmass)/1000.0
         h_m = self.xL_*self.h_liq() + (1-self.xL_)*h_g
         return h_m
         
@@ -274,11 +274,11 @@ cdef class StateFlooded(State):
             #specific heat [kJ/kg-K] of Duratherm LT given T in K
             cp_l = (3.4014*T + 1094.3)/1000
         elif self.Liq == b"Water":
-            MM_l=18.0153
-            cl_A=92.053/MM_l
-            cl_B=-0.039953/MM_l
-            cl_C=-0.00021103/MM_l
-            cl_D=5.3469E-07/MM_l
+            one_over_MM_l=1/18.0153
+            cl_A=92.053*one_over_MM_l
+            cl_B=-0.039953*one_over_MM_l
+            cl_C=-0.00021103*one_over_MM_l
+            cl_D=5.3469E-07*one_over_MM_l
             cp_l = cl_A + cl_B*T + cl_C*T*T + cl_D*T*T*T
         elif self.Liq == b"ACD100FY":
             # 273 < T [K] < 387
@@ -306,7 +306,7 @@ cdef class StateFlooded(State):
         cdef double T = self.T_, mu_l
         
         if self.Liq == b'Duratherm_LT': 
-            mu_l = 8e12*pow(T, -6.001)  #LT
+            mu_l = 8e12*T**(-6.001)  #LT
         elif self.Liq == b'Zerol60': 
             mu_l = 1.0*(-0.0001235*T + 0.04808) #Zerol60 Vincent
         elif self.Liq == b'POE':
@@ -316,7 +316,7 @@ cdef class StateFlooded(State):
         elif self.Liq == b"ACD100FY":
             # 313 < T [K] < 387
             #mu_l = 1.603e+46*pow(T,-19.69) #T [K]   
-            mu_l = 2.0022e+31*pow(T,-1.2961e+01)
+            mu_l = 2.0022e+31*T**(-1.2961e+01)
         else:
             raise ValueError(b"Invalid liquid:" + self.Liq)
         return mu_l
@@ -324,7 +324,7 @@ cdef class StateFlooded(State):
     cpdef double mu_mix(self) except *:
         cdef double mu_l, mu_g, mu_m, xL = self.xL_
         mu_l = self.mu_liq()
-        mu_g = self.pAS.keyed_output(CoolProp.iviscosity)
+        mu_g = self.pAS.keyed_output(constants_header.iviscosity)
         mu_m = 1/(xL/mu_l + (1-xL)/mu_g )
         return mu_m
             
@@ -359,7 +359,7 @@ cdef class StateFlooded(State):
         """
         cdef double k_l, k_g, VF, k_m
         k_l = self.k_liq()
-        k_g = self.pAS.keyed_output(CoolProp.iconductivity)/1000
+        k_g = self.pAS.keyed_output(constants_header.iconductivity)/1000
         VF = self.VoidFrac()
         k_m = (1-VF)*k_l + VF*k_g
         return k_m
@@ -373,10 +373,11 @@ cdef class StateFlooded(State):
         return Pr
             
     def kstar_mix(self):
-        cdef double xL = self.xL_, kstar_m
-        kstar_m =((1-xL)*self.cp_gas() + xL*self.cp_liq())/((1-xL)*self.cv_gas() + xL*self.cp_liq())
+        cdef double xL = self.xL_, kstar_m, cv_g, cp_g
+        cp_g = self.pAS.cpmass()/1000.0
+        cv_g = self.pAS.cvmass()/1000.0
+        kstar_m =((1-xL)*cp_g + xL*self.cp_liq())/((1-xL)*cv_g + xL*self.cp_liq())
         return kstar_m
-            
     
     #def e_mix(self):
     #    
@@ -411,7 +412,7 @@ cdef class StateFlooded(State):
 
         cdef double u_l, u_g, u_m
         u_l = self.u_liq()
-        u_g = self.pAS.keyed_output(CoolProp.iUmass)/1000.0
+        u_g = self.pAS.keyed_output(constants_header.iUmass)/1000.0
         return u_l - u_g
         
     def T_sp(self,s,p,xL,T_guess):   
