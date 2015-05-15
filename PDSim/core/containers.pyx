@@ -617,69 +617,22 @@ cdef class ControlVolumeCollection(object):
         return [CV.State.get_dpdT() for CV in self.exists_CV]
         
     #TODO: missing xL, dudxL and the properties as mixture
-    """
-    For example:
-    
-    @property
-    def rho_m(self):
-        """
-            Density for each CV that exists
-        """
-        cdef ControlVolume CV
-        return [CV.StateFlood.get_rho_m() for CV in self.exists_CV]
-    
-    @property
-    def h_m(self):
-        """
-        Enthalpy for each CV that exists
-        """
-        cdef ControlVolume CV
-        return [CV.StateFlood.get_h_m() for CV in self.exists_CV]
-    
-    @property
-    def cp_m(self):
-        """
-        Specific heat at constant volume for each CV that exists
-        """
-        cdef ControlVolume CV
-        return [CV.StateFlood.get_cp_m() for CV in self.exists_CV]
-    
-    @property
-    def cv(self):
-        """
-        Specific heat at constant volume for each CV that exists
-        """
-        cdef ControlVolume CV
-        return [CV.StateFlood.get_cv_m() for CV in self.exists_CV]
-    
-    @property
-    def dpdT_m(self):
-        """
-        Derivative of pressure with respect to temperature at constant volume for each CV that exists
-        """
-        cdef ControlVolume CV
-        return [CV.StateFlood.get_dpdT_m() for CV in self.exists_CV]    
-    
-    @property
-    def xL(self):
-        """
-        Liquid mass fraction for each CV that exists
-        """
-        cdef ControlVolume CV
-        return [CV.StateFlood.get_xL() for CV in self.exists_CV]    
-
-    @property
-    def dudxL(self):
-        """
-        Liquid mass fraction for each CV that exists
-        """
-        cdef ControlVolume CV
-        return [CV.StateFlood.get_dudxL() for CV in self.exists_CV]
-    
-    
-    """
-    
-    
+    #
+    #@property
+    #def xL(self):
+    #    """
+    #    Liquid mass fraction for each CV that exists
+    #    """
+    #    cdef ControlVolume CV
+    #    return [CV.StateFlood.get_xL() for CV in self.exists_CV]    
+    #
+    #@property
+    #def dudxL(self):
+    #    """
+    #    Liquid mass fraction for each CV that exists
+    #    """
+    #    cdef ControlVolume CV
+    #    return [CV.StateFlood.get_dudxL() for CV in self.exists_CV]
     
     #TODO: update the FloodStates
     """
@@ -694,7 +647,6 @@ cdef class ControlVolumeCollection(object):
     
     """
     
-    
     cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2):
 #        if not len(array1) == len(array2) or not len(array2)==len(self.exists_CV):
 #            raise AttributeError('length of arrays must be the same and equal number of CV in existence')
@@ -703,10 +655,6 @@ cdef class ControlVolumeCollection(object):
 
         for CV,v1,v2 in zip(self.exists_CV, array1, array2):
             CV.State.update({name1:v1,name2:v2})
-        
-    
-    
-    
     
     cpdef volumes(self, double theta, bint as_dict = False):
         """
