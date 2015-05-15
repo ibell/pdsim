@@ -15,12 +15,11 @@ cdef extern from "Python.h":
     int __LINE__
 
 cdef class StateFlooded(State):
-    cdef int iLiquid    # Maybe ??
-    
-    cpdef set_Fluid(self, string Fluid, string backend)
-    
-    #Now the properties are all defined above and we can be consistend with the definition
-    #I used in containers_20150419  @properties
+
+    cdef readonly bytes Liq
+    cdef readonly double xL_
+    cdef bytes model
+    #cdef int iLiquid    # Maybe ??
     
     cpdef speed_test(self, int N)
     cpdef update(self, dict params)
