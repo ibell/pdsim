@@ -50,6 +50,7 @@ pyx_list = [
             "PDSim/core/containers.pyx",
             "PDSim/core/callbacks.pyx",
             "PDSim/core/cycleintegrators.pyx",
+            "PDSim/core/state_flooded.pyx",
             "PDSim/misc/scipylike.pyx",
             "PDSim/flow/flow_models.pyx",
             "PDSim/flow/flow.pyx",
