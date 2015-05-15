@@ -685,15 +685,15 @@ class PDSimCore(object):
         self.derivs(t0,xold)
         self.FlowStorage.append(self.Flows.get_deepcopy())
         
-        if self.__hasLiquid__=True:
+        if self.__hasLiquid__ == True:
             if sorted(self.stateVariables) == ['D','T','xL']:
-                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist],'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
             elif sorted(self.stateVariables) == ['M','T','xL']:
-                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,]/V,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
             else:      
                 raise NotImplementedError            
         
-        elif self.__hasLiquid__=False:
+        elif self.__hasLiquid__ == False:
             if sorted(self.stateVariables) == ['D','T']:
                 self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
             elif sorted(self.stateVariables) == ['M','T']:
@@ -774,15 +774,15 @@ class PDSimCore(object):
         self.derivs(t0,xold)
         self._put_to_matrices(xnew,N)
         self.FlowStorage.append(self.Flows.get_deepcopy())
-        if self.__hasLiquid__=True:
+        if self.__hasLiquid__ == True:
             if sorted(self.stateVariables) == ['D','T','xL']:
-                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist],'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
             elif sorted(self.stateVariables) == ['M','T','xL']:
                 self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,]/V,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
             else:      
                 raise NotImplementedError            
         
-        elif self.__hasLiquid__=False:
+        elif self.__hasLiquid__ == False:
             if sorted(self.stateVariables) == ['D','T']:
                 self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
             elif sorted(self.stateVariables) == ['M','T']:
@@ -1042,15 +1042,15 @@ class PDSimCore(object):
         # Store the flows for the end
         self.FlowStorage.append(self.Flows.get_deepcopy())
 
-        if self.__hasLiquid__=True:
+        if self.__hasLiquid__ == True:
             if sorted(self.stateVariables) == ['D','T','xL']:
-                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist],'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
             elif sorted(self.stateVariables) == ['M','T','xL']:
                 self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,]/V,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
             else:      
                 raise NotImplementedError            
         
-        elif self.__hasLiquid__=False:
+        elif self.__hasLiquid__ == False:
             if sorted(self.stateVariables) == ['D','T']:
                 self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
             elif sorted(self.stateVariables) == ['M','T']:
