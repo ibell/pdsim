@@ -3,11 +3,11 @@ from __future__ import division
 cimport cython
 import CoolProp.CoolProp
 import math
-from math import floor,fabs,isnan,isinf
+from math import floor
 from math import log
 import warnings
 from scipy import optimize
-from numpy import float64,isnan,isinf
+from numpy import float64,isnan,isinf,fabs
 from scipy.optimize import newton,fsolve
 
 from CoolProp.CoolProp cimport constants_header
@@ -402,29 +402,30 @@ cdef class StateFlooded(State):
         change = 999
         iter = 1
         
-        while (iter<3 or fabs(f)>eps) and iter < 100:
+        while (iter<=3 or fabs(f)>eps) and iter < 100:
             
             if iter ==1:
                 x1 = P1
                 P2 = x1
-            elif iter == 2:
+            if iter == 2:
                 x2 = P1 + 0.001
                 P2 = x2
-            elif iter > 2:
+            if iter > 2:
                 P2 = x2
                 
-                self.update(dict(T = self.T_+delta, P = P2, xL = self.xL_))
-                f = (1.0/self.rho_mix()) - v1
+            self.update(dict(T = self.T_+delta, P = P2, xL = self.xL_))
+            f = (1.0/self.rho_mix()) - v1
             
             if iter==1:
                 y1 = f
-            elif iter > 1:
+            if iter > 1:
                 y2 = f
                 x3 = x2-y2/(y2-y1)*(x2-x1)
                 change = fabs(y2/(y2-y1)*(x2-x1))
                 y1=y2
                 x1=x2
                 x2=x3
+            
             iter = iter+1
             
             if iter > 50:
@@ -587,7 +588,7 @@ cdef class StateFlooded(State):
             return self.get_cond()
 
     cpdef double get_dpdT(self) except *:
-       raise ValueError()
+       """ Get dpdT_const_V, in [ ]"""
        return self.dpdT_const_V
     property dpdT:
        def __get__(self):
