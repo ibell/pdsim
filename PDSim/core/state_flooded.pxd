@@ -44,20 +44,25 @@ cdef class StateFlooded(State):
     cpdef double get_dpdT(self) except *
     cpdef double get_dudxL(self) except*
     
-    cpdef double k_mix(self) except *
-    cpdef double mu_mix(self) except *
-    cpdef double h_mix(self) except *
     cpdef double s_mix(self) except *
     cpdef double u_mix(self) except *
+    cpdef double h_mix(self) except *
+    cpdef double rho_mix(self) except *
     cpdef double cp_mix(self) except *
     cpdef double cv_mix(self) except *
-    cpdef double rho_mix(self) except *
+    cpdef double mu_mix(self) except *
+    cpdef double k_mix(self) except * 
+    cpdef double Pr_mix(self) except * 
+    cpdef double kstar_mix(self) except * 
     cpdef double dudxL_mix(self) except *
+    cpdef double dpdT_const_V(self) except *
+    cpdef double T_crit(self) except *
+    cpdef double p_crit(self) except *
 
-    cpdef double k_liq(self) except *
-    cpdef double mu_liq(self) except *
-    cpdef double h_liq(self) except *
     cpdef double s_liq(self) except *
     cpdef double u_liq(self) except *
-    cpdef double cp_liq(self) except *
+    cpdef double h_liq(self) except *
     cpdef double rho_liq(self) except *
+    cpdef double cp_liq(self) except *
+    cpdef double mu_liq(self) except *
+    cpdef double k_liq(self) except *

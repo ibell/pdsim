@@ -8,6 +8,7 @@ from math import log
 import warnings
 from scipy import optimize
 from numpy import float64,isnan,isinf
+from scipy.optimize import newton,fsolve
 
 from CoolProp.CoolProp cimport constants_header
 
@@ -47,17 +48,6 @@ cdef class StateFlooded(State):
         self.set_Fluid(Ref, backend)
         self.phase = b''
 
-    #cpdef update_with_guesses(self, constants_header.input_pairs ipair, double Value1, double Value2, double Value3, PyGuessesStructure guesses):
-    #    """ Update function - wrapper of c++ function :cpapi:`CoolProp::AbstractState::update` """
-    #    cdef cAbstractState.GuessesStructure _guesses
-    #    _guesses.T = guesses.T
-    #    _guesses.p = guesses.p
-    #    _guesses.rhomolar_liq = guesses.rhomolar_liq
-    #    _guesses.rhomolar_vap = guesses.rhomolar_vap
-    #    _guesses.x = guesses.x
-    #    _guesses.y = guesses.y
-    #    self.thisptr.update_with_guesses(ipair, Value1, Value2, Value3, _guesses)
-
     ##
     cpdef update_TrhoxL(self, double T, double rho, double xL):
         """
@@ -75,7 +65,6 @@ cdef class StateFlooded(State):
         self.T_ = T
         self.rho_ = rho
         self.xL_ = xL
-        #self.thisptr.update(DmassTxL_INPUTS, rho, T, xL)
     
     cpdef update(self, dict params):
         """
@@ -133,6 +122,8 @@ cdef class StateFlooded(State):
             s_l = 2.30 * log(T/T0)
         elif self.Liq == b"Duratherm_LT":
             s_l = (3.4014*(T-298)+1094.3*log(T/298.0))/1000 
+        elif self.Liq == b"Zerol60":
+            s_l = (5.186*(T-298)+3337.116*log(T/298.0))/1000 
         elif self.Liq == b"Water":
             cl_A=92.053
             cl_B=-0.039953
@@ -197,6 +188,8 @@ cdef class StateFlooded(State):
         elif self.Liq == b'Duratherm_LT':
             #the specific enthalpy of Duratherm LT [kJ/kg-k]"
             h_l = self.u_liq()/1000 + (P-P0)/self.rho_liq()
+        elif self.Liq == b"Zerol60":
+            h_l = self.u_liq()/1000 + (P-P0)/self.rho_liq()
         elif self.Liq == b'Water':
             cl_A = 92.053
             cl_B = -0.039953
@@ -226,6 +219,8 @@ cdef class StateFlooded(State):
         elif self.Liq == b'Duratherm_LT':
             #density [kg/m^3] of Duratherm LT given T in K"
             rho_l = -0.6793*T + 1012.4 
+        elif self.Liq == b"Zerol60":
+            rho_l = -0.667*T + 1050.86
         elif self.Liq == b"Water":
             # Water Props from Yaws
             rhol_A=0.3471     
@@ -273,6 +268,8 @@ cdef class StateFlooded(State):
         elif self.Liq == b'Duratherm_LT':
             #specific heat [kJ/kg-K] of Duratherm LT given T in K
             cp_l = (3.4014*T + 1094.3)/1000
+        elif self.Liq == b"Zerol60":
+            cp_l = (5.186*T + 337.116)/1000
         elif self.Liq == b"Water":
             one_over_MM_l=1/18.0153
             cl_A=92.053*one_over_MM_l
@@ -364,7 +361,7 @@ cdef class StateFlooded(State):
         k_m = (1-VF)*k_l + VF*k_g
         return k_m
     
-    def Pr_mix(self): 
+    cpdef double Pr_mix(self) except *: 
         """
         ## Prandtl Number
         #TODO: maybe it is Prm (pag491 Ian Thesis)
@@ -372,7 +369,7 @@ cdef class StateFlooded(State):
         cdef double Pr = (self.cp_mix()*self.mu_mix())/self.k_mix()
         return Pr
             
-    def kstar_mix(self):
+    cpdef double kstar_mix(self) except *:
         cdef double xL = self.xL_, kstar_m, cv_g, cp_g
         cp_g = self.pAS.cpmass()/1000.0
         cv_g = self.pAS.cvmass()/1000.0
@@ -391,22 +388,18 @@ cdef class StateFlooded(State):
     #    if isinf(self.e_m) == True:
     #        print 'e_m is Infinite'
     #    else:
-    #        return float(self.e_m)    
-        
-    #def dpdT_const_V(self):
-    #    
-    #    delta =1e-5
-    #    self.v = 1/self.rho_mix()
-    #    self.f = lambda P2: 1.0/self.rho_mix(Ref,Liq,T+delta,P2[0],xL) - self.v
-    #    
-    #    P2 = optimize.fsolve(self.f,P1)
-    #    
-    #    if isnan((P2-P1)/delta) == True:
-    #        print 'dpdt_v is a NaN'
-    #    if isinf((P2-P1)/delta) == True:
-    #        print 'dpdt_v is Infinite'
-    #    else:
-    #        return float((P2-P1)/delta)
+    #        return float(self.e_m) 
+    
+    cpdef double dpdT_const_V(self) except *:
+        cdef double obj(P):((1/self.rho_mix()) - v), Ref = self.Fluid, Liq = self.Liq, xL = self.xL, T = self.T_, P1 = self.p_
+        delta =1e-5
+        v = 1/self.rho_mix()
+        self.update(dict(T = T+delta, xL = self.xL_, P = self.p_))
+        P2 = newton(obj, P1)
+        f = (lambda P: (1/self.rho_mix()) - v)
+        P2 = fsolve(obj,P1)
+        return float((P2-P1)/delta)
+
        
     cpdef double dudxL_mix(self) except *:
 
@@ -415,71 +408,56 @@ cdef class StateFlooded(State):
         u_g = self.pAS.keyed_output(constants_header.iUmass)/1000.0
         return u_l - u_g
         
-    def T_sp(self,s,p,xL,T_guess):   
-        """
-        Solve for the temperature which gives the same entropy - s [kJ/kg-K], p [kPa], T [K]
-        """
+    # cpdef T_sp(self,s,p,xL,T_guess):   
+    #     """
+    #     Solve for the temperature which gives the same entropy - s [kJ/kg-K], p [kPa], T [K]
+    #     """
+    # 
+    #     """
+    #     When fsolve() is called, it will use a single element
+    #     ndarray but we only want a double to be passed along,
+    #     so take the first element of the 1-element array, which
+    #     is a 64-bit float
+    #     """ 
+    #     def obj(T):
+    #         self.update(dict(T = T, xL = self.xL_, P = self.p_))
+    #         self.s_mix() - s
+    #     T = optimize.fsolve(obj, T_guess)
+    #     return T
     
-        """
-        When fsolve() is called, it will use a single element
-        ndarray but we only want a double to be passed along,
-        so take the first element of the 1-element array, which
-        is a 64-bit float
-        """ 
-        def obj(T):
-            self.update(dict(T = T, xL = self.xL_, P = self.p_))
-            self.s_mix() - s
-        T = optimize.fsolve(obj, T_guess)
-        return T
+    # cpdef T_hp(self,Ref,Liq,h,p,xL,T_guess):   
+    #     """
+    #     Solve for the temperature which gives the same enthalpy - h [kJ/kg], p [kPa], T [K]
+    #     """
+    # 
+    #     global h_mix
+    #     
+    #     """
+    #     When fsolve() is called, it will use a single element
+    #     ndarray but we only want a double to be passed along,
+    #     so take the first element of the 1-element array, which
+    #     is a 64-bit float
+    #     """
+    #     def obj(T):
+    #         self.update(dict(T = T, xL = self.xL_, P = self.p_))
+    #         self.h_mix() - h
+    #         
+    #     T = optimize.fsolve(obj, T_guess)
+    #     return T
     
-    def T_hp(self,Ref,Liq,h,p,xL,T_guess):   
-        """
-        Solve for the temperature which gives the same enthalpy - h [kJ/kg], p [kPa], T [K]
-        """
-    
-        global h_mix
-        
-        """
-        When fsolve() is called, it will use a single element
-        ndarray but we only want a double to be passed along,
-        so take the first element of the 1-element array, which
-        is a 64-bit float
-        """
-        def obj(T):
-            self.update(dict(T = T, xL = self.xL_, P = self.p_))
-            self.h_mix() - h
-            
-        T = optimize.fsolve(obj, T_guess)
-        return T
-    
-    def T_crit(self):    
+    cpdef double T_crit(self) except *:    
         """
         Return the critical temperature of the refrigerant [K]
         """
         return self.pAS.keyed_output(constants_header.iT_critical)
     
-    def p_crit(self):    
+    cpdef double p_crit(self) except *:    
         """
         Return the critical pressure of the refrigerant [kPa]
         """
         return self.pAS.keyed_output(constants_header.iP_critical)/1000.0
+    ##
         
-    cpdef double get_Q(self) except *:
-        """ Get the quality [-] """
-        return -1
-    property Q:
-        """ The quality [-] """
-        def __get__(self):
-            return self.get_Q()
-
-    cpdef double get_rho(self) except *:
-        """ Get the density [kg/m^3] """
-        return self.rho_mix()
-    property rho:
-        """ The density [kg/m^3] """
-        def __get__(self):
-            return self.get_rho()
-
     cpdef double get_p(self) except *:
         """ Get the pressure [kPa] """
         return self.p_
@@ -495,6 +473,22 @@ cdef class StateFlooded(State):
         """ The temperature [K] """
         def __get__(self):
             return self.get_T()
+            
+    cpdef double get_Q(self) except *:
+        """ Get the quality [-] """
+        return -1
+    property Q:
+        """ The quality [-] """
+        def __get__(self):
+            return self.get_Q()
+
+    cpdef double get_rho(self) except *:
+        """ Get the density [kg/m^3] """
+        return self.rho_mix()
+    property rho:
+        """ The density [kg/m^3] """
+        def __get__(self):
+            return self.get_rho()
 
     cpdef double get_h(self) except *:
         """ Get the specific enthalpy of the mixture [kJ/kg] """
@@ -552,12 +546,12 @@ cdef class StateFlooded(State):
         def __get__(self):
             return self.get_cond()
 
-    #cpdef double get_dpdT(self) except *:
-    #    raise ValueError()
-    #    return self.dpdT_const_V
-    #property dpdT:
-    #    def __get__(self):
-    #        return self.get_dpdT()
+    cpdef double get_dpdT(self) except *:
+       raise ValueError()
+       return self.dpdT_const_V
+    property dpdT:
+       def __get__(self):
+           return self.get_dpdT()
              
     cpdef double get_dudxL(self) except *:
         return self.dudxL_mix()
