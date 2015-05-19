@@ -451,7 +451,7 @@ cdef class StateFlooded(State):
         return ( u_m (Gas ,Liq ,T,P,xL+ delta )-u_m(Gas ,Liq ,T,P,xL))/ delta ;
         """
         
-        cdef double u_m1,u_m2 delta, xL
+        cdef double u_m1,u_m2, delta, xL
         delta = 0.001
         u_m1 = self.u_mix()
         
