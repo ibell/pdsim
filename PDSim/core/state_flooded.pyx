@@ -3,7 +3,7 @@ from __future__ import division
 cimport cython
 import CoolProp.CoolProp
 import math
-from math import floor
+from math import floor,fabs,isnan,isinf
 from math import log
 import warnings
 from scipy import optimize
@@ -391,14 +391,54 @@ cdef class StateFlooded(State):
     #        return float(self.e_m) 
     
     cpdef double dpdT_const_V(self) except *:
-        cdef double obj(P):((1/self.rho_mix()) - v), Ref = self.Fluid, Liq = self.Liq, xL = self.xL, T = self.T_, P1 = self.p_
-        delta =1e-5
-        v = 1/self.rho_mix()
-        self.update(dict(T = T+delta, xL = self.xL_, P = self.p_))
-        P2 = newton(obj, P1)
-        f = (lambda P: (1/self.rho_mix()) - v)
-        P2 = fsolve(obj,P1)
-        return float((P2-P1)/delta)
+        cdef double f,P1,P2,v1,delta,eps,change,x1,x2,x3,y1,y2
+        cdef int iter
+        #Ref = self.Fluid, Liq = self.Liq,, xL = self.xL, T = self.T_, 
+        P1 = self.p_
+        v1 = 1.0/self.rho_mix()
+
+        delta=1.0e-5
+        eps = 1e-6
+        change = 999
+        iter = 1
+        
+        while (iter<3 or fabs(f)>eps) and iter < 100:
+            
+            if iter ==1:
+                x1 = P1
+                P2 = x1
+            elif iter == 2:
+                x2 = P1 + 0.001
+                P2 = x2
+            elif iter > 2:
+                P2 = x2
+                
+                self.update(dict(T = self.T_+delta, P = P2, xL = self.xL_))
+                f = (1.0/self.rho_mix()) - v1
+            
+            if iter==1:
+                y1 = f
+            elif iter > 1:
+                y2 = f
+                x3 = x2-y2/(y2-y1)*(x2-x1)
+                change = fabs(y2/(y2-y1)*(x2-x1))
+                y1=y2
+                x1=x2
+                x2=x3
+            iter = iter+1
+            
+            if iter > 50:
+                print 'dPdT_const_v not converging'
+            
+        
+        if isnan((P2-P1)/delta) == True:
+            print 'dpdt_v is a NaN'
+        if isinf((P2-P1)/delta) == True:
+            print 'dpdt_v is Infinite'
+        else:
+            return (P2-P1)/delta
+       
+
 
        
     cpdef double dudxL_mix(self) except *:
