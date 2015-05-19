@@ -391,7 +391,7 @@ cdef class StateFlooded(State):
     #        return float(self.e_m) 
     
     cpdef double dpdT_const_V(self) except *:
-        cdef double f,P1,P2,v1,delta,eps,change,x1,x2,x3,y1,y2
+        cdef double f,P1,P2,v1,T,delta,eps,change,x1,x2,x3,y1,y2
         cdef int iter
         #Ref = self.Fluid, Liq = self.Liq,, xL = self.xL, T = self.T_, 
         P1 = self.p_
@@ -412,8 +412,9 @@ cdef class StateFlooded(State):
                 P2 = x2
             if iter > 2:
                 P2 = x2
-                
-            self.update(dict(T = self.T_+delta, P = P2, xL = self.xL_))
+            
+            T = self.T_    
+            self.update(dict(T = T +delta, P = P2, xL = self.xL_))
             f = (1.0/self.rho_mix()) - v1
             
             if iter==1:
@@ -443,11 +444,22 @@ cdef class StateFlooded(State):
 
        
     cpdef double dudxL_mix(self) except *:
-
-        cdef double u_l, u_g, u_m
-        u_l = self.u_liq()
-        u_g = self.pAS.keyed_output(constants_header.iUmass)/1000.0
-        return u_l - u_g
+        
+        """
+        double dudxL_m ( char *Gas , char *Liq , double T, double P, double xL)
+        double delta =.001;
+        return ( u_m (Gas ,Liq ,T,P,xL+ delta )-u_m(Gas ,Liq ,T,P,xL))/ delta ;
+        """
+        
+        cdef double u_m1,u_m2 delta, xL
+        delta = 0.001
+        u_m1 = self.u_mix()
+        
+        xL = self.xL_
+        self.update(dict(T = self.T_, P = self.p_, xL = xL + delta ))
+        u_m2 = self.u_mix()
+        
+        return (u_m2 - u_m1)/delta
         
     # cpdef T_sp(self,s,p,xL,T_guess):   
     #     """
