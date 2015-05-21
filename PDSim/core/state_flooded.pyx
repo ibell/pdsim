@@ -601,7 +601,7 @@ cdef class StateFlooded(State):
 
     cpdef double get_dpdT(self) except *:
        """ Get dpdT_const_V, in [ ]"""
-        return self.dpdT_const_V
+        return self.dpdT_const_V()
     property dpdT:
         def __get__(self):
             return self.get_dpdT()
