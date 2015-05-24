@@ -32,6 +32,8 @@ cdef class IsentropicNozzleWrapper(FlowFunction):
     
 cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State State_down, double delta, int Type, double t = *, double ro = *)
 
+cpdef double TwoPhaseNozzle(double A, State State_up, State State_down, double psi, double sigma = 0.0)
+
 cdef class ValveModel(object):
     cdef public double E,A_port,A_valve,d_valve,l_valve,a_valve,h_valve,rho_valve,d_port,m_eff,C_D,k_valve,x_stopper
     cdef public bytes key_up, key_down
