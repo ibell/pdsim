@@ -461,6 +461,102 @@ cdef class StateFlooded(State):
         
         return (u_m2 - u_m1)/delta
         
+
+    cpdef double cK_e(self) except*:
+        
+        
+        
+        cdef double K, flag, psi,x,v_g,v_l
+        
+        
+        """
+        Equation taken from page 43, equation 4.51 from Chisholm for
+        liquid entrainment in gas. Value of psi 0.4 is recommended from text
+        
+        
+        cK_e(v_l,v_g,x,psi,flag):
+        
+        """
+        v_g = 1.0/self.rho_liq()
+        v_l = 1.0/self.pAS.rhomass()
+        
+        
+        if (x ==0 or x ==1):
+    
+            return 1
+    
+        if (flag >0.9 and flag <1.1):
+    
+            K=psi +(1.0 -psi)* sqrt(( v_g/v_l + psi*(1 -x)/x) /(1+ psi*(1 -x)/x))
+    
+        if (flag >1.9 and flag <2.1):
+            """
+            Chisholms sqrt (vh/vl)
+            """
+            K= sqrt(1.0+ x*( v_g /v_l -1.0))
+    
+        if (flag >2.9 and flag <3.1):
+    
+            K= pow(v_g/v_l ,0.25*.28) 
+
+      
+        return K
+    
+    cpdef double cv_e(self) except*:
+        
+        """
+        cv_e(v_l,v_g,K_e,x,psi,flag):
+        
+        """
+        cdef double ve,flag,x,K_e,K_c,psi,x, v_l, v_g
+        
+    
+        if (flag >0.9 and flag <1.1):
+            """
+            // using 5.48 and 5.49 from Chisholm
+            // if psi=0, separated flow results ( flag ==2 )
+            // if psi=1, homogeneous flow results ( flag == 5)
+            // So basically this form is general and captures all possibilities , sep , hom
+            , or entrained
+            // should use this one
+            //     (    [(1 -psi)^2] ) -1
+            // Kc= ( w+ [----------] )
+            //     (    [ K_e -psi ] )
+            """
+            Kc =1.0/( psi +((1.0 - psi) *(1.0 -psi))/( K_e -psi))
+            ve =(x* v_g + K_e *(1.0 -x)* v_l )*(x +(1.0 - x)/Kc)
+    
+        if (flag >1.9 and flag <2.1):
+            """
+            // Equation 5.13 from Chisholm for separated flow
+            """
+            ve =(x* v_g + K_e *(1.0 -x)* v_l )*(x +(1.0 - x)/ K_e )
+    
+        if (flag >2.9 and flag <3.1):
+            """
+            // Equation 2.48 from Chisholm
+            """
+            ve =(1+ w*(1 -x)/x*v_l/ v_g ) /(1+ w*(1 -x)/x)* v_g;
+    
+        if (flag >3.9 and flag <4.1):
+            """
+            // using 15 from Morris
+            // If going to use this formula , must change pow () to multiply
+            """
+            ve =(x* v_g + K_e *(1.0 -x)* v_l )*(x +(1.0 - x)/ K_e *(1+ (K_e -1)**2.0 /( (v_g /v_l)**0.5-1)))
+    
+        if (flag >4.9 and flag <5.1):
+            """
+            // homogenous
+            """
+            ve =(x* v_g +(1.0 - x)* v_l )
+    
+        return ve    
+    
+    
+    
+    
+    
     # cpdef T_sp(self,s,p,xL,T_guess):   
     #     """
     #     Solve for the temperature which gives the same entropy - s [kJ/kg-K], p [kPa], T [K]
@@ -611,3 +707,16 @@ cdef class StateFlooded(State):
     property dudxL:
         def __get__(self):
             return self.get_dudxL()
+
+
+    cpdef double get_cKe(self) except *:
+        return self.cK_e()
+    property cKe
+        def __get__(self):
+            return self.get_cKe()
+    
+    cpdef double get_cve(self) except *:
+        return self.cv_e()
+    property cve
+        def __get__(self):
+            return self.get_cve()

@@ -43,6 +43,8 @@ cdef class StateFlooded(State):
     cpdef double get_cv(self) except *
     cpdef double get_dpdT(self) except *
     cpdef double get_dudxL(self) except*
+    cpdef double get_cKe(self) except*
+    cpdef double get_cve(self) except*
     
     cpdef double s_mix(self) except *
     cpdef double u_mix(self) except *
@@ -66,3 +68,6 @@ cdef class StateFlooded(State):
     cpdef double cp_liq(self) except *
     cpdef double mu_liq(self) except *
     cpdef double k_liq(self) except *
+    
+    cpdef double cK_e(self) except *
+    cpdef double cv_e(self) except *
