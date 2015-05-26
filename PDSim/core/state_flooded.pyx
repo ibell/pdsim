@@ -5,6 +5,7 @@ import CoolProp.CoolProp
 import math
 from math import floor
 from math import log
+from math import sqrt
 import warnings
 from scipy import optimize
 from numpy import float64,isnan,isinf,fabs
@@ -508,7 +509,7 @@ cdef class StateFlooded(State):
         cv_e(v_l,v_g,K_e,x,psi,flag):
         
         """
-        cdef double ve,flag,x,K_e,K_c,psi,x, v_l, v_g
+        cdef double ve,flag,x,K_e,K_c,psi,v_l,v_g,w
         
     
         if (flag >0.9 and flag <1.1):
@@ -711,12 +712,12 @@ cdef class StateFlooded(State):
 
     cpdef double get_cKe(self) except *:
         return self.cK_e()
-    property cKe
+    property cKe:
         def __get__(self):
             return self.get_cKe()
     
     cpdef double get_cve(self) except *:
         return self.cv_e()
-    property cve
+    property cve:
         def __get__(self):
             return self.get_cve()
