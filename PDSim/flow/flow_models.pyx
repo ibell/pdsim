@@ -688,27 +688,36 @@ cpdef double TwoPhaseNozzle(double A, State State_up, State State_down, double p
     
 
     """
-    Two_Phase_Nozzle(gas,A,P_1,P_2,T_1,xL,psi,sigma):
+    Two_Phase_Nozzle(Gas,A,P_1,P_2,T_1,xL,psi,sigma):
     
     su -> su1
     Thermal equilibrium  Tsu_r = Tsu_o
     also at discharge  Tsu1_r = Tsu1_o
     """
 
-    cdef int N = 1000,I,j,
-    cdef double I,dP ,v_l ,v_g ,v_g0 ,K_e ,v_e_1 , v_e_high ,P,xG ,e_t ,G_max ,G_thr ,M,beta , v_e_thr ,T,
-gamma ,C_c_1 , C_d0, mdot
-    cdef double f,kN2 ,C_dg ,Prat ,C_dL ,w,v_h_t ,v_e_2 ,dI
-    
+    cdef int N = 1000,j
+    cdef double I, dP ,v_l ,v_g ,v_g0 ,K_e ,v_e_1 , v_e_high ,P,xG ,e_t ,G_max ,G_thr ,M,beta , v_e_thr ,T, gamma ,C_c_1 , C_d0, mdot
+    cdef double f,kN2 ,C_dg ,Prat ,C_dL ,w,v_h_t ,v_e_2 ,dI, T_1, P_1, P_2, xL, xg, w_ent
+    cdef c_p, c_v, rho_l, rho_g, Gas, cK_e, cv_e, vol_g, dvdP_m, mu_mix
     N = 1000
     I =0
-
+    c_p = 0
+    c_v = 0
+    rho_l = 0
+    rho_g = 0
+    cK_e = 0
+    cv_e = 0
+    vol_g = 0
+    dvdP_m = 0
+    mu_mix = 0
+    Gas = "string"
+    
     gamma = c_p(Gas ,T_1 , P_1 )/ c_v(Gas ,T_1 , P_1 );
     T= T_1 
     dP =( P_1 - P_2 )/N
     P= P_1 
     v_l =1/rho_l(T)
-    v_g =1/rho_g(gas,T,P)
+    v_g =1/rho_g(Gas,T,P)
     v_g0 =  v_g
     xG = 1 - xL
     K_e = cK_e(v_l ,v_g ,xg ,psi ,1.0)
@@ -719,7 +728,7 @@ gamma ,C_c_1 , C_d0, mdot
     while j <= N:
     
         P=P/1000.0-dP/1000. #[ kPa]
-        v_g =vol_g(gas,T,P)  #[m ^3/ kg]
+        v_g =vol_g(Gas,T,P)  #[m ^3/ kg]
         K_e = cK_e (v_l,v_g,xG ,psi,1.0) #[-]
         v_e_2 = cv_e(v_l ,v_g ,K_e ,xG ,psi,1.0) #[m^3/ kg]
         dI=dP/2.0*( v_e_1 + v_e_2 )
@@ -760,7 +769,7 @@ gamma ,C_c_1 , C_d0, mdot
     """
     Two - Phase Choking conditions
     """
-    G_max = sqrt( -1000.0/( xG* dvdP_mix(gas,T,P_2 ,0) +(1 - xG)* dvdP_m(gas,T,P_2,1) ))
+    G_max = sqrt( -1000.0/( xG* dvdP_m(Gas,T,P_2 ,0) +(1 - xG)* dvdP_m(Gas,T,P_2,1) ))
     M= G_thr*sqrt((- xG* dvdP_m(Gas,T,P_2,0) -(1-xG)*dvdP_m(Gas,T,P_2,1))/1000.0)
 
     if (M >1):
