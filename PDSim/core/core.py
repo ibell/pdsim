@@ -1046,7 +1046,7 @@ class PDSimCore(object):
             if sorted(self.stateVariables) == ['D','T','xL']:
                 self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist],'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
             elif sorted(self.stateVariables) == ['M','T','xL']:
-                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,]/V,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,]/self.core.V,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
             else:      
                 raise NotImplementedError            
         
@@ -1054,7 +1054,7 @@ class PDSimCore(object):
             if sorted(self.stateVariables) == ['D','T']:
                 self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
             elif sorted(self.stateVariables) == ['M','T']:
-                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/self.core.V)
             else:      
                 raise NotImplementedError
         else:
