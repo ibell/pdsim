@@ -1,10 +1,8 @@
 from CoolProp.State import State as StateClass
 from CoolProp.State cimport State as StateClass
-from PDSim.core.state_flooded import StateFlooded as StateFloodClass
-from PDSim.core.state_flooded cimport StateFlooded as StateFloodClass
 
 from libcpp cimport bool
-
+from PDSim.core.core import PDSimCore
 from PDSim.flow.flow import FlowPathCollection
 from PDSim.flow.flow cimport FlowPathCollection
 
@@ -39,7 +37,7 @@ cdef class ControlVolume(object):
     cdef public dict V_dV_kwargs
     cdef public object ForceFcn
     cdef public bint exists
-    cdef public StateClass state_flooded
+    cdef public StateClass State
 
 cdef class CVScore(object):
     cdef list array_list
@@ -73,6 +71,6 @@ cdef class ControlVolumeCollection(object):
 
     cpdef add(self, ControlVolume CV)
     cpdef rebuild_exists(self)
-    cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2, str name3, arraym array3)
+    cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2)
     cpdef volumes(self, double theta, bint as_dict = *)
     cpdef at(self, int i)
