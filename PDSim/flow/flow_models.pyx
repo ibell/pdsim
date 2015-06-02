@@ -711,7 +711,7 @@ cpdef double TwoPhaseNozzle(double A, State State_up, State State_down, double p
     dvdP_m = 0
     mu_mix = 0
     Gas = "string"
-    
+    #TODO: derive properties from State_Flooded class
     gamma = c_p(Gas ,T_1 , P_1 )/ c_v(Gas ,T_1 , P_1 );
     T= T_1 
     dP =( P_1 - P_2 )/N

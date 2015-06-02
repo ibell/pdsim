@@ -8,7 +8,10 @@ from PDSim.flow.flow cimport FlowPathCollection
 
 from PDSim.misc.datatypes cimport arraym
 from PDSim.misc.datatypes import arraym
-    
+
+#TODO: is it correct to be defined here ?
+cpdef public bint __hasLiquid__ 
+
 cdef class TubeCollection(list):
     cdef dict _Nodes
     cdef arraym harray, parray, Tarray
@@ -51,6 +54,11 @@ cdef class CVArrays(CVScore):
 
     # Storage arrays
     cdef public arraym T,p,h,rho,V,dV,cp,cv,m,v,dpdT_constV,Q,xL,dudxL
+    
+    #  Flooding instance
+    #TODO: it should be a boolean. Check if it is correct
+    cdef readonly bint __hasLiquid__
+    
     
     # Property derivative arrays
     cdef public arraym drhodtheta, dTdtheta, dmdtheta, dxLdtheta, summerdm, summerdT, summerdxL, property_derivs

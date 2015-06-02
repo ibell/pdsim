@@ -227,7 +227,7 @@ cdef class CVArrays(CVScore):
     all the control volumes that are passed into the instantiator
     """
     
-    def __init__(self, int N):
+    def __init__(self, int N, __hasLiquid__ = False):
         self.array_list = ['T','p','h','rho','V','dV','cp','cv','m','v','dpdT_constV','Q','xL','dudxL','drhodtheta', 
                            'dTdtheta','dmdtheta','dxLdtheta','summerdm','summerdT','summerdxL','property_derivs']
         self.build_all(N)
@@ -318,7 +318,11 @@ cdef class CVArrays(CVScore):
             self.just_volumes(CVs,theta)
         
             # Split the state variable array into chunks        
-        
+            
+            #TODO: xL
+            
+            
+
             for i in range(N):
                 self.T.data[i] = x.data[i]
             
@@ -596,6 +600,25 @@ cdef class ControlVolumeCollection(object):
         """
         cdef ControlVolume CV
         return [CV.State.get_dpdT() for CV in self.exists_CV]
+
+
+    @property
+    def xL(self):
+        """
+        Liquid mass fraction for each CV that exists
+        """
+        cdef ControlVolume CV
+        return [CV.state_flooded.get_xL() for CV in self.exists_CV]  
+                
+    @property
+    def dudxL(self):
+        """
+        Derivative of the specific internal energy with respect the liquid mass fraction for each CV that exists
+        """    
+        cdef ControlVolume CV
+        return [CV.state_flooded.get_dudxL() for CV in self.exists_CV]
+
+
                 
     # elif self.__hasLiquid__ == True:
 
