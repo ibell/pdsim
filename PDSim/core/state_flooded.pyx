@@ -110,6 +110,22 @@ cdef class StateFlooded(State):
         #self.rho_ = self.pAS.rhomass()
     
     cpdef double s_liq(self) except *:
+        """
+        Specific entropy of the flooding medium
+
+        Parameters
+        ----------
+        T: float
+            Temperature [K]
+        Liq: string
+             Current lubricant implemented: "PAO", "PAG", "POE", "Duratherm LT", "Zerol 60","Water"
+             
+        Returns
+        -------
+        s_l: float
+            specific entropy [J/kg-K]
+        """
+        
         cdef double T0 = 273.15, P0 = 101.325, s_l, T = self.T_
 
         if self.Liq == b"PAO":
@@ -142,8 +158,14 @@ cdef class StateFlooded(State):
     
     cpdef double s_mix(self) except *: 
         """
-        Entropy of the mixture as a function of temperature [K] and pressure [kPa].  Output in kJ/kg-K
+        Entropy of the mixture 
+        
+        Returns
+        ---------
+        s_m: float
+            specific entropy [kJ/kg-K]
         """
+        
         cdef double s_g, s_l
         s_g = self.pAS.keyed_output(constants_header.iSmass)/1000.0
         s_m = self.xL_*self.s_liq() + (1-self.xL_)*s_g
@@ -151,7 +173,21 @@ cdef class StateFlooded(State):
         
     cpdef double u_liq(self) except *:
         """
+        Specific internal energy of the flooding medium
+
+        Parameters
+        ----------
+        T: float
+            Temperature [K]
+        Liq: string
+             Current lubricant implemented: "PAO", "PAG", "POE", "Duratherm LT", "Zerol 60","Water"
+             
+        Returns
+        -------
+        u_l: float
+            specific internal energy [J/kg]
         """
+        
         cdef double T = self.T_
         if self.Liq == b"Duratherm_LT":
             #internal energy [kJ/kg] of Duratherm LT given T in K
@@ -167,8 +203,14 @@ cdef class StateFlooded(State):
     
     cpdef double u_mix(self) except *:
         """
-        input in K, [-] output in J/kg
+        Specific internal energy of the mixture 
+        
+        Returns
+        ---------
+        u_m: float
+            specific internal energy [kJ/kg]
         """
+        
         cdef double u_l, u_g, u_m
         u_l = self.u_liq()
         u_g = self.pAS.keyed_output(constants_header.iUmass)/1000.0
@@ -176,6 +218,25 @@ cdef class StateFlooded(State):
         return u_m
     
     cpdef double h_liq(self) except *:  
+        """
+        Specific enthalpy of the flooding medium
+
+        Parameters
+        ----------
+        T: float
+            Temperature [K]
+        P: float
+            Pressure [kPa]
+        Liq: string
+             Current lubricant implemented: "PAO", "PAG", "POE", "Duratherm LT", "Zerol 60","Water"
+             
+        Returns
+        -------
+        h_l: float
+            specific enthalpy[J/kg]
+        """        
+        
+        
         cdef double T0 = 273.15, P0 = 101.325, h = 0, h_l = 0, T = self.T_, P = self.p_
         if self.Liq == b'PAO':
             h_l = 1.940*(T-T0)+(P-P0)/849
@@ -204,12 +265,37 @@ cdef class StateFlooded(State):
         return h_l*1000
         
     cpdef double h_mix(self) except *:
+        """
+        Specific enthalpy of the mixture 
+        
+        Returns
+        ---------
+        h_m: float
+            specific internal energy [kJ/kg]
+        """
+        
         cdef double h_g, h_m
         h_g = self.pAS.keyed_output(constants_header.iHmass)/1000.0
         h_m = self.xL_*self.h_liq() + (1-self.xL_)*h_g
         return h_m
         
     cpdef double rho_liq(self) except *:
+        """
+        Density of the flooding medium
+
+        Parameters
+        ----------
+        T: float
+            Temperature [K]
+        Liq: string
+             Current lubricant implemented: "PAO", "PAG", "POE", "Duratherm LT", "Zerol 60","Water"
+             
+        Returns
+        -------
+        rho_l: float
+            density [kg/m^3]
+        """        
+        
         cdef double rho_l, T = self.T_
         if self.Liq == b'PAO':
             rho_l = 849
@@ -234,6 +320,21 @@ cdef class StateFlooded(State):
         return rho_l
     
     cpdef double rho_mix(self) except *:
+        """
+        Density of the mixture 
+        
+        Parameters
+        ----------
+        model: string
+                Slip ratio correlation: "HEM", "Zivi","Fauske"
+        
+        Returns
+        ---------
+        rho_m: float
+            specific internal energy [kJ/kg]
+        
+        """
+        
         cdef double rho, v_g, v_l, x_g, S, x
         
         v_l = 1.0/self.rho_liq()
@@ -248,15 +349,31 @@ cdef class StateFlooded(State):
         elif self.model == 'Fauske':
             S = (v_g/v_l)**(0.5)     # Eqn. 4.57 from Chisholm
         
-        rho = (x + S*(1.0-x))/(x*v_g + S*(1.0-x)*v_l) #Eq 2.36 from Chisholm
+        rho_m = (x + S*(1.0-x))/(x*v_g + S*(1.0-x)*v_l) #Eq 2.36 from Chisholm
         
         if x>0:
             self.alpha = 1.0/(1.0+(1.0-x)/x*v_l/v_g*S)
         else:
             self.alpha = 0.0
-        return rho
+        return rho_m
 
     cpdef double cp_liq(self) except *:
+        """
+        Specific heat of the flooding medium
+
+        Parameters
+        ----------
+        T: float
+            Temperature [K]
+        Liq: string
+             Current lubricant implemented: "PAO", "PAG", "POE", "Duratherm LT", "Zerol 60","Water"
+             
+        Returns
+        -------
+        cp_l: float
+            specific heat [J/kg-K]
+        """ 
+        
         cdef double T = self.T_, cp_l
         if self.Liq == b'PAO':
             cp_l = 1.940
@@ -284,6 +401,16 @@ cdef class StateFlooded(State):
         return cp_l*1000
             
     cpdef double cp_mix(self) except *:
+        """
+        Specific heat at constant pressure of the mixture 
+
+        Returns
+        ---------
+        cp_m: float
+            specific heat [kJ/kg-K]
+        
+        """        
+        
         cdef double cp_g, cp_l, xL = self.xL_
         cp_g = self.pAS.cpmass()/1000.0
         cp_l = self.cp_liq()
@@ -291,6 +418,16 @@ cdef class StateFlooded(State):
         return cp_m
         
     cpdef double cv_mix(self) except *:
+        """
+        Specific heat at constant volume of the mixture 
+
+        Returns
+        ---------
+        cv_m: float
+            specific heat [kJ/kg-K]
+        
+        """ 
+
         cdef double cv_g, cv_l, xL = self.xL_
         cv_g = self.pAS.cvmass()/1000.0
         cv_l = self.cp_liq()
@@ -299,8 +436,21 @@ cdef class StateFlooded(State):
     
     cpdef double mu_liq(self) except *:
         """
-        Dynamic Viscosity [Pa-s]
+        Dynamic viscosity of the flooding medium
+
+        Parameters
+        ----------
+        T: float
+            Temperature [K]
+        Liq: string
+             Current lubricant implemented: "PAO", "PAG", "POE", "Duratherm LT", "Zerol 60","Water"
+             
+        Returns
+        -------
+        mu_l: float
+            dynamic viscosity [Pa-s]
         """
+        
         cdef double T = self.T_, mu_l
         
         if self.Liq == b'Duratherm_LT': 
@@ -320,6 +470,16 @@ cdef class StateFlooded(State):
         return mu_l
         
     cpdef double mu_mix(self) except *:
+        """
+        Dynamic viscosity of the mixture 
+
+        Returns
+        ---------
+        mu_m: float
+            dynamic viscosity [Pa-s]
+        
+        """ 
+        
         cdef double mu_l, mu_g, mu_m, xL = self.xL_
         mu_l = self.mu_liq()
         mu_g = self.pAS.keyed_output(constants_header.iviscosity)
@@ -328,8 +488,23 @@ cdef class StateFlooded(State):
             
     cpdef double VoidFrac(self) except *:
         """
-        Input in K,kPa , [-] output [-] 
+        Void Fraction of the mixture
+        
+        Parameters
+        ----------
+        T: float
+            Temperature [K]
+        P:float
+            Pressure [kPa]
+        xL: float
+            Liquid mass fraction [-]
+
+        Returns
+        -------
+        VF: float
+            Void fraction [-]
         """
+        
         cdef double rho_l, rho_g, xL = self.xL_, VF
         rho_l = self.rho_liq()
         rho_g = self.pAS.rhomass()
@@ -337,6 +512,21 @@ cdef class StateFlooded(State):
         return VF
     
     cpdef double k_liq(self) except *:
+        """
+        Thermal Conductivity of the flooding medium
+        
+        Parameters
+        ----------
+        T: float
+            Temperature [K]
+
+        Returns
+        -------
+        k_l: float
+            Thermal conductivity [W/m-K]
+        """        
+        
+
         cdef double T = self.T_
         if self.Liq == b'Duratherm_LT': 
             k_l = -9e-5*T + 0.1223
@@ -353,8 +543,19 @@ cdef class StateFlooded(State):
         
     cpdef double k_mix(self) except *:
         """
-        Input in K, kPa , [-] output in kW/m-K
-        """
+        Thermal Conductivity of the mixture
+        
+        Parameters
+        ----------
+        T: float
+            Temperature [K]
+
+        Returns
+        -------
+        k_m: float
+            Thermal conductivity [kW/m-K]
+        """ 
+        
         cdef double k_l, k_g, VF, k_m
         k_l = self.k_liq()
         k_g = self.pAS.keyed_output(constants_header.iconductivity)/1000
@@ -364,11 +565,16 @@ cdef class StateFlooded(State):
     
     cpdef double Pr_mix(self) except *: 
         """
-        ## Prandtl Number
-        #TODO: maybe it is Prm (pag491 Ian Thesis)
+        Prandtl Number of the mixture
+        
+        Returns
+        -------
+        Pr_m: float
+                Prandtl Number [-]
         """
-        cdef double Pr = (self.cp_mix()*self.mu_mix())/self.k_mix()
-        return Pr
+        
+        cdef double Pr_m = (self.cp_mix()*self.mu_mix())/self.k_mix()
+        return Pr_m
             
     cpdef double kstar_mix(self) except *:
         cdef double xL = self.xL_, kstar_m, cv_g, cp_g
