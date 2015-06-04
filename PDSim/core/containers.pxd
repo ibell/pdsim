@@ -31,11 +31,12 @@ cdef class Tube(object):
 cdef class TubeCollection(list):
     cdef readonly bint __hasLiquid__
     cdef dict _Nodes
-    cdef arraym harray, parray, Tarray
+    cdef arraym harray, parray, Tarray, xLarray
     cpdef update_existence(self, int NCV)
     cpdef arraym get_h(self)
     cpdef arraym get_p(self)
     cpdef arraym get_T(self)
+    cpdef arraym get_xL(self)
     cpdef dict get_Nodes(self)
     cpdef update(self)
     
@@ -47,6 +48,7 @@ cdef class CVScore(object):
     cdef free_all(self)
     cpdef copy(self)
     cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, arraym parray, arraym Tarray)
+    cpdef calculate_flows_flood(self, FlowPathCollection Flows, arraym harray, arraym parray, arraym Tarray, arraym xLarray)
 
 cdef class CVArrays(CVScore):
     cdef public arraym T,p,h,rho,V,dV,cp,cv,m,v,dpdT_constV,Q,xL,dudxL
@@ -80,5 +82,6 @@ cdef class ControlVolumeCollection(object):
     cpdef add(self, ControlVolume CV)
     cpdef rebuild_exists(self)
     cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2)
+    cpdef updateStatesFlood(self, str name1, arraym array1, str name2, arraym array2, str name3, arraym array3)
     cpdef volumes(self, double theta, bint as_dict = *)
     cpdef at(self, int i)
