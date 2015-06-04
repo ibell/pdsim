@@ -4,9 +4,8 @@ cimport cython
 cdef public enum STATE_VARS:
     STATE_VARS_TD
     STATE_VARS_TM
-    # TODO: For Oil Flooding
-    # STATE_VARS_TDxL
-    # STATE_VARS_TMxL
+    STATE_VARS_TDxL
+    STATE_VARS_TMxL
     
 cdef class Tube(object):
     """
@@ -134,6 +133,12 @@ cdef class TubeCollection(list):
         """
         return self.Tarray
         
+    cpdef arraym get_xL(self):
+        """
+
+        """
+        return self.xLarray
+        
     cpdef update_existence(self, int NCV):
         """
         Set the indices for each tube node in the array of enthalpies
@@ -141,7 +146,7 @@ cdef class TubeCollection(list):
         First index is equal to NCV since python (& c++) are 0-based indexing
         """
         cdef int i = NCV
-        h,p,T = [],[],[]
+        h,p,T,xL = [],[],[],[]
         if self.__hasLiquid__ == False:
             for Tube in self:
                 h.append(Tube.State1.h)
@@ -156,7 +161,7 @@ cdef class TubeCollection(list):
             self.harray = arraym(h)
             self.parray = arraym(p)
             self.Tarray = arraym(T)
-        # TODO: For Oil Flooding - Include xLarray        
+       
         else:
             for Tube in self:
                 h.append(Tube.StateFlood1.h)
@@ -165,12 +170,15 @@ cdef class TubeCollection(list):
                 p.append(Tube.StateFlood2.p)
                 T.append(Tube.StateFlood1.T)
                 T.append(Tube.StateFlood2.T)
+                xL.append(Tube.StateFlood1.xL)
+                xL.append(Tube.StateFlood2.xL)
                 Tube.i1 = i
                 Tube.i2 = i+1 
                 i += 2
             self.harray = arraym(h)
             self.parray = arraym(p)
             self.Tarray = arraym(T)
+            self.xLarray = arraym(xL)
             
     property Nodes:
         def __get__(self):
@@ -260,17 +268,33 @@ cdef class CVScore(object):
         parray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
         Tarray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
         """
-        if self.__hasLiquid__ == False:
-            Flows.calculate(harray, parray, Tarray)
-        # TODO: For Oil Flooding - Include xLarray 
-        else:
-            Flows.calculate(harray, parray, Tarray)
-        
-        if self.__hasLiquid__ == False:    
-            Flows.sumterms(self.summerdT, self.summerdm)    
-        # TODO: For Oil Flooding - Include self.summerdxL
-        else:
-            Flows.sumterms(self.summerdT, self.summerdm)  
+
+        Flows.calculate(harray, parray, Tarray)   
+        Flows.sumterms(self.summerdT, self.summerdm)     
+            
+    cpdef calculate_flows_flood(self, FlowPathCollection Flows, arraym harray, arraym parray, arraym Tarray, arraym xLarray):
+        """
+        Calculate the flows between tubes and control volumes and sum up the
+        flow-related terms
+        Loads the arraym instances ``summerdT`` and ``summerdm`` of this class
+        These terms are defined by
+        .. math::
+            \\mathrm{summerdm} = \\sum  \\frac{\\dot m}{\\omega}
+        and
+        .. math::
+            \\mathrm{summerdT} = \\sum  \\frac{\\dot m h}{\\omega}
+        where the signs are dependent on whether the flow is into or out of the
+        given control volume
+        Parameters
+        ----------
+        Flows : :class:`FlowPathCollection <PDSim.flow.flow.FlowPathCollection>` instance
+        harray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
+        parray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
+        Tarray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
+        """
+
+        Flows.calculateFlood(harray, parray, Tarray, xLarray)
+        Flows.sumtermsFlood(self.summerdT, self.summerdm, self.summerdxL)  
         
 cdef class CVArrays(CVScore):
     """
@@ -363,7 +387,7 @@ cdef class CVArrays(CVScore):
                 self.dpdT_constV.data[iCV] = State.get_dpdT()
             self.N = N
             self.state_vars = state_vars
-        # TODO: For Oil Flooding - change STATE_VARS from TM & TD to TMxL & TDxL
+
         else:
         
             #Calculate the volumes
@@ -373,14 +397,14 @@ cdef class CVArrays(CVScore):
             for i in range(N):
                 self.T.data[i] = x.data[i]
             
-            if state_vars == STATE_VARS_TM:
+            if state_vars == STATE_VARS_TMxL:
                 i = 0
                 for j in xrange(N, 2*N):
                     self.m.data[i] = x.data[j]
                     i += 1
                 for iCV in range(N):
                     self.rho.data[iCV] = self.m.data[iCV]/self.V.data[iCV]
-            elif state_vars == STATE_VARS_TD:
+            elif state_vars == STATE_VARS_TDxL:
                 i = 0
                 for j in xrange(N, 2*N):
                     self.rho.data[i] = x.data[j]
@@ -456,16 +480,16 @@ cdef class CVArrays(CVScore):
                     self.property_derivs.set_index(i + self.N, self.dmdtheta.data[i])
                 elif self.state_vars == STATE_VARS_TD:
                     self.property_derivs.set_index(i + self.N, self.drhodtheta.data[i]) 
-        # TODO: For Oil Flooding - change STATE_VARS from TM & TD to TMxL & TDxL           
+         
         else:
             for i in range(self.N):
                 self.property_derivs.set_index(i, self.dTdtheta.data[i])
         
-                if self.state_vars == STATE_VARS_TM:
+                if self.state_vars == STATE_VARS_TMxL:
                     self.property_derivs.set_index(i + self.N, self.dmdtheta.data[i])
                     self.property_derivs.set_index(i + self.N, self.dxLdtheta.data[i])
                 
-                elif self.state_vars == STATE_VARS_TD:
+                elif self.state_vars == STATE_VARS_TDxL:
                     self.property_derivs.set_index(i + self.N, self.drhodtheta.data[i])
                     self.property_derivs.set_index(i + self.N, self.dxLdtheta.data[i]) 
         
@@ -699,22 +723,20 @@ cdef class ControlVolumeCollection(object):
 
     
     cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2):
-        if self.__hasLiquid__ == False:
-            # if not len(array1) == len(array2) or not len(array2)==len(self.exists_CV):
-            #     raise AttributeError('length of arrays must be the same and equal number of CV in existence')
-            keys = self.exists_keys
-            # Update each of the states of the control volume
-            for CV,v1,v2 in zip(self.exists_CV, array1, array2):
-                CV.State.update({name1:v1,name2:v2})
-        # TODO: For Oil Flooding - Look if updateStates inputs are okay
-        else:
-            # if not len(array1) == len(array2) or not len(array2)==len(self.exists_CV):
-            #     raise AttributeError('length of arrays must be the same and equal number of CV in existence')
-            keys = self.exists_keys
-            # Update each of the states of the control volume
-            for CV,v1,v2 in zip(self.exists_CV, array1, array2):
-                CV.StateFlood.update({name1:v1,name2:v2})
-    
+        # if not len(array1) == len(array2) or not len(array2)==len(self.exists_CV):
+        #     raise AttributeError('length of arrays must be the same and equal number of CV in existence')
+        keys = self.exists_keys
+        # Update each of the states of the control volume
+        for CV,v1,v2 in zip(self.exists_CV, array1, array2):
+            CV.State.update({name1:v1,name2:v2})
+                
+    cpdef updateStatesFlood(self, str name1, arraym array1, str name2, arraym array2, str name3, arraym array3):
+        # if not len(array1) == len(array2) or not len(array2)==len(self.exists_CV):
+        #     raise AttributeError('length of arrays must be the same and equal number of CV in existence')
+        keys = self.exists_keys
+        # Update each of the states of the control volume
+        for CV,v1,v2,v3 in zip(self.exists_CV, array1, array2, array3):
+            CV.StateFlood.update({name1:v1,name2:v2,name3:v3})
     
     cpdef volumes(self, double theta, bint as_dict = False):
         """
