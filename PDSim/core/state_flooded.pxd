@@ -36,6 +36,7 @@ cdef class StateFlooded(State):
     cpdef double get_rho(self) except *
     cpdef double get_s(self) except *
     cpdef double get_u(self) except *
+    cpdef double get_e(self) except*:
     cpdef double get_visc(self) except *
     cpdef double get_cond(self) except *
     cpdef double get_cp(self) except *
@@ -49,6 +50,7 @@ cdef class StateFlooded(State):
     cpdef double s_mix(self) except *
     cpdef double u_mix(self) except *
     cpdef double h_mix(self) except *
+    cpdef double e_mix(self) except *
     cpdef double rho_mix(self) except *
     cpdef double cp_mix(self) except *
     cpdef double cv_mix(self) except *

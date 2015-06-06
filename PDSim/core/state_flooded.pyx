@@ -123,7 +123,7 @@ cdef class StateFlooded(State):
         Returns
         -------
         s_l: float
-            specific entropy [J/kg-K]
+            specific entropy [kJ/kg-K]
         """
         
         cdef double T0 = 273.15, P0 = 101.325, s_l, T = self.T_
@@ -154,7 +154,7 @@ cdef class StateFlooded(State):
         else:
             raise ValueError(b"Invalid liquid:" + self.Liq)
     
-        return s_l*1000 #J/kg-K
+        return s_l #kJ/kg-K
     
     cpdef double s_mix(self) except *: 
         """
@@ -185,7 +185,7 @@ cdef class StateFlooded(State):
         Returns
         -------
         u_l: float
-            specific internal energy [J/kg]
+            specific internal energy [kJ/kg]
         """
         
         cdef double T = self.T_
@@ -199,7 +199,7 @@ cdef class StateFlooded(State):
         else:
             raise ValueError(b"Invalid liquid:" + self.Liq)
         
-        return u_l*1000  #J/kg
+        return u_l  #kJ/kg
     
     cpdef double u_mix(self) except *:
         """
@@ -233,7 +233,7 @@ cdef class StateFlooded(State):
         Returns
         -------
         h_l: float
-            specific enthalpy[J/kg]
+            specific enthalpy[kJ/kg]
         """        
         
         
@@ -262,7 +262,7 @@ cdef class StateFlooded(State):
         else:
             raise ValueError(b"Invalid liquid:" + self.Liq)
             
-        return h_l*1000
+        return h_l #kJ/kg
         
     cpdef double h_mix(self) except *:
         """
@@ -278,7 +278,40 @@ cdef class StateFlooded(State):
         h_g = self.pAS.keyed_output(constants_header.iHmass)/1000.0
         h_m = self.xL_*self.h_liq() + (1-self.xL_)*h_g
         return h_m
-        
+
+    cpdef double e_mix(self) except *:
+       """
+       Specific Exergy of the mixture
+       
+       
+       Returns
+       -------
+       e_mix: float
+                Specific exergy [kJ/kg]
+       """
+       
+       cdef double T0_ref = 25+273.15, P0_ref = 101.325, 
+       cdef double e_m, h_mix, h_mix_ref, s_mix, s_mix_ref
+  
+       h_mix = self.h_mix()
+       s_mix = self.s_mix()
+       
+       self.update(dict(T = T0_ref, P = P0_ref, xL = self.xL_))
+       
+       h_mix_ref = self.h_mix()
+       s_mix_ref = self.s_mix()
+       
+       
+       e_m = h_mix - h_mix_ref - T0_ref*(s_mix) # - s_mix_ref
+    
+       if isnan(e_m) == True:
+           print 'e_m is a NaN'
+       if isinf(e_m) == True:
+           print 'e_m is Infinite'
+       else:
+           return e_m
+
+
     cpdef double rho_liq(self) except *:
         """
         Density of the flooding medium
@@ -371,7 +404,7 @@ cdef class StateFlooded(State):
         Returns
         -------
         cp_l: float
-            specific heat [J/kg-K]
+            specific heat [kJ/kg-K]
         """ 
         
         cdef double T = self.T_, cp_l
@@ -398,7 +431,7 @@ cdef class StateFlooded(State):
         elif self.Liq == b"ACD100FY":
             # 273 < T [K] < 387
             cp_l = 1.304 + 1.035e-3*T+2.801e-6*T**2   #[kJ/kg-K]
-        return cp_l*1000
+        return cp_l #[kJ/kg]
             
     cpdef double cp_mix(self) except *:
         """
@@ -577,27 +610,59 @@ cdef class StateFlooded(State):
         return Pr_m
             
     cpdef double kstar_mix(self) except *:
+        
+        """
+        Ratio of specific heats defined by Hugenroth (2006)
+        
+        Parameters
+        ----------
+        cp_g: float
+                Specific heat at constant pressure of the refrigerant [kJ/kg-K]
+        cv_g: float
+                Specific heat at constant volume of the refrigerant [kJ/kg-K] 
+        cp_liq: float
+                Specific heat of the flooding medium [kJ/kg-K]
+        xL: float
+            Liquid mass fraction [-]
+        
+        Returns
+        -------
+        kstar_m: float
+                    Ratio of specific heats of the mixture [-]
+
+        """
+        
+        
         cdef double xL = self.xL_, kstar_m, cv_g, cp_g
         cp_g = self.pAS.cpmass()/1000.0
         cv_g = self.pAS.cvmass()/1000.0
         kstar_m =((1-xL)*cp_g + xL*self.cp_liq())/((1-xL)*cv_g + xL*self.cp_liq())
         return kstar_m
     
-    #def e_mix(self):
-    #    
-    #    self.T0 =25+273.15
-    #    self.P0 =101.325
-    #    
-    #    self.e_m = (self.h_mix(Ref,Liq,T,P,xL) - self.h_mix(Ref,Liq,self.T0,self.P0,xL)) - self.T0*(self.s_mix(Ref,Liq,T,P,xL) - #self.s_mix(Ref,Liq,self.T0,self.P0,xL));
-    #
-    #    if isnan(self.e_m) == True:
-    #        print 'e_m is a NaN'
-    #    if isinf(self.e_m) == True:
-    #        print 'e_m is Infinite'
-    #    else:
-    #        return float(self.e_m) 
-    
+
     cpdef double dpdT_const_V(self) except *:
+        """
+        Derivative of pressure over the temperature at constant specific
+        volume of the mixture
+        
+        Parameters
+        ----------
+        P: float
+            Pressure [kPa]
+        v: float
+            Specific volume [m^3/kg]
+        T: float
+            Temperature [K]
+        
+        Returns
+        -------
+        dPdT_v: float
+                Derivative [kPa/K]
+        
+        
+        """
+    
+        
         cdef double f,P1,P2,v1,T,delta,eps,change,x1,x2,x3,y1,y2
         cdef int iter
         #Ref = self.Fluid, Liq = self.Liq,, xL = self.xL, T = self.T_, 
@@ -651,13 +716,27 @@ cdef class StateFlooded(State):
 
        
     cpdef double dudxL_mix(self) except *:
+        """
+        Derivative of the internal energy of the mixture over the liquid mass fraction
+        
+        Parameters
+        ----------
+        P: float
+            Pressure [kPa]
+        T: float
+            Temperature [K]
+        um: float
+            Specific internal energy of the mixture [kJ/kg]
+        xL: float
+            Liquid mass fraction [-]
+
+        Returns
+        -------
+        dudxL_m: float
+                Derivative [kJ/kg]
         
         """
-        double dudxL_m ( char *Gas , char *Liq , double T, double P, double xL)
-        double delta =.001;
-        return ( u_m (Gas ,Liq ,T,P,xL+ delta )-u_m(Gas ,Liq ,T,P,xL))/ delta ;
-        """
-        
+
         cdef double u_m1,u_m2, delta, xL
         delta = 0.001
         u_m1 = self.u_mix()
@@ -670,35 +749,49 @@ cdef class StateFlooded(State):
         
 
     cpdef double cK_e(self) except*:
-        
-        
-        
-        cdef double K, flag, psi,x,v_g,v_l
-        
-        
         """
-        Equation taken from page 43, equation 4.51 from Chisholm for
+        Effective slip ratio of the mixture
+        
+        Equation taken from page 43, equation 4.51 from Chisholm (1983) for
         liquid entrainment in gas. Value of psi 0.4 is recommended from text
         
+        Parameters
+        ----------
+        x: float
+            Mass dryness fraction [-]
+        w: float
+            entrainment [-]
         
-        cK_e(v_l,v_g,x,psi,flag):
+        Returns
+        -------
+        Ke: float
+                Effective slip ratio [-]
+        """        
         
-        """
-        v_g = 1.0/self.rho_liq()
-        v_l = 1.0/self.pAS.rhomass()
+        
+        cdef double K, flag, x,v_g,v_l
+
+        x = 1 - self.xL_
+        v_l = 1.0/self.rho_liq()
+        v_g = 1.0/self.pAS.rhomass()
         
         
         if (x ==0 or x ==1):
-    
+            """
+            Homogenous flow
+            """
             return 1
     
         if (flag >0.9 and flag <1.1):
-    
-            K=psi +(1.0 -psi)* sqrt(( v_g/v_l + psi*(1 -x)/x) /(1+ psi*(1 -x)/x))
+            """
+            Entrainment slip ratio
+            From Chisholm (1983) w=0.4
+            """            
+            K= w +(1.0 -w)* sqrt(( v_g/v_l + w*(1-x)/x) /(1+ w*(1-x)/x))
     
         if (flag >1.9 and flag <2.1):
             """
-            Chisholms sqrt (vh/vl)
+            Chisholms sqrt(vh/vl)
             """
             K= sqrt(1.0+ x*( v_g /v_l -1.0))
     
@@ -706,18 +799,25 @@ cdef class StateFlooded(State):
     
             K= pow(v_g/v_l ,0.25*.28) 
 
-      
         return K
     
     cpdef double cv_e(self) except*:
-        
         """
-        cv_e(v_l,v_g,K_e,x,psi,flag):
+        Effective specific volume of the mixture
+
+        Returns
+        -------
+        ve: float
+                effective specific volume [-]
+        """           
+
+        cdef double ve,flag,x,K_e,K_c,v_l,v_g,w
         
-        """
-        cdef double ve,flag,x,K_e,K_c,psi,v_l,v_g,w
+        K_e = self.cK_e()
+        x = 1 - self.xL_
+        v_l = 1.0/self.rho_liq()
+        v_g = 1.0/self.pAS.rhomass()
         
-    
         if (flag >0.9 and flag <1.1):
             """
             // using 5.48 and 5.49 from Chisholm
@@ -730,7 +830,7 @@ cdef class StateFlooded(State):
             // Kc= ( w+ [----------] )
             //     (    [ K_e -psi ] )
             """
-            Kc =1.0/( psi +((1.0 - psi) *(1.0 -psi))/( K_e -psi))
+            Kc =1.0/( w +((1.0 - w) *(1.0 -w))/( K_e -w))
             ve =(x* v_g + K_e *(1.0 -x)* v_l )*(x +(1.0 - x)/Kc)
     
         if (flag >1.9 and flag <2.1):
@@ -803,13 +903,25 @@ cdef class StateFlooded(State):
     
     cpdef double T_crit(self) except *:    
         """
-        Return the critical temperature of the refrigerant [K]
+        Critical temperature of the refrigerant 
+        
+        Returns
+        -------
+        Tcrit: float
+                Temperature [K]
+
         """
         return self.pAS.keyed_output(constants_header.iT_critical)
     
     cpdef double p_crit(self) except *:    
         """
-        Return the critical pressure of the refrigerant [kPa]
+        Critical pressure of the refrigerant 
+        
+        Returns
+        -------
+        pcrit: float
+                Pressure [kPa]
+
         """
         return self.pAS.keyed_output(constants_header.iP_critical)/1000.0
     ##
@@ -869,6 +981,16 @@ cdef class StateFlooded(State):
         """ The specific enthalpy [kJ/kg/K] """
         def __get__(self):
             return self.get_s()
+
+    
+    cpdef double get_e(self) except *:
+        """ Get specific exergy [kJ/kg] """
+        return self.e_mix()
+    property e:
+        """ The specific exergy [kJ/kg] """
+        def __get__(self):
+            return self.get_e()
+
 
     cpdef double get_cp(self) except *:
         """ Get the specific heat at constant pressure  [kJ/kg/K] """
