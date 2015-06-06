@@ -7,3 +7,6 @@
 [submodule "externals/scipy-sphinx-theme"]
 	path = externals/scipy-sphinx-theme
 	url = https://github.com/scipy/scipy-sphinx-theme
+[submodule "externals/msgpack-c"]
+	path = externals/msgpack-c
+	url = https://github.com/msgpack/msgpack-c

@@ -7,6 +7,9 @@ import inspect
 ##--  Package imports  --
 from PDSim.flow import flow,flow_models
 from containers import STATE_VARS_TM, CVArrays
+
+#TODO: eventually define a STATE_VARS_TMxL externally that takes StateClass from CoolProp and FloodProps and returns homog properties  (Davide)
+
 from PDSim.flow.flow import FlowPathCollection
 from containers import ControlVolumeCollection,TubeCollection
 from PDSim.plot.plots import debug_plots
@@ -18,6 +21,7 @@ import numpy as np
 from scipy.integrate import trapz, simps
 from scipy.optimize import newton
 import h5py
+import csv
 
 ## matplotlib imports
 import matplotlib.pyplot as plt
@@ -76,7 +80,14 @@ class PDSimCore(object):
         ----------
         stateVariables : mutable object [list or tuple], optional
             list of keys for the state variables to be used.  Current options are 'T','D' or 'T','M'.  Default state variables are 'T','M'
+        
+        Davide,Kunal : if flooding is True also xL is given as key
+        
+        
         """
+        
+        
+        
         #Initialize the containers to be empty
         
         #: The Valves container class
@@ -104,7 +115,7 @@ class PDSimCore(object):
         if isinstance(stateVariables,(list,tuple)):
             self.stateVariables=list(stateVariables)
         else:
-            self.stateVariables=['T','M']
+            self.stateVariables=['T','M']   #xL Added Later when trying flooding
         self._want_abort = False
         
         #  Build a structure to hold all the callbacks
@@ -139,8 +150,23 @@ class PDSimCore(object):
         Get values back from the matrices and reconstruct the state variable list
         """
         if self.__hasLiquid__==True:
-            raise NotImplementedError
-            #return np.hstack([self.T[:,i],self.m[:,i],self.xL[:,i]])
+            #raise NotImplementedError
+#             return np.hstack([self.T[:,i],self.m[:,i],self.xL[:,i]])
+            
+            VarList=np.array([])                                       #Added Later when trying flooding
+            exists_indices = np.array(self.CVs.exists_indices)
+            for s in self.stateVariables:
+                if s=='T':
+                    VarList = np.append(VarList, self.T[exists_indices,i])
+                elif s=='D':
+                    VarList = np.append(VarList, self.rho[exists_indices,i])
+                elif s=='M':
+                    VarList = np.append(VarList, self.m[exists_indices,i])
+                elif s=='xL':
+                    VarList = np.append(VarList, self.xL[exists_indices,i])
+                else:
+                    raise KeyError
+                    
         else:
             VarList=np.array([])
             exists_indices = np.array(self.CVs.exists_indices)
@@ -168,6 +194,8 @@ class PDSimCore(object):
                 d['D']=x_
             elif s=='M':
                 d['M']=x_
+            elif s=='xL':      #Added Later when trying flooding
+                d['xL']=x_
         return d
         
     def _put_to_matrices(self,x,i):
@@ -177,12 +205,39 @@ class PDSimCore(object):
         exists_indices=self.CVs.exists_indices
         Nexist = self.CVs.Nexist
         Ns = len(self.stateVariables)
+        
         if self.__hasLiquid__==True:
-            raise NotImplementedError
 #             self.T[:,i]=x[0:self.NCV]
 #             self.m[:,i]=x[self.NCV:2*self.NCV]
 #             self.xL[:,i]=x[2*self.NCV:3*self.NCV]
-        else: # self.__hasLiquid__==False
+
+            for iS, s in enumerate(self.stateVariables):     #Added Later when trying flooding
+                if s=='T':
+                    self.T[exists_indices, i] = x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)]
+                elif s=='D':
+                    self.rho[exists_indices, i] = x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)]
+                elif s=='M':
+                    self.m[exists_indices, i] = x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)]
+                elif s=='xL':
+                    self.xL[exists_indices, i] = x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)]
+            #Left over terms are for the valves
+            if self.__hasValves__:
+                self.xValves[range(len(self.Valves)*2), i] = arraym(x[Ns*Nexist:len(x)])
+            
+            # In the first iteration, self.core has not been filled, so do not 
+            # overwrite with the values in self.core.m and self.core.rho
+            if self.core.m[0] > 0.0 :
+                self.m[exists_indices, i] = self.core.m
+            if self.core.rho[0] > 0.0 :
+                self.rho[exists_indices, i] = self.core.rho
+            
+            self.V[exists_indices, i] = self.core.V
+            self.dV[exists_indices, i] = self.core.dV
+            self.p[exists_indices, i] = self.core.p
+            self.h[exists_indices, i] = self.core.h
+            self.Q[exists_indices,i] = self.core.Q
+
+        elif self.__hasLiquid__==False:
             for iS, s in enumerate(self.stateVariables):
                 if s=='T':
                     self.T[exists_indices, i] = x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)]
@@ -500,7 +555,7 @@ class PDSimCore(object):
         self.update_existence()
         
         # Set a flag about liquid flooding
-        self.__hasLiquid__ = False
+        self.__hasLiquid__ = False #Set to False but should be True
         
     def pre_cycle(self, x0 = None):
         """
@@ -624,15 +679,27 @@ class PDSimCore(object):
         self._put_to_matrices(xnew, N)
         
         #ensure you end up at the right place
+        #assert abs(t0-tmax)<1e-10
         assert abs(t0-tmax)<1e-10
         
         self.derivs(t0,xold)
         self.FlowStorage.append(self.Flows.get_deepcopy())
         
-        if sorted(self.stateVariables) == ['D','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
-        elif sorted(self.stateVariables) == ['M','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
+        if self.__hasLiquid__ == True:
+            if sorted(self.stateVariables) == ['D','T','xL']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist],'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+            elif sorted(self.stateVariables) == ['M','T','xL']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+            else:      
+                raise NotImplementedError            
+        
+        elif self.__hasLiquid__ == False:
+            if sorted(self.stateVariables) == ['D','T']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+            elif sorted(self.stateVariables) == ['M','T']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
+            else:      
+                raise NotImplementedError
         else:
             raise NotImplementedError
         
@@ -707,10 +774,21 @@ class PDSimCore(object):
         self.derivs(t0,xold)
         self._put_to_matrices(xnew,N)
         self.FlowStorage.append(self.Flows.get_deepcopy())
-        if sorted(self.stateVariables) == ['D','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
-        elif sorted(self.stateVariables) == ['M','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
+        if self.__hasLiquid__ == True:
+            if sorted(self.stateVariables) == ['D','T','xL']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist],'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+            elif sorted(self.stateVariables) == ['M','T','xL']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,]/V,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+            else:      
+                raise NotImplementedError            
+        
+        elif self.__hasLiquid__ == False:
+            if sorted(self.stateVariables) == ['D','T']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+            elif sorted(self.stateVariables) == ['M','T']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
+            else:      
+                raise NotImplementedError
         else:
             raise NotImplementedError
         
@@ -964,10 +1042,21 @@ class PDSimCore(object):
         # Store the flows for the end
         self.FlowStorage.append(self.Flows.get_deepcopy())
 
-        if sorted(self.stateVariables) == ['D','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
-        elif sorted(self.stateVariables) == ['M','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/self.core.V)
+        if self.__hasLiquid__ == True:
+            if sorted(self.stateVariables) == ['D','T','xL']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist],'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+            elif sorted(self.stateVariables) == ['M','T','xL']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist,]/self.core.V,'xL',xnew[2*self.CVs.Nexist:3*self.CVs.Nexist])
+            else:      
+                raise NotImplementedError            
+        
+        elif self.__hasLiquid__ == False:
+            if sorted(self.stateVariables) == ['D','T']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
+            elif sorted(self.stateVariables) == ['M','T']:
+                self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/self.core.V)
+            else:      
+                raise NotImplementedError
         else:
             raise NotImplementedError
         
@@ -1011,9 +1100,12 @@ class PDSimCore(object):
             
         self.Wdot_pv = 0.0
         for CVindex in range(self.p.shape[0]):
-            self.Wdot_pv+=Wdot_one_CV(CVindex)
-        
+            self.Wdot_pv = abs(Wdot_one_CV(CVindex))
+    
+    
+    #TODO: still not worked on post_cycle    
     def post_cycle(self):
+        
         """
         This stuff all happens at the end of the cycle.  It is a private method 
         not meant to be called externally
@@ -1061,21 +1153,47 @@ class PDSimCore(object):
             Vdisp = self.Vdisp()
             
         self.eta_v = self.mdot / (self.omega/(2*pi)*Vdisp*inletState.rho)
-
-        h1 = inletState.h
-        h2 = outletState.h
-        s1 = inletState.s
+        
+        self.P1 = inletState.p
+        self.T1 = inletState.T
+        self.h1 = inletState.h
+        self.s1 = inletState.s
+        self.rho1 = inletState.rho
+        
+        self.P2 = outletState.p
+        self.T2 = outletState.T
+        self.h2 = outletState.h
+        self.s2 = outletState.s
+        self.rho2 = outletState.rho
+        
 
         # Can't use intermediate temperature because the state might be two-phase
         # for some conditions and you are better off just calculating the enthalpy
         # directly
-        h2s = PropsSI('H','P',outletState.p*1000,'S',s1*1000,outletState.Fluid)/1000
+        self.h2s = PropsSI('H','P',outletState.p*1000,'S',self.s1*1000,outletState.Fluid)/1000
         
-        self.eta_a = (h2s-h1)/(h2-h1)
-        self.Wdot_i = self.mdot*(h2s-h1)
+        if outletState.p > inletState.p:
+            self.eta_a = (self.h2s-self.h1)/(self.h2-self.h1)
+        else:
+            self.eta_a = (self.h2-self.h1)/(self.h2s-self.h1)
+            
         # self.Qamb is positive if heat is being added to the lumped mass
-        self.Wdot = self.mdot*(h2-h1)-self.Qamb
+        if outletState.p > inletState.p:
+            self.Wdot = self.mdot*(self.h2-self.h1) - self.Qamb
+        else:
+            self.Wdot = self.mdot*(self.h1-self.h2) - self.Qamb
+        
+        if outletState.p > inletState.p:    
+            self.Wdot_i = self.mdot*(self.h2s-self.h1)
+        else:
+            self.Wdot_i = self.mdot*(self.h1-self.h2s)
+        
+        if outletState.p > inletState.p:
+            self.eta_isen = self.Wdot_i/self.Wdot
+        else:
+            self.eta_isen = self.Wdot/self.Wdot_i
 
+        
     
     def _check_cycle_abort(self, index, I = 100):
         """
@@ -1761,7 +1879,7 @@ class PDSimCore(object):
         """      
 
         #Resize all the matrices to keep only the real data
-        print 'Ntheta is', self.Ntheta
+        
         self.t = self.t[  0:self.Ntheta]
         self.T = self.T[:,0:self.Ntheta]
         self.p = self.p[:,0:self.Ntheta]
@@ -1774,16 +1892,39 @@ class PDSimCore(object):
         self.xL = self.xL[:,0:self.Ntheta]
         self.xValves = self.xValves[:,0:self.Ntheta]
         
-        print 'mdot*(h2-h1),P-v,Qamb', self.Wdot, self.Wdot_pv, self.Qamb
-        print 'Mass flow rate is',self.mdot*1000,'g/s'
-        print 'Volumetric efficiency is',self.eta_v*100,'%'
-        print 'Adiabatic efficiency is',self.eta_a*100,'%'
+        print 'Ntheta =', self.Ntheta
+        print 'P_su, T_su, h_su, s_su, rho_su =',self.P1, self.T1, self.h1, self.s1, self.rho1
+        print 'P_ex, T_ex, h_ex, s_ex, rho_ex =',self.P2, self.T2, self.h2, self.s2, self.rho2
+        print 'h_ex_s =',self.h2s
+        
+        #print 'Wdot_motor_losses =',self.motor.losses
+        #print 'Wdot_electrical =',self.Wdot_electrical
+        
+        #print 'Wdot_pv =',self.Wdot_pv
+        
+        #print 'Wdot_mech_losses =',self.mech.Wdot_losses        
+        #print 'Wdot_mechanical =',self.Wdot_mechanical
+        #print 'Wdot_shaft =',self.Wdot_shaft
+        #print 'Wdot_expansion =', self.Wdot
+        #print 'Wdot_isentropic  =',self.Wdot_i 
+                
+        #print 'Qambient =',self.Qamb
+        #print 'Qsuc  =',self.Qsuc
+        #print 'Qscroll  =',self.Qscroll
+        
+        #print 'Mass flow rate =',self.mdot,'Kg/s'
+        
+        print 'eta_vol =',self.eta_v*100,'%'
+        print 'eta_a =',self.eta_a*100,'%'
+        #print 'eta_isen =',(self.Wdot_shaft/self.Wdot_i)*100,'%'
+        #print 'eta_o_isen =',self.eta_oi*100,'%'
         
         # Restructure the history for easier writing to file and more clear description of what the things are
         hdisc_history = zip(*self.solvers.hdisc_history)
         self.solvers.hdisc_history = dict(Td = np.array(hdisc_history[0]), hd_error = np.array(hdisc_history[1]))
         lump_eb_history = zip(*self.solvers.lump_eb_history)
         self.solvers.lump_eb_history = dict(Tlumps = np.array(lump_eb_history[0]), lump_eb_error = np.array(lump_eb_history[1]))
+        
         
     def derivs(self, theta, x):
         """
@@ -1814,7 +1955,7 @@ class PDSimCore(object):
         #  Join the pressures of the CV in existence and the tubes
         parray = self.core.p.copy()
         parray.extend(self.Tubes.get_p())
-        #  Join the pressures of the CV in existence and the tubes
+        #  Join the temperatures of the CV in existence and the tubes
         Tarray = self.core.T.copy()
         Tarray.extend(self.Tubes.get_T())
         
@@ -1831,22 +1972,25 @@ class PDSimCore(object):
             
         # Calculate the derivative terms and set the derivative of the state vector
         self.core.calculate_derivs(self.omega, False)
+
+
+        #TODO: flooding with Valves ?!
         
-        #Liquid not yet supported
-        if self.__hasLiquid__:
-            raise NotImplementedError()
-        
-        #Add the derivatives for the valves
-        if self.__hasValves__:
-            # 
-            offset = len(self.stateVariables)*self.CVs.Nexist
-            for i, valve in enumerate(self.Valves):
-                # Get the values from the input array for this valve
-                xvalve = x[offset+i*2:offset+2+i*2]
-                # Set the values in the valve class
-                valve.set_xv(xvalve)
-                # Get the derivatives of position and derivative of velocity                
-                self.core.property_derivs.extend(valve.derivs(self))
+#         #Liquid not yet supported
+#         if self.__hasLiquid__: True                                                     #was blank
+#         raise NotImplementedError()
+#         
+#         #Add the derivatives for the valves
+#         if self.__hasValves__: True                                                     #was blank
+#         
+#         offset = len(self.stateVariables)*self.CVs.Nexist
+#         for i, valve in enumerate(self.Valves):
+#             # Get the values from the input array for this valve
+#             xvalve = x[offset+i*2:offset+2+i*2]
+#             # Set the values in the valve class
+#             valve.set_xv(xvalve)
+#             # Get the derivatives of position and derivative of velocity                
+#             self.core.property_derivs.extend(valve.derivs(self))
         
         return self.core.property_derivs
         
@@ -1957,7 +2101,14 @@ class PDSimCore(object):
         assert self.Ntheta - 1 == self.Itheta
         #old and new CV keys
         LHS,RHS=[],[]
-        errorT,error_rho,error_mass,newT,new_rho,new_mass,oldT,old_rho,old_mass={},{},{},{},{},{},{},{},{}
+        
+        
+        if self.__hasLiquid__ == True:
+            errorT,error_rho,error_mass,error_xL,newT,new_rho,new_mass,new_xL,oldT,old_rho,old_mass,old_xL={},{},{},{},{},{},{},{},{},{},{},{}
+        elif self.__hasLiquid__ == False:
+            errorT,error_rho,error_mass,newT,new_rho,new_mass,oldT,old_rho,old_mass={},{},{},{},{},{},{},{},{}
+        else:
+            NotImplementedError
         
         for key in self.CVs.exists_keys:
             # Get the 'becomes' field.  If a list, parse each fork of list. If a single key convert 
@@ -1968,7 +2119,8 @@ class PDSimCore(object):
                 becomes = self.CVs[key].becomes
                 
             Iold = self.CVs.index(key)
-
+            
+            #TODO: add error_xL_list and new_xL_list
             for newkey in becomes:
                 #  If newkey is 'none', the control volume will die at the end
                 #  of the cycle, so just keep going
@@ -2010,29 +2162,31 @@ class PDSimCore(object):
         # Error values are based on density and temperature independent of 
         # selection of state variables 
         error_list = []
-        for var in ['T','D']:
+        #TODO: if self.__hasLiquid__ == True, for var in ['T','D','xL'] .... else: for var in ['T','D'] 
+        for var in ['T','D']:   #Should include xL
             if var == 'T':
                 error_list += error_T_list
             elif var == 'D':
                 error_list += error_rho_list
             elif var == 'M':
-                error_list += error_mass_list
+                error_list += error_mass_list   #Include xL
             else:
                 raise KeyError
             
         # Calculate the volumes at the beginning of the next rotation
         self.core.just_volumes(self.CVs.exists_CV, 0)
         V = {key:V for key,V in zip(self.CVs.exists_keys,self.core.V)}
-        new_mass_list = [new_rho[key]*V[key] for key in self.CVs.exists_keys]
+        new_mass_list = [new_rho[key]*V[key] for key in self.CVs.exists_keys]       #Should Include xL
         
         new_list = []
+        #TODO: same things as line 2132  new_list += new_xL_list
         for var in self.stateVariables:
             if var == 'T':
                 new_list += new_T_list
             elif var == 'D':
                 new_list += new_rho_list
             elif var == 'M':
-                new_list += new_mass_list
+                new_list += new_mass_list       #Include xL
             else:
                 raise KeyError
     

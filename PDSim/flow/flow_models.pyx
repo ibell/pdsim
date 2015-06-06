@@ -682,3 +682,102 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
     return mdot
 
 
+
+@cython.cdivision(True)
+cpdef double TwoPhaseNozzle(double A, State State_up, State State_down, double psi, double sigma = 0.0):
+    
+
+    """
+    Two_Phase_Nozzle(Gas,A,P_1,P_2,T_1,xL,psi,sigma):
+    
+    su -> su1
+    Thermal equilibrium  Tsu_r = Tsu_o
+    also at discharge  Tsu1_r = Tsu1_o
+    """
+
+    cdef int N = 1000,j
+    cdef double I, dP ,v_l ,v_g ,v_g0 ,K_e ,v_e_1 , v_e_high ,P,xG ,e_t ,G_max ,G_thr ,M,beta , v_e_thr ,T, gamma ,C_c_1 , C_d0, mdot
+    cdef double f,kN2 ,C_dg ,Prat ,C_dL ,w,v_h_t ,v_e_2 ,dI, T_1, P_1, P_2, xL, xg, w_ent
+    cdef c_p, c_v, rho_l, rho_g, Gas, cK_e, cv_e, vol_g, dvdP_m, mu_mix
+    N = 1000
+    I =0
+    c_p = 0
+    c_v = 0
+    rho_l = 0
+    rho_g = 0
+    cK_e = 0
+    cv_e = 0
+    vol_g = 0
+    dvdP_m = 0
+    mu_mix = 0
+    Gas = "string"
+    #TODO: derive properties from State_Flooded class
+    gamma = c_p(Gas ,T_1 , P_1 )/ c_v(Gas ,T_1 , P_1 );
+    T= T_1 
+    dP =( P_1 - P_2 )/N
+    P= P_1 
+    v_l =1/rho_l(T)
+    v_g =1/rho_g(Gas,T,P)
+    v_g0 =  v_g
+    xG = 1 - xL
+    K_e = cK_e(v_l ,v_g ,xg ,psi ,1.0)
+    v_e_1 = cv_e(v_l ,v_g ,K_e ,xg ,w_ent ,1.0)
+    v_e_high = v_e_1 
+    j=1
+    
+    while j <= N:
+    
+        P=P/1000.0-dP/1000. #[ kPa]
+        v_g =vol_g(Gas,T,P)  #[m ^3/ kg]
+        K_e = cK_e (v_l,v_g,xG ,psi,1.0) #[-]
+        v_e_2 = cv_e(v_l ,v_g ,K_e ,xG ,psi,1.0) #[m^3/ kg]
+        dI=dP/2.0*( v_e_1 + v_e_2 )
+        I=I+dI;
+        v_e_1 = v_e_2 
+        
+        j = j + 1
+        
+        if j==N:                       
+            raise Exception("Two-Phase Nozzle not converging after 1000x") 
+    """
+    Two - Phase Discharge Coefficient from Morris */
+    """
+    beta = sqrt(sigma)
+    v_e_thr = v_e_2
+    Prat = P_2/P_1
+    v_h_t =xG* v_g0 * pow(Prat, -1/ gamma )+(1 - xG)* v_l 
+    v_e_star = v_e_thr/v_h_t
+    
+    """
+    For Orifice:
+    """
+    C_dL =0.6135+0.13318* pow(beta ,2) -0.26095* pow(beta,4) +0.51146* pow(beta ,6)
+    f =1/ C_dL -1/(2* pow(C_dL ,2))
+    kN2 =2* gamma /( gamma -1) * pow(Prat,2/ gamma )*(1 - pow(Prat ,( gamma -1) / gamma ))
+    w =4* pow(Prat ,2/ gamma )*(1 - Prat )*f/ kN2
+    C_dg =(1 - pow(1-w ,0.5) )/(2* f*pow(Prat ,1/ gamma ))
+    e_t =1/(1+(1 - xG)/xG* v_l / v_g0 * pow(Prat,1/ gamma)* pow(v_h_t /v_l ,0.5) )
+    C_d0 = e_t * C_dg +(1 - e_t)* C_dL
+    C_c_1 =(1.26 -0.26* beta )* C_d0
+
+    """
+    For Nozzles:
+    C_d = 0.77       # From Morris 0.75 + 0.25*v_e_star
+    """
+    G_thr = sqrt(2.0* I/( pow( v_e_thr ,2.0) -pow(beta ,4.0) * pow(v_e_1 ,2.0) )*1000.0) 
+    
+    """
+    Two - Phase Choking conditions
+    """
+    G_max = sqrt( -1000.0/( xG* dvdP_m(Gas,T,P_2 ,0) +(1 - xG)* dvdP_m(Gas,T,P_2,1) ))
+    M= G_thr*sqrt((- xG* dvdP_m(Gas,T,P_2,0) -(1-xG)*dvdP_m(Gas,T,P_2,1))/1000.0)
+
+    if (M >1):
+        G_thr = G_max
+    mdot = G_thr*A     #Cd*G_thr*A
+    Ma=M
+    Re= G_thr * sqrt(4.0*A/pi)/ mu_mix(Gas,T_1 ,P_1 ,1.0 - xG)
+    if ( mdot >100000):
+        raise Exception(" Mass flow rate in Two_Phase_Nozzle too high")
+
+    return mdot

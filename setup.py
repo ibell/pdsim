@@ -20,7 +20,7 @@ from Cython.Distutils import build_ext
 from Cython.Distutils.extension import Extension as CyExtension
 import sys, shutil, os, glob
 
-version = '2.9'
+version = '3.0'
 
 if len(sys.argv) == 1:
    #sys.argv += ['clean','develop']
@@ -50,6 +50,7 @@ pyx_list = [
             "PDSim/core/containers.pyx",
             "PDSim/core/callbacks.pyx",
             "PDSim/core/cycleintegrators.pyx",
+            "PDSim/core/state_flooded.pyx",
             "PDSim/misc/scipylike.pyx",
             "PDSim/flow/flow_models.pyx",
             "PDSim/flow/flow.pyx",
@@ -126,8 +127,9 @@ package_data = package_pxd_files
 setup(
   name = 'PDSim',
   version = version,
-  author = "Ian Bell",
-  author_email='ian.h.bell@gmail.com',
+  author = "Ian Bell, Davide Ziviani, Kunal Bansal",
+  #TODO: not sure if there is a contributors section. It would be more fair for Ian
+  author_email='ian.h.bell@gmail.com, davide.ziviani@ugent.be, bansal16@purdue.edu',
   url='http://pdsim.sourceforge.net',
   description = """A flexible open-source framework for the quasi-steady-state simulation of positive displacement machines including compressors and expanders""",
   packages = ['PDSim','PDSim.core','PDSim.flow','PDSim.plot','PDSim.scroll','PDSim.misc','PDSim.recip','PDSim.misc.clipper'],
@@ -135,7 +137,7 @@ setup(
   ext_modules = ext_module_list,
   package_dir = {'PDSim':'PDSim',},
   package_data = package_data,
-  include_dirs = [numpy.get_include(), CoolProp.get_include_directory(), "PDSim/misc/clipper"],
+  include_dirs = [numpy.get_include(), CoolProp.get_include_directory(), "PDSim/misc/clipper", 'externals/msgpack-c/include'],
 
 )
 
