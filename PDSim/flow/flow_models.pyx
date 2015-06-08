@@ -682,7 +682,6 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
     return mdot
 
 
-
 @cython.cdivision(True)
 cpdef double TwoPhaseNozzle(double A, State State_up, State State_down, double psi, double sigma = 0.0):
     
@@ -710,8 +709,14 @@ cpdef double TwoPhaseNozzle(double A, State State_up, State State_down, double p
     vol_g = 0
     dvdP_m = 0
     mu_mix = 0
+    P_1 = 0
+    T_1 = 0
+    P_2 = 0
+    xL = 0
+    xg = 0
+    w_ent = 0
     Gas = "string"
-    #TODO: derive properties from State_Flooded class
+    
     gamma = c_p(Gas ,T_1 , P_1 )/ c_v(Gas ,T_1 , P_1 );
     T= T_1 
     dP =( P_1 - P_2 )/N
