@@ -36,7 +36,7 @@ cdef class StateFlooded(State):
     cpdef double get_rho(self) except *
     cpdef double get_s(self) except *
     cpdef double get_u(self) except *
-    cpdef double get_e(self) except*:
+    cpdef double get_e(self) except*
     cpdef double get_visc(self) except *
     cpdef double get_cond(self) except *
     cpdef double get_cp(self) except *
