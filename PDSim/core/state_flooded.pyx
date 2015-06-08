@@ -53,7 +53,6 @@ cdef class StateFlooded(State):
     cpdef update_TrhoxL(self, double T, double rho, double xL):
         """
         Just use the temperature, density and liquid fraction directly for speed
-
         Parameters
         ----------
         T: float
@@ -112,7 +111,6 @@ cdef class StateFlooded(State):
     cpdef double s_liq(self) except *:
         """
         Specific entropy of the flooding medium
-
         Parameters
         ----------
         T: float
@@ -174,7 +172,6 @@ cdef class StateFlooded(State):
     cpdef double u_liq(self) except *:
         """
         Specific internal energy of the flooding medium
-
         Parameters
         ----------
         T: float
@@ -220,7 +217,6 @@ cdef class StateFlooded(State):
     cpdef double h_liq(self) except *:  
         """
         Specific enthalpy of the flooding medium
-
         Parameters
         ----------
         T: float
@@ -315,7 +311,6 @@ cdef class StateFlooded(State):
     cpdef double rho_liq(self) except *:
         """
         Density of the flooding medium
-
         Parameters
         ----------
         T: float
@@ -393,7 +388,6 @@ cdef class StateFlooded(State):
     cpdef double cp_liq(self) except *:
         """
         Specific heat of the flooding medium
-
         Parameters
         ----------
         T: float
@@ -436,7 +430,6 @@ cdef class StateFlooded(State):
     cpdef double cp_mix(self) except *:
         """
         Specific heat at constant pressure of the mixture 
-
         Returns
         ---------
         cp_m: float
@@ -453,7 +446,6 @@ cdef class StateFlooded(State):
     cpdef double cv_mix(self) except *:
         """
         Specific heat at constant volume of the mixture 
-
         Returns
         ---------
         cv_m: float
@@ -470,7 +462,6 @@ cdef class StateFlooded(State):
     cpdef double mu_liq(self) except *:
         """
         Dynamic viscosity of the flooding medium
-
         Parameters
         ----------
         T: float
@@ -505,7 +496,6 @@ cdef class StateFlooded(State):
     cpdef double mu_mix(self) except *:
         """
         Dynamic viscosity of the mixture 
-
         Returns
         ---------
         mu_m: float
@@ -531,7 +521,6 @@ cdef class StateFlooded(State):
             Pressure [kPa]
         xL: float
             Liquid mass fraction [-]
-
         Returns
         -------
         VF: float
@@ -552,7 +541,6 @@ cdef class StateFlooded(State):
         ----------
         T: float
             Temperature [K]
-
         Returns
         -------
         k_l: float
@@ -582,7 +570,6 @@ cdef class StateFlooded(State):
         ----------
         T: float
             Temperature [K]
-
         Returns
         -------
         k_m: float
@@ -629,7 +616,6 @@ cdef class StateFlooded(State):
         -------
         kstar_m: float
                     Ratio of specific heats of the mixture [-]
-
         """
         
         
@@ -729,7 +715,6 @@ cdef class StateFlooded(State):
             Specific internal energy of the mixture [kJ/kg]
         xL: float
             Liquid mass fraction [-]
-
         Returns
         -------
         dudxL_m: float
@@ -769,12 +754,13 @@ cdef class StateFlooded(State):
         """        
         
         
-        cdef double K, flag, x,v_g,v_l
+        cdef double K,flag,x,v_g,v_l,w
 
         x = 1 - self.xL_
         v_l = 1.0/self.rho_liq()
         v_g = 1.0/self.pAS.rhomass()
-        
+        flag = 0
+        w = 0
         
         if (x ==0 or x ==1):
             """
@@ -804,7 +790,6 @@ cdef class StateFlooded(State):
     cpdef double cv_e(self) except*:
         """
         Effective specific volume of the mixture
-
         Returns
         -------
         ve: float
@@ -817,6 +802,8 @@ cdef class StateFlooded(State):
         x = 1 - self.xL_
         v_l = 1.0/self.rho_liq()
         v_g = 1.0/self.pAS.rhomass()
+        flag = 0
+        w = 0
         
         if (flag >0.9 and flag <1.1):
             """
@@ -909,7 +896,6 @@ cdef class StateFlooded(State):
         -------
         Tcrit: float
                 Temperature [K]
-
         """
         return self.pAS.keyed_output(constants_header.iT_critical)
     
@@ -921,7 +907,6 @@ cdef class StateFlooded(State):
         -------
         pcrit: float
                 Pressure [kPa]
-
         """
         return self.pAS.keyed_output(constants_header.iP_critical)/1000.0
     ##
