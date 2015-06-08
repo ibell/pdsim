@@ -6,9 +6,7 @@ import inspect
 
 ##--  Package imports  --
 from PDSim.flow import flow,flow_models
-from containers import STATE_VARS_TM, CVArrays
-
-#TODO: eventually define a STATE_VARS_TMxL externally that takes StateClass from CoolProp and FloodProps and returns homog properties  (Davide)
+from containers import STATE_VARS_TM, STATE_VARS_TMxL, CVArrays
 
 from PDSim.flow.flow import FlowPathCollection
 from containers import ControlVolumeCollection,TubeCollection
@@ -30,6 +28,7 @@ import pylab
 ## Coolprop imports
 from CoolProp.CoolProp import PropsSI
 from CoolProp.State import State
+from PDSim.core.state_flooded import StateFlooded
 
 def _pickle_method(method):
     func_name = method.im_func.__name__
@@ -80,13 +79,7 @@ class PDSimCore(object):
         ----------
         stateVariables : mutable object [list or tuple], optional
             list of keys for the state variables to be used.  Current options are 'T','D' or 'T','M'.  Default state variables are 'T','M'
-        
-        Davide,Kunal : if flooding is True also xL is given as key
-        
-        
         """
-        
-        
         
         #Initialize the containers to be empty
         
@@ -112,11 +105,17 @@ class PDSimCore(object):
         self.xstate_init = None
         
         # A storage of the initial valves vector
-        if isinstance(stateVariables,(list,tuple)):
-            self.stateVariables=list(stateVariables)
+        # if isinstance(stateVariables,(list,tuple)):
+        #     self.stateVariables=list(stateVariables)
+        # #TODO: Add __hasLiquid__ and xL for oil flooding
+        # else:
+        #     self.stateVariables=['T','M']   
+        # self._want_abort = False
+        
+        if self.__hasLiquid__ == False:
+            self.stateVariables=['T','M']  
         else:
-            self.stateVariables=['T','M']   #xL Added Later when trying flooding
-        self._want_abort = False
+            self.stateVariables=['T','M','xL']
         
         #  Build a structure to hold all the callbacks
         self.callbacks = PDSim.core.callbacks.CallbackContainer()
@@ -150,10 +149,7 @@ class PDSimCore(object):
         Get values back from the matrices and reconstruct the state variable list
         """
         if self.__hasLiquid__==True:
-            #raise NotImplementedError
-#             return np.hstack([self.T[:,i],self.m[:,i],self.xL[:,i]])
-            
-            VarList=np.array([])                                       #Added Later when trying flooding
+            VarList=np.array([])
             exists_indices = np.array(self.CVs.exists_indices)
             for s in self.stateVariables:
                 if s=='T':
@@ -194,7 +190,7 @@ class PDSimCore(object):
                 d['D']=x_
             elif s=='M':
                 d['M']=x_
-            elif s=='xL':      #Added Later when trying flooding
+            elif s=='xL':
                 d['xL']=x_
         return d
         
@@ -207,11 +203,7 @@ class PDSimCore(object):
         Ns = len(self.stateVariables)
         
         if self.__hasLiquid__==True:
-#             self.T[:,i]=x[0:self.NCV]
-#             self.m[:,i]=x[self.NCV:2*self.NCV]
-#             self.xL[:,i]=x[2*self.NCV:3*self.NCV]
-
-            for iS, s in enumerate(self.stateVariables):     #Added Later when trying flooding
+            for iS, s in enumerate(self.stateVariables):
                 if s=='T':
                     self.T[exists_indices, i] = x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)]
                 elif s=='D':
@@ -555,7 +547,7 @@ class PDSimCore(object):
         self.update_existence()
         
         # Set a flag about liquid flooding
-        self.__hasLiquid__ = False #Set to False but should be True
+        # self.__hasLiquid__ = False
         
     def pre_cycle(self, x0 = None):
         """
@@ -1102,8 +1094,6 @@ class PDSimCore(object):
         for CVindex in range(self.p.shape[0]):
             self.Wdot_pv = abs(Wdot_one_CV(CVindex))
     
-    
-    #TODO: still not worked on post_cycle    
     def post_cycle(self):
         
         """
@@ -1958,9 +1948,16 @@ class PDSimCore(object):
         #  Join the temperatures of the CV in existence and the tubes
         Tarray = self.core.T.copy()
         Tarray.extend(self.Tubes.get_T())
+        #TODO: Add xLarray for oil flooding - It causes python to crash
+        #  Join the xL of the CV in existence and the tubes
+        # xLarray = self.core.xL.copy()
+        # xLarray.extend(self.Tubes.get_xL())
         
         # Calculate the flows and sum up all the terms
-        self.core.calculate_flows(self.Flows, harray, parray, Tarray)
+        if self.__hasLiquid__ == False:
+            self.core.calculate_flows(self.Flows, harray, parray, Tarray)
+        else:
+            self.core.calculate_flows_flood(self.Flows, harray, parray, Tarray, xLarray)
         
         # Calculate the heat transfer terms if provided
         if self.callbacks.heat_transfer_callback is not None:
@@ -1972,9 +1969,6 @@ class PDSimCore(object):
             
         # Calculate the derivative terms and set the derivative of the state vector
         self.core.calculate_derivs(self.omega, False)
-
-
-        #TODO: flooding with Valves ?!
         
 #         #Liquid not yet supported
 #         if self.__hasLiquid__: True                                                     #was blank
@@ -2098,57 +2092,99 @@ class PDSimCore(object):
             ``True`` if cycle should be run again with updated inputs, ``False`` otherwise.
             A return value of ``True`` means that convergence of the cycle has been achieved
         """
+        
         assert self.Ntheta - 1 == self.Itheta
         #old and new CV keys
         LHS,RHS=[],[]
         
-        
         if self.__hasLiquid__ == True:
             errorT,error_rho,error_mass,error_xL,newT,new_rho,new_mass,new_xL,oldT,old_rho,old_mass,old_xL={},{},{},{},{},{},{},{},{},{},{},{}
+            
+            for key in self.CVs.exists_keys:
+                # Get the 'becomes' field.  If a list, parse each fork of list. If a single key convert 
+                # into a list so you can use the same code below 
+                if not isinstance(self.CVs[key].becomes, list):
+                    becomes = [self.CVs[key].becomes]
+                else:
+                    becomes = self.CVs[key].becomes
+                    
+                Iold = self.CVs.index(key)
+                
+                for newkey in becomes:
+                    #  If newkey is 'none', the control volume will die at the end of the cycle, so just keep going
+                    if newkey == 'none': continue
+                    Inew = self.CVs.index(newkey)
+                    newCV = self.CVs[newkey]
+                    # There can't be any overlap between keys
+                    if newkey in newT:
+                        raise KeyError
+                    #What the state variables were at the start of the rotation
+                    oldT[newkey]=self.T[Inew, 0]
+                    old_rho[newkey]=self.rho[Inew, 0]
+                    old_xL[newkey]=self.xL[Inew, 0]
+                    #What they are at the end of the rotation
+                    newT[newkey]=self.T[Iold,self.Itheta]
+                    new_rho[newkey]=self.rho[Iold,self.Itheta]
+                    new_xL[newkey]=self.xL[Iold,self.Itheta]
+                    
+                    errorT[newkey]=(oldT[newkey]-newT[newkey])/newT[newkey]
+                    error_rho[newkey]=(old_rho[newkey]-new_rho[newkey])/new_rho[newkey]
+                    error_xL[newkey]=(old_xL[newkey]-new_xL[newkey])/new_xL[newkey]
+                    #Update the list of keys for setting the exist flags
+                    LHS.append(key)
+                    RHS.append(newkey)
+            
+            error_T_list = [errorT[key] for key in self.CVs.keys if key in newT]
+            error_rho_list = [error_rho[key] for key in self.CVs.keys if key in new_rho]
+            error_xL_list = [error_xL[key] for key in self.CVs.keys if key in new_xL]
+            
+            new_T_list = [newT[key] for key in self.CVs.keys if key in newT]
+            new_rho_list = [new_rho[key] for key in self.CVs.keys if key in new_rho]
+            new_xL_list = [new_xL[key] for key in self.CVs.keys if key in new_xL]
+            
         elif self.__hasLiquid__ == False:
             errorT,error_rho,error_mass,newT,new_rho,new_mass,oldT,old_rho,old_mass={},{},{},{},{},{},{},{},{}
+            
+            for key in self.CVs.exists_keys:
+                # Get the 'becomes' field.  If a list, parse each fork of list. If a single key convert 
+                # into a list so you can use the same code below 
+                if not isinstance(self.CVs[key].becomes, list):
+                    becomes = [self.CVs[key].becomes]
+                else:
+                    becomes = self.CVs[key].becomes
+                    
+                Iold = self.CVs.index(key)
+                
+                for newkey in becomes:
+                    #  If newkey is 'none', the control volume will die at the end of the cycle, so just keep going
+                    if newkey == 'none': continue
+                    Inew = self.CVs.index(newkey)
+                    newCV = self.CVs[newkey]
+                    # There can't be any overlap between keys
+                    if newkey in newT:
+                        raise KeyError
+                    #What the state variables were at the start of the rotation
+                    oldT[newkey]=self.T[Inew, 0]
+                    old_rho[newkey]=self.rho[Inew, 0]
+                    #What they are at the end of the rotation
+                    newT[newkey]=self.T[Iold,self.Itheta]
+                    new_rho[newkey]=self.rho[Iold,self.Itheta]
+                    
+                    errorT[newkey]=(oldT[newkey]-newT[newkey])/newT[newkey]
+                    error_rho[newkey]=(old_rho[newkey]-new_rho[newkey])/new_rho[newkey]
+                    #Update the list of keys for setting the exist flags
+                    LHS.append(key)
+                    RHS.append(newkey)
+            
+            error_T_list = [errorT[key] for key in self.CVs.keys if key in newT]
+            error_rho_list = [error_rho[key] for key in self.CVs.keys if key in new_rho]
+            
+            new_T_list = [newT[key] for key in self.CVs.keys if key in newT]
+            new_rho_list = [new_rho[key] for key in self.CVs.keys if key in new_rho]
+            
         else:
             NotImplementedError
-        
-        for key in self.CVs.exists_keys:
-            # Get the 'becomes' field.  If a list, parse each fork of list. If a single key convert 
-            # into a list so you can use the same code below 
-            if not isinstance(self.CVs[key].becomes, list):
-                becomes = [self.CVs[key].becomes]
-            else:
-                becomes = self.CVs[key].becomes
-                
-            Iold = self.CVs.index(key)
-            
-            #TODO: add error_xL_list and new_xL_list
-            for newkey in becomes:
-                #  If newkey is 'none', the control volume will die at the end
-                #  of the cycle, so just keep going
-                if newkey == 'none': continue
-                Inew = self.CVs.index(newkey)
-                newCV = self.CVs[newkey]
-                # There can't be any overlap between keys
-                if newkey in newT:
-                    raise KeyError
-                #What the state variables were at the start of the rotation
-                oldT[newkey]=self.T[Inew, 0]
-                old_rho[newkey]=self.rho[Inew, 0]
-                #What they are at the end of the rotation
-                newT[newkey]=self.T[Iold,self.Itheta]
-                new_rho[newkey]=self.rho[Iold,self.Itheta]
-                
-                errorT[newkey]=(oldT[newkey]-newT[newkey])/newT[newkey]
-                error_rho[newkey]=(old_rho[newkey]-new_rho[newkey])/new_rho[newkey]
-                #Update the list of keys for setting the exist flags
-                LHS.append(key)
-                RHS.append(newkey)
-        
-        error_T_list = [errorT[key] for key in self.CVs.keys if key in newT]
-        error_rho_list = [error_rho[key] for key in self.CVs.keys if key in new_rho]
-        
-        new_T_list = [newT[key] for key in self.CVs.keys if key in newT]
-        new_rho_list = [new_rho[key] for key in self.CVs.keys if key in new_rho]
-        
+
         #Reset the exist flags for the CV - this should handle all the possibilities
         #Turn off the LHS CV
         for key in LHS:
@@ -2162,34 +2198,60 @@ class PDSimCore(object):
         # Error values are based on density and temperature independent of 
         # selection of state variables 
         error_list = []
-        #TODO: if self.__hasLiquid__ == True, for var in ['T','D','xL'] .... else: for var in ['T','D'] 
-        for var in ['T','D']:   #Should include xL
-            if var == 'T':
-                error_list += error_T_list
-            elif var == 'D':
-                error_list += error_rho_list
-            elif var == 'M':
-                error_list += error_mass_list   #Include xL
-            else:
-                raise KeyError
-            
+        if self.__hasLiquid__ == False:
+            for var in ['T','D']:
+                if var == 'T':
+                    error_list += error_T_list
+                elif var == 'D':
+                    error_list += error_rho_list
+                elif var == 'M':
+                    error_list += error_mass_list 
+                else:
+                    raise KeyError
+                    
+        else:
+            for var in ['T','D','xL']:
+                if var == 'T':
+                    error_list += error_T_list
+                elif var == 'D':
+                    error_list += error_rho_list
+                elif var == 'M':
+                    error_list += error_mass_list 
+                elif var == 'xL':
+                    error_list += error_xL_list
+                else:
+                    raise KeyError
+                                
         # Calculate the volumes at the beginning of the next rotation
         self.core.just_volumes(self.CVs.exists_CV, 0)
         V = {key:V for key,V in zip(self.CVs.exists_keys,self.core.V)}
-        new_mass_list = [new_rho[key]*V[key] for key in self.CVs.exists_keys]       #Should Include xL
+        new_mass_list = [new_rho[key]*V[key] for key in self.CVs.exists_keys]
         
         new_list = []
-        #TODO: same things as line 2132  new_list += new_xL_list
-        for var in self.stateVariables:
-            if var == 'T':
-                new_list += new_T_list
-            elif var == 'D':
-                new_list += new_rho_list
-            elif var == 'M':
-                new_list += new_mass_list       #Include xL
-            else:
-                raise KeyError
-    
+        if self.__hasLiquid__ == False:
+            for var in self.stateVariables:
+                if var == 'T':
+                    new_list += new_T_list
+                elif var == 'D':
+                    new_list += new_rho_list
+                elif var == 'M':
+                    new_list += new_mass_list
+                else:
+                    raise KeyError
+                    
+        else:
+            for var in self.stateVariables:
+                if var == 'T':
+                    new_list += new_T_list
+                elif var == 'D':
+                    new_list += new_rho_list
+                elif var == 'M':
+                    new_list += new_mass_list
+                elif var == 'xL':
+                    new_list += new_xL_list                    
+                else:
+                    raise KeyError
+                        
         return arraym(error_list), arraym(new_list)
     
     def connect_flow_functions(self):
@@ -2213,3 +2275,4 @@ if __name__=='__main__':
     PC = PDSimCore()
     PC.attach_HDF5_annotations('runa.h5')
     print 'This is the base class that is inherited by other compressor types.  Running this file doesn\'t do anything'
+
