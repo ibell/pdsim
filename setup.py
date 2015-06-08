@@ -135,8 +135,7 @@ setup(
   ext_modules = ext_module_list,
   package_dir = {'PDSim':'PDSim',},
   package_data = package_data,
-  include_dirs = [numpy.get_include(), CoolProp.get_include_directory(), "PDSim/misc/clipper"],
-
+  include_dirs = [numpy.get_include(), CoolProp.get_include_directory(), "PDSim/misc/clipper", "externals/coolprop/externals/msgpack-c/include"],
 )
 
 try:
