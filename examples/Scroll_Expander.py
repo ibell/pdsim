@@ -34,11 +34,13 @@ class ScrollExpander(core.Scroll):
     #Theta starts a revolution at 2*pi and then decreases over one rotation to 0. 
     #Beta is equal to 2*pi-theta whc.
     
+    
+    
     def __init__(self, *args, **kwargs):
         core.Scroll.__init__(self, *args, **kwargs)
         self.__before_discharge1__ =True 
         self.__before_discharge2__ =True
-        self.__hasLiquid__ = False
+        self.__hasLiquid__ = True
         
     def V_ss(self, beta, full_output=False):
         VdV = core.Scroll.V_dd(self, 2*pi-beta, full_output=full_output)

@@ -65,6 +65,8 @@ class Scroll(PDSimCore, _Scroll):
     scroll wraps, use the AsymmetricScroll class
     """
     
+    PDSimCore.__hasLiquid__ = False
+    
     def __init__(self):
         PDSimCore.__init__(self)
         
