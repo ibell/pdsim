@@ -42,6 +42,8 @@ cdef class StateFlooded(State):
     cpdef double get_cp(self) except *
     cpdef double get_cp0(self) except *   #TODO: not sure if we need this one
     cpdef double get_cv(self) except *
+    cpdef double get_kstar(self) except *
+    
     cpdef double get_dpdT(self) except *
     cpdef double get_dudxL(self) except *
     cpdef double get_cKe(self) except *

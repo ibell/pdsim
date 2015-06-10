@@ -1009,6 +1009,14 @@ cdef class StateFlooded(State):
         def __get__(self):
             return self.get_cond()
 
+    cpdef double get_kstar(self) except *:
+        """Get ratio of specific heats of the mixture, in [-] """
+        return self.kstar_mix()
+    property kstar:
+        def __get__(self):
+            return self.get_kstar()
+    
+    
     cpdef double get_dpdT(self) except *:
         """ Get dpdT_const_V, in [ ]"""
         return self.dpdT_const_V()
