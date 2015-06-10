@@ -906,7 +906,10 @@ class PDSimCore(object):
                 if disableAdaptive == 'no_integrate':
                     stepAccepted = True
                     # Updates the state, calculates the volumes, prepares all the things needed for derivatives
-                    self.core.properties_and_volumes(self.CVs.exists_CV, t0+h+1e-10, STATE_VARS_TM, xold)
+                    if self.__hasLiquid__ == False:
+                        self.core.properties_and_volumes(self.CVs.exists_CV, t0+h+1e-10, STATE_VARS_TM, xold)
+                    else:
+                        self.core.properties_and_volumes(self.CVs.exists_CV, t0+h+1e-10, STATE_VARS_TMxL, xold)
                     # Store a copy of the flows for future use as well as a buffered set of state variables
                     Flows_temporary = self.Flows.get_deepcopy()
                     core_temporary = self.core.copy()
@@ -1935,28 +1938,41 @@ class PDSimCore(object):
         dfdt : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
         
         """
-
-        # Updates the state, calculates the volumes, prepares all the things needed for derivatives
-        self.core.properties_and_volumes(self.CVs.exists_CV, theta, STATE_VARS_TM, x)
-        
-        #  Join the enthalpies of the CV in existence and the tubes
-        harray = self.core.h.copy()
-        harray.extend(self.Tubes.get_h())
-        #  Join the pressures of the CV in existence and the tubes
-        parray = self.core.p.copy()
-        parray.extend(self.Tubes.get_p())
-        #  Join the temperatures of the CV in existence and the tubes
-        Tarray = self.core.T.copy()
-        Tarray.extend(self.Tubes.get_T())
-        #TODO: Add xLarray for oil flooding - It causes python to crash
-        #  Join the xL of the CV in existence and the tubes
-        # xLarray = self.core.xL.copy()
-        # xLarray.extend(self.Tubes.get_xL())
-        
-        # Calculate the flows and sum up all the terms
         if self.__hasLiquid__ == False:
+            # Updates the state, calculates the volumes, prepares all the things needed for derivatives
+            self.core.properties_and_volumes(self.CVs.exists_CV, theta, STATE_VARS_TM, x)
+            
+            #  Join the enthalpies of the CV in existence and the tubes
+            harray = self.core.h.copy()
+            harray.extend(self.Tubes.get_h())
+            #  Join the pressures of the CV in existence and the tubes
+            parray = self.core.p.copy()
+            parray.extend(self.Tubes.get_p())
+            #  Join the temperatures of the CV in existence and the tubes
+            Tarray = self.core.T.copy()
+            Tarray.extend(self.Tubes.get_T())
+            
+            # Calculate the flows and sum up all the terms
             self.core.calculate_flows(self.Flows, harray, parray, Tarray)
+            
         else:
+            # Updates the state, calculates the volumes, prepares all the things needed for derivatives
+            self.core.properties_and_volumes(self.CVs.exists_CV, theta, STATE_VARS_TMxL, x)
+            
+            #  Join the enthalpies of the CV in existence and the tubes
+            harray = self.core.h.copy()
+            harray.extend(self.Tubes.get_h())
+            #  Join the pressures of the CV in existence and the tubes
+            parray = self.core.p.copy()
+            parray.extend(self.Tubes.get_p())
+            #  Join the temperatures of the CV in existence and the tubes
+            Tarray = self.core.T.copy()
+            Tarray.extend(self.Tubes.get_T())
+            #  Join the xL of the CV in existence and the tubes
+            xLarray = self.core.xL.copy()
+            xLarray.extend(self.Tubes.get_xL())
+            
+            # Calculate the flows and sum up all the terms
             self.core.calculate_flows_flood(self.Flows, harray, parray, Tarray, xLarray)
         
         # Calculate the heat transfer terms if provided
@@ -2275,4 +2291,3 @@ if __name__=='__main__':
     PC = PDSimCore()
     PC.attach_HDF5_annotations('runa.h5')
     print 'This is the base class that is inherited by other compressor types.  Running this file doesn\'t do anything'
-
