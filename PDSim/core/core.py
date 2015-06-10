@@ -163,7 +163,7 @@ class PDSimCore(object):
                 else:
                     raise KeyError
                     
-        else:
+        if self.__hasLiquid__==False:
             VarList=np.array([])
             exists_indices = np.array(self.CVs.exists_indices)
             for s in self.stateVariables:
@@ -407,17 +407,38 @@ class PDSimCore(object):
         implement a different guess method
         """
         
-        h1 = inlet_state.h
-        h2s = PropsSI('H','S',inlet_state.s*1000,'P',p_outlet*1000, inlet_state.Fluid)/1000
-        if p_outlet > inlet_state.p:
-            # Compressor Mode
-            h2 = h1 + (h2s-h1)/eta_a
-            return PropsSI('T','H',h2*1000,'P',p_outlet*1000, inlet_state.Fluid)
-        else:
-            # Expander Mode
-            h2 = h1 + (h2s-h1)*eta_a
-            return PropsSI('T','H',h2*1000,'P',p_outlet*1000, inlet_state.Fluid)
-    
+        if self.__hasLiquid__ == False:
+            h1 = inlet_state.h
+            h2s = PropsSI('H','S',inlet_state.s*1000,'P',p_outlet*1000, inlet_state.Fluid)/1000
+            if p_outlet > inlet_state.p:
+                # Compressor Mode
+                h2 = h1 + (h2s-h1)/eta_a
+                return PropsSI('T','H',h2*1000,'P',p_outlet*1000, inlet_state.Fluid)
+            else:
+                # Expander Mode
+                h2 = h1 + (h2s-h1)*eta_a
+                return PropsSI('T','H',h2*1000,'P',p_outlet*1000, inlet_state.Fluid)
+        
+        elif self.__hasLiquid__ == True:
+            """
+            It is assumed that the overall compression(expansion) of the two-phase
+            can be treated as that of an adiabatic compression(expansion) of a quasi-perfect gas.
+            """
+            p1 = inlet_state.get_p()
+            kstar_mix = inlet_state.get_kstar()
+            
+            if p_outlet > inlet_state.p:
+                # Compressor Mode
+                T2s = T1*(p_outlet/p1)**((kstar_mix - 1)/kstar_mix)
+                T2 = (T2s -T1)/eta_a + T1
+                return T2
+            else:
+                # Expander Mode
+                T2s = T1*(p_outlet/p1)**((kstar_mix - 1)/kstar_mix)
+                T2 = T1 - (T1-T2s)*eta_a 
+                return T2           
+            
+            
     def reset_initial_state(self):
         """
         Reset the initial state of the core class, typically after doing a 
@@ -578,12 +599,26 @@ class PDSimCore(object):
         
         # If x0 is provided, use its values to initialize the chamber states
         if x0 is None:
-            # self.CVs.exists_indices is a list of indices of the CV with the same order of entries
-            # as the entries in self.CVs.T
-            self.T[self.CVs.exists_indices, 0] = self.CVs.T
-            self.p[self.CVs.exists_indices, 0] = self.CVs.p
-            self.rho[self.CVs.exists_indices, 0] = self.CVs.rho
-            self.m[self.CVs.exists_indices, 0] = self.CVs.rho*arraym(V)
+            
+            if self.__hasLiquid__ == False:
+                # self.CVs.exists_indices is a list of indices of the CV with the same order of entries
+                # as the entries in self.CVs.T
+                self.T[self.CVs.exists_indices, 0] = self.CVs.T
+                self.p[self.CVs.exists_indices, 0] = self.CVs.p
+                self.rho[self.CVs.exists_indices, 0] = self.CVs.rho
+                self.m[self.CVs.exists_indices, 0] = self.CVs.rho*arraym(V)
+        
+            elif self.__hasLiquid__ == True:
+                self.T[self.CVs.exists_indices, 0] = self.CVs.T
+                self.p[self.CVs.exists_indices, 0] = self.CVs.p
+                self.rho[self.CVs.exists_indices, 0] = self.CVs.rho
+                self.m[self.CVs.exists_indices, 0] = self.CVs.rho*arraym(V)
+                self.xL[self.CVs.exists_indices, 0] = self.CVs.xL
+                print self.m
+                print self.xL
+            else:
+                print 'Not implemented'
+        
         else:
             #x0 is provided, but need to pad it out to include valve values
             x0_ = x0.copy()
