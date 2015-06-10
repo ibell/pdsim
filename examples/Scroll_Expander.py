@@ -454,9 +454,17 @@ def Expander():
 ## Inlet/Outlet State
     global inletState
     global outletState
-    inletState = CPState(Ref,{'T':Tinlet,'P':pinlet})
-    T2s = SE.guess_outlet_temp(inletState,poutlet)  #Guess outlet
-    outletState = CPState(Ref,{'T':T2s,'P':poutlet})
+    
+    if SE.__hasLiquid__ == False:
+    
+        inletState = CPState(Ref,{'T':Tinlet,'P':pinlet})
+        T2s = SE.guess_outlet_temp(inletState,poutlet)  #Guess outlet
+        outletState = CPState(Ref,{'T':T2s,'P':poutlet})
+    elif SE.__hasLiquid__ == True:
+
+        inletState = StateFlooded(Ref,Liq,Tinlet,pinlet,xL,'HEM')
+        T2s = SE.guess_outlet_temp(inletState,poutlet)  #Guess outlet
+        outletState = StateFlooded(Ref,Liq,T2s,poutlet,xL,'HEM')        
     
 ## Define CVc and tubes - Suction, Expansion and Exhaust
     #Guess mass flow rate
