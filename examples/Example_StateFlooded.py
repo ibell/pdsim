@@ -9,6 +9,7 @@ S = StateFlooded('R245FA', 'POE', 101.325, 300, 0.5, 'HEM')
 S.update(dict(T=300, P=101.325, xL=0.3))
 print 'R245FA'
 print S
+print 'kstar_mix:',S.get_kstar()
 print '--------------------------'
 
 from CoolProp.CoolProp import State
