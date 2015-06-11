@@ -890,14 +890,16 @@ class Scroll(PDSimCore, _Scroll):
                 V2 = self.V_c1(0,alpha)[0]
                 #Mass is constant, so rho1*V1 = rho2*V2
                 rho2 = rho1 * V1 / V2
+                
+                T2guess = T1*(V1/V2)**(k-1)
                 # Now don't know temperature or pressure, but you can assume
                 # it is isentropic to find the temperature
                 temp = inletState.copy()
                 def resid(T):
-                    temp.update(dict(T=T,D=rho2))
+                    temp.update(dict(T=T, D=rho2))
                     return temp.s-s1
-                T2 = newton(resid, T1)
-                initState=State.State(inletState.Fluid,dict(T=T2,D=rho2)).copy()
+                # temp has now been updated
+                initState=temp.copy()
             if alpha<nCmax:
                 # Does not change definition at discharge angle
                 disc_becomes_c1 = 'c1.'+str(alpha)
