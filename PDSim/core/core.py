@@ -23,8 +23,7 @@ import h5py
 import matplotlib.pyplot as plt
 import pylab
 
-## Coolprop imports
-from CoolProp.CoolProp import PropsSI
+## CoolProp imports
 from CoolProp.State import State
 
 def _pickle_method(method):
@@ -361,15 +360,17 @@ class PDSimCore(object):
         """
         
         h1 = inlet_state.h
-        h2s = PropsSI('H','S',inlet_state.s*1000,'P',p_outlet*1000, inlet_state.Fluid)/1000
+        out_state = inlet_state.copy()
+        out_state.update(dict(S = inlet_state.s, P = p_outlet))
+        h2s = out_state.h
         if p_outlet > inlet_state.p:
             # Compressor Mode
             h2 = h1 + (h2s-h1)/eta_a
-            return PropsSI('T','H',h2*1000,'P',p_outlet*1000, inlet_state.Fluid)
         else:
             # Expander Mode
             h2 = h1 + (h2s-h1)*eta_a
-            return PropsSI('T','H',h2*1000,'P',p_outlet*1000, inlet_state.Fluid)
+        out_state.update(dict(H = h2, P = p_outlet))
+        return out_state.T
     
     def reset_initial_state(self):
         """
@@ -1069,7 +1070,9 @@ class PDSimCore(object):
         # Can't use intermediate temperature because the state might be two-phase
         # for some conditions and you are better off just calculating the enthalpy
         # directly
-        h2s = PropsSI('H','P',outletState.p*1000,'S',s1*1000,outletState.Fluid)/1000
+        temp = outletState.copy()
+        temp.update(dict(P=outletState.p, S=s1))
+        h2s = temp.h
         
         self.eta_a = (h2s-h1)/(h2-h1)
         self.Wdot_i = self.mdot*(h2s-h1)
