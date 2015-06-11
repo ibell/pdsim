@@ -108,6 +108,15 @@ cdef class StateFlooded(State):
         #self.p_ =  self.pAS.p()/1000;
         #self.rho_ = self.pAS.rhomass()
     
+    cpdef StateFlooded copy2(self):
+        """
+        Make a copy of this StateFlooded class
+        """
+        cdef StateFlooded S = StateFlooded(self.Fluid,self.Liq,self.p_,self.T_,self.xL_,self.model)
+        #S.phase = self.phase
+        return S
+    
+    
     cpdef double s_liq(self) except *:
         """
         Specific entropy of the flooding medium

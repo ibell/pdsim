@@ -52,6 +52,10 @@ cdef class Tube(object):
         self.alpha = -1.0
         
         self.exists = exists
+        
+        if self.__hasLiquid__ == False:
+            raise Exception('Something wrong')
+        
         if self.__hasLiquid__ == False:
             if fixed<0:
                 raise AttributeError("You must provide an integer value for fixed, either 1 for Node 1 fixed, or 2 for Node 2 fixed.")
@@ -76,19 +80,19 @@ cdef class Tube(object):
             self.ID=ID
             self.OD=OD
    
-        else:
+        elif self.__hasLiquid__ == True:
             if fixed<0:
                 raise AttributeError("You must provide an integer value for fixed, either 1 for Node 1 fixed, or 2 for Node 2 fixed.")
             if fixed==1 and isinstance(StateFlood1,StateClassFlood) and StateFlood2==None:
                 #Everything good
                 self.StateFlood1=StateFlood1
-                self.StateFlood2=StateFlood1.copy()
+                self.StateFlood2=StateFlood1.copy2()
             elif fixed==2 and isinstance(StateFlood2,StateClassFlood) and StateFlood1==None:
                 #Everything good
                 self.StateFlood2=StateFlood2
-                self.StateFlood1=StateFlood2.copy()
+                self.StateFlood1=StateFlood2.copy2()
             else:
-                raise AttributeError('Incompatibility between the value for fixed and the states provided')
+                raise AttributeError('Incompatibility between the value for fixed and the flooded states provided')
                 
             self.TubeFcn=TubeFcn
             if mdot<0:
@@ -99,6 +103,9 @@ cdef class Tube(object):
             self.L=L
             self.ID=ID
             self.OD=OD
+        
+        else:
+            raise Exception('Not implemented')
         
 cdef class TubeCollection(list):
     

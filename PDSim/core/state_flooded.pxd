@@ -25,7 +25,7 @@ cdef class StateFlooded(State):
     cpdef update(self, dict params)
     cpdef update_ph(self, double p, double h)
     cpdef update_TrhoxL(self, double T, double rho, double xL)
-    cpdef State copy(self)
+    cpdef StateFlooded copy2(self)
     cpdef double Props(self, constants_header.parameters iOutput) except *
     cpdef double VoidFrac(self) except *
     cpdef long Phase(self) except *

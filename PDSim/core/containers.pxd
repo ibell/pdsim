@@ -15,7 +15,7 @@ from PDSim.misc.datatypes import arraym
 cpdef public bint __hasLiquid__ 
 
 cdef class Tube(object):
-    cdef readonly bint __hasLiquid__
+    cdef readonly bool __hasLiquid__
     cdef public bytes key1,key2
     cdef public int fixed
     cdef public StateClass State1, State2

@@ -454,7 +454,7 @@ def Expander():
 ## Inlet/Outlet State
     global inletState
     global outletState
-    
+
     if SE.__hasLiquid__ == False:
     
         inletState = CPState(Ref,{'T':Tinlet,'P':pinlet})
@@ -462,19 +462,29 @@ def Expander():
         outletState = CPState(Ref,{'T':T2s,'P':poutlet})
     elif SE.__hasLiquid__ == True:
 
-        inletState = StateFlooded(Ref,Liq,Tinlet,pinlet,xL,'HEM')
+        inletState = StateFlooded(Ref,Liq,pinlet,Tinlet,xL,'HEM')
+        inletState.update(dict(T=Tinlet, P=pinlet, xL=xL))
         T2s = SE.guess_outlet_temp(inletState,poutlet)  #Guess outlet
-        outletState = StateFlooded(Ref,Liq,T2s,poutlet,xL,'HEM')        
-    
+        outletState = StateFlooded(Ref,Liq,poutlet,T2s,xL,'HEM')        
+        outletState.update(dict(T=T2s, P=poutlet, xL=xL))
 ## Define CVc and tubes - Suction, Expansion and Exhaust
     #Guess mass flow rate
     SE.mdot_guess = inletState.rho*SE.Vdisp/SE.Vratio*SE.omega/(2*pi)
     
-    #Suction tube
-    SE.add_tube(Tube(key1 = 'inlet.1',key2 = 'inlet.2',L = 0.086,ID = 0.018,mdot = SE.mdot_guess, State1 = inletState.copy(),fixed = 1,TubeFcn = SE.TubeCode))
     
-    #Exhaust tube
-    SE.add_tube(Tube(key1 = 'outlet.1',key2 = 'outlet.2',L = 0.09,ID = 0.015,mdot = SE.mdot_guess, State2 = outletState.copy(),fixed = 2,TubeFcn = SE.TubeCode))
+    if SE.__hasLiquid__ == False:
+        #Suction tube
+        SE.add_tube(Tube(key1 = 'inlet.1',key2 = 'inlet.2',L = 0.086,ID = 0.018,mdot = SE.mdot_guess, State1 = inletState.copy(),fixed = 1,TubeFcn = SE.TubeCode))
+        #Exhaust tube
+        SE.add_tube(Tube(key1 = 'outlet.1',key2 = 'outlet.2',L = 0.09,ID = 0.015,mdot = SE.mdot_guess, State2 = outletState.copy(),fixed = 2,TubeFcn = SE.TubeCode))
+    
+    elif SE.__hasLiquid__ == True:
+        #Suction tube
+        SE.add_tube(Tube(key1 = 'inlet.1',key2 = 'inlet.2',L = 0.086,ID = 0.018,mdot = SE.mdot_guess, StateFlood1 = inletState.copy2(),fixed = 1,TubeFcn = SE.TubeCode))
+        #Exhaust tube
+        SE.add_tube(Tube(key1 = 'outlet.1',key2 = 'outlet.2',L = 0.09,ID = 0.015,mdot = SE.mdot_guess, StateFlood2 = outletState.copy2(),fixed = 2,TubeFcn = SE.TubeCode))        
+    else:
+        print 'Not implemented'
     
     #Adds all the control volumes for the scroll expander
     SE.auto_add_CVs(inletState, outletState)

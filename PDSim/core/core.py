@@ -425,6 +425,7 @@ class PDSimCore(object):
             can be treated as that of an adiabatic compression(expansion) of a quasi-perfect gas.
             """
             p1 = inlet_state.get_p()
+            T1 = inlet_state.get_T()
             kstar_mix = inlet_state.get_kstar()
             
             if p_outlet > inlet_state.p:
