@@ -33,14 +33,10 @@ import numpy as np
 from matplotlib import pyplot as plt
 import time
 
-Injection = False
 check_valve = False
 
-def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
-    if TTSE:
-        CP.set_TTSESinglePhase_LUT_size("Propane", 500, 500)
-        CP.enable_TTSE_LUT('Propane')
-    global Injection
+def Compressor(Te = 273, Tc = 300, f = None, OneCycle = False, Ref = 'R410A'):
+
     ScrollComp=Scroll()
     #This runs if the module code is run directly 
     
@@ -79,16 +75,15 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
     ScrollComp.motor = Motor()
     ScrollComp.motor.set_eta(0.9)
     ScrollComp.motor.suction_fraction = 1.0
-        
-    Ref = 'Propane'
-    #Ref = 'REFPROP-MIX:R410A.mix'
     
     Te = -20 + 273.15
     Tc = 20 + 273.15
     Tin = Te + 11.1
     DT_sc = 7
-    pe = CP.PropsSI('P','T',Te,'Q',1.0,Ref)/1000.0
-    pc = CP.PropsSI('P','T',Tc,'Q',1.0,Ref)/1000.0
+    temp = State.State(Ref,{'T':Te,'Q':1})
+    pe = temp.p
+    temp.update(dict(T=Tc, Q=1))
+    pc = temp.p
     inletState = State.State(Ref,{'T':Tin,'P':pe})
 
     T2s = ScrollComp.guess_outlet_temp(inletState,pc)
@@ -203,13 +198,13 @@ def Compressor(Te = 273, Tc = 300, f = None,TTSE = False, OneCycle = False):
         print(E)
         raise
 
-    print 'time taken',clock()-t1
+    print 'time taken', clock()-t1
     
-    del ScrollComp.FlowStorage
-    from PDSim.misc.hdf5 import HDF5Writer
-    h5 = HDF5Writer()
-    import CoolProp
-    h5.write_to_file(ScrollComp, 'CPgit_'+CoolProp.__gitrevision__+'.h5')
+    #del ScrollComp.FlowStorage
+    #from PDSim.misc.hdf5 import HDF5Writer
+    #h5 = HDF5Writer()
+    #import CoolProp
+    #h5.write_to_file(ScrollComp, 'CPgit_'+CoolProp.__gitrevision__+'.h5')
     
     return ScrollComp
     
