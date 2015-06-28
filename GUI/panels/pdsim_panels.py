@@ -2038,7 +2038,7 @@ class StateChooser(wx.Dialog):
         p=float(self.p.GetValue())
         rho=float(self.rho.GetValue())
         State(Fluid,dict(T = T, D = rho))
-        if CP.Phase(Fluid,T,p) not in ['Gas','Supercritical']:
+        if CP.PhaseSI("T",T,"P",p*1000.0,Fluid) not in ['gas','supercritical','supercritical_gas']:
             dlg = wx.MessageDialog(None, message = "The phase is not gas or supercritical, cannot accept this state",caption='Invalid state')
             dlg.ShowModal()
             dlg.Destroy()
