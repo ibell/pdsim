@@ -1963,11 +1963,16 @@ class StateChooser(wx.Dialog):
         self.SetSizer(sizer)
         self.Fluids.SetStringSelection(Fluid)
         
-        if CP.PropsSI(Fluid,"Ttriple") < T < CP.PropsSI(Fluid,"Tcrit"):
-            #Pressure from temperature and density
-            p = CP.PropsSI('P','T',T,'D',rho,Fluid)/1000.0
+        state = CP.State(Fluid, dict(T=T,D=rho))
+        Tt = state.Props(CoolProp.iT_triple)
+        Tc = state.Props(CoolProp.iT_critical)
+        if Tt < T < Tc:
+            # Pressure from temperature and density
+            state = CP.State(Fluid, dict(T=T,D=rho))
+            p = state.p
             #Saturation temperature
-            Tsat = CP.PropsSI('T','P',p*1000.0,'Q',1,Fluid)
+            state = CP.State(Fluid, dict(P=p,Q=1))
+            Tsat = state.T
             self.SC.Tsat1.SetValue(str(Tsat))
             self.SC.DTsh1.SetValue(str(T-Tsat))
             self.SC.T1.SetValue(str(T))
@@ -1975,7 +1980,8 @@ class StateChooser(wx.Dialog):
             self.SC.SetSelection(0) ## The page of Tsat,DTsh
         else:
             #Pressure from temperature and density
-            p = CP.PropsSI('P','T',T,'D',rho,Fluid)/1000.0
+            state = CP.State(Fluid, dict(T=T,D=rho))
+            p = state.p
             self.SC.T1.SetValue(str(T))
             self.SC.p1.SetValue(str(p))
             self.SC.SetSelection(1) ## The page of Tsat,DTsh
@@ -2009,18 +2015,26 @@ class StateChooser(wx.Dialog):
         
     def OnAddFluid(self, event = None):
         dlg = wx.TextEntryDialog(None,"Enter the name of a fluid to add, e.g. REFPROP-WATER")
-        dlg.SetValue("REFPROP-R134A")
+        dlg.SetValue("REFPROP::R134A")
+        
         if dlg.ShowModal() == wx.ID_OK:
             # Check that you can get the molar mass of this fluid
             Fluid = dlg.GetValue().encode('ascii')
+            dlg.Destroy()
+            if 'BICUBIC' in Fluid or 'TTSE' in Fluid:
+                dlg3 = wx.MessageDialog(None,"Warning: If tables have not been created already for this fluid, it will take a while to build the tables")
+                dlg3.ShowModal()
+                dlg3.Destroy()
             try:
-                CP.PropsSI(Fluid,'M')*1000.0
+                state = CP.State(Fluid, dict(T=300,D=1e-10))
+                mm = state.MM
                 self.Fluids.Append(Fluid)
-            except ValueError:
-                dlg2 = wx.MessageDialog(None,"Unable to add this fluid (cannot retrieve its molar mass).  Did you type it properly?")
+            except ValueError as VE:
+                dlg2 = wx.MessageDialog(None,"Unable to add this fluid (cannot retrieve its molar mass).  Did you type it properly?  Error:" + str(VE))
                 dlg2.ShowModal()
                 dlg2.Destroy()
-        dlg.Destroy()
+        else:
+            dlg.Destroy()
         
     def OnKeyPress(self,event=None):
         """ cancel if Escape key is pressed """
@@ -2037,12 +2051,12 @@ class StateChooser(wx.Dialog):
         T=float(self.T.GetValue())
         p=float(self.p.GetValue())
         rho=float(self.rho.GetValue())
-        State(Fluid,dict(T = T, D = rho))
-        if CP.PhaseSI("T",T,"P",p*1000.0,Fluid) not in ['gas','supercritical','supercritical_gas']:
-            dlg = wx.MessageDialog(None, message = "The phase is not gas or supercritical, cannot accept this state",caption='Invalid state')
-            dlg.ShowModal()
-            dlg.Destroy()
-            return
+        #State(Fluid,dict(T = T, D = rho))
+        #if CP.PhaseSI("T",T,"P",p*1000.0,Fluid) not in ['gas','supercritical','supercritical_gas']:
+        #    dlg = wx.MessageDialog(None, message = "The phase is not gas or supercritical, cannot accept this state",caption='Invalid state')
+        #    dlg.ShowModal()
+        #    dlg.Destroy()
+        #    return
         self.EndModal(wx.ID_OK)
     
     def GetValues(self):
@@ -2060,22 +2074,26 @@ class StateChooser(wx.Dialog):
         Fluid = str(self.Fluids.GetStringSelection())
         try:
             if PageNum == 0:
-                #Sat temperature and superheat are given
-                p=CP.PropsSI('P','T',float(self.SC.Tsat1.GetValue()),'Q',1.0,Fluid)/1000.0
-                T=float(self.SC.Tsat1.GetValue())+float(self.SC.DTsh1.GetValue())
-                rho=CP.PropsSI('D','T',T,'P',p*1000.0,Fluid)
+                # Sat temperature and superheat are given
+                Ts = float(self.SC.Tsat1.GetValue())
+                state = CP.State(Fluid, dict(T=Ts,Q=1))
+                p = state.p
+                T = Ts + float(self.SC.DTsh1.GetValue())
+                state = CP.State(Fluid, dict(T=T,P=p))
+                rho = state.rho
             elif PageNum == 1:
-                #Temperature and pressure are given
-                T=float(self.SC.T1.GetValue())
-                p=float(self.SC.p1.GetValue())
-                rho=CP.PropsSI('D','T',T,'P',p*1000.0,Fluid)
+                # Temperature and pressure are given
+                T = float(self.SC.T1.GetValue())
+                p = float(self.SC.p1.GetValue())
+                state = CP.State(Fluid, dict(T=T,P=p))
+                rho = state.rho
             else:
                 raise NotImplementedError
             
             self.T.SetValue(str(T))
             self.p.SetValue(str(p))
             self.rho.SetValue(str(rho))
-        except ValueError:
+        except ValueError as VE:
             return
         
 class StatePanel(wx.Panel):
@@ -2244,11 +2262,13 @@ class StateInputsPanel(PDPanel):
         if 'pratio' in config['discharge']:
             pratio = config['discharge']['pratio']
             pressure = pratio * inletState.p
-            Tsat = CP.PropsSI('T','P',pressure*1000.0,'Q',1,inletState.Fluid)
+            state = CP.State(inletState.Fluid, dict(P=pressure,Q=1))
+            Tsat = state.T
         elif 'pressure' in config['discharge']:
             pressure = config['discharge']['pressure']
             pratio = pressure / inletState.p
-            Tsat = CP.PropsSI('T','P',pressure*1000.0,'Q',1,inletState.Fluid)
+            state = CP.State(inletState.Fluid, dict(P=pressure,Q=1))
+            Tsat = state.T
         else:
             raise ValueError('either pratio or pressure must be provided for discharge')
              
@@ -2311,16 +2331,19 @@ class StateInputsPanel(PDPanel):
         if changed_parameter == 'pressure':
             pdisc = self.main.get_GUI_object_value('discPressure')
             pratio = pdisc / psuction
-            Tsat = CP.PropsSI('T', 'P', pdisc*1000.0, 'Q', 1.0, Fluid)
+            state = CP.State(Fluid, dict(P=pdisc,Q=1))
+            Tsat = state.T
             
         elif changed_parameter == 'pratio':
             pratio = self.main.get_GUI_object_value('discPratio')
             pdisc = psuction * pratio
-            Tsat = CP.PropsSI('T', 'P', pdisc*1000.0, 'Q', 1.0, Fluid)
+            state = CP.State(Fluid, dict(P=pdisc,Q=1))
+            Tsat = state.T
             
         elif changed_parameter == 'Tsat':
             Tsat = self.main.get_GUI_object_value('discTsat')
-            pdisc = CP.PropsSI('P', 'T', Tsat, 'Q', 1.0, Fluid)/1000.0
+            state = CP.State(Fluid, dict(T=Tsat,Q=1))
+            pdisc = state.p
             pratio = pdisc / psuction
             
         else:
@@ -2382,7 +2405,8 @@ class StateInputsPanel(PDPanel):
             DTsh = val_map['suctDTsh']
             
             Fluid = self.SuctionStatePanel.GetState().Fluid
-            p = CP.PropsSI('P','T',Tsat,'Q',1,Fluid)/1000.0
+            state = CP.State(Fluid, dict(T=Tsat,Q=1))
+            p = state.p
             
             self.SuctionStatePanel.set_state(Fluid, **dict(T = Tsat+DTsh, P = p))
             
