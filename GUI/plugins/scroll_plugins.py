@@ -661,7 +661,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
                         injection_superheat = state_vals[state_attrs.index('injection_state_superheat_'+I)]
                         injection_temp = injection_sat_temp + injection_superheat
                         import CoolProp.CoolProp as CP
-                        injection_pressure = CP.Props('P','T',injection_sat_temp,'Q',1.0,inletState.Fluid)
+                        injection_pressure = CP.PropsSI('P','T',injection_sat_temp,'Q',1.0,inletState.Fluid)/1000.0
                         self.Lines[i].state.set_state(inletState.Fluid,
                                                       T=injection_temp, 
                                                       P=injection_pressure)

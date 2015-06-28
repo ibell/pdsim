@@ -1963,11 +1963,11 @@ class StateChooser(wx.Dialog):
         self.SetSizer(sizer)
         self.Fluids.SetStringSelection(Fluid)
         
-        if CP.Props(Fluid,"Ttriple") < T < CP.Props(Fluid,"Tcrit"):
+        if CP.PropsSI(Fluid,"Ttriple") < T < CP.PropsSI(Fluid,"Tcrit"):
             #Pressure from temperature and density
-            p = CP.Props('P','T',T,'D',rho,Fluid)
+            p = CP.PropsSI('P','T',T,'D',rho,Fluid)/1000.0
             #Saturation temperature
-            Tsat = CP.Props('T','P',p,'Q',1,Fluid)
+            Tsat = CP.PropsSI('T','P',p*1000.0,'Q',1,Fluid)
             self.SC.Tsat1.SetValue(str(Tsat))
             self.SC.DTsh1.SetValue(str(T-Tsat))
             self.SC.T1.SetValue(str(T))
@@ -1975,7 +1975,7 @@ class StateChooser(wx.Dialog):
             self.SC.SetSelection(0) ## The page of Tsat,DTsh
         else:
             #Pressure from temperature and density
-            p = CP.Props('P','T',T,'D',rho,Fluid)
+            p = CP.PropsSI('P','T',T,'D',rho,Fluid)/1000.0
             self.SC.T1.SetValue(str(T))
             self.SC.p1.SetValue(str(p))
             self.SC.SetSelection(1) ## The page of Tsat,DTsh
@@ -2014,7 +2014,7 @@ class StateChooser(wx.Dialog):
             # Check that you can get the molar mass of this fluid
             Fluid = dlg.GetValue().encode('ascii')
             try:
-                CP.Props(Fluid,'M')
+                CP.PropsSI(Fluid,'M')*1000.0
                 self.Fluids.Append(Fluid)
             except ValueError:
                 dlg2 = wx.MessageDialog(None,"Unable to add this fluid (cannot retrieve its molar mass).  Did you type it properly?")
@@ -2061,14 +2061,14 @@ class StateChooser(wx.Dialog):
         try:
             if PageNum == 0:
                 #Sat temperature and superheat are given
-                p=CP.Props('P','T',float(self.SC.Tsat1.GetValue()),'Q',1.0,Fluid)
+                p=CP.PropsSI('P','T',float(self.SC.Tsat1.GetValue()),'Q',1.0,Fluid)/1000.0
                 T=float(self.SC.Tsat1.GetValue())+float(self.SC.DTsh1.GetValue())
-                rho=CP.Props('D','T',T,'P',p,Fluid)
+                rho=CP.PropsSI('D','T',T,'P',p*1000.0,Fluid)
             elif PageNum == 1:
                 #Temperature and pressure are given
                 T=float(self.SC.T1.GetValue())
                 p=float(self.SC.p1.GetValue())
-                rho=CP.Props('D','T',T,'P',p,Fluid)
+                rho=CP.PropsSI('D','T',T,'P',p*1000.0,Fluid)
             else:
                 raise NotImplementedError
             
@@ -2244,11 +2244,11 @@ class StateInputsPanel(PDPanel):
         if 'pratio' in config['discharge']:
             pratio = config['discharge']['pratio']
             pressure = pratio * inletState.p
-            Tsat = CP.Props('T','P',pressure,'Q',1,inletState.Fluid)
+            Tsat = CP.PropsSI('T','P',pressure*1000.0,'Q',1,inletState.Fluid)
         elif 'pressure' in config['discharge']:
             pressure = config['discharge']['pressure']
             pratio = pressure / inletState.p
-            Tsat = CP.Props('T','P',pressure,'Q',1,inletState.Fluid)
+            Tsat = CP.PropsSI('T','P',pressure*1000.0,'Q',1,inletState.Fluid)
         else:
             raise ValueError('either pratio or pressure must be provided for discharge')
              
@@ -2311,16 +2311,16 @@ class StateInputsPanel(PDPanel):
         if changed_parameter == 'pressure':
             pdisc = self.main.get_GUI_object_value('discPressure')
             pratio = pdisc / psuction
-            Tsat = CP.Props('T', 'P', pdisc, 'Q', 1.0, Fluid)
+            Tsat = CP.PropsSI('T', 'P', pdisc*1000.0, 'Q', 1.0, Fluid)
             
         elif changed_parameter == 'pratio':
             pratio = self.main.get_GUI_object_value('discPratio')
             pdisc = psuction * pratio
-            Tsat = CP.Props('T', 'P', pdisc, 'Q', 1.0, Fluid)
+            Tsat = CP.PropsSI('T', 'P', pdisc*1000.0, 'Q', 1.0, Fluid)
             
         elif changed_parameter == 'Tsat':
             Tsat = self.main.get_GUI_object_value('discTsat')
-            pdisc = CP.Props('P', 'T', Tsat, 'Q', 1.0, Fluid)
+            pdisc = CP.PropsSI('P', 'T', Tsat, 'Q', 1.0, Fluid)/1000.0
             pratio = pdisc / psuction
             
         else:
@@ -2382,7 +2382,7 @@ class StateInputsPanel(PDPanel):
             DTsh = val_map['suctDTsh']
             
             Fluid = self.SuctionStatePanel.GetState().Fluid
-            p = CP.Props('P','T',Tsat,'Q',1,Fluid)
+            p = CP.PropsSI('P','T',Tsat,'Q',1,Fluid)/1000.0
             
             self.SuctionStatePanel.set_state(Fluid, **dict(T = Tsat+DTsh, P = p))
             
