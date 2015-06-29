@@ -2014,8 +2014,8 @@ class StateChooser(wx.Dialog):
         self.rho.SetValue("")
         
     def OnAddFluid(self, event = None):
-        dlg = wx.TextEntryDialog(None,"Enter the name of a fluid to add, e.g. REFPROP-WATER")
-        dlg.SetValue("REFPROP::R134A")
+        dlg = wx.TextEntryDialog(None,"Enter the name of a fluid to add, e.g. REFPROP::WATER")
+        dlg.SetValue("BICUBIC&REFPROP::R32[0.697614699375863]&R125[0.302385300624138]")
         
         if dlg.ShowModal() == wx.ID_OK:
             # Check that you can get the molar mass of this fluid
