@@ -860,8 +860,8 @@ class MainFrame(wx.Frame):
                 self.out=aWxTextCtrl
             def write(self, string):
                 wx.CallAfter(self.out.AppendText, string)
-#            def flush(self):
-#                return None
+            def flush(self):
+                return None
                 
         redir=RedirectText(self.MTB.RunTB.main_log_ctrl)
         sys.stdout=redir
