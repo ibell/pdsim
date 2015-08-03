@@ -1992,6 +1992,12 @@ class StateChooser(wx.Dialog):
         self.SC.DTsh1.Bind(wx.EVT_KEY_UP,self.OnUpdateVals)
         self.SC.T1.Bind(wx.EVT_KEY_UP,self.OnUpdateVals)
         self.SC.p1.Bind(wx.EVT_KEY_UP,self.OnUpdateVals)
+
+        self.SC.Tsat1.Bind(wx.EVT_TEXT,self.OnUpdateVals)
+        self.SC.DTsh1.Bind(wx.EVT_TEXT,self.OnUpdateVals)
+        self.SC.T1.Bind(wx.EVT_TEXT,self.OnUpdateVals)
+        self.SC.p1.Bind(wx.EVT_TEXT,self.OnUpdateVals)
+
         self.AddFluid.Bind(wx.EVT_BUTTON,self.OnAddFluid)
         
         self.Fluids.Bind(wx.EVT_COMBOBOX, self.OnFlushVals)
