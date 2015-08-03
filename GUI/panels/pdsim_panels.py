@@ -1966,7 +1966,9 @@ class StateChooser(wx.Dialog):
         state = CP.State(Fluid, dict(T=T,D=rho))
         Tt = state.Props(CoolProp.iT_triple)
         Tc = state.Props(CoolProp.iT_critical)
-        if Tt < T < Tc:
+        pt = state.Props(CoolProp.iP_triple)
+        pc = state.Props(CoolProp.iP_critical)
+        if Tt < T < Tc and pt < state.p < pc:
             # Pressure from temperature and density
             state = CP.State(Fluid, dict(T=T,D=rho))
             p = state.p
@@ -2337,20 +2339,29 @@ class StateInputsPanel(PDPanel):
         if changed_parameter == 'pressure':
             pdisc = self.main.get_GUI_object_value('discPressure')
             pratio = pdisc / psuction
-            state = CP.State(Fluid, dict(P=pdisc,Q=1))
-            Tsat = state.T
+            try:
+                state = CP.State(Fluid, dict(P=pdisc,Q=1))
+                Tsat = state.T
+            except ValueError:
+                Tsat = -1
             
         elif changed_parameter == 'pratio':
             pratio = self.main.get_GUI_object_value('discPratio')
             pdisc = psuction * pratio
-            state = CP.State(Fluid, dict(P=pdisc,Q=1))
-            Tsat = state.T
+            try:
+                state = CP.State(Fluid, dict(P=pdisc,Q=1))
+                Tsat = state.T
+            except ValueError:
+                Tsat = -1
             
         elif changed_parameter == 'Tsat':
             Tsat = self.main.get_GUI_object_value('discTsat')
-            state = CP.State(Fluid, dict(T=Tsat,Q=1))
-            pdisc = state.p
-            pratio = pdisc / psuction
+            try:
+                state = CP.State(Fluid, dict(T=Tsat,Q=1))
+                pdisc = state.p
+                pratio = pdisc / psuction
+            except ValueError:
+                pass
             
         else:
             raise ValueError('Your parameter [{s:s}] is invalid for OnChangeDischargeValue.  Must be one of (pressure, pratio, Tsat)'.format(s = changed_parameter))
