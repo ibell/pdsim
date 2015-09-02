@@ -53,8 +53,8 @@ cdef class Tube(object):
         
         self.exists = exists
         
-        if self.__hasLiquid__ == False:
-            raise Exception('Something wrong')
+#         if self.__hasLiquid__ == False:
+#             raise Exception('Something wrong')
         
         if self.__hasLiquid__ == False:
             if fixed<0:
