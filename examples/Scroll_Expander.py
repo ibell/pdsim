@@ -23,7 +23,7 @@ from PDSim.misc.datatypes import arraym
 
 from PDSim.plot.plots import debug_plots
 
-from CoolProp.CoolProp import Props
+from CoolProp.CoolProp import PropsSI
 from CoolProp.CoolProp import State as CPState
 from PDSim.core.state_flooded import StateFlooded
 
@@ -40,7 +40,7 @@ class ScrollExpander(core.Scroll):
         core.Scroll.__init__(self, *args, **kwargs)
         self.__before_discharge1__ =True 
         self.__before_discharge2__ =True
-        self.__hasLiquid__ = True
+        self.__hasLiquid__ = False
         
     def V_ss(self, beta, full_output=False):
         VdV = core.Scroll.V_dd(self, 2*pi-beta, full_output=full_output)
@@ -123,11 +123,19 @@ class ScrollExpander(core.Scroll):
             keye2 = 'e2.'+str(alpha)
             if alpha == nCmax:
                 #It is the outermost pair of expansion chambers
-                initState = CPState(inletState.Fluid,dict(T=inletState.T,D=inletState.rho))
+                if self.__hasLiquid__ == False:
+                    initState = CPState(inletState.Fluid,dict(T=inletState.T,D=inletState.rho))
+                elif self.__hasLiquid__ == True: 
+                    initState = StateFlooded(inletState.Fluid,inletState.Liq,inletState.p,inletState.T,self.xL,'HEM')
+                    initState.update(dict(T=inletState.T, P = inletState.p, xL=self.xL))
+                else:
+                    raise Exception('Not implemented')
+                    
             else:
                 #It is not the first CV, more involved analysis
                 #Assume isentropic expansion from the inlet state at the end of the suction process
                 T1 = inletState.T
+                p1 = inletState.p
                 s1 = inletState.s
                 rho1 = inletState.rho
                 k = inletState.cp/inletState.cv#Specific heat ratio
@@ -136,8 +144,19 @@ class ScrollExpander(core.Scroll):
                 # Mass is constant, so rho1*V1 = rho2*V2
                 rho2 = rho1 * V1 / V2
                 # Now don't know temperature or pressure, but you can assume it is isentropic to find the temperature
-                T2 = newton(lambda T: Props('S','T',T,'D',rho2,inletState.Fluid)-s1, T1)
-                initState = CPState(inletState.Fluid,dict(T=T2,D=rho2)).copy()
+                if self.__hasLiquid__ == False:
+                    T2 = newton(lambda T: PropsSI('S','T',T,'D',rho2,inletState.Fluid)/1000-s1, T1)
+                    initState = CPState(inletState.Fluid,dict(T=T2,D=rho2)).copy()
+                elif self.__hasLiquid__ == True: 
+                    #TODO: add a better guess
+                    kstar_mix = inletState.get_kstar()
+                    T2s = T1*(outletState.p/p1)**((kstar_mix - 1)/kstar_mix)
+                    T2 = T1 - (T1-T2s)*0.7
+                    initState = StateFlooded(inletState.Fluid,inletState.Liq,outletState.p,T2,inletState.xL,'HEM').copy()
+                    #(initState.update(dict(T=T2, P = outletState.p, xL=self.xL))).copy()
+
+                else:
+                    raise Exception('Not implemented')                
             
             # Expansion chambers do not change definition at discharge angle
             disc_becomes_e1 = keye1
@@ -332,7 +351,7 @@ class ScrollExpander(core.Scroll):
             
             print 'splitting'
             
-            if self.__hasLiquid__==False:
+            if self.__hasLiquid__== False:
 
                 T = self.CVs['sss'].State.T
                 rho = self.CVs['sss'].State.rho
@@ -388,7 +407,7 @@ def Expander():
     N = 2295
     Tamb = 304
     Liq = 'Duratherm_LT'
-    xL = 0.5   #Liquid fraction
+    SE.xL = 0.5   #Liquid fraction
     
     #Flood_Prop = State_Flooded(Ref,Liq,Tinlet,pinlet,xL)
     #SE.Entropy = Flood_Prop.s_mix(Ref,Liq,Tinlet,pinlet,xL)
@@ -455,18 +474,19 @@ def Expander():
     global inletState
     global outletState
 
+
     if SE.__hasLiquid__ == False:
     
         inletState = CPState(Ref,{'T':Tinlet,'P':pinlet})
         T2s = SE.guess_outlet_temp(inletState,poutlet)  #Guess outlet
         outletState = CPState(Ref,{'T':T2s,'P':poutlet})
     elif SE.__hasLiquid__ == True:
-
-        inletState = StateFlooded(Ref,Liq,pinlet,Tinlet,xL,'HEM')
-        inletState.update(dict(T=Tinlet, P=pinlet, xL=xL))
+        inletState = StateFlooded(Ref,Liq,pinlet,Tinlet,SE.xL,'HEM')
+        inletState.update(dict(T=Tinlet, P=pinlet, xL=SE.xL))
         T2s = SE.guess_outlet_temp(inletState,poutlet)  #Guess outlet
-        outletState = StateFlooded(Ref,Liq,poutlet,T2s,xL,'HEM')        
-        outletState.update(dict(T=T2s, P=poutlet, xL=xL))
+        outletState = StateFlooded(Ref,Liq,poutlet,T2s,SE.xL,'HEM')        
+        outletState.update(dict(T=T2s, P=poutlet, xL=SE.xL))
+        
 ## Define CVc and tubes - Suction, Expansion and Exhaust
     #Guess mass flow rate
     SE.mdot_guess = inletState.rho*SE.Vdisp/SE.Vratio*SE.omega/(2*pi)
@@ -480,9 +500,9 @@ def Expander():
     
     elif SE.__hasLiquid__ == True:
         #Suction tube
-        SE.add_tube(Tube(key1 = 'inlet.1',key2 = 'inlet.2',L = 0.086,ID = 0.018,mdot = SE.mdot_guess, StateFlood1 = inletState.copy2(),fixed = 1,TubeFcn = SE.TubeCode))
+        SE.add_tube(Tube(key1 = 'inlet.1',key2 = 'inlet.2',L = 0.086,ID = 0.018,mdot = SE.mdot_guess, StateFlood1 = inletState.copy(),fixed = 1,TubeFcn = SE.TubeCode,__hasLiquid__ = SE.__hasLiquid__))
         #Exhaust tube
-        SE.add_tube(Tube(key1 = 'outlet.1',key2 = 'outlet.2',L = 0.09,ID = 0.015,mdot = SE.mdot_guess, StateFlood2 = outletState.copy2(),fixed = 2,TubeFcn = SE.TubeCode))        
+        SE.add_tube(Tube(key1 = 'outlet.1',key2 = 'outlet.2',L = 0.09,ID = 0.015,mdot = SE.mdot_guess, StateFlood2 = outletState.copy(),fixed = 2,TubeFcn = SE.TubeCode,__hasLiquid__ = SE.__hasLiquid__))        
     else:
         print 'Not implemented'
     
