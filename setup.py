@@ -58,7 +58,7 @@ pyx_list = [
             "PDSim/misc/stl_utilities.pyx",
             "PDSim/misc/datatypes.pyx",
             "PDSim/misc/clipper/pyclipper.pyx",
-            "PDSim/misc/clipper/polymath.pyx",
+            "PDSim/misc/polymath.pyx",
             "PDSim/recip/_recip.pyx",
             "PDSim/scroll/common_scroll_geo.pyx",
             "PDSim/scroll/symm_scroll_geo.pyx",
