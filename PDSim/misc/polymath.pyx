@@ -1,14 +1,41 @@
 from __future__ import division
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import cython
-from matplotlib.nxutils import pnpoly
+import itertools
+
+if (matplotlib.__version__ < '1.2'):
+    from matplotlib.nxutils import pnpoly
+else:
+    from matplotlib.path import Path as mpl_path
+
+
+
 
 """
 A module for doing polygon math - finding regions of overlap and differences of
 two polygons
 
+Updated Davide Ziviani 9/2015 
+- The matplotlib.nxutils module has been removed from Matplotlib. Use "matplotlib.path.Path.contains_point" instead
+  you make a Path object using the vertices, and then use its contains_point() method:
+  
+  path = Path(polygonVerts)
+  isInside = path.contains_point(point) 
+
+
+Info on pnpoly:
+pnpoly(...)
+inside = pnpoly(x, y, xyverts)
+ 
+Return 1 if x,y is inside the polygon, 0 otherwise.
+ 
+*xyverts*
+    a sequence of x,y vertices.
+
 """
+
 cdef class Polygon(object):
     def __init__(self, np.ndarray x, np.ndarray y):
         self.x = x
@@ -21,8 +48,13 @@ cdef class Polygon(object):
         Recommendation from 
         http://www.heikkitoivonen.net/blog/2009/01/26/point-in-polygon-in-python/
         """
-        return pnpoly(testx, testy, self.xy)
+        #TODO: to fix
+        if(matplotlib.__version__ < '1.2'):
+            return pnpoly(testx, testy, self.xy)
         
+        return mpl_path(self.xy).contains_points([(testx,testy)])
+
+
     cpdef double area(self):
         cdef long i
         cdef double area = 0.0
