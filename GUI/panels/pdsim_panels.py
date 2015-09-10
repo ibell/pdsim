@@ -53,7 +53,8 @@ volume_units = {
 
 pressure_units = {
                   'kPa' : pq.kPa,
-                  'psia' : pq.psi
+                  'psia' : pq.psi,
+                  'torr' : pq.torr
                   }
 rev = pq.UnitQuantity('revolution', 2*np.pi*pq.radians, symbol='rev')
 
