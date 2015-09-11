@@ -229,6 +229,10 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
         # alpha is not provided directly, use the correlation
         if alpha is None:
             alpha = k*Nu/ID #W/m^2-K
+        # If the Reynolds number is very, very small, you will get a negative Nusselt number,
+        # so we limit the heat transfer coefficient to be positive
+        if alpha < 0:
+            alpha = 0
 
         #Pressure gradient using Darcy friction factor
         G = mdot/InnerFlowArea
