@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+    # -*- coding: utf-8 -*-
 
 from math import pi, cos, sin
 import textwrap
@@ -49,6 +49,87 @@ class ReadOnlyLaTeXLabel(wx.Panel):
     def SetValue(self, value):
         self.textbox.SetValue(value)
         
+class GeometryConverterChoicebook(wx.Choicebook):
+    def __init__(self, parent, id=-1, geo = None):
+        wx.Choicebook.__init__(self, parent, id)
+
+        self.pagePitch_thickness_height = wx.Panel(self)
+        self.AddPage(self.pagePitch_thickness_height,'Pitch, Thickness, Height')
+
+        self.pitch_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'Pitch [m]')
+        self.thickness_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'Thickness [m]')
+        self.height_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'Height [m]')
+        self.phimstart_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'Phim start [rad]')
+        self.phimend_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'Phim end [rad]')
+
+        self.pitch_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['pitch']))
+        self.thickness_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['thickness']))
+        self.height_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['height']))
+        self.phimstart_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['phimstart']))
+        self.phimend_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['phimend']))
+
+        sizer_for_outputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+
+        # Add all the output objects to the sizer for the outputs
+        sizer_for_outputs.AddMany([self.pitch_label, self.pitch_value,
+                                   self.thickness_label, self.thickness_value,
+                                   self.height_label, self.height_value,
+                                   self.phimstart_label, self.phimstart_value,
+                                   self.phimend_label, self.phimend_value
+                                   ])
+
+        self.pagePitch_thickness_height.SetSizer(sizer_for_outputs)
+        sizer_for_outputs.Layout()
+
+    def get_geo(self):
+        pitch = float(self.pitch_value.GetValue())
+        t = thickness = float(self.thickness_value.GetValue())
+        h = height = float(self.height_value.GetValue())
+        phi_ie = float(self.phimend_value.GetValue())
+        phi_is = float(self.phimstart_value.GetValue())
+
+        rb = base_radius = pitch/(2*pi)
+        ro = orbiting_radius = rb*pi - thickness
+        
+        phi_os = phi_is - pi
+        phi_i0 = t/(2.0*rb)
+        phi_o0 = -phi_i0
+        displacement = -2*pi*h*rb*ro*(3*pi-2*phi_ie+phi_i0+phi_o0)
+        volume_ratio = (3*pi-2*phi_ie+phi_i0+phi_o0)/(-2*phi_os-3*pi+phi_i0+phi_o0)
+
+        return dict(displacement = displacement,
+                    volume_ratio = volume_ratio,
+                    thickness = thickness,
+                    orbiting_radius = orbiting_radius,
+                    phi_fi0 = 0,
+                    phi_fis = phi_is,
+                    phi_fos = phi_os,
+                    )
+
+class ConvertGeometryFrame(wx.Dialog):
+    """ A dialog for converting sets of geometries to the geometry definition used in paper of Bell, IJR, 2013 """
+    def __init__(self, geo = None):
+        wx.Dialog.__init__(self, None)
+
+        panel = wx.Panel(self)
+
+        self.GCS = GeometryConverterChoicebook(self, geo = geo)
+        self.OkButton = wx.Button(self,-1,"Ok")
+        self.OkButton.Bind(wx.EVT_BUTTON, self.OnOk)
+        
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        main_sizer.Add(self.GCS, 1, wx.EXPAND)
+        main_sizer.Add(self.OkButton, 1, wx.EXPAND)
+        self.SetSizer(main_sizer)
+        main_sizer.Layout()
+
+    def OnOk(self, event):
+        self.EndModal(wx.ID_OK)
+
+    def get_geo(self):
+        """ Get the geometry to be set as a dictionary """
+        return self.GCS.get_geo()
+
 class ScrollWrapAnglesFrame(wx.Frame):
     def __init__(self, geo):
         wx.Frame.__init__(self, None)
@@ -386,6 +467,13 @@ class GeometryPanel(pdsim_panels.PDPanel):
             
         self.ScrollWrapAnglesButton = wx.Button(scrolled_panel, label = 'View Scroll Wrap Angles')
         self.ScrollWrapAnglesButton.Bind(wx.EVT_BUTTON,self.OnShowWrapGeo)
+        self.ConvertGeometryButton = wx.Button(scrolled_panel, label = 'Convert Geometry')
+        self.ConvertGeometryButton.Bind(wx.EVT_BUTTON,self.OnConvertGeometry)
+
+        geosizer = wx.BoxSizer(wx.HORIZONTAL)
+        geosizer.Add(self.ScrollWrapAnglesButton, 1, wx.ALIGN_CENTER_HORIZONTAL)
+        geosizer.Add(self.ConvertGeometryButton, 1, wx.ALIGN_CENTER_HORIZONTAL)
+
         
         # Build the items and return the list of annotated GUI objects
         annotated_GUI_objects = self.construct_items(annotated_values, 
@@ -474,7 +562,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         sizer.AddSpacer(5)
         sizer.Add(plotwrapssizer, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
-        sizer.Add(self.ScrollWrapAnglesButton, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(geosizer, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
         sizer.Add(sizer_for_wrap_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
@@ -551,6 +639,26 @@ class GeometryPanel(pdsim_panels.PDPanel):
         
         frm = ScrollWrapAnglesFrame(self.Scroll.geo)
         frm.Show()
+
+    def OnConvertGeometry(self, event = None):
+        if event is not None: event.Skip()
+    
+        def get(key):
+            # Compact code to get a parameter from the main database
+            return self.main.get_GUI_object_value(key)
+
+        geo = dict(pitch = 2*pi*self.Scroll.geo.rb,
+                   thickness = self.Scroll.geo.t,
+                   height = self.Scroll.geo.h,
+                   phimstart = self.Scroll.geo.phi_fis,
+                   phimend = self.Scroll.geo.phi_fie
+                   )
+
+        frm = ConvertGeometryFrame(geo = geo)
+        if frm.ShowModal() == wx.ID_OK:
+            geo = frm.get_geo()
+            print geo
+        frm.Destroy()
         
     def OnAnimate(self, event = None):
         
