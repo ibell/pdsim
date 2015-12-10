@@ -59,8 +59,8 @@ class Run1(Process):
         #Get the module name (file name without the .py)
         script_name = self.script_name.split('.', 1)[0]
         
-        print 'About to run the script file', self.script_name
-        
+        print 'About to run the script file', os.path.join(pdsim_home_folder,self.script_name)
+
         #Import the script module
         script_module = __import__(script_name, globals(), locals(), [], -1)
         
