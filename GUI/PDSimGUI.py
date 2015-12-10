@@ -153,7 +153,8 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
     
     desc_map = {'eps_cycle' : ('Cycle-cycle convergence criterion','-',0.003),
                 'eps_energy_balance' : ('Energy balance convergence criterion','kW',0.01),
-                'timeout': ('Timeout for a run [s]','-',3600)
+                'timeout': ('Timeout for a run [s]','-',3600),
+                'max_number_of_steps': ('Maximum number of steps per revolution','-',40000)
                 }
     
     def __init__(self, parent, configdict,**kwargs):
@@ -167,7 +168,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         annotated_values = []
         self.keys_for_config = []
         
-        keys = ['eps_cycle', 'eps_energy_balance', 'timeout']
+        keys = ['eps_cycle', 'eps_energy_balance', 'timeout', 'max_number_of_steps']
         annotated_values = self.get_annotated_values(keys, config = configdict)
         
         # Build the items and return the list of annotated GUI objects
@@ -235,6 +236,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         eps_cycle = self.main.get_GUI_object('eps_cycle').GetValue()
         eps_energy_balance = self.main.get_GUI_object('eps_energy_balance').GetValue()
         timeout = self.main.get_GUI_object('timeout').GetValue()
+        max_number_of_steps = self.main.get_GUI_object('max_number_of_steps').GetValue()
         
         return textwrap.dedent(
             """
@@ -254,10 +256,12 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
                               timeout = {timeout:s},
                               eps_energy_balance = {eps_energy_balance:s},
                               eps_cycle = {eps_cycle:s},
+                              max_number_of_steps = {max_number_of_steps:s}
                               )
             print 'time taken',time.clock()-t1
             """.format(RK_eps = self.IC.RK45_eps.GetValue(),
                        eps_cycle = str(eps_cycle),
+                       max_number_of_steps = str(max_number_of_steps),
                        eps_energy_balance = str(eps_energy_balance),
                        timeout = str(timeout),
                        OneCycle = str(self.OneCycle.GetValue()),

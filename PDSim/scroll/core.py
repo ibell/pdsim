@@ -1776,7 +1776,7 @@ class Scroll(PDSimCore, _Scroll):
                     else:
                         Tube.Q_add = 0.0
                         
-    def pre_run(self):
+    def pre_run(self, N = 40000):
         """
         Intercepts the call to pre_run and does some scroll processing, then 
         calls the base class function
@@ -1798,7 +1798,7 @@ class Scroll(PDSimCore, _Scroll):
             FP.key2Index = scroll_geo.get_compressor_CV_index(FP.key2)
         
         #  Call the base class function        
-        PDSimCore.pre_run(self)
+        PDSimCore.pre_run(self, N = N)
         
         self.CVs['sa'].ForceFcn = symm_scroll_geo.SA_forces
         self.CVs['s1'].ForceFcn = symm_scroll_geo.S1_forces

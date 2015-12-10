@@ -1531,6 +1531,7 @@ class PDSimCore(object):
               eps_cycle = 0.001,
               eps_energy_balance = 0.01,
               cycle_integrator_options = None,
+              max_number_of_steps = 40000,
               **kwargs):
         """
         This is the driving function for the PDSim model.  It can be extended through the 
@@ -1573,6 +1574,8 @@ class PDSimCore(object):
             Energy balance convergence criterion
         cycle_integrator_options : dictionary
             A dictionary of options to be passed to the cycle integrator
+        max_number_of_steps : int
+            Maximum number of steps allowed per rotation
         
         Notes
         -----
@@ -1629,7 +1632,7 @@ class PDSimCore(object):
             self.pre_solve()
             
         # This runs before the model starts at all
-        self.pre_run()
+        self.pre_run(N = max_number_of_steps)
         
         # Check which method is used to do aborting
         if Abort is None and pipe_abort is not None:
