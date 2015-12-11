@@ -2241,7 +2241,7 @@ class StateInputsPanel(PDPanel):
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_for_omega = wx.BoxSizer(wx.HORIZONTAL)
         sizer_for_inletState = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_for_discState = wx.FlexGridSizer(cols = 2)
+        sizer_for_discState = wx.FlexGridSizer(cols = 3)
         
         # The list for all the annotated objects
         self.annotated_values = []
@@ -2267,17 +2267,25 @@ class StateInputsPanel(PDPanel):
         CAGO_suctTsat.link_required_parameters([CAGO_suctDTsh])
         CAGO_suctDTsh.link_required_parameters([CAGO_suctTsat])
         
-        #Construct the discharge state
+        # Construct option objects for the variable used to set the discharge state
+        self.radio_discp = wx.RadioButton(self)
+        self.radio_discpratio = wx.RadioButton(self)
+        self.radio_discTsat = wx.RadioButton(self)
+        radios = [self.radio_discp, self.radio_discpratio, self.radio_discTsat]
+
+        # Construct the discharge state
         if 'pratio' in config['discharge']:
             pratio = config['discharge']['pratio']
             pressure = pratio * inletState.p
             state = CP.State(inletState.Fluid, dict(P=pressure,Q=1))
             Tsat = state.T
+            self.radio_discpratio.SetValue(True)
         elif 'pressure' in config['discharge']:
             pressure = config['discharge']['pressure']
             pratio = pressure / inletState.p
             state = CP.State(inletState.Fluid, dict(P=pressure,Q=1))
             Tsat = state.T
+            self.radio_discp.SetValue(True)
         else:
             raise ValueError('either pratio or pressure must be provided for discharge')
              
@@ -2286,12 +2294,13 @@ class StateInputsPanel(PDPanel):
             AnnotatedValue('discPratio', pratio, *self.desc_map['discPratio']),
             AnnotatedValue('discTsat', Tsat, *self.desc_map['discTsat'])
             ]
-        
-        AGO_disc = self.construct_items(disc_annotated_values, sizer_for_discState)
-        
-        AGO_disc[0].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'pressure'))
-        AGO_disc[1].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'pratio'))
-        AGO_disc[2].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'Tsat'))
+
+        AGO_disc = []
+        for i, (av,name, radio) in enumerate(zip(disc_annotated_values, ['pressure','pratio','Tsat'], radios)):
+            sizer_for_discState.Add(radio, -1)
+            AGO_disc.append(self.construct_items([av], sizer = sizer_for_discState))
+            AGO_disc[i].GUI_location.Bind(wx.EVT_KILL_FOCUS, lambda event: self.OnChangeDischargeValue(event, name))
+            radio.Bind(wx.EVT_RADIOBUTTON, self.OnChangeDischargeVariable)
         
         self.main.register_GUI_objects([AGO_omega, CAGO_suctTsat, CAGO_suctDTsh] + AGO_disc)
         
@@ -2324,9 +2333,33 @@ class StateInputsPanel(PDPanel):
         sizer.Add(HeaderStaticText(self, 'Discharge State'), 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
         sizer.Add(sizer_for_discState, 0, wx.ALIGN_CENTER_HORIZONTAL)
-        
+
         self.SetSizer(sizer)
         sizer.Layout()
+
+        self.OnChangeDischargeVariable()
+
+        # If the inlet state changes, fire an even to update the discharge state
+        self.SuctionStatePanel.Bind(self.SuctionStatePanel.EVT_STATE_UPDATE_EVENT, self.OnChangeDischargeValue)
+
+    def OnChangeDischargeVariable(self, event = None, changed_parameter = ''):
+        """
+        Change which variable is held constant at the discharge state
+        """
+
+        # Only one can be active:
+        if self.radio_discp.GetValue():
+            self.main.get_GUI_object('discPressure').GUI_location.Enable()
+            for other in ['discPratio', 'discTsat']:
+                self.main.get_GUI_object(other).GUI_location.Disable()
+        elif self.radio_discpratio.GetValue():
+            self.main.get_GUI_object('discPratio').GUI_location.Enable()
+            for other in ['discPressure', 'discTsat']:
+                self.main.get_GUI_object(other).GUI_location.Disable()
+        elif self.radio_discTsat.GetValue():
+            self.main.get_GUI_object('discTsat').GUI_location.Enable()
+            for other in ['discPressure', 'discPratio', ]:
+                self.main.get_GUI_object(other).GUI_location.Disable()
         
     def OnChangeDischargeValue(self, event = None, changed_parameter = ''):
         """ 
@@ -2336,6 +2369,15 @@ class StateInputsPanel(PDPanel):
         suction_state = self.SuctionStatePanel.GetState()
         psuction = suction_state.p
         Fluid = suction_state.Fluid
+
+        # If changed_parameter not provided, use radios to figure out which to use
+        if not changed_parameter:
+            if self.radio_discp.GetValue():
+                changed_parameter = 'pressure'
+            elif self.radio_discpratio.GetValue():
+                changed_parameter = 'pratio'
+            elif self.radio_discTsat.GetValue():
+                changed_parameter = 'Tsat'
         
         if changed_parameter == 'pressure':
             pdisc = self.main.get_GUI_object_value('discPressure')
@@ -2363,6 +2405,7 @@ class StateInputsPanel(PDPanel):
                 pratio = pdisc / psuction
             except ValueError:
                 pass
+            pdisc = -1
             
         else:
             raise ValueError('Your parameter [{s:s}] is invalid for OnChangeDischargeValue.  Must be one of (pressure, pratio, Tsat)'.format(s = changed_parameter))
