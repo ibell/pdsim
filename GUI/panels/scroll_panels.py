@@ -59,14 +59,14 @@ class GeometryConverterChoicebook(wx.Choicebook):
         self.pitch_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'Pitch [m]')
         self.thickness_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'Thickness [m]')
         self.height_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'Height [m]')
-        self.phimstart_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'Phim start [rad]')
-        self.phimend_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'Phim end [rad]')
+        self.W0_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'W0 [rad]')
+        self.W1_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'W1 [rad]')
 
         self.pitch_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['pitch']))
         self.thickness_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['thickness']))
         self.height_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['height']))
-        self.phimstart_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['phimstart']))
-        self.phimend_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['phimend']))
+        self.W0_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['W0']))
+        self.W1_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['W1']))
 
         sizer_for_outputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
 
@@ -74,8 +74,8 @@ class GeometryConverterChoicebook(wx.Choicebook):
         sizer_for_outputs.AddMany([self.pitch_label, self.pitch_value,
                                    self.thickness_label, self.thickness_value,
                                    self.height_label, self.height_value,
-                                   self.phimstart_label, self.phimstart_value,
-                                   self.phimend_label, self.phimend_value
+                                   self.W0_label, self.W0_value,
+                                   self.W1_label, self.W1_value
                                    ])
 
         self.pagePitch_thickness_height.SetSizer(sizer_for_outputs)
@@ -85,15 +85,21 @@ class GeometryConverterChoicebook(wx.Choicebook):
         pitch = float(self.pitch_value.GetValue())
         t = thickness = float(self.thickness_value.GetValue())
         h = height = float(self.height_value.GetValue())
-        phi_ie = float(self.phimend_value.GetValue())
-        phi_is = float(self.phimstart_value.GetValue())
+        W1 = float(self.W1_value.GetValue())
+        W0 = float(self.W0_value.GetValue())
 
         rb = base_radius = pitch/(2*pi)
         ro = orbiting_radius = rb*pi - thickness
+
+        # Midline starting wrap angle
+        phi_m0 = -W0
+        # Initial angles based on offsets off the midline
+        phi_i0 = phi_m0+thickness/rb/2.0
+        phi_o0 = phi_m0-thickness/rb/2.0
+        phi_ie = W1-W0
+        phi_is = 0
+        phi_os = 0
         
-        phi_os = phi_is - pi
-        phi_i0 = t/(2.0*rb)
-        phi_o0 = -phi_i0
         displacement = -2*pi*h*rb*ro*(3*pi-2*phi_ie+phi_i0+phi_o0)
         volume_ratio = (3*pi-2*phi_ie+phi_i0+phi_o0)/(-2*phi_os-3*pi+phi_i0+phi_o0)
 
@@ -101,7 +107,7 @@ class GeometryConverterChoicebook(wx.Choicebook):
                     volume_ratio = volume_ratio,
                     thickness = thickness,
                     orbiting_radius = orbiting_radius,
-                    phi_fi0 = 0,
+                    phi_fi0 = phi_i0,
                     phi_fis = phi_is,
                     phi_fos = phi_os,
                     )
@@ -406,6 +412,8 @@ sim.geo.phi_ie_offset = {phi_ie_offset:s}
 
 """
         
+        
+
 class GeometryPanel(pdsim_panels.PDPanel):
     """
     The geometry panel of the scroll compressor
@@ -647,17 +655,25 @@ class GeometryPanel(pdsim_panels.PDPanel):
             # Compact code to get a parameter from the main database
             return self.main.get_GUI_object_value(key)
 
+        W0 = self.Scroll.geo.t/(2*self.Scroll.geo.rb)-self.Scroll.geo.phi_fi0
+        W1_minus_W0 = self.Scroll.geo.phi_fie-self.Scroll.geo.phi_fis
         geo = dict(pitch = 2*pi*self.Scroll.geo.rb,
                    thickness = self.Scroll.geo.t,
                    height = self.Scroll.geo.h,
-                   phimstart = self.Scroll.geo.phi_fis,
-                   phimend = self.Scroll.geo.phi_fie
+                   W0 = W0,
+                   W1 = W1_minus_W0 + W0
                    )
 
         frm = ConvertGeometryFrame(geo = geo)
         if frm.ShowModal() == wx.ID_OK:
             geo = frm.get_geo()
-            print geo
+
+            self.main.get_GUI_object('t').SetValue(str(geo['thickness']))
+            self.main.get_GUI_object('Vdisp').SetValue(str(geo['displacement']))
+            self.main.get_GUI_object('Vratio').SetValue(str(geo['volume_ratio']))
+            self.main.get_GUI_object('ro').SetValue(str(geo['orbiting_radius']))
+            for key in ['phi_fi0','phi_fos','phi_fis']:
+                self.main.get_GUI_object(key).SetValue(str(geo[key]))
         frm.Destroy()
         
     def OnAnimate(self, event = None):
