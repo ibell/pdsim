@@ -1263,8 +1263,6 @@ class MainFrame(wx.Frame):
         #  Collect all the .py files in the plugins folder (for standard plugins)
         py_files = recursively_find_files('plugins',extensions = ['.py'])
         
-        print py_files
-        
         # Collect from the user-specified plugin folders 
         for directory in GUIconfig.get('plugin_dirs', default = []):
             for file in glob.glob(os.path.join(directory,'*.py')):
