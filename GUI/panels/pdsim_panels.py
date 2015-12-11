@@ -2277,14 +2277,20 @@ class StateInputsPanel(PDPanel):
         if 'pratio' in config['discharge']:
             pratio = config['discharge']['pratio']
             pressure = pratio * inletState.p
-            state = CP.State(inletState.Fluid, dict(P=pressure,Q=1))
-            Tsat = state.T
+            try:
+                state = CP.State(inletState.Fluid, dict(P=pressure,Q=1))
+                Tsat = state.T
+            except ValueError:
+                Tsat = -1
             self.radio_discpratio.SetValue(True)
         elif 'pressure' in config['discharge']:
             pressure = config['discharge']['pressure']
             pratio = pressure / inletState.p
-            state = CP.State(inletState.Fluid, dict(P=pressure,Q=1))
-            Tsat = state.T
+            try:
+                state = CP.State(inletState.Fluid, dict(P=pressure,Q=1))
+                Tsat = state.T
+            except ValueError:
+                Tsat = -1
             self.radio_discp.SetValue(True)
         else:
             raise ValueError('either pratio or pressure must be provided for discharge')
