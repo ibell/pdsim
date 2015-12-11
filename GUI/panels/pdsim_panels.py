@@ -2296,11 +2296,15 @@ class StateInputsPanel(PDPanel):
             ]
 
         AGO_disc = []
-        for i, (av,name, radio) in enumerate(zip(disc_annotated_values, ['pressure','pratio','Tsat'], radios)):
+        for i, (av, name, radio) in enumerate(zip(disc_annotated_values, ['pressure','pratio','Tsat'], radios)):
             sizer_for_discState.Add(radio, -1)
             AGO_disc.append(self.construct_items([av], sizer = sizer_for_discState))
-            AGO_disc[i].GUI_location.Bind(wx.EVT_KILL_FOCUS, lambda event: self.OnChangeDischargeValue(event, name))
             radio.Bind(wx.EVT_RADIOBUTTON, self.OnChangeDischargeVariable)
+
+        # Bind events to listen for modifications
+        AGO_disc[0].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'pressure'))
+        AGO_disc[1].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'pratio'))
+        AGO_disc[2].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'Tsat'))
         
         self.main.register_GUI_objects([AGO_omega, CAGO_suctTsat, CAGO_suctDTsh] + AGO_disc)
         
