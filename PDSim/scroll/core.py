@@ -24,9 +24,11 @@ import types
 try:
     import scipy.interpolate as interp
     import scipy.optimize as optimize
+    from scipy.optimize import fsolve
 except ImportError:
     import PDSim.misc.scipylike as interp
     import PDSim.misc.scipylike as optimize
+    from PDSim.misc.solvers import MultiDimNewtRaph as fsolve
 
 import matplotlib.pyplot as plt
 import subprocess
@@ -595,7 +597,7 @@ class Scroll(PDSimCore, _Scroll):
             r4=ro-ro_goal
             return [r1,r2,r3,r4]
         
-        phi_ie,phi_o0,hs,rb=optimize.fsolve(f,[20,1.3,0.03,0.003],args=(phi_i0,phi_os,Vdisp,Vratio,Thickness,OrbitingRadius))
+        phi_ie,phi_o0,hs,rb = fsolve(f,[20,1.3,0.03,0.003],args=(phi_i0,phi_os,Vdisp,Vratio,Thickness,OrbitingRadius))
         phi_oe=phi_ie
         self.geo.h=hs
         self.geo.rb=rb
