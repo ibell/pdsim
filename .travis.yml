@@ -10,7 +10,7 @@ install:
   - git submodule update --init --recursive
   - pip -q install cython --install-option="--no-cython-compile"
   - python setup_coolprop.py install
-  - sudo apt-get install python-numpy python-numpy-dev python-scipy python-matplotlib python-wxgtk2.8 python-wxtools wx2.8-i18n python-h5py
+  - sudo apt-get install python-numpy python-numpy-dev python-matplotlib python-wxgtk2.8 python-wxtools wx2.8-i18n python-h5py
   - python setup.py install # Install PDSim
   
 # command to run tests
