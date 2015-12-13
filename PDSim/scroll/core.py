@@ -18,7 +18,14 @@ from math import pi
 import numpy as np
 import copy
 import types
-import scipy.interpolate
+
+# If scipy is available, use its spline interpolation function, otherwise, 
+# use our implementation (for packaging purposes mostly)
+try:
+    import scipy.interpolate as interp
+except ImportError:
+    import PDSim.misc.scipylike as interp
+
 import matplotlib.pyplot as plt
 import subprocess
 import glob
@@ -136,7 +143,7 @@ class Scroll(PDSimCore, _Scroll):
         mdot : float
             The mass flow through the flow path [kg/s]
         """
-        FlowPath.A = scipy.interpolate.splev(self.theta, A_interpolator)
+        FlowPath.A = interp.splev(self.theta, A_interpolator)
         
         try:
             if FlowPath.State_up.p - FlowPath.State_down.p > DP_floor and abs(FlowPath.A) > 1e-15:
@@ -412,16 +419,16 @@ class Scroll(PDSimCore, _Scroll):
                 os.remove(file)
         
         #  Create a spline interpolator object for the area between DD and port
-        self.spline_Adisc_DD = scipy.interpolate.splrep(t, self.Adisc_dd, k = 2, s = 0)
+        self.spline_Adisc_DD = interp.splrep(t, self.Adisc_dd, k = 2, s = 0)
         
         #  Create a spline interpolator object for the area between D1 and port
-        self.spline_Adisc_D1 = scipy.interpolate.splrep(t, self.Adisc_d1, k = 2, s = 0)
+        self.spline_Adisc_D1 = interp.splrep(t, self.Adisc_d1, k = 2, s = 0)
         
         #  Create a spline interpolator object for the area between C1_N and port
-        self.spline_Adisc_C1_N = scipy.interpolate.splrep(t, self.Adisc_c1_N, k = 2, s = 0)
+        self.spline_Adisc_C1_N = interp.splrep(t, self.Adisc_c1_N, k = 2, s = 0)
         
         #  Create a spline interpolator object for the area between C1_N and port
-        self.spline_Adisc_C1_Nm1 = scipy.interpolate.splrep(t, self.Adisc_c1_Nm1, k = 2, s = 0)
+        self.spline_Adisc_C1_Nm1 = interp.splrep(t, self.Adisc_c1_Nm1, k = 2, s = 0)
         
         print 'done'
             
@@ -1977,7 +1984,7 @@ class Scroll(PDSimCore, _Scroll):
         The flow path function for the flow between discharge port and the DD chamber
         """
         
-        FP.A = scipy.interpolate.splev(self.theta, self.spline_Adisc_DD)
+        FP.A = interp.splev(self.theta, self.spline_Adisc_DD)
         try:
             return flow_models.IsentropicNozzle(FP.A, FP.State_up, FP.State_down) * X_d
         except ZeroDivisionError:
@@ -1988,7 +1995,7 @@ class Scroll(PDSimCore, _Scroll):
         The flow path function for the flow between discharge port and the D1 chamber
         """
         
-        FP.A = scipy.interpolate.splev(self.theta, self.spline_Adisc_D1)
+        FP.A = interp.splev(self.theta, self.spline_Adisc_D1)
         try:
             return flow_models.IsentropicNozzle(FP.A, FP.State_up, FP.State_down) * X_d
         except ZeroDivisionError:
@@ -1999,7 +2006,7 @@ class Scroll(PDSimCore, _Scroll):
         The flow path function for the flow between discharge port and the D1 chamber
         """
         
-        FP.A = scipy.interpolate.splev(self.theta, self.spline_Adisc_C1_N)
+        FP.A = interp.splev(self.theta, self.spline_Adisc_C1_N)
         try:
             return flow_models.IsentropicNozzle(FP.A, FP.State_up, FP.State_down) * X_d
         except ZeroDivisionError:
@@ -2010,7 +2017,7 @@ class Scroll(PDSimCore, _Scroll):
         The flow path function for the flow between discharge port and the D1 chamber
         """
         
-        FP.A = scipy.interpolate.splev(self.theta, self.spline_Adisc_C1_Nm1)
+        FP.A = interp.splev(self.theta, self.spline_Adisc_C1_Nm1)
         try:
             return flow_models.IsentropicNozzle(FP.A, FP.State_up, FP.State_down) * X_d
         except ZeroDivisionError:
