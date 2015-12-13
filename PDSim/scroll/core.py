@@ -27,7 +27,7 @@ try:
     from scipy.optimize import fsolve
 except ImportError:
     import PDSim.misc.scipylike as interp
-    import PDSim.misc.scipylike as optimize
+    import PDSim.misc.solvers as optimize
     from PDSim.misc.solvers import MultiDimNewtRaph as fsolve
 
 import matplotlib.pyplot as plt

@@ -24,7 +24,11 @@ def trapz(np.ndarray[np.float_t] y, np.ndarray[np.float_t] x):
     
 # A header defining the Spline class
 cimport cSpline 
-        
+    
+ctypedef fused number_t:
+    double
+    vector[double]
+    
 cdef class Spline:
     """ A python wrapper around the Spline interpolator class from Devin Lane: http://shiftedbits.org/2011/01/30/cubic-spline-interpolation/ """
     cdef cSpline.Spline[double,double] *thisptr     # hold a C++ instance which we're wrapping
@@ -35,8 +39,12 @@ cdef class Spline:
     def __dealloc__(self):
         del self.thisptr
         
-    def interpolate(self, vector[double] x):
-        return self.thisptr.interpolate(x)
+    def interpolate(self, number_t x):
+        # Only one of these branches will be compiled for each specialization!
+        if number_t is double:
+            return self.thisptr.interpolate(x)
+        else:
+            return np.array(self.thisptr.interpolate(x))
         
 cpdef Spline splrep(vector[double] x, vector[double] y, k = 3, s = 0):
     """
@@ -44,8 +52,15 @@ cpdef Spline splrep(vector[double] x, vector[double] y, k = 3, s = 0):
     """
     return Spline(x, y)
     
-cpdef splev(vector[double] x, Spline spl):
+
+    
+cpdef splev(number_t x, Spline spl):
     """
     A C++/python equivalent of the scipy function scipy.interpolate.splev
     """
-    return np.array(spl.interpolate(x))
+    
+    # Only one of these branches will be compiled for each specialization!
+    if number_t is double:
+        return spl.interpolate(x)
+    else:
+        return np.array(spl.interpolate(x))
