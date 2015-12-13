@@ -12,19 +12,21 @@ from _scroll import _Scroll
 
 ##--- non-package imports
 import warnings
-from scipy.optimize import fsolve, newton
+
 from CoolProp import State
 from math import pi
 import numpy as np
 import copy
 import types
 
-# If scipy is available, use its spline interpolation function, otherwise, 
+# If scipy is available, use its interpolation and optimization functions, otherwise, 
 # use our implementation (for packaging purposes mostly)
 try:
     import scipy.interpolate as interp
+    import scipy.optimize as optimize
 except ImportError:
     import PDSim.misc.scipylike as interp
+    import PDSim.misc.scipylike as optimize
 
 import matplotlib.pyplot as plt
 import subprocess
@@ -593,7 +595,7 @@ class Scroll(PDSimCore, _Scroll):
             r4=ro-ro_goal
             return [r1,r2,r3,r4]
         
-        phi_ie,phi_o0,hs,rb=fsolve(f,[20,1.3,0.03,0.003],args=(phi_i0,phi_os,Vdisp,Vratio,Thickness,OrbitingRadius))
+        phi_ie,phi_o0,hs,rb=optimize.fsolve(f,[20,1.3,0.03,0.003],args=(phi_i0,phi_os,Vdisp,Vratio,Thickness,OrbitingRadius))
         phi_oe=phi_ie
         self.geo.h=hs
         self.geo.rb=rb
@@ -1353,7 +1355,7 @@ class Scroll(PDSimCore, _Scroll):
                     temp.update(dict(T=T,D=rhoddd))
                     return temp.u - U_before/m
                     
-                T_u = newton(resid, T)
+                T_u = optimize.newton(resid, T)
                 
                 self.CVs['ddd'].State.update({'T':T_u,'D':rhoddd})
                 U_after=self.CVs['ddd'].State.u*self.CVs['ddd'].State.rho*Vddd
