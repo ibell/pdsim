@@ -1,5 +1,12 @@
 import operator
-import scipy.interpolate
+
+# If scipy is available, use its spline interpolation function, otherwise, 
+# use our implementation (for packaging purposes)
+try:
+    import scipy.interpolate as interp
+except ImportError:
+    import PDSim.misc.scipylike as interp
+    
 import warnings
 
 class Motor(object):
@@ -77,10 +84,10 @@ class Motor(object):
         else:
             Wdot_coeffs = [tau*omega/1000 for tau,omega in zip(self.tau_coeffs, self.omega_coeffs)]
             #Do the 1D interpolation
-            eta_interp = scipy.interpolate.splrep(Wdot_coeffs, self.eta_coeffs, k=2, s=0)
-            eta = scipy.interpolate.splev(Wdot, eta_interp)
-            omega_interp = scipy.interpolate.splrep(Wdot_coeffs, self.omega_coeffs, k=2, s=0)
-            omega = scipy.interpolate.splev(Wdot, omega_interp)
+            eta_interp = interp.splrep(Wdot_coeffs, self.eta_coeffs, k=2, s=0)
+            eta = interp.splev(Wdot, eta_interp)
+            omega_interp = interp.splrep(Wdot_coeffs, self.omega_coeffs, k=2, s=0)
+            omega = interp.splev(Wdot, omega_interp)
         
             return eta,omega
     
@@ -106,12 +113,10 @@ class Motor(object):
         if not kind == 'linear':
             warnings.warn('apply_map does not take parameter "kind" anymore')
             
-        eta_interp = scipy.interpolate.splrep(self.tau_coeffs, self.eta_coeffs, k=2, s=0)
-        eta = scipy.interpolate.splev(tau, eta_interp)
-        omega_interp = scipy.interpolate.splrep(self.tau_coeffs, self.omega_coeffs, k=2, s=0)
-        omega = scipy.interpolate.splev(tau, omega_interp)
+        eta_interp = interp.splrep(self.tau_coeffs, self.eta_coeffs, k=2, s=0)
+        eta = interp.splev(tau, eta_interp)
+        omega_interp = interp.splrep(self.tau_coeffs, self.omega_coeffs, k=2, s=0)
+        omega = interp.splev(tau, omega_interp)
         
         #Return the values
         return eta, omega
-        
-        

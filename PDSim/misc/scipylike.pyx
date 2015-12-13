@@ -1,6 +1,7 @@
 import cython
 import numpy as np
 cimport numpy as np
+from libcpp.vector cimport vector
 
 def trapz(np.ndarray[np.float_t] y, np.ndarray[np.float_t] x):
     """
@@ -20,3 +21,31 @@ def trapz(np.ndarray[np.float_t] y, np.ndarray[np.float_t] x):
         sum += (y[i]+y[i+1])/2.0*(x[i+1]-x[i])
     
     return sum
+    
+# A header defining the Spline class
+cimport cSpline 
+        
+cdef class Spline:
+    """ A python wrapper around the Spline interpolator class from Devin Lane: http://shiftedbits.org/2011/01/30/cubic-spline-interpolation/ """
+    cdef cSpline.Spline[double,double] *thisptr     # hold a C++ instance which we're wrapping
+    
+    def __cinit__(self, vector[double] x, vector[double] y):
+        self.thisptr = new cSpline.Spline[double, double](x, y)
+        
+    def __dealloc__(self):
+        del self.thisptr
+        
+    def interpolate(self, vector[double] x):
+        return self.thisptr.interpolate(x)
+        
+cpdef Spline splrep(vector[double] x, vector[double] y, k = 3, s = 0):
+    """
+    A C++/python equivalent of the scipy function scipy.interpolate.splrep
+    """
+    return Spline(x, y)
+    
+cpdef splev(vector[double] x, Spline spl):
+    """
+    A C++/python equivalent of the scipy function scipy.interpolate.splev
+    """
+    return np.array(spl.interpolate(x))

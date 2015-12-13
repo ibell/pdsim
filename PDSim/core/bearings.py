@@ -1,7 +1,5 @@
 from math import pi,sqrt,log
-import numpy as np
-from scipy.interpolate import interp1d, splev, splrep
-import scipy.optimize
+import numpy as np    
 from _bearings import calculate_epsilon_short, calculate_epsilon_long
 
 class struct: pass
