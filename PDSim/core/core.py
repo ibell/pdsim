@@ -15,8 +15,14 @@ import PDSim.core.callbacks
 
 ##-- Non-package imports  --
 import numpy as np
-from scipy.integrate import trapz, simps
-from scipy.optimize import newton
+
+# If scipy is available, use its optimization function, otherwise, 
+# use our implementation (for packaging purposes)
+try:
+    from scipy.integrate import trapz
+except ImportError:
+    from PDSim.misc.scipylike import trapz
+
 import h5py
 
 ## matplotlib imports

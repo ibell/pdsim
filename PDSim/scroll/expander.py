@@ -9,10 +9,16 @@ from PDSim.core.containers import Tube,ControlVolume
 import matplotlib.pyplot as plt
 from CoolProp.CoolProp import Props
 from CoolProp.State import State as CPState
-from scipy.optimize import newton
 from PDSim.core.core import PDSimCore
 from PDSim.flow import flow_models
 from PDSim.misc.datatypes import arraym
+
+# If scipy is available, use its interpolation and optimization functions, otherwise, 
+# use our implementation (for packaging purposes mostly)
+try:
+    import scipy.optimize as optimize
+except ImportError:
+    import PDSim.misc.solvers as optimize
 
 class ScrollExpander(core.Scroll):
     """
@@ -142,7 +148,7 @@ class ScrollExpander(core.Scroll):
                 rho2 = rho1 * V1 / V2
                 # Now don't know temperature or pressure, but you can assume
                 # it is isentropic to find the temperature
-                T2 = newton(lambda T: PropsSI('S','T',T,'D',rho2,inletState.Fluid)-s1*1000, T1)
+                T2 = optimize.newton(lambda T: PropsSI('S','T',T,'D',rho2,inletState.Fluid)-s1*1000, T1)
                 initState = CPState(inletState.Fluid,dict(T=T2,D=rho2)).copy()
             
             # Expansion chambers do not change definition at discharge angle

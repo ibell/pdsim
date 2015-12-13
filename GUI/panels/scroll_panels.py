@@ -22,6 +22,13 @@ from pdsim_panels import LaTeXImageMaker, MotorChoices, PlotPanel
 from datatypes import HeaderStaticText, AnnotatedGUIObject
 from PDSim.scroll import scroll_geo
 
+# If scipy is available, use its optimization functions, otherwise, 
+# use our implementation (for packaging purposes)
+try:
+    from scipy import optimize
+except ImportError:
+    import PDSim.misc.solvers as optimize
+
 LabeledItem = pdsim_panels.LabeledItem
         
 class ReadOnlyLaTeXLabel(wx.Panel):
@@ -610,13 +617,12 @@ class GeometryPanel(pdsim_panels.PDPanel):
         def objective(phi):
             return cos(phi)+(phi-phi0)*sin(phi)
         
-        from scipy.optimize import newton
-        phi = newton(objective, phi0 + 0.3)
+        phi = optimize.newton(objective, phi0 + 0.3)
         if phi < phi0: phi += 2*pi
         
         while phi < phie:
             phiv.append(phi)
-            phi = newton(objective, phi + pi)
+            phi = optimize.newton(objective, phi + pi)
         
         phiv.append(phi)
         

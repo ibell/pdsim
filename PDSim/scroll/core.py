@@ -1851,7 +1851,7 @@ class Scroll(PDSimCore, _Scroll):
         
         print OBJECTIVE(T0-50)
         print OBJECTIVE(T0+50)
-        return newton(OBJECTIVE,T0)
+        return optimize.newton(OBJECTIVE, T0)
         
     def lump_energy_balance_callback(self):
         """
