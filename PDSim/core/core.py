@@ -1,5 +1,6 @@
 from __future__ import division
 
+import math
 from math import pi
 from time import clock
 import inspect
@@ -9,6 +10,7 @@ from PDSim.flow import flow,flow_models
 from containers import STATE_VARS_TM, CVArrays
 from PDSim.flow.flow import FlowPathCollection
 from containers import ControlVolumeCollection,TubeCollection
+import integrators
 from PDSim.plot.plots import debug_plots
 from PDSim.misc.datatypes import arraym, empty_arraym
 import PDSim.core.callbacks
@@ -52,9 +54,121 @@ import copy_reg
 import types
 copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 
-#An empty class for storage
+# An empty class for storage
 class struct(object):
     pass    
+    
+class IntegratorMixin(object):
+    """
+    This class contains the methods that will be merged with one of the system of ODE integrators
+    and includes the methods that are specific to PDSim
+    """
+    def __init__(self, sim, x_state):
+        self.sim = sim
+        self.x_state = x_state
+    
+    def get_initial_array(self):
+        # Get the beginning of the cycle configured
+        # Put a copy of the values into the matrices
+        xold = self.x_state.copy()
+        # Add zeros for the valves as they are assumed to start closed and at rest
+        if self.sim.__hasValves__:
+            xold.extend(empty_arraym(len(self.sim.Valves)*2))
+        self.sim._put_to_matrices(xold, 0)
+        return xold
+        
+    def premature_termination(self):
+        # Once every 100 steps check if you are supposed to abort
+        if self.sim._check_cycle_abort(self.Itheta):
+            return 'abort'
+        else:
+            return False
+        
+    def pre_step_callback(self):
+        # Call the step callback if provided
+        if self.sim.callbacks.step_callback is not None:
+            self.h = self.sim.callbacks.step_callback(self.t0, self.h, self.Itheta)
+            disable = self.sim.callbacks.step_callback.disable_adaptive
+            
+            # If we don't want to actually do the step, rather just copy the values
+            # (for instance at the merging angle for scroll machines), we set
+            # stepAccepted to True and move on
+            if disable == 'no_integrate':
+                self.stepAccepted = True
+                # Updates the state, calculates the volumes, prepares all the things needed for derivatives
+                print (self.xold)
+                self.sim.core.properties_and_volumes(self.sim.CVs.exists_CV, self.t0+self.h+1e-10, STATE_VARS_TM, self.xold)
+                self.__store_values()
+                
+            x = self.sim._get_from_matrices(self.Itheta)
+                
+            if disable != False and np.all(np.isfinite(x)):
+                self.xold = self.sim._get_from_matrices(self.Itheta)
+                
+            # The integrator only cares whether disable is true or not, convert to true or false
+            if disable != False:
+                print (self.xold)
+                self.disableAdaptive = True
+            else:
+                self.disableAdaptive = False
+    
+    def __store_values(self):
+        """ Private method that stores the values in the internal data structure """
+        self.sim.t[self.Itheta] = self.t0
+        self.sim._put_to_matrices(self.xold, self.Itheta)
+        flows = self.sim.Flows.get_deepcopy()
+        # If the index we want to fill is beyond the length of FlowStorage, we append it,
+        # otherwise, we replace that entry in the list
+        if self.Itheta > len(self.sim.FlowStorage)-1:
+            self.sim.FlowStorage.append(flows)
+        else:
+            self.sim.FlowStorage[self.Itheta] = flows
+        
+    def post_deriv_callback(self):
+        self.__store_values()
+        
+    def post_step_callback(self): pass
+    
+    def derivs(self, t, x):
+        return self.sim.derivs(t, x)
+        
+    def post_integration(self):
+        """
+        Run this at the end
+        """
+        # Cache the values
+        self.sim.derivs(self.t0, self.xold)
+        self.__store_values()
+        
+        V, dV = self.sim.CVs.volumes(self.t0)
+        Nexist = self.sim.CVs.Nexist
+        if sorted(self.sim.stateVariables) == ['D','T']:
+            self.sim.CVs.updateStates('T',self.xnew[0:Nexist],'D',self.xnew[Nexist:2*Nexist])
+        elif sorted(self.sim.stateVariables) == ['M','T']:
+            self.sim.CVs.updateStates('T',self.xnew[0:Nexist],'D',self.xnew[Nexist:2*Nexist]/V)
+        else:
+            raise NotImplementedError
+            
+class EulerIntegrator(IntegratorMixin, integrators.AbstractSimpleEulerODEIntegrator):
+    """ 
+    Mixin class using the functions defined in IntegratorMixin and the generalized simple ODE 
+    """
+    def __init__(self, sim, x_state):
+        IntegratorMixin.__init__(self, sim, x_state)
+        
+class HeunIntegrator(IntegratorMixin, integrators.AbstractHeunODEIntegrator):
+    """ 
+    Mixin class using the functions defined in IntegratorMixin and the generalized Heun ODE integrator
+    """
+    def __init__(self, sim, x_state):
+        IntegratorMixin.__init__(self, sim, x_state)
+        
+class RK45Integrator(IntegratorMixin, integrators.AbstractRK45ODEIntegrator):
+    """ 
+    Mixin class using the functions defined in IntegratorMixin and the generalized RK45 integrator
+    """
+    def __init__(self, sim, x_state):
+        IntegratorMixin.__init__(self, sim, x_state)
 
 class PDSimCore(object):
     """
@@ -563,169 +677,6 @@ class PDSimCore(object):
         for Tube in self.Tubes:
             self.Tubes_hdict[Tube.key1]=Tube.State1.get_h()
             self.Tubes_hdict[Tube.key2]=Tube.State2.get_h()
-        
-    def cycle_SimpleEuler(self,N,x_state,tmin=0,tmax=2*pi):
-        """
-        The simple Euler PDSim ODE integrator
-        
-        Parameters
-        ----------
-        N : integer
-            Number of steps taken.  There will be N+1 entries in the state matrices
-        x_state : 
-            The initial values of the variables (ONLY the state variables, no valves)
-        tmin : float, optional
-            Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
-        tmax : float, optional
-            Ending value for the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``] 
-        
-        """
-        #Do some initialization - create arrays, etc.
-        self.pre_cycle(x_state)
-        
-        #Step variables
-        t0=tmin
-        h=(tmax-tmin)/(N)
-        
-        # Get the beginning of the cycle configured
-        # Put a copy of the values into the matrices
-        xold = x_state.copy()
-        #Add zeros for the valves as they are assumed to start closed and at rest
-        if self.__hasValves__:
-            xold.extend(empty_arraym(len(self.Valves)*2))
-        self._put_to_matrices(xold, 0)
-        
-        for Itheta in range(N):
-            #Once every 100 steps check if you are supposed to abort
-            if self._check_cycle_abort(Itheta):
-                return 'abort'
-                  
-            #Call the step callback if provided
-            if self.callbacks.step_callback is not None:
-                h = self.callbacks.step_callback(t0, h, Itheta)
-                disable = self.callbacks.step_callback.disable_adaptive
-                if disable:
-                    print 'CV have changed'
-                    xold = self._get_from_matrices(Itheta)
-            
-            # Step 1: derivatives evaluated at old values of t = t0
-            f1 = self.derivs(t0, xold)
-            xnew = xold+h*f1
-            
-            #Store at the current index (first run at index 0)
-            self.t[Itheta] = t0
-            self._put_to_matrices(xold, Itheta)
-            self.FlowStorage.append(self.Flows.get_deepcopy())
-            
-            # Everything from this step is finished, now update for the next
-            # step coming
-            t0+=h
-            xold = xnew
-            
-        #Run this at the end at index N-1
-        #Run this at the end
-        V,dV=self.CVs.volumes(t0)
-        #Stored at the old value
-        self.t[N]=t0
-        
-        self._put_to_matrices(xnew, N)
-        
-        #ensure you end up at the right place
-        assert abs(t0-tmax)<1e-10
-        
-        self.derivs(t0,xold)
-        self.FlowStorage.append(self.Flows.get_deepcopy())
-        
-        if sorted(self.stateVariables) == ['D','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
-        elif sorted(self.stateVariables) == ['M','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
-        else:
-            raise NotImplementedError
-        
-        # last index is Itheta, number of entries in FlowStorage is Ntheta
-        print 'Number of steps taken', N
-        self.Itheta = N
-        self.Ntheta = N+1
-        self.post_cycle()
-        
-    def cycle_Heun(self, N, x_state, tmin = 0, tmax = 2*pi):
-        """
-        Use the Heun method (modified Euler method)
-        
-        Parameters
-        ----------
-        N : integer
-            Number of steps to take (N+1 entries in the state vars matrices)
-        x_state : 
-            The initial values of the variables (only the state variables)
-        tmin : float
-            Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
-        tmax : float
-            Ending value for the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``] 
-        
-        """
-        #Do some initialization - create arrays, etc.
-        self.pre_cycle()
-        
-        #Start at an index of 0
-        Itheta=0
-        t0=tmin
-        h=(tmax-tmin)/(N)
-        
-        # Get the beginning of the cycle configured
-        # Put a copy of the values into the matrices
-        self._put_to_matrices(x_state.copy(), 0)
-    
-        for Itheta in range(N):
-            
-            #Once every 100 steps check if you are supposed to abort
-            if self._check_cycle_abort(Itheta):
-                return 'abort'
-            
-            if self.callbacks.step_callback!=None:
-                self.callbacks.step_callback(t0,h,Itheta)
-                
-            xold=self._get_from_matrices(Itheta)
-                        
-            # Step 1: derivatives evaluated at old values
-            f1=self.derivs(t0,xold)
-            xtemp=xold+h*f1
-            
-            #Stored at the starting value of the step
-            self.t[Itheta]=t0+h
-            self._put_to_matrices(xold,Itheta)
-            self.FlowStorage.append(self.Flows.get_deepcopy())
-            
-            #Step 2: Evaluated at predicted step
-            f2=self.derivs(t0+h,xtemp)
-            xnew = xold + h/2.0*(f1 + f2)
-            
-            t0+=h
-            xold = xnew
-            
-        #ensure you end up at the right place
-        assert abs(t0-tmax)<1e-10
-        
-        #Run this at the end
-        V,dV=self.CVs.volumes(t0)
-        #Stored at the old value
-        self.t[N]=t0
-        self.derivs(t0,xold)
-        self._put_to_matrices(xnew,N)
-        self.FlowStorage.append(self.Flows.get_deepcopy())
-        if sorted(self.stateVariables) == ['D','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
-        elif sorted(self.stateVariables) == ['M','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
-        else:
-            raise NotImplementedError
-        
-        print 'Number of steps taken', N,'len(FlowStorage)',len(self.FlowStorage)
-        self.Itheta = N
-        self.Ntheta = N+1
-        self.post_cycle()
-        return
         
     def cycle_RK45(self,
                    x_state,
@@ -1298,24 +1249,50 @@ class PDSimCore(object):
         
         try:
             t1 = clock()
+            self.pre_cycle()
             if cycle_integrator == 'Euler':
                 # Default to 7000 steps if not provided
-                N = getattr(self,'EulerN', 7000)
-                aborted = self.cycle_SimpleEuler(N, X, **cycle_integrator_options)
+                N = getattr(self,'EulerN', 7000)                
+                TEI = EulerIntegrator(self, X)
+                aborted = TEI.do_integration(N, 0, 2*math.pi)
+                if aborted == False:
+                    TEI.post_integration()
             elif cycle_integrator == 'Heun':
                 # Default to 7000 steps if not provided
                 N = getattr(self,'HeunN', 7000)
-                aborted = self.cycle_Heun(N, X, **cycle_integrator_options)
+                THI = HeunIntegrator(self, X)
+                aborted = THI.do_integration(N, 0, 2*math.pi)
+                if aborted == False:
+                    THI.post_integration()
             elif cycle_integrator == 'RK45':
                 # Default to tolerance of 1e-8 if not provided
                 eps_allowed = getattr(self,'RK45_eps', 1e-8)
-                aborted = self.cycle_RK45(X, eps_allowed=eps_allowed, **cycle_integrator_options)
+                
+                if False:
+                    RKI = RK45Integrator(self, X)
+                    aborted = RKI.do_integration(0, 2*math.pi, eps_allowed=eps_allowed)
+                    RKI.post_integration()
+                    N = len(self.FlowStorage) - 1
+                else:
+                    aborted = self.cycle_RK45(X, eps_allowed=eps_allowed, **cycle_integrator_options)
             else:
                 raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
+                
+            if 'N' in locals():
+                self.Ntheta = N
+            self.Ntheta = len(self.FlowStorage)
+            self.Itheta = self.Ntheta - 1
+
+            assert self.Ntheta == len(self.FlowStorage)
+            self.post_cycle()
+            
         except ValueError as VE:
             # debug_plots(self)
             raise
         
+        if aborted is None:
+            aborted = False
+                    
         #  Quit if you have aborted in one of the cycle solvers
         if aborted == 'abort':
             return None
