@@ -1618,19 +1618,19 @@ class Scroll(PDSimCore, _Scroll):
                     # just like the suction chambers
                     if path == 1:
                         theta = np.append(theta, self.t + 2*pi*alpha)
-                        p1 = np.append(p1, self.p[self.CVs.index('c1.'+str(alpha))])
+                        p1 = np.append(p1, self.p[self.CVs.index('c1.'+str(alpha))].copy())
                     else:
-                        p2 = np.append(p2, self.p[self.CVs.index('c2.'+str(alpha))])
+                        p2 = np.append(p2, self.p[self.CVs.index('c2.'+str(alpha))].copy())
                     
             # Innermost compression chamber begins to be tricky
             # By definition innermost compression chamber doesn't make it to the 
             # end of the rotation
             next_theta = self.t + 2*pi*Nc_max
             if path == 1:
-                next_p1 = self.p[self.CVs.index('c1.'+str(Nc_max))]
+                next_p1 = self.p[self.CVs.index('c1.'+str(Nc_max))].copy()
                 next_p1[np.isnan(next_p1)] = 0
             else:
-                next_p2 = self.p[self.CVs.index('c2.'+str(Nc_max))]
+                next_p2 = self.p[self.CVs.index('c2.'+str(Nc_max))].copy()
                 next_p2[np.isnan(next_p2)] = 0
         
         pd1 = self.p[self.CVs.index('d1')].copy()
