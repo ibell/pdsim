@@ -107,7 +107,7 @@ class PlotNotebook(wx.Panel):
                 sizer.Add(btn)
                 btn.Bind(wx.EVT_BUTTON, callbackfcn)
         else:
-            print 'could not add more buttons particular to current family'
+            print 'could not add more buttons particular to current family:', self.family
             
         page.SetSizer(sizer)
         self.nb.AddPage(page,"Main")
@@ -119,30 +119,29 @@ class PlotNotebook(wx.Panel):
         else:
             keys = self.Sim.CVs.keys
         return keys
+
+    def get(self, key):
+        if isinstance(self.Sim, h5py.File):
+            out = self.Sim.get('/' + key).value
+        else:
+            out=getattr(self.Sim, key)
+        return out
         
     def stepsize_theta(self,event=None):
         #Stepsize
         axes = self.add('Stepsize').gca()
-        if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-        else:
-            theta=self.Sim.t
+        theta = self.get('t')
         h = theta[1::]-theta[0:len(theta)-1]
-        axes.semilogy(theta[0:len(theta)-1],h)
+        axes.semilogy(theta[0:len(theta)-1], h)
         axes.set_ylabel('Stepsize [rad]')
         axes.set_xlabel(r'$\theta$ [rad]')
         
-    def V_theta(self,event=None):
-        #Volume
+    def V_theta(self, event=None):
+        # Volume
         axes = self.add('Volume').gca()
-        if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-            V = self.Sim.get('/V').value.T*1e6
-        else:
-            theta=self.Sim.t
-            V=self.Sim.V.T*1e6
+        theta, V = self.get('t'), self.get('V')
         V[V<1e-15]=np.nan
-        axes.plot(theta,V, lw = 1.5)
+        axes.plot(theta, V.T, lw = 1.5)
         axes.set_ylabel('Volume [cm$^{3}$]')
         axes.set_xlabel(r'$\theta$ [rad]')
         
@@ -154,14 +153,10 @@ class PlotNotebook(wx.Panel):
     def dV_dtheta(self,event=None):
         #Derivative of Volume
         axes = self.add('Vol. Derivative').gca()
-        if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-            dV = self.Sim.get('/dV').value.T*1e6
-        else:
-            theta=self.Sim.t
-            dV=self.Sim.dV.T*1e6
+        theta, dV = self.get('t'), self.get('dV')
+        dV *= 1e6
         dV[np.abs(dV)<1e-15]=np.nan
-        axes.plot(theta,dV, lw = 1.5)
+        axes.plot(theta, dV.T, lw = 1.5)
         axes.set_ylabel('Volume Derivative [cm$^{3}$/rad]')
         axes.set_xlabel(r'$\theta$ [rad]')
         
@@ -173,14 +168,9 @@ class PlotNotebook(wx.Panel):
     def T_theta(self,event=None):
         #Temperature
         axes = self.add('Temperature').gca()
-        if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-            T = self.Sim.get('/T').value.T
-        else:
-            theta = self.Sim.t
-            T = self.Sim.T.T
+        theta, T = self.get('t'), self.get('T')
         T[T<0.1]=np.nan
-        axes.plot(theta,T, lw = 1.5)
+        axes.plot(theta, T.T, lw = 1.5)
         axes.set_ylabel('Temperature [K]')
         axes.set_xlabel(r'$\theta$ [rad]')
         
@@ -192,14 +182,9 @@ class PlotNotebook(wx.Panel):
     def p_theta(self,event=None):    
         #pressure
         axes = self.add('Pressure').gca()
-        if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-            p = self.Sim.get('/p').value.T
-        else:
-            theta = self.Sim.t
-            p = self.Sim.p.T
-        p[p<0.1]=np.nan
-        axes.plot(theta,p, lw = 1.5)
+        theta, p = self.get('t'), self.get('p')
+        p[p<0.1] = np.nan
+        axes.plot(theta, p.T, lw = 1.5)
         axes.set_ylabel('Pressure [kPa]')
         axes.set_xlabel(r'$\theta$ [rad]')
         
@@ -211,30 +196,20 @@ class PlotNotebook(wx.Panel):
     def p_V(self, event=None):
         #pressure-volume
         axes = self.add('P-V').gca()
-        if isinstance(self.Sim,h5py.File):
-            V = self.Sim.get('/V').value.T*1e6
-            p = self.Sim.get('/p').value.T
-        else:
-            V = self.Sim.V.T*1e6
-            p = self.Sim.p.T
-        p[p<0.1]=np.nan
-        V[V<1e-15]=np.nan
-        axes.plot(V,p, lw = 1.5)
+        V, p = self.get('V'), self.get('p')
+        V *= 1e6
+        p[p<0.1] = np.nan
+        V[V<1e-15] = np.nan
+        axes.plot(V.T, p.T, lw = 1.5)
         axes.set_ylabel('Pressure [kPa]')
         axes.set_xlabel(r'Volume [cm$^{3}$]')
         
     def rho_theta(self,event=None):    
         #density
         axes = self.add('Density').gca()
-        if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-            rho = self.Sim.get('/rho').value.T
-        else:
-            theta = self.Sim.t
-            rho = self.Sim.rho.T
-            
+        theta, rho = self.get('t'), self.get('rho')
         rho[rho<0.1]=np.nan
-        axes.plot(theta,rho, lw = 1.5)
+        axes.plot(theta, rho.T, lw = 1.5)
         axes.set_ylabel('Density [kg/m$^{3}$]')
         axes.set_xlabel(r'$\theta$ [rad]')
         
@@ -246,16 +221,10 @@ class PlotNotebook(wx.Panel):
     def m_theta(self,event=None):
         #Mass
         axes = self.add('Mass').gca()
-        
-        if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-            m = self.Sim.get('/rho').value.T*self.Sim.get('/V').value.T
-        else:
-            theta = self.Sim.t
-            m=self.Sim.rho.T*self.Sim.V.T
-        
+        theta, rho, V = self.get('t'), self.get('rho'), self.get('V')
+        m = rho*V
         m[m<1e-20]=np.nan
-        axes.plot(theta,m, lw = 1.5)
+        axes.plot(theta, m.T, lw = 1.5)
         axes.set_ylabel('Mass [kg]')
         axes.set_xlabel(r'$\theta$ [rad]')
         
@@ -304,18 +273,10 @@ class PlotNotebook(wx.Panel):
         axes.set_ylabel(r'Pressure [kPa]')
             
     def heat_transfer(self, event = None):
-        #Axial force
-            
         axes = self.add('Heat transfer').gca()
-        if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-            Q = self.Sim.get('/Q').value.T
-        else:
-            theta = self.Sim.t
-            Q = self.Sim.Q.T
-            
+        theta, Q = self.get('t'), self.get('Q')
         Q[np.abs(Q)<1e-12]=np.nan
-        axes.plot(theta,Q, lw = 1.5)
+        axes.plot(theta, Q.T, lw = 1.5)
         axes.plot(theta,self.Sim.HTProcessed.summed_Q[0:self.Sim.Ntheta],lw=2)
         axes.set_ylabel(r'$\dot Q$ [kW]')
         axes.set_xlabel(r'$\theta$ [rad]')
@@ -539,10 +500,10 @@ class PlotNotebook(wx.Panel):
          
     
 def debug_plots(Comp, plotparent=None, plot_names = None):
-    #Build a new frame, not embedded
-    app = wx.PySimpleApp()
-    frame = wx.Frame(None,-1,'Plotter')
-    notebook = PlotNotebook(Comp,frame,plot_names=plot_names)
+    # Build a new frame, not embedded
+    app = wx.App(False)
+    frame = wx.Frame(None, -1,'Plotter')
+    notebook = PlotNotebook(Comp, frame, plot_names=plot_names)
     frame.Show()
     app.MainLoop()
 
