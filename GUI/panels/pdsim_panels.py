@@ -2228,6 +2228,8 @@ class StateInputsPanel(PDPanel):
                     discTsat = ('Discharge saturation temperature [K]','K'),
                     suctTsat = ('Suction saturation temperature [K]','K'),
                     suctDTsh = ('Suction superheat [K]','K'),
+                    suctT = ('Suction temperature [K]','K'),
+                    suctp = ('Suction pressure [kPa]','kPa'),
                     )
     
     def __init__(self, parent, config, **kwargs):
@@ -2258,14 +2260,20 @@ class StateInputsPanel(PDPanel):
         
         self.Tsat = StateVariablesShimClass(self, 300)
         self.DTsh = StateVariablesShimClass(self, 11.1)
+        self.suctT = StateVariablesShimClass(self, 300)
+        self.suctp = StateVariablesShimClass(self, 100)
         
         # Construct the coupled annotated terms for the suction state
         CAGO_suctTsat = CoupledAnnotatedGUIObject(AnnotatedValue('suctTsat', self.Tsat, *self.desc_map['suctTsat']), self.Tsat, handler = self.parse_coupled_parametric_terms)
         CAGO_suctDTsh = CoupledAnnotatedGUIObject(AnnotatedValue('suctDTsh', self.DTsh, *self.desc_map['suctDTsh']), self.DTsh, handler = self.parse_coupled_parametric_terms)
+        CAGO_suctT = CoupledAnnotatedGUIObject(AnnotatedValue('suctT', self.suctT, *self.desc_map['suctT']), self.suctT, handler = self.parse_coupled_parametric_terms)
+        CAGO_suctp = CoupledAnnotatedGUIObject(AnnotatedValue('suctp', self.suctp, *self.desc_map['suctp']), self.suctp, handler = self.parse_coupled_parametric_terms)
         
-        #Link required parameters
+        # Link required parameters
         CAGO_suctTsat.link_required_parameters([CAGO_suctDTsh])
         CAGO_suctDTsh.link_required_parameters([CAGO_suctTsat])
+        CAGO_suctT.link_required_parameters([CAGO_suctp])
+        CAGO_suctp.link_required_parameters([CAGO_suctT])
         
         # Construct option objects for the variable used to set the discharge state
         self.radio_discp = wx.RadioButton(self)
@@ -2312,7 +2320,7 @@ class StateInputsPanel(PDPanel):
         AGO_disc[1].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'pratio'))
         AGO_disc[2].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'Tsat'))
         
-        self.main.register_GUI_objects([AGO_omega, CAGO_suctTsat, CAGO_suctDTsh] + AGO_disc)
+        self.main.register_GUI_objects([AGO_omega, CAGO_suctTsat, CAGO_suctDTsh, CAGO_suctT, CAGO_suctp] + AGO_disc)
         
         # Hack the discharge textctrl so that when they are updated using SetValue() they fire the EVT_KILL_FOCUS event
         def HackedSetValue(self, value):
@@ -2471,15 +2479,21 @@ class StateInputsPanel(PDPanel):
         
         terms_keys = [t.key for t in terms]
         
+        Fluid = self.SuctionStatePanel.GetState().Fluid
+        
         if 'suctDTsh' in terms_keys and 'suctTsat' in terms_keys:
             Tsat = val_map['suctTsat']
             DTsh = val_map['suctDTsh']
             
-            Fluid = self.SuctionStatePanel.GetState().Fluid
             state = CP.State(Fluid, dict(T=Tsat,Q=1))
             p = state.p
             
             self.SuctionStatePanel.set_state(Fluid, **dict(T = Tsat+DTsh, P = p))
+            
+            # Update the discharge pressure ratio (Tsat disc and pdisc do not change)
+            self.OnChangeDischargeValue(changed_parameter = 'pressure')
+        elif 'suctT' in terms_keys and 'suctp' in terms_keys:
+            self.SuctionStatePanel.set_state(Fluid, T = val_map['suctT'], P = val_map['suctp'])
             
             # Update the discharge pressure ratio (Tsat disc and pdisc do not change)
             self.OnChangeDischargeValue(changed_parameter = 'pressure')

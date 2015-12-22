@@ -1309,7 +1309,7 @@ class Scroll(PDSimCore, _Scroll):
             
             # This has to be quite large - why?
             h = 2e-10
-            disable='no_integrate'
+            disable='no_integrate' # This means that no actual update will be made, simply a copy from the old CV to the new CV
        
         elif self.CVs['d1'].exists and IsAtMerge():
             
