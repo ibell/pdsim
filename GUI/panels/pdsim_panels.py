@@ -2422,8 +2422,7 @@ class StateInputsPanel(PDPanel):
                 pdisc = state.p
                 pratio = pdisc / psuction
             except ValueError:
-                pass
-            pdisc = -1
+                pdisc = -1
             
         else:
             raise ValueError('Your parameter [{s:s}] is invalid for OnChangeDischargeValue.  Must be one of (pressure, pratio, Tsat)'.format(s = changed_parameter))
