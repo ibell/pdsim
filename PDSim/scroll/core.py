@@ -1602,10 +1602,11 @@ class Scroll(PDSimCore, _Scroll):
         
         # Calculate along one path to track one set of pockets through the whole process
         theta = self.t
+        pcopy = self.p.copy() # make a copy to avoid risk of pointer-to-data-overwriting problem
 
         # Suction chambers
-        p1 = self.p[self.CVs.index('s1')].copy()
-        p2 = self.p[self.CVs.index('s2')].copy()
+        p1 = pcopy[self.CVs.index('s1')]
+        p2 = pcopy[self.CVs.index('s2')]
         
         Nc_max1, Nc_max2 = self.Nc_max()
         
@@ -1618,24 +1619,24 @@ class Scroll(PDSimCore, _Scroll):
                     # just like the suction chambers
                     if path == 1:
                         theta = np.append(theta, self.t + 2*pi*alpha)
-                        p1 = np.append(p1, self.p[self.CVs.index('c1.'+str(alpha))].copy())
+                        p1 = np.append(p1, pcopy[self.CVs.index('c1.'+str(alpha))])
                     else:
-                        p2 = np.append(p2, self.p[self.CVs.index('c2.'+str(alpha))].copy())
+                        p2 = np.append(p2, pcopy[self.CVs.index('c2.'+str(alpha))])
                     
             # Innermost compression chamber begins to be tricky
             # By definition innermost compression chamber doesn't make it to the 
             # end of the rotation
             next_theta = self.t + 2*pi*Nc_max
             if path == 1:
-                next_p1 = self.p[self.CVs.index('c1.'+str(Nc_max))].copy()
+                next_p1 = pcopy[self.CVs.index('c1.'+str(Nc_max))]
                 next_p1[np.isnan(next_p1)] = 0
             else:
-                next_p2 = self.p[self.CVs.index('c2.'+str(Nc_max))].copy()
+                next_p2 = pcopy[self.CVs.index('c2.'+str(Nc_max))]
                 next_p2[np.isnan(next_p2)] = 0
         
-        pd1 = self.p[self.CVs.index('d1')].copy()
-        pd2 = self.p[self.CVs.index('d2')].copy()
-        pddd = self.p[self.CVs.index('ddd')].copy()
+        pd1 = pcopy[self.CVs.index('d1')]
+        pd2 = pcopy[self.CVs.index('d2')]
+        pddd = pcopy[self.CVs.index('ddd')]
         
         assert len(theta) == len(p1) == len(p2)
         
