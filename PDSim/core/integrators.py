@@ -244,13 +244,13 @@ class AbstractRK45ODEIntegrator(AbstractODEIntegrator):
         #t is the independent variable here, where t takes on values in the bounded range [tmin,tmax]
         while (self.t0 < self.tmax - 1e-10):
             
+            # Check for termination
+            abort = self.premature_termination()
+            if abort != False: return abort
+
             self.stepAccepted = False
             
             while not self.stepAccepted:
-                
-                # Check for termination
-                abort = self.premature_termination()
-                if abort != False: return abort
                 
                 # reset the flag
                 self.disableAdaptive = False
