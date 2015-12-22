@@ -54,7 +54,7 @@ class AbstractSimpleEulerODEIntegrator(AbstractODEIntegrator):
         
         # Step variables
         self.t0 = tmin
-        h = (tmax-tmin)/(N)
+        self.h = (tmax-tmin)/(N)
         
         # Get the initial value
         self.xold = self.get_initial_array()
@@ -75,11 +75,11 @@ class AbstractSimpleEulerODEIntegrator(AbstractODEIntegrator):
             self.post_deriv_callback()
             
             # Calculate the new values
-            self.xnew = self.xold + h*self.f1
+            self.xnew = self.xold + self.h*self.f1
             
             # Everything from this step is finished, now update for the next
             # step coming
-            self.t0 += h
+            self.t0 += self.h
             self.xold = self.xnew
             
             # Call the post-step callback
@@ -119,7 +119,7 @@ class AbstractHeunODEIntegrator(AbstractODEIntegrator):
         
         # Step variables
         self.t0 = tmin
-        h = (tmax-tmin)/(N)
+        self.h = (tmax-tmin)/(N)
         
         # Get the initial value
         self.xold = self.get_initial_array()
@@ -140,17 +140,17 @@ class AbstractHeunODEIntegrator(AbstractODEIntegrator):
             self.post_deriv_callback()
             
             # Predicted values based on extrapolation using initial derivatives
-            self.xtemp = self.xold + h*self.f1
+            self.xtemp = self.xold + self.h*self.f1
             
             # Step 2: Evaluated at predicted step
-            self.f2 = self.derivs(self.t0+h, self.xtemp)
+            self.f2 = self.derivs(self.t0 + self.h, self.xtemp)
             
             # Get corrected values
-            self.xnew = self.xold + h/2.0*(self.f1 + self.f2)
+            self.xnew = self.xold + self.h/2.0*(self.f1 + self.f2)
             
             # Everything from this step is finished, now update for the next
             # step coming
-            self.t0 += h
+            self.t0 += self.h
             self.xold = self.xnew
             
             # Call the post-step callback
