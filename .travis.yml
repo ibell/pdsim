@@ -3,14 +3,32 @@ virtualenv:
   system_site_packages: true
 python:
   - "2.7"
-  - "3.2"
+  - "3.4"
   
 # command to install dependencies
 install: 
   - git submodule update --init --recursive
-  - pip -q install cython --install-option="--no-cython-compile"
+  
+  - sudo apt-get update
+  # We do this conditionally because it saves us some downloading if the
+  # version is the same.
+  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
+      wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
+    else
+      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+    fi
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  # Useful for debugging any issues with conda
+  - conda info -a
+
+  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy matplotlib wxpython h5py cython
+  - source activate test-environment
+  
   - python setup_coolprop.py install
-  - sudo conda install numpy matplotlib wxpython h5py
   - python setup.py install # Install PDSim
   
 # command to run tests
