@@ -9,12 +9,6 @@ from __future__ import division
 import sys, os
 from math import pi
 
-# If the following line is uncommented, python will try to use a local version
-# of PDSim.  This is handy for debugging purposes.  Generally you want this line 
-# commented out
-# PDSim should also be built using a command like python build_ext --inplace to keep all the extension modules next to the .pyx files
-# sys.path.insert(0, os.path.abspath('..'))
-
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
 from PDSim.scroll import scroll_geo
@@ -32,8 +26,6 @@ import numpy as np
 
 from matplotlib import pyplot as plt
 import time
-
-check_valve = False
 
 def Compressor(Te = 273, Tc = 300, f = None, OneCycle = False, Ref = 'R410A'):
 
@@ -210,4 +202,3 @@ def Compressor(Te = 273, Tc = 300, f = None, OneCycle = False, Ref = 'R410A'):
     
 if __name__=='__main__':
     Compressor()
-
