@@ -327,8 +327,9 @@ class AbstractRK45ODEIntegrator(AbstractODEIntegrator):
             if (max_error < eps_allowed and self.disableAdaptive == False and max_error > 0):
                 # Take a bigger step next time, since eps_allowed>max_error
                 self.h *= step_relax*(eps_allowed/max_error)**(0.2)
-                
-            assert((self.t0 - tmax) < 1e-10)
+               
+            if not (self.t0 - tmax) < 1e-3:
+                raise AssertionError('(self.t0 - tmax) [' + str(self.t0 - tmax) + '] > 1e-3')
         
         # No termination was requested
         return False
