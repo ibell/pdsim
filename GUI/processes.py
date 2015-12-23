@@ -73,7 +73,7 @@ class Run1(Process):
         #Run the simulation
         script_module.run(self.sim, pipe_abort = self.pipe_abort)
         
-        #Delete a few items that cannot pickle properly
+        # Delete a few items that cannot pickle properly
         if hasattr(self.sim,'pipe_abort'):
             
             del self.sim.pipe_abort
@@ -101,10 +101,10 @@ class Run1(Process):
             self.sim.attach_HDF5_annotations(hdf5_path)
             print 'Wrote hdf5 file to', hdf5_path
             
-            #Send simulation result back to calling thread
+            # Send simulation result back to calling thread
             self.pipe_results.send(hdf5_path)
             print 'Sent simulation back to calling thread',
-            #Wait for an acknowledgment of receipt
+            # Wait for an acknowledgment of receipt
             while not self.pipe_results.poll():
                 time.sleep(0.1)
                 #Check that you got the right acknowledgment key back
@@ -245,12 +245,12 @@ class RedirectedWorkerThread(Thread):
                 
             #If the manager is asked to quit
             if self._want_abort == True:
-                #Tell the process to abort, passes message to simulation run
+                # Tell the process to abort, passes message to simulation run
                 pipe_abort_inlet.send(True)
-                #Wait until it acknowledges the kill by sending back 'ACK'
+                # Wait until it acknowledges the kill by sending back 'ACK'
                 while not pipe_abort_inlet.poll():
                     time.sleep(0.1)
-#                   #Collect all display output from process while you wait
+                    # Collect all display output from process while you wait
                     while pipe_outlet.poll():
                         wx.CallAfter(self.stdout_target.AppendText, pipe_outlet.recv())
                         
@@ -261,12 +261,12 @@ class RedirectedWorkerThread(Thread):
                 else:
                     raise ValueError('abort pipe should have received a value of "ACK"')
                 
-            #Collect all display output from process
+            # Collect all display output from process
             while pipe_outlet.poll():
                 wx.CallAfter(self.stdout_target.AppendText, pipe_outlet.recv())
             time.sleep(1)
             
-            #Get back the results from the simulation process if they are waiting
+            # Get back the results from the simulation process if they are waiting
             if pipe_results_outlet.poll():
                 hdf5_path = pipe_results_outlet.recv()
                 pipe_results_outlet.send('ACK')
@@ -274,9 +274,10 @@ class RedirectedWorkerThread(Thread):
             else:
                 hdf5_path = None
         
-        #Flush out any remaining stuff left in the pipe after process ends
+        # Flush out any remaining stuff left in the pipe after process ends
         while pipe_outlet.poll():
             wx.CallAfter(self.stdout_target.AppendText, pipe_outlet.recv())
+            time.sleep(0.1)
         
         if self._want_abort == True:
             print self.name+": Process has aborted successfully"
