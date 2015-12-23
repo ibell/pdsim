@@ -75,7 +75,8 @@ class PlotNotebook(wx.Panel):
                            ('Mass v. crank angle',self.m_theta),
                            ('Mass flow v. crank angle',self.mdot_theta),
                            ('Temperature-pressure',self.temperature_pressure),             
-                           ('Heat transfer v. crank angle', self.heat_transfer)
+                           ('Heat transfer v. crank angle', self.heat_transfer),
+                           ('Initial temperature history', self.initial_temperature_history)
                            ]
         self.recip_plot_buttons = [('Valve lift v. crank angle',self.valve_theta)]
         self.scroll_plot_buttons = [('Pressure profile',self.pressure_profile),
@@ -242,6 +243,18 @@ class PlotNotebook(wx.Panel):
         axes.plot(self.Sim.FlowsProcessed.t,self.Sim.FlowsProcessed.mean_mdot['inlet.2']*np.ones_like(self.Sim.FlowsProcessed.t), lw = 1.5)
         axes.set_xlabel(r'$\theta$ [rad]')
         axes.set_ylabel(r'$\dot m$ [kg/s]')
+
+    def initial_temperature_history(self, event = None):
+        axes = self.add('Initial Temperature History').gca()
+        if isinstance(self.Sim, h5py.File):
+            TTT = self.Sim.get('/solvers/initial_states_history').value
+        else:
+            TTTT = self.Sim.solvers.initial_states_history
+        xx = np.array(range(TTT.shape[0]))
+        yy = TTT
+        axes.plot(xx, yy, 'o-')
+        axes.set_xlabel('Iteration Number')
+        axes.set_ylabel('Temperature [K]')
     
     def valve_theta(self, event = None):
         #valve lift
