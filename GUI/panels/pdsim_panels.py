@@ -633,8 +633,9 @@ class OutputTreePanel(wx.Panel):
                 # If it is a dataset, write the dataset contents to the tree
                 if isinstance(objects[0][thing], h5py.Dataset):
                     for i, o in enumerate(objects):
-                        if not o[thing].shape: # It's a single element, perhaps a number or a string.  
-                                               # shape will be an empty tuple, hence not () is True
+                        if hasattr(o[thing], 'shape') and o[thing].shape == tuple(): 
+                            # It's a single element, perhaps a number or a string.  
+                            # shape will be an empty tuple, hence not () is True
                             self.tree.SetItemText(child, str(o[thing].value), i+1)
                         else:
                             # A place holder for now - will develop a frame to display the matrix
