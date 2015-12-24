@@ -13,7 +13,7 @@ import warnings, setuptools
 from distutils.core import setup
 from Cython.Build import cythonize
 from Cython.Distutils import build_ext
-from Cython.Distutils.extension import Extension as CyExtension
+from Cython.Distutils.extension import Extension
 import sys, shutil, os, glob
 
 version = '2.9'
@@ -45,7 +45,6 @@ pyx_list = [
             "PDSim/core/_bearings.pyx",
             "PDSim/core/containers.pyx",
             "PDSim/core/callbacks.pyx",
-            "PDSim/core/cycleintegrators.pyx",
             "PDSim/misc/scipylike.pyx",
             "PDSim/flow/flow_models.pyx",
             "PDSim/flow/flow.pyx",
@@ -108,13 +107,11 @@ for pyx_file in pyx_list:
     else:
         package_pxd_files[name] = [pxd]
 
-    ext_module_list.append(CyExtension(ext_name,
-                                       sources,
-                                       language='c++',
-                                       cython_directives=dict(profile = True,
-                                                              embedsignature = True),
-                                       cython_c_in_temp=True
-                                       )
+    ext_module_list.append(Extension(ext_name,
+                                     sources,
+                                     language='c++',
+                                     cython_c_in_temp=True
+                                     )
                            )
 
 package_data = package_pxd_files
@@ -128,7 +125,9 @@ setup(
   description = """A flexible open-source framework for the quasi-steady-state simulation of positive displacement machines including compressors and expanders""",
   packages = ['PDSim','PDSim.core','PDSim.flow','PDSim.plot','PDSim.scroll','PDSim.misc','PDSim.recip','PDSim.misc.clipper'],
   cmdclass={'build_ext': build_ext},
-  ext_modules = ext_module_list,
+  ext_modules = cythonize(ext_module_list, 
+                          compiler_directives=dict(profile = True, embedsignature = True),
+                          ),
   package_dir = {'PDSim':'PDSim',},
   package_data = package_data,
   include_dirs = [numpy.get_include(), CoolProp.get_include_directory(), "PDSim/misc/clipper", "PDSim/misc/spline", "externals/coolprop/externals/msgpack-c/include"],
