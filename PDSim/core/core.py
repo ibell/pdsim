@@ -107,7 +107,7 @@ class IntegratorMixin(object):
                 
             x = self.sim._get_from_matrices(self.Itheta)
                 
-            if disable != False and np.all(np.isfinite(x)):
+            if disable != False and x.all_finite():
                 self.xold = self.sim._get_from_matrices(self.Itheta)
                 
             # The integrator only cares whether disable is true or not, convert to true or false

@@ -41,6 +41,10 @@ cdef class ControlVolume(object):
 
 cdef class CVScore(object):
     cdef list array_list
+    
+    # Property derivative arrays
+    cdef public arraym summerdm, summerdT
+    
     cpdef update_size(self, int N)
     cdef build_all(self, int N)
     cdef free_all(self)
@@ -53,7 +57,7 @@ cdef class CVArrays(CVScore):
     cdef public arraym T,p,h,rho,V,dV,cp,cv,m,v,dpdT_constV,Q,xL,dudxL
     
     # Property derivative arrays
-    cdef public arraym drhodtheta, dTdtheta, dmdtheta, dxLdtheta, summerdm, summerdT, summerdxL, property_derivs
+    cdef public arraym drhodtheta, dTdtheta, dmdtheta, dxLdtheta, summerdxL, property_derivs
     
     # Other variables
     cdef int state_vars, N
