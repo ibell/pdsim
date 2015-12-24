@@ -1184,8 +1184,11 @@ class Scroll(PDSimCore, _Scroll):
         
     def calcHT(self, theta, key, HTC_tune, dT_dphi, phim): 
         
+        #TODO: calculate HTC
+        hc = self.HTC #[kW/m2/K]
+        
         ## If HT is turned off, no heat transfer
-        if HTC_tune <= 0.0 or key.startswith('inj') or key == 'sa' or key == 'dd':
+        if abs(hc) < 1e-10 or HTC_tune <= 0.0 or key.startswith('inj') or key == 'sa' or key == 'dd':
             return 0.0
         elif key == 'ddd':
             # ddd is a combination of the heat transfer in the d1, d2, and
@@ -1194,8 +1197,7 @@ class Scroll(PDSimCore, _Scroll):
             Q_d2 = self.calcHT(theta,str('d2'),HTC_tune,dT_dphi,phim)
             return Q_d1 + Q_d2
                 
-        #TODO: calculate HTC
-        hc = self.HTC #[kW/m2/K]
+        
             
         #Get the bounding angles for the control volume
         angles = self.HT_angles(theta, self.geo, key)
