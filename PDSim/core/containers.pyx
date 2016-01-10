@@ -6,6 +6,9 @@ cdef public enum STATE_VARS:
     STATE_VARS_TD
     STATE_VARS_TM
     
+cimport CoolProp.constants_header as constants
+from CoolProp import constants
+    
 cdef class Tube(object):
     """
     A tube is a component of the model that allows for heat transfer and pressure drop.
@@ -418,7 +421,7 @@ cdef class ControlVolumeCollection(object):
     """
     ControlVolumeCollection is class to hold all the control volumes
     """
-    def __init__(self):
+    def __cinit__(self):
         self.keys = []
         self.CVs = []
         
@@ -491,54 +494,55 @@ cdef class ControlVolumeCollection(object):
     
     def index(self,key):
         return self.keys.index(key)
+        
+    cpdef get(self, parameters key, double factor = 1.0):
+        """
+        Get a value from all the control volumes 
+        Parameters
+        ----------
+        key : 
+            The key to get from CoolProp
+        factor : double
+            The value to multiply each acquired value by
+        """
+        cdef int i
+        cdef ControlVolume CV
+        cdef arraym arr = arraym.__new__(arraym)
+        arr.set_size(self.Nexist)
+        for i in range(self.Nexist):
+            CV = self.exists_CV[i]
+            arr.set_index(i,CV.State.Props(key)*factor)
+        return arr
     
     @property
     def T(self):
-        """
-        Temperature for each CV that exists
-        """
-        cdef ControlVolume CV
-        return [CV.State.get_T() for CV in self.exists_CV]
+        """ Temperature for each CV that exists """
+        return self.get(constants.iT)
     
     @property
     def p(self):
-        """
-        Pressure for each CV that exists
-        """
-        cdef ControlVolume CV
-        return [CV.State.get_p() for CV in self.exists_CV]
+        """ Pressure for each CV that exists """
+        return self.get(constants.iP,0.001)
     
     @property
     def rho(self):
-        """
-        Density for each CV that exists
-        """
-        cdef ControlVolume CV
-        return [CV.State.get_rho() for CV in self.exists_CV]
+        """ Density for each CV that exists """
+        return self.get(constants.iDmass)
     
     @property
     def h(self):
-        """
-        Enthalpy for each CV that exists
-        """
-        cdef ControlVolume CV
-        return [CV.State.get_h() for CV in self.exists_CV]
+        """ Enthalpy for each CV that exists """
+        return self.get(constants.iHmass,0.001)
     
     @property
     def cp(self):
-        """
-        Specific heat at constant volume for each CV that exists
-        """
-        cdef ControlVolume CV
-        return [CV.State.get_cp() for CV in self.exists_CV]
+        """ Specific heat at constant volume for each CV that exists """
+        return self.get(constants.iCpmass,0.001)
     
     @property
     def cv(self):
-        """
-        Specific heat at constant volume for each CV that exists
-        """
-        cdef ControlVolume CV
-        return [CV.State.get_cv() for CV in self.exists_CV]
+        """ Specific heat at constant volume for each CV that exists """
+        return self.get(constants.iCvmass,0.001)
     
     @property
     def dpdT(self):
@@ -551,7 +555,7 @@ cdef class ControlVolumeCollection(object):
     cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2):
 #        if not len(array1) == len(array2) or not len(array2)==len(self.exists_CV):
 #            raise AttributeError('length of arrays must be the same and equal number of CV in existence')
-        keys = self.exists_keys
+#        keys = self.exists_keys
         # Update each of the states of the control volume
         for CV,v1,v2 in zip(self.exists_CV, array1, array2):
             CV.State.update({name1:v1,name2:v2})

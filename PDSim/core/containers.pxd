@@ -1,6 +1,8 @@
 from CoolProp.State import State as StateClass
 from CoolProp.State cimport State as StateClass
 
+from CoolProp.constants_header cimport parameters
+
 from libcpp cimport bool
 
 from PDSim.flow.flow import FlowPathCollection
@@ -78,3 +80,4 @@ cdef class ControlVolumeCollection(object):
     cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2)
     cpdef volumes(self, double theta, bint as_dict = *)
     cpdef at(self, int i)
+    cpdef get(self, parameters key, double factor=*)
