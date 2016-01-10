@@ -152,9 +152,10 @@ class IntegratorChoices(wx.Choicebook):
 class SolverInputsPanel(pdsim_panels.PDPanel):
     
     desc_map = {'eps_cycle' : ('Cycle-cycle convergence criterion','-',0.003),
-                'eps_energy_balance' : ('Energy balance convergence criterion','kW',0.01),
+                'eps_energy_balance' : ('Energy balance convergence criterion [kW]','kW',0.01),
                 'timeout': ('Timeout for a run [s]','-',3600),
-                'max_number_of_steps': ('Maximum number of steps per revolution','-',40000)
+                'max_number_of_steps': ('Maximum number of steps per revolution','-',40000),
+                'outlet_temperature_guess': ('Guess value for outlet temperature [K]','K',-1)
                 }
     
     def __init__(self, parent, configdict,**kwargs):
@@ -168,7 +169,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         annotated_values = []
         self.keys_for_config = []
         
-        keys = ['eps_cycle', 'eps_energy_balance', 'timeout', 'max_number_of_steps']
+        keys = ['eps_cycle', 'eps_energy_balance', 'timeout', 'max_number_of_steps', 'outlet_temperature_guess']
         annotated_values = self.get_annotated_values(keys, config = configdict)
         
         # Build the items and return the list of annotated GUI objects
@@ -179,6 +180,8 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         # ---------------------------------------------------------------------
         # Register terms in the GUI database
         self.main.register_GUI_objects(annotated_GUI_objects)
+        
+        self.main.get_GUI_object('outlet_temperature_guess').GUI_location.SetToolTipString('Guess for outlet temperature; if <0, adiabatic efficiency will be used to estimate outlet temperature')
 
         from multiprocessing import cpu_count
         

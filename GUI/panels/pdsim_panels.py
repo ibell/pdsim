@@ -2454,12 +2454,18 @@ class StateInputsPanel(PDPanel):
         inletState = self.SuctionStatePanel.GetState()
         discPressure = self.main.get_GUI_object_value('discPressure')
         omega = self.main.get_GUI_object_value('omega')
+        outlet_temperature_guess = self.main.get_GUI_object('outlet_temperature_guess').GetValue()
     
         return textwrap.dedent(
             """
             inletState = State.State("{Ref:s}", {{'T': {Ti:s}, 'P' : {pi:s} }})
-    
-            T2s = sim.guess_outlet_temp(inletState,{po:s})
+            
+            outlet_temperature_guess = {outlet_temperature_guess:s} # [K]
+            if outlet_temperature_guess > 0:
+                # Use the specified guess for outlet temperature
+                T2s = outlet_temperature_guess 
+            else:
+                T2s = sim.guess_outlet_temp(inletState,{po:s})
             outletState = State.State("{Ref:s}", {{'T':T2s,'P':{po:s} }})
             
             # The rotational speed (over-written if motor map provided)
@@ -2468,6 +2474,7 @@ class StateInputsPanel(PDPanel):
                        Ti = str(inletState.T),
                        pi = str(inletState.p),
                        po = str(discPressure),
+                       outlet_temperature_guess = str(outlet_temperature_guess),
                        omega = str(omega)
                        )
             )
