@@ -44,28 +44,24 @@ cdef class ControlVolume(object):
 cdef class CVScore(object):
     cdef list array_list
     
+    # Other variables
+    cdef int state_vars, N
+    cdef double omega
+    
+    # Storage arrays that are always required
+    cdef public arraym T,p,h,rho,V,dV,cp,cv,m,v,dpdT_constV,Q
+    
     # Property derivative arrays
-    cdef public arraym summerdm, summerdT
+    cdef public arraym summerdm, summerdT, drhodtheta, dTdtheta, dmdtheta, property_derivs
     
     cpdef update_size(self, int N)
     cdef build_all(self, int N)
     cdef free_all(self)
     cpdef copy(self)
     cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, arraym parray, arraym Tarray)
+    cpdef just_volumes(self, list CVs, double theta)
 
 cdef class CVArrays(CVScore):
-
-    # Storage arrays
-    cdef public arraym T,p,h,rho,V,dV,cp,cv,m,v,dpdT_constV,Q,xL,dudxL
-    
-    # Property derivative arrays
-    cdef public arraym drhodtheta, dTdtheta, dmdtheta, dxLdtheta, summerdxL, property_derivs
-    
-    # Other variables
-    cdef int state_vars, N
-    cdef double omega
-    
-    cpdef just_volumes(self, list CVs, double theta)
     cpdef properties_and_volumes(self, list CVs, double theta, int state_vars, arraym x)
     cpdef calculate_derivs(self, double omega, bint has_liquid)
 

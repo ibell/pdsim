@@ -228,21 +228,7 @@ cdef class CVScore(object):
 
         Flows.calculate(harray, parray, Tarray)
         Flows.sumterms(self.summerdT, self.summerdm)
-
-cdef class CVArrays(CVScore):
-    """
-    A stub class that contains the arraym arrays of the state variables for
-    all the control volumes that are passed into the instantiator
-    """
-    
-    def __init__(self, int N): 
-        self.array_list = ['T','p','h','rho','V','dV','cp','cv','m','v',
-                           'dpdT_constV','Q','xL','dudxL','drhodtheta', 
-                           'dTdtheta', 'dmdtheta', 'dxLdtheta', 'summerdm', 
-                           'summerdT', 'summerdxL', 'property_derivs']
         
-        self.build_all(N)
-         
     cpdef just_volumes(self, list CVs, double theta):
         """
         Just calculate the volumes
@@ -264,6 +250,18 @@ cdef class CVArrays(CVScore):
             # Calculate the volume and derivative of volume - does not depend on
             # any of the other state variables
             self.V.data[iCV], self.dV.data[iCV] = CV.V_dV(theta, **CV.V_dV_kwargs)
+
+cdef class CVArrays(CVScore):
+    """
+    A stub class that contains the arraym arrays of the state variables for
+    all the control volumes that are passed into the instantiator
+    """
+    
+    def __cinit__(self, int N): 
+        self.array_list = ['T','p','h','rho','V','dV','cp','cv','m','v',
+                           'dpdT_constV','Q','drhodtheta', 
+                           'dTdtheta', 'dmdtheta', 'summerdm', 
+                           'summerdT', 'property_derivs']
     
     @cython.cdivision(True)    
     cpdef properties_and_volumes(self, list CVs, double theta, int state_vars, arraym x):
@@ -329,7 +327,7 @@ cdef class CVArrays(CVScore):
     @cython.cdivision(True)
     cpdef calculate_derivs(self, double omega, bint has_liquid):
         
-        cdef double m,T,cv,xL,dV,V,v,summerdxL,summerdm,summerdT
+        cdef double m,T,cv,dV,V,v,summerdm,summerdT
         cdef int i
         
         self.omega = omega
@@ -349,20 +347,15 @@ cdef class CVArrays(CVScore):
             omega = self.omega
             rho = self.rho.data[i]
             cv = self.cv.data[i]
-            xL = self.xL.data[i]
             dV = self.dV.data[i]
             V = self.V.data[i]
             v = self.v.data[i]
-            dudxL = self.dudxL.data[i]
             dpdT = self.dpdT_constV.data[i]
-            summerdxL = self.summerdxL.data[i]
             summerdm = self.summerdm.data[i]
             summerdT = self.summerdT.data[i]
             dmdtheta = self.dmdtheta.data[i]
-            
-            self.dxLdtheta.data[i] = 1.0/m*(summerdxL-xL*dmdtheta)    
-            dxLdtheta = self.dxLdtheta.data[i]            
-            self.dTdtheta.data[i] = 1.0/(m*cv)*(-1.0*T*dpdT*(dV-v*dmdtheta)-m*dudxL*dxLdtheta-h*dmdtheta+Q/omega+summerdT)
+                 
+            self.dTdtheta.data[i] = 1.0/(m*cv)*(-1.0*T*dpdT*(dV-v*dmdtheta)-h*dmdtheta+Q/omega+summerdT)
             self.drhodtheta.data[i] = 1.0/V*(dmdtheta-rho*dV)
         
         #  Create the array of output values
