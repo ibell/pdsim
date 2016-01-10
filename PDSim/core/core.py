@@ -264,7 +264,6 @@ class PDSimCore(object):
         """
         if self.__hasLiquid__==True:
             raise NotImplementedError
-            #return np.hstack([self.T[:,i],self.m[:,i],self.xL[:,i]])
         else:
             VarList=np.array([])
             exists_indices = np.array(self.CVs.exists_indices)
@@ -305,7 +304,6 @@ class PDSimCore(object):
             raise NotImplementedError
 #             self.T[:,i]=x[0:self.NCV]
 #             self.m[:,i]=x[self.NCV:2*self.NCV]
-#             self.xL[:,i]=x[2*self.NCV:3*self.NCV]
         else: # self.__hasLiquid__==False
             for iS, s in enumerate(self.stateVariables):
                 if s=='T':
@@ -420,7 +418,6 @@ class PDSimCore(object):
             
             #For each tube, update the flow going through it
             #Tube.mdot is always a positive value
-            print 'Tube mdots',mdot1, mdot2
             Tube.mdot = max(abs(mdot1), abs(mdot2))
             
         self.mdot = self.FlowsProcessed.mean_mdot[self.key_inlet]
@@ -616,7 +613,6 @@ class PDSimCore(object):
         self.dV = self.T.copy()
         self.rho = self.T.copy()
         self.Q = self.T.copy()
-        self.xL = self.T.copy()
         self.xValves = np.zeros((2*len(self.Valves),N))
         
         # Initialize the core class that contains the arrays and the derivs
@@ -644,7 +640,6 @@ class PDSimCore(object):
         self.dV.fill(np.nan)
         self.rho.fill(np.nan)
         self.Q.fill(np.nan)
-        self.xL.fill(np.nan)
         
         self.FlowStorage=[]
         
@@ -1043,7 +1038,6 @@ class PDSimCore(object):
         
         mdot_out = self.FlowsProcessed.mean_mdot[self.key_outlet]
         mdot_in = self.FlowsProcessed.mean_mdot[self.key_inlet]
-        print 'Mass flow difference',(mdot_out+mdot_in)/mdot_out*100,' %'
         
         # We need to find the key at the inlet to the outlet tube.
         Tube = self.Tubes[self.key_outlet]
@@ -1061,8 +1055,6 @@ class PDSimCore(object):
         h_outlet_Tube = self.Tubes.Nodes[key_outtube_inlet].h
         # Residual is the difference of these two terms
         # We put it in kW by multiplying by flow rate
-        print 'h_outlet_Tube',h_outlet_Tube
-        print 'self.h_outlet_pump_set',self.h_outlet_pump_set
         self.resid_Td = mdot_out * (h_outlet_Tube - self.h_outlet_pump_set)
         
     def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45', OneCycle = False, cycle_integrator_options = None, plot_every_cycle = False):
@@ -1224,6 +1216,10 @@ class PDSimCore(object):
             #  Reset the flag for the fixed side of the outlet tube
             outlet_tube.fixed = old_fixed
             
+            mdot_out = abs(self.FlowsProcessed.mean_mdot[self.key_outlet])
+            mdot_in = abs(self.FlowsProcessed.mean_mdot[self.key_inlet])
+            mdot_error = (mdot_out/mdot_in-1)*100
+        
             from PDSim.misc.error_bar import error_ascii_bar
             
             error_metric = np.sqrt(np.sum(np.power(errors, 2)))
@@ -1233,6 +1229,7 @@ class PDSimCore(object):
             print error_ascii_bar(abs(self.lumps_resid[0]), epsilon), 'energy balance ', self.lumps_resid[0], ' Tlumps: ',self.Tlumps,'K'
             print error_ascii_bar(abs(self.resid_Td), epsilon), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg', self.Tubes.Nodes[key_outtube_inlet].h, 'kJ/kg'
             print error_ascii_bar(error_metric, epsilon), 'cycle-cycle    ', error_metric
+            print error_ascii_bar(abs(mdot_error), 1), 'mdot    ', mdot_error, 'in:', mdot_in, 'out:', mdot_out
             
             worst_error = max(abs(self.lumps_resid[0]), abs(self.resid_Td), np.sqrt(np.sum(np.power(errors, 2))))
             i += 1
@@ -1504,7 +1501,6 @@ class PDSimCore(object):
         self.V = self.V[:,0:self.Ntheta]
         self.dV = self.dV[:,0:self.Ntheta]
         self.h = self.h[:,0:self.Ntheta]
-        self.xL = self.xL[:,0:self.Ntheta]
         self.xValves = self.xValves[:,0:self.Ntheta]
         
         print 'mdot*(h2-h1),P-v,Qamb', self.Wdot, self.Wdot_pv, self.Qamb
