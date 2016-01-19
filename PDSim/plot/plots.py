@@ -76,7 +76,9 @@ class PlotNotebook(wx.Panel):
                            ('Mass flow v. crank angle',self.mdot_theta),
                            ('Temperature-pressure',self.temperature_pressure),             
                            ('Heat transfer v. crank angle', self.heat_transfer),
-                           ('Initial temperature history', self.initial_temperature_history)
+                           ('Initial temperature history', self.initial_temperature_history),
+                           ('Lump residuals v. lump temps', self.lumps_residual_v_lump_temps),
+                           ('Discharge residual history', self.discharge_residual_history),
                            ]
         self.recip_plot_buttons = [('Valve lift v. crank angle',self.valve_theta)]
         self.scroll_plot_buttons = [('Pressure profile',self.pressure_profile),
@@ -255,6 +257,31 @@ class PlotNotebook(wx.Panel):
         axes.plot(xx, yy, 'o-')
         axes.set_xlabel('Iteration Number')
         axes.set_ylabel('Temperature [K]')
+        
+    def lumps_residual_v_lump_temps(self, event = None):
+        axes = self.add('Lump Error History').gca()
+        if isinstance(self.Sim, h5py.File):
+            Tlumps = self.Sim.get('/solvers/lump_eb_history/Tlumps').value
+            lump_eb_error = self.Sim.get('/solvers/lump_eb_history/lump_eb_error').value
+        else:
+            Tlumps = self.solvers.lump_eb_history.Tlumps
+            lump_eb_error = self.solvers.lump_eb_history.lump_eb_error
+            
+        axes.plot(Tlumps, lump_eb_error, 'o-')
+        axes.set_xlabel('Lump temperature [K]')
+        axes.set_ylabel('Lump energy balance [kW]')
+        
+    def discharge_residual_history(self, event = None):
+        axes = self.add('Discharge Residual History').gca()
+        if isinstance(self.Sim, h5py.File):
+            hd = self.Sim.get('/solvers/hdisc_history/hd').value
+            hd_error = self.Sim.get('/solvers/hdisc_history/hd_error').value
+        else:
+            hd = self.solvers.hdisc_history.hd
+            hd_error = self.solvers.hdisc_history.hd_error
+        axes.plot(hd, hd_error, 'o-')
+        axes.set_xlabel('Discharge enthalpy [kJ/kg]')
+        axes.set_ylabel('Discharge state error [kJ/kg]')
     
     def valve_theta(self, event = None):
         #valve lift
