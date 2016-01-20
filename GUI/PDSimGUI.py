@@ -229,7 +229,8 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
                           eps_energy_balance = self.main.get_GUI_object_value('eps_energy_balance'),
                           cycle_integrator = IC_type,
                           integrator_options = kwargs,
-                          Ncore_max = self.Ncore_max.GetValue()
+                          Ncore_max = self.Ncore_max.GetValue(),
+                          outlet_temperature_guess = self.main.get_GUI_object_value('outlet_temperature_guess')
                           )
         return configdict
         
