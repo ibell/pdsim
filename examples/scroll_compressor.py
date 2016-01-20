@@ -62,7 +62,7 @@ def Compressor(Te = 273, Tc = 300, f = None, OneCycle = False, Ref = 'R410A'):
     
     ScrollComp.h_shell = 0.02
     ScrollComp.A_shell = 0.05
-    ScrollComp.HTC = 1.0
+    ScrollComp.HTC = 0.0
     
     ScrollComp.motor = Motor()
     ScrollComp.motor.set_eta(0.9)
