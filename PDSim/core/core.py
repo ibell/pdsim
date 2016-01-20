@@ -14,6 +14,7 @@ import integrators
 from PDSim.plot.plots import debug_plots
 from PDSim.misc.datatypes import arraym, empty_arraym
 import PDSim.core.callbacks
+from PDSim.misc.error_bar import error_ascii_bar
 
 ##-- Non-package imports  --
 import numpy as np
@@ -1055,7 +1056,7 @@ class PDSimCore(object):
         h_outlet_Tube = self.Tubes.Nodes[key_outtube_inlet].h
         # Residual is the difference of these two terms
         # We put it in kW by multiplying by flow rate
-        self.resid_Td = mdot_out * (h_outlet_Tube - self.h_outlet_pump_set)
+        self.resid_Td = 0.1*(h_outlet_Tube - self.h_outlet_pump_set)
         
     def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45', OneCycle = False, cycle_integrator_options = None, plot_every_cycle = False):
         """
@@ -1102,25 +1103,34 @@ class PDSimCore(object):
             
             if self.Abort():
                 return
+                
+            errors, X = self.callbacks.endcycle_callback()
+            error_metric = np.sqrt(np.sum(np.power(errors, 2)))
             
             ###  -----------------------------------
             ###         The lump temperatures
             ###  -----------------------------------
+                
             self.solvers.lump_eb_history.append([self.Tlumps, self.lumps_resid])
             
             if len(self.solvers.lump_eb_history) == 1:
                 
-                T, EB = self.solvers.lump_eb_history[0]
+                T, EB = self.solvers.lump_eb_history[-1]
                 
                 #  T and EB are one-element lists, get floats
-                _T = T[0]
-                _EB = EB[0]
+                _T, _EB = T[0], EB[0]
             
-                #  If the first step, use a large thermal mass to make the step
-                lump_thermal_inertia = 1.6/(2*np.pi)
+                # Use the thermal mass to make the step
+                # Here is the logic:
+                # Instantaneous energy balance given by
+                # dU/dt = m*c*(dT/dt) = sum(Qdot)
+                # and if dt = one cycle period (seconds/rev) DeltaT = 2*pi/omega
+                # DELTAT = sum(Qdot)*Deltat/(m*c)
+                thermal_capacitance = 0.49*0.001 # [kJ/K]
+                Deltat = (2*np.pi)/self.omega # [s]
             
                 #  Update the lump temperatures
-                self.Tlumps = [_T + _EB/lump_thermal_inertia]
+                self.Tlumps = [_T + _EB*Deltat/thermal_capacitance]
             
             else:
                 
@@ -1132,7 +1142,7 @@ class PDSimCore(object):
                 Tn1, EBn1, Tn2, EBn2 = [np.array(l) for l in Tn1, EBn1, Tn2, EBn2]
                 
                 #  Use the relaxed secant method to find the solution 
-                Tnew = Tn1 - 0.75*EBn1*(Tn1-Tn2)/(EBn1-EBn2)
+                Tnew = Tn1 - 0.7*EBn1*(Tn1-Tn2)/(EBn1-EBn2)
             
                 #  Update the lump temperatures    
                 self.Tlumps = Tnew.tolist()
@@ -1140,8 +1150,6 @@ class PDSimCore(object):
             ###  -----------------------------------
             ###        The discharge enthalpy
             ###  -----------------------------------
-            
-            errors, X = self.callbacks.endcycle_callback()
             
             #  The outlet tube
             outlet_tube = self.Tubes[self.key_outlet]
@@ -1153,52 +1161,36 @@ class PDSimCore(object):
             elif outlet_tube.key2 == self.key_outlet:
                 key_outtube_inlet = outlet_tube.key1
                 key_outtube_outlet = outlet_tube.key2
+                
+            if error_metric < 0.1*epsilon and abs(self.lumps_resid[0]) < epsilon:
+
+                # Each time that we get here and we are significantly below the threshold, store the values
             
-            #  Get the current value for the outlet enthalpy
-            h_outlet = self.Tubes[self.key_outlet].State2.get_h()
-                
-            self.solvers.hdisc_history.append([h_outlet,self.resid_Td])
-            
-            if max(np.abs(self.lumps_resid)) > epsilon or len(self.solvers.hdisc_history) == 1:
-                
-                #  Here we are going to solve the tube in the flow direction
-                #  since the energy balance on the lumps 
-                print 'Solving outlet tube in the flow direction'
-                
-                #  Save the old state of the outlet tube
-                old_fixed = outlet_tube.fixed
-                
-                #  Set the inlet state to be fixed
-                outlet_tube.fixed = 1
-                
-                #  Update the inlet state of the outlet tube based on the output of
-                #  the pump set
-                self.Tubes.Nodes[key_outtube_inlet].update_ph(self.Tubes.Nodes[self.key_outlet].p,self.h_outlet_pump_set)
-                
-                #  Run the outlet tube
-                outlet_tube.TubeFcn(outlet_tube)
-                
-                #  Calculate the outlet enthalpy
+                #  Get the current value for the outlet enthalpy of the machine
                 h_outlet = self.Tubes[self.key_outlet].State2.get_h()
+                    
+                # Store the values in the list of values
+                self.solvers.hdisc_history.append([h_outlet,self.resid_Td])
+
+                if len(self.solvers.hdisc_history) == 1:
+                    # The first time we get here, perturb the discharge enthalpy
+                    self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, h_outlet + 5)
+                else:
+                    #  Get the values from the history
+                    hdn1, EBn1 = self.solvers.hdisc_history[-1]
+                    hdn2, EBn2 = self.solvers.hdisc_history[-2]
+                    
+                    #  Use the relaxed secant method to find the solution 
+                    hdnew = hdn1 - 0.75*EBn1*(hdn1-hdn2)/(EBn1-EBn2)
+                    
+                    #  Reset the outlet enthalpy of the outlet tube based on our new
+                    #  value for it
+                    self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, hdnew)
+
+                print self.solvers.hdisc_history
                 
-                #  Reset the outlet enthalpy of the outlet tube
-                self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, h_outlet)
+            print 'new outlet T', self.Tubes.Nodes[self.key_outlet].T
                 
-                #  Reset which state is fixed
-                outlet_tube.fixed = old_fixed
-                
-            else:
-                
-                #  Get the values from the history
-                hdn1, EBn1 = self.solvers.hdisc_history[-1]
-                hdn2, EBn2 = self.solvers.hdisc_history[-2]
-                
-                #  Use the relaxed secant method to find the solution 
-                hdnew = hdn1 - 0.5*EBn1*(hdn1-hdn2)/(EBn1-EBn2)
-                
-                #  Reset the outlet enthalpy of the outlet tube based on our new
-                #  value for it
-                self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, hdnew)
             # Store a copy of the initial temperatures of the chambers
             self.solvers.initial_states_history.append(self.T[:,0].copy())
                 
@@ -1214,22 +1206,19 @@ class PDSimCore(object):
                 return
             
             #  Reset the flag for the fixed side of the outlet tube
-            outlet_tube.fixed = old_fixed
+            #outlet_tube.fixed = old_fixed
             
             mdot_out = abs(self.FlowsProcessed.mean_mdot[self.key_outlet])
             mdot_in = abs(self.FlowsProcessed.mean_mdot[self.key_inlet])
             mdot_error = (mdot_out/mdot_in-1)*100
-        
-            from PDSim.misc.error_bar import error_ascii_bar
             
-            error_metric = np.sqrt(np.sum(np.power(errors, 2)))
             print '==========='
             print '|| # {i:03d} ||'.format(i=i)
             print '==========='
-            print error_ascii_bar(abs(self.lumps_resid[0]), epsilon), 'energy balance ', self.lumps_resid[0], ' Tlumps: ',self.Tlumps,'K'
+            print error_ascii_bar(abs(self.lumps_resid[0]), epsilon), 'energy balance kW ', self.lumps_resid[0], ' Tlumps: ',self.Tlumps,'K'
             print error_ascii_bar(abs(self.resid_Td), epsilon), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg', self.Tubes.Nodes[key_outtube_inlet].h, 'kJ/kg'
             print error_ascii_bar(error_metric, epsilon), 'cycle-cycle    ', error_metric
-            print error_ascii_bar(abs(mdot_error), 1), 'mdot    ', mdot_error, 'in:', mdot_in, 'out:', mdot_out
+            print error_ascii_bar(abs(mdot_error), 1), 'mdot    ', mdot_error, '%  || in:', mdot_in, ' kg/s || out:', mdot_out, 'kg/s '
             
             worst_error = max(abs(self.lumps_resid[0]), abs(self.resid_Td), np.sqrt(np.sum(np.power(errors, 2))))
             i += 1
@@ -1238,6 +1227,10 @@ class PDSimCore(object):
         if self.Abort():
             print 'Quitting OBJECTIVE_CYCLE loop in core.solve'
             return None #  Stop
+        else:
+            if len(self.solvers.hdisc_history) == 0:
+                # Store the values in the list of values
+                self.solvers.hdisc_history.append([self.Tubes[self.key_outlet].State2.get_h(),self.resid_Td])
             
     def solve(self,
               key_inlet = None,
@@ -1510,7 +1503,7 @@ class PDSimCore(object):
         
         # Restructure the history for easier writing to file and more clear description of what the things are
         hdisc_history = zip(*self.solvers.hdisc_history)
-        self.solvers.hdisc_history = dict(Td = np.array(hdisc_history[0]), hd_error = np.array(hdisc_history[1]))
+        self.solvers.hdisc_history = dict(hd = np.array(hdisc_history[0]), hd_error = np.array(hdisc_history[1]))
         lump_eb_history = zip(*self.solvers.lump_eb_history)
         self.solvers.lump_eb_history = dict(Tlumps = np.array(lump_eb_history[0]), lump_eb_error = np.array(lump_eb_history[1]))
         self.solvers.initial_states_history = np.array(zip(*self.solvers.initial_states_history)).T
