@@ -258,7 +258,7 @@ cdef class CVArrays(CVScore):
     """
     
     def __cinit__(self, int N): 
-        self.array_list = ['T','p','h','rho','V','dV','cp','cv','m','v',
+        self.array_list = ['T','p','h','rho','V','dV','cp','cv','m',
                            'dpdT_constV','Q','drhodtheta', 
                            'dTdtheta', 'dmdtheta', 'summerdm', 
                            'summerdT', 'property_derivs']
@@ -283,7 +283,7 @@ cdef class CVArrays(CVScore):
         cdef int N = len(CVs)
         cdef int iCV, iVar, i
         
-        #Calculate the volumes
+        # Calculate the volumes
         self.just_volumes(CVs,theta)
         
         # Split the state variable array into chunks
@@ -297,6 +297,7 @@ cdef class CVArrays(CVScore):
                 i += 1
             for iCV in range(N):
                 self.rho.data[iCV] = self.m.data[iCV]/self.V.data[iCV]
+                
         elif state_vars == STATE_VARS_TD:
             i = 0
             for j in xrange(N, 2*N):
@@ -304,9 +305,6 @@ cdef class CVArrays(CVScore):
                 i += 1
             for iCV in range(N):
                 self.m.data[iCV] = self.rho.data[iCV]*self.V.data[iCV]
-        
-        for iCV in range(N):
-            self.v.data[iCV] = 1/self.rho.data[iCV]
         
         for iCV in range(N):
             # Early-bind the State for speed
@@ -337,9 +335,9 @@ cdef class CVArrays(CVScore):
         self.property_derivs = arraym()
         self.property_derivs.set_size(self.N*2)
         
-        #Loop over the control volumes
+        # Loop over the control volumes
         for i in range(self.N):
-            #For compactness, pull the data from the arrays
+            # For compactness, pull the data from the arrays
             m = self.m.data[i]
             h = self.h.data[i]
             T = self.T.data[i]
@@ -349,13 +347,11 @@ cdef class CVArrays(CVScore):
             cv = self.cv.data[i]
             dV = self.dV.data[i]
             V = self.V.data[i]
-            v = self.v.data[i]
             dpdT = self.dpdT_constV.data[i]
-            summerdm = self.summerdm.data[i]
             summerdT = self.summerdT.data[i]
             dmdtheta = self.dmdtheta.data[i]
                  
-            self.dTdtheta.data[i] = 1.0/(m*cv)*(-1.0*T*dpdT*(dV-v*dmdtheta)-h*dmdtheta+Q/omega+summerdT)
+            self.dTdtheta.data[i] = 1.0/(m*cv)*(-1.0*T*dpdT*(dV-(1/rho)*dmdtheta)-h*dmdtheta+Q/omega+summerdT)
             self.drhodtheta.data[i] = 1.0/V*(dmdtheta-rho*dV)
         
         #  Create the array of output values
@@ -542,8 +538,14 @@ cdef class ControlVolumeCollection(object):
         """
         Derivative of pressure with respect to temperature at constant volume for each CV that exists
         """
+        cdef int i
         cdef ControlVolume CV
-        return [CV.State.get_dpdT() for CV in self.exists_CV]
+        cdef arraym arr = arraym.__new__(arraym)
+        arr.set_size(self.Nexist)
+        for i in range(self.Nexist):
+            CV = self.exists_CV[i]
+            arr.set_index(i,CV.State.get_dpdT())
+        return arr
     
     cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2):
 #        if not len(array1) == len(array2) or not len(array2)==len(self.exists_CV):

@@ -131,6 +131,8 @@ cdef class arraym(object):
         if N <= 0:
             self.N = 0
             return
+        elif N == self.N:
+            return
         
         if self.data == NULL:
             #Allocate the memory for the array that will be used internally
@@ -461,9 +463,10 @@ cdef class arraym(object):
     def __getslice__(self, Py_ssize_t i, Py_ssize_t j):
         return self.slice(i,j)
     
+    @cython.returns(double)
     def __iter__(self):
         for i in range(self.N):
-            yield float(self.data[i])
+            yield self.data[i]
         
     def __repr__(self):
         return str(list(self))
