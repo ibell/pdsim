@@ -225,17 +225,28 @@ class Scroll(PDSimCore, _Scroll):
 #            plt.show()  
             
     def get_discharge_port_blockage_poly(self, theta):
+        """
+        Get all the polygons associated with the control volumes that could in principle
+        be connected with the discharge port
+        """
         xdd, ydd = scroll_geo.CVcoords('dd',self.geo,theta)
         xd1, yd1 = scroll_geo.CVcoords('d1',self.geo,theta)
         Ncmax = scroll_geo.nC_Max(self.geo)
         Nc = scroll_geo.getNc(theta, self.geo)
         
-        if Nc == Ncmax:
+        if Nc == Ncmax and Nc > 0:
+            # Inner-most compression chamber in use
             xc1_N, yc1_N = scroll_geo.CVcoords('c1.+'+str(Ncmax), self.geo, theta)
+            xc2_N, yc2_N = scroll_geo.CVcoords('c2.+'+str(Ncmax), self.geo, theta)
+        elif Nc == Ncmax and Nc == 0:
+            # Suction chamber 
+            xc1_N, yc1_N = scroll_geo.CVcoords('s1', self.geo, theta)
+            xc2_N, yc2_N = scroll_geo.CVcoords('s2', self.geo, theta)
         else:
             xc1_N, yc1_N = None, None
+            xc2_N, yc2_N = None, None
             
-        if Nc == Ncmax-1:
+        if Nc == Ncmax-1 and Ncmax > 0:
             xc1_Nm1, yc1_Nm1 = scroll_geo.CVcoords('c1.+'+str(Ncmax-1), self.geo, theta)
         else:
             xc1_Nm1, yc1_Nm1 = None, None
@@ -276,7 +287,7 @@ class Scroll(PDSimCore, _Scroll):
         scale_factor = 1000000000
         
         if xport is None and yport is None:
-            warnings.warn('xport and yport not provided, defaulting back to circular discharge port')
+            warnings.warn('xport and yport not provided, defaulting back to circular discharge port; should be stored in self.geo.xvec_disc_port and self.geo.yvec_disc_port')
             xport = self.geo.xa_arc1 + 0.9*self.geo.ra_arc1*np.cos(np.linspace(0,2*pi,100))
             yport = self.geo.ya_arc1 + 0.9*self.geo.ra_arc1*np.sin(np.linspace(0,2*pi,100))
         
@@ -285,12 +296,12 @@ class Scroll(PDSimCore, _Scroll):
         scaled_xport = xport*scale_factor
         scaled_yport = yport*scale_factor
         
-        xinvi, yinvi = scroll_geo.coords_inv(np.linspace(self.geo.phi_fis+pi/2,self.geo.phi_fis,75), self.geo, 0, flag="fi")
+        xinvi, yinvi = scroll_geo.coords_inv(np.linspace(self.geo.phi_fis+2*np.pi,self.geo.phi_fis,75), self.geo, 0, flag="fi")
         xarc1 = self.geo.xa_arc1 + self.geo.ra_arc1*np.cos(np.linspace(self.geo.t2_arc1,self.geo.t1_arc1,75))
         yarc1 = self.geo.ya_arc1 + self.geo.ra_arc1*np.sin(np.linspace(self.geo.t2_arc1,self.geo.t1_arc1,75))
         xarc2 = self.geo.xa_arc2 + self.geo.ra_arc2*np.cos(np.linspace(self.geo.t1_arc2,self.geo.t2_arc2,75))
         yarc2 = self.geo.ya_arc2 + self.geo.ra_arc2*np.sin(np.linspace(self.geo.t1_arc2,self.geo.t2_arc2,75))
-        xinvo, yinvo = scroll_geo.coords_inv(np.linspace(self.geo.phi_fos,self.geo.phi_fos+3*pi/2,75), self.geo, 0, flag="fo")
+        xinvo, yinvo = scroll_geo.coords_inv(np.linspace(self.geo.phi_fos,self.geo.phi_fis+2*np.pi,75), self.geo, 0, flag="fo")
         
         if plot:
             fig = plt.figure()
@@ -389,9 +400,9 @@ class Scroll(PDSimCore, _Scroll):
             Ac1_Nm1.append(calculate_area(scaled_xc1_Nm1, scaled_yc1_Nm1))
             
             if plot:
-                ax.set_xlim(-0.025*scale_factor,0.025*scale_factor)
-                ax.set_ylim(-0.025*scale_factor,0.025*scale_factor)
-                ax.set_aspect(1.0)
+                #ax.set_xlim(-0.025*scale_factor,0.025*scale_factor)
+                #ax.set_ylim(-0.025*scale_factor,0.025*scale_factor)
+                ax.set_aspect(1.0)  
                 fig.savefig('disc_' + '{i:04d}'.format(i=i) + '.png')
         #  Save these values
         self.tdisc = np.array(t)
@@ -409,7 +420,7 @@ class Scroll(PDSimCore, _Scroll):
             ax.plot(t, self.Adisc_c1_N*1e6, label='Ac1.N')
             ax.plot(t, self.Adisc_c1_Nm1*1e6, label='Ac1.(N-1)')
             ax.axvline(self.theta_d)
-            plt.legend()
+            #plt.legend()
             plt.xlabel('Crank angle [rad]')
             plt.ylabel('Area [mm$^2$]')
             fig.savefig('A_v_t.png')
@@ -422,17 +433,11 @@ class Scroll(PDSimCore, _Scroll):
             for file in glob.glob('disc_0*.png'):
                 os.remove(file)
         
-        #  Create a spline interpolator object for the area between DD and port
-        self.spline_Adisc_DD = interp.splrep(t, self.Adisc_dd, k = 2, s = 0)
-        
-        #  Create a spline interpolator object for the area between D1 and port
-        self.spline_Adisc_D1 = interp.splrep(t, self.Adisc_d1, k = 2, s = 0)
-        
-        #  Create a spline interpolator object for the area between C1_N and port
-        self.spline_Adisc_C1_N = interp.splrep(t, self.Adisc_c1_N, k = 2, s = 0)
-        
-        #  Create a spline interpolator object for the area between C1_N and port
-        self.spline_Adisc_C1_Nm1 = interp.splrep(t, self.Adisc_c1_Nm1, k = 2, s = 0)
+        #  Create spline interpolator objects
+        self.spline_Adisc_DD = interp.splrep(t, self.Adisc_dd, k = 2, s = 0) # DD and port
+        self.spline_Adisc_D1 = interp.splrep(t, self.Adisc_d1, k = 2, s = 0) #  D1 and port
+        self.spline_Adisc_C1_N = interp.splrep(t, self.Adisc_c1_N, k = 2, s = 0) # C1_N and port
+        self.spline_Adisc_C1_Nm1 = interp.splrep(t, self.Adisc_c1_Nm1, k = 2, s = 0) #C1_{N-1} and port
         
         print 'done'
             
@@ -857,15 +862,24 @@ class Scroll(PDSimCore, _Scroll):
         ============= ===================================================================
         """
         
+        # Maximum number of pairs of compression chambers in existence
+        nCmax = scroll_geo.nC_Max(self.geo)
+        
         #Add all the control volumes that are easy.  Suction area and suction chambera
         self.add_CV(ControlVolume(key='sa',initialState=inletState.copy(),
                                 VdVFcn=self.V_sa,becomes=['sa','s1','s2']))
-        self.add_CV(ControlVolume(key='s1',initialState=inletState.copy(),
+        if nCmax > 0:
+            self.add_CV(ControlVolume(key='s1',initialState=inletState.copy(),
                                 VdVFcn=self.V_s1,becomes='c1.1'))
-        self.add_CV(ControlVolume(key='s2',initialState=inletState.copy(),
+            self.add_CV(ControlVolume(key='s2',initialState=inletState.copy(),
                                 VdVFcn=self.V_s2,becomes='c2.1'))
+        else:
+            self.add_CV(ControlVolume(key='s1',initialState=inletState.copy(),
+                                VdVFcn=self.V_s1,becomes='s1'))
+            self.add_CV(ControlVolume(key='s2',initialState=inletState.copy(),
+                                VdVFcn=self.V_s2,becomes='s2'))
         
-        #Discharge chambers are also easy.  Assume that you start with 'ddd' chamber merged.
+        # Discharge chambers are also easy.  Assume that you start with 'ddd' chamber merged.
         # No problem if this isn't true.
         self.add_CV(ControlVolume(key='d1',initialState=outletState.copy(),
                                 VdVFcn=self.V_d1,exists=False))
@@ -877,9 +891,10 @@ class Scroll(PDSimCore, _Scroll):
                                 VdVFcn=self.V_ddd,discharge_becomes='dd'))
 
         #Add each pair of compression chambers
-        nCmax = scroll_geo.nC_Max(self.geo)
+        
         # Must have at least one pair
-        assert (nCmax>=1)
+        #~ if nCmax < 1:
+            #~ raise AssertionError('nCmax ['+str(nCmax)+'] must be at least 1')
         for alpha in range(1,nCmax+1):
             keyc1 = 'c1.'+str(alpha)
             keyc2 = 'c2.'+str(alpha)
@@ -1021,7 +1036,7 @@ class Scroll(PDSimCore, _Scroll):
         nCmax = scroll_geo.nC_Max(self.geo)
         
         # Must have at least one pair
-        assert (nCmax>=1)
+        # assert (nCmax>=1)
         
         for alpha in range(1, nCmax+1):
             keyc1 = 'c1.'+str(alpha)

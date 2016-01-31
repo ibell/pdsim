@@ -241,10 +241,16 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         r1=((1.0/2*dy**2+1.0/2*dx**2+r2*dx*sin(geo.phi_fos)-r2*dy*cos(geo.phi_fos))
                /(r2*cos(geo.phi_fos-geo.phi_fis)+dx*sin(geo.phi_fis)-dy*cos(geo.phi_fis)+r2))
         
+        # If the radius of arc2 is zero, and arc1 has a radius equal to half the 
+        # scroll thickness (but negative), then flip the sign of r1
+        if abs(geo.t+2*r1) < 1e-10:
+            r1 *= -1
+            nx_is *= -1
+            ny_is *= -1
         
         ## Negative sign since you want the outward pointing unit normal vector
-        xarc1 =  x_is-nx_is*r1
-        yarc1 =  y_is-ny_is*r1
+        xarc1 =  x_is - nx_is*r1
+        yarc1 =  y_is - ny_is*r1
                 
         geo.xa_arc2 = xarc2
         geo.ya_arc2 = yarc2
@@ -252,7 +258,7 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         geo.t1_arc2 = atan2(yarc1-yarc2,xarc1-xarc2)
         geo.t2_arc2 = atan2(y_os-yarc2,x_os-xarc2)
         while geo.t2_arc2 < geo.t1_arc2:
-            geo.t2_arc2 = geo.t2_arc2+2.0*pi;
+            geo.t2_arc2 += 2.0*pi; # Want t2 > t1
     
         geo.xa_arc1 = xarc1
         geo.ya_arc1 = yarc1
@@ -260,7 +266,13 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         geo.t2_arc1 = atan2(y_is-yarc1,x_is-xarc1)
         geo.t1_arc1 = atan2(yarc2-yarc1,xarc2-xarc1)
         while geo.t2_arc1 < geo.t1_arc1:
-            geo.t2_arc1 = geo.t2_arc1+2.0*pi;
+            geo.t2_arc1 += 2.0*pi; # Want t2 > t1
+            
+        # If the radius of arc2 is zero, and arc1 has a radius equal to half the 
+        # scroll thickness (but negative), then shift the angles such that we get 
+        # the correct ordering of the angles
+        if abs(geo.t-2*r1) < 1e-10:
+            geo.t2_arc1 -= 2*pi #
         
         """ 
         line given by y=m*t+b with one element at the intersection
@@ -424,13 +436,14 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
     cdef long alpha,Nc
     phi_min = 9e99
     phi_max = 9e99
-    Nc = getNc(theta,geo)
+    Nc = getNc(theta, geo)
     
-    #These are always in existence
+    # These are always in existence
     if matchpair(key1,key2,comm.keyIs2,comm.keyIsa) or matchpair(key1,key2,comm.keyIs1,comm.keyIsa):
-            phi_max = geo.phi_fie
-            phi_min = max2(geo.phi_fie - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0)
-    #suction chambers only in contact with each other beyond theta = pi
+        phi_max = geo.phi_fie
+        phi_min = geo.phi_fie - theta
+        #print geo.phi_fie, geo.phi_fie - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0, geo.phi_oo0, geo.phi_fi0
+    # The suction chambers only in contact with each other beyond theta = pi
     elif matchpair(key1,key2,comm.keyIs1,comm.keyIs2):
         if theta > pi:
             phi_max = phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0
@@ -494,7 +507,7 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
                 phi_min = geo.phi_fis
 
     if phi_min > phi_max:
-        raise ValueError ('For the keys ('+key1+','+key2+') @theta = '+str(theta)+' max < min (error because '+str(phi_max)+' < '+str(phi_min)+')')
+        raise ValueError ('For the keys ('+str(key1)+','+str(key2)+') @theta = '+str(theta)+' max < min (error because phi_max('+str(phi_max)+') < phi_min('+str(phi_min)+')')
     
     angle_min[0] = phi_min
     angle_max[0] = phi_max

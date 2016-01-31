@@ -1218,7 +1218,7 @@ class PDSimCore(object):
             print error_ascii_bar(abs(self.lumps_resid[0]), epsilon), 'energy balance kW ', self.lumps_resid[0], ' Tlumps: ',self.Tlumps,'K'
             print error_ascii_bar(abs(self.resid_Td), epsilon), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg', self.Tubes.Nodes[key_outtube_inlet].h, 'kJ/kg'
             print error_ascii_bar(error_metric, epsilon), 'cycle-cycle    ', error_metric
-            print error_ascii_bar(abs(mdot_error), 1), 'mdot    ', mdot_error, '%  || in:', mdot_in, ' kg/s || out:', mdot_out, 'kg/s '
+            print error_ascii_bar(abs(mdot_error), 1), 'mdot [%]', mdot_error, '|| in:', mdot_in*1000, 'g/s || out:', mdot_out*1000, 'g/s '
             
             worst_error = max(abs(self.lumps_resid[0]), abs(self.resid_Td), np.sqrt(np.sum(np.power(errors, 2))))
             i += 1
@@ -1701,7 +1701,7 @@ class PDSimCore(object):
                 newCV = self.CVs[newkey]
                 # There can't be any overlap between keys
                 if newkey in newT:
-                    raise KeyError
+                    raise KeyError('newkey [' + newkey + '] is already in newT; becomes keys overlap but should not')
                 #What the state variables were at the start of the rotation
                 oldT[newkey]=self.T[Inew, 0]
                 old_rho[newkey]=self.rho[Inew, 0]
