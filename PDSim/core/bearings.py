@@ -1,7 +1,5 @@
 from math import pi,sqrt,log
-import numpy as np
-from scipy.interpolate import interp1d, splev, splrep
-import scipy.optimize
+import numpy as np    
 from _bearings import calculate_epsilon_short, calculate_epsilon_long
 
 class struct: pass
@@ -157,8 +155,11 @@ def journal_bearing(**kwargs):
     else: #Weighted average of the two to calculate the shear force
         epsilon = calculate_epsilon_long(np.log(Wr_long),epsilon0_long)
         if not (epsilon >= 0 and epsilon <= 1):
-            print 'Wr_long,epsilon,W',Wr_long,epsilon0_long,W
-            raise ValueError('epsilon [{epsilon:g}] is not between 0 and 1 for W of [{W:g}] N.  Is your journal bearing too small?'.format(epsilon = epsilon, W = W))
+            #print 'Wr_long,epsilon,W',Wr_long,epsilon0_long,W
+            if epsilon < 0:
+                epsilon = 0
+            elif epsilon > 1:
+                raise ValueError('epsilon [{epsilon:g}] is greater than 1 for W of [{W:g}] N.  Is your journal bearing too small?'.format(epsilon = epsilon, W = W))
         Fshear_long = pi/np.sqrt(1-epsilon**2)*(5*epsilon**2+4)/(epsilon**2+2)*eta_0*omega*r_b*L*(r_b/c)
         epsilon = calculate_epsilon_short(np.log(Wr_short),epsilon0_short)
         assert epsilon >= 0 and epsilon <= 1

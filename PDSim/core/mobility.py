@@ -6,7 +6,12 @@ from __future__ import division
 import numpy as np
 from math import pi
 import matplotlib.pyplot as plt
-import scipy.interpolate
+# If scipy is available, use its spline interpolation function, otherwise, 
+# use our implementation (for packaging purposes)
+try:
+    import scipy.interpolate as interp
+except ImportError:
+    import PDSim.misc.scipylike as interp
 
 if __name__=='__main__':
     omega_bar = 2000/60.0*2*pi
@@ -14,7 +19,7 @@ if __name__=='__main__':
     t = theta/omega_bar
     F = np.array([-2.012326, -1.595861, -1.365927, -1.182637, -1.204212, -1.020913, -0.809306, -0.604367, -0.512673, -0.394341, 0.00214, 0.370316, 0.695178, 1.111646, 1.413198, 1.574837, 1.6482, 1.38846, 1.088737, 0.878955, 0.695831, 0.491044, 0.372878, 0.367959, 0.253114, 0.184913, 0.206643, 0.183404, 0.160174, 0.116946, -0.254394, -0.672362, -1.226917, -1.639896, -1.896306, -2.202689, -2.457441, -2.220844, -2.014238, -2.015825, -2.014074, -2.013995])*1000
     
-    F_interp = scipy.interpolate.splrep(t, F, k = 2, s = 0)
+    F_interp = interp.splrep(t, F, k = 2, s = 0)
     
     mu = 0.00416 #[Pa-s]
     L = 0.0254 #[m]
@@ -69,7 +74,7 @@ if __name__=='__main__':
     while t < 0.12:
         
         # Interpolate to find F
-        F_t = scipy.interpolate.splev(t%(4*pi/omega_bar), F_interp)
+        F_t = interp.splev(t%(4*pi/omega_bar), F_interp)
         
         # Get the derivatives
         xdot = f(x, F_t, t)

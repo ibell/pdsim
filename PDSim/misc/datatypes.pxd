@@ -1,5 +1,7 @@
 import cython
 cimport cython
+
+from cpython cimport bool
         
 cdef class AnnotatedValue(object):
     cdef public object value
@@ -32,6 +34,7 @@ cdef class arraym(object):
     cpdef double get_index(self, int i) except *
     cpdef double set_index(self, int i, double val) except *
     cpdef fill(self, double fillval)
+    cpdef bool all_finite(self)
     
 cpdef arraym empty_arraym(int N)
     

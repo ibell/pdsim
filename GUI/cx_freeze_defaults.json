@@ -1,9 +1,10 @@
 {
     "include_files" : [],
-    "includes" : ["numpy","scipy.sparse.csgraph._validation","PDSim"],
+    "includes" : [],
     "excludes" : ["_gtkagg", "_tkagg", "bsddb", "curses", "email", "PyQt4",
             "pywin.debugger", "pywin.debugger.dbgcon", "pywin.dialogs",
-            "tcl", "Tkconstants", "Tkinter","sympy","IPython","h5py.api_gen","PySide"],
-    "packages" : ["h5py","matplotlib","scipy","scipy.special","scipy.interpolate","scipy.integrate","scipy.optimize","quantities","PDSim"],
+            "tcl", "Tkconstants", "Tkinter","sympy","IPython","h5py.api_gen",
+            "PySide","scipy","sphinx","Cython"],
+    "packages" : ["h5py","matplotlib","quantities","PDSim"],
     "path" : []
 }

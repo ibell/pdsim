@@ -1,5 +1,6 @@
 from __future__ import division
 
+import math
 from math import pi
 from time import clock
 import inspect
@@ -9,22 +10,29 @@ from PDSim.flow import flow,flow_models
 from containers import STATE_VARS_TM, CVArrays
 from PDSim.flow.flow import FlowPathCollection
 from containers import ControlVolumeCollection,TubeCollection
+import integrators
 from PDSim.plot.plots import debug_plots
 from PDSim.misc.datatypes import arraym, empty_arraym
 import PDSim.core.callbacks
+from PDSim.misc.error_bar import error_ascii_bar
 
 ##-- Non-package imports  --
 import numpy as np
-from scipy.integrate import trapz, simps
-from scipy.optimize import newton
+
+# If scipy is available, use its optimization function, otherwise, 
+# use our implementation (for packaging purposes)
+try:
+    from scipy.integrate import trapz
+except ImportError:
+    from PDSim.misc.scipylike import trapz
+
 import h5py
 
 ## matplotlib imports
 import matplotlib.pyplot as plt
 import pylab
 
-## Coolprop imports
-from CoolProp.CoolProp import PropsSI
+## CoolProp imports
 from CoolProp.State import State
 
 def _pickle_method(method):
@@ -47,9 +55,125 @@ import copy_reg
 import types
 copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 
-#An empty class for storage
+# An empty class for storage
 class struct(object):
     pass    
+    
+class IntegratorMixin(object):
+    """
+    This class contains the methods that will be merged with one of the system of ODE integrators
+    and includes the methods that are specific to PDSim
+    """
+    def __init__(self, sim, x_state):
+        self.sim = sim
+        self.x_state = x_state
+    
+    def get_initial_array(self):
+        # Get the beginning of the cycle configured
+        # Put a copy of the values into the matrices
+        xold = self.x_state.copy()
+        # Add zeros for the valves as they are assumed to start closed and at rest
+        if self.sim.__hasValves__:
+            xold.extend(empty_arraym(len(self.sim.Valves)*2))
+        self.sim._put_to_matrices(xold, 0)
+        return xold
+        
+    def premature_termination(self):
+        # Once every 100 steps check if you are supposed to abort
+        if self.sim._check_cycle_abort(self.Itheta):
+            return 'abort'
+        else:
+            return False
+        
+    def pre_step_callback(self):
+        # Call the step callback if provided
+        if self.sim.callbacks.step_callback is not None:
+            self.h = self.sim.callbacks.step_callback(self.t0, self.h, self.Itheta)
+            disable = self.sim.callbacks.step_callback.disable_adaptive
+            
+            # If we don't want to actually do the step, rather just copy the values
+            # (for instance at the merging angle for scroll machines), we set
+            # stepAccepted to True and move on
+            if disable == 'no_integrate':
+                self.stepAccepted = True
+                # Retrieve the array of values based on the values set in step_callback
+                x = self.sim._get_from_matrices(self.Itheta)
+                # Updates the state, calculates the volumes, prepares all the things needed for derivatives
+                # The crank angle must be evaluated after theta_d in order to ensure that the new volumes are used
+                # The newly calculated values are used
+                self.sim.core.properties_and_volumes(self.sim.CVs.exists_CV, self.t0+self.h+1e-10, STATE_VARS_TM, x)
+                self.xold = x.copy()
+                self.xnew = x.copy()
+                self.__store_values()
+                
+            x = self.sim._get_from_matrices(self.Itheta)
+                
+            if disable != False and x.all_finite():
+                self.xold = self.sim._get_from_matrices(self.Itheta)
+                
+            # The integrator only cares whether disable is true or not, convert to true or false
+            if disable != False:
+                self.disableAdaptive = True
+            else:
+                self.disableAdaptive = False
+    
+    def __store_values(self):
+        """ Private method that stores the values in the internal data structure """
+        self.sim.t[self.Itheta] = self.t0
+        self.sim._put_to_matrices(self.xold, self.Itheta)
+        flows = self.sim.Flows.get_deepcopy()
+        # If the index we want to fill is beyond the length of FlowStorage, we append it,
+        # otherwise, we replace that entry in the list
+        if self.Itheta > len(self.sim.FlowStorage)-1:
+            self.sim.FlowStorage.append(flows)
+        else:
+            self.sim.FlowStorage[self.Itheta] = flows
+        
+    def post_deriv_callback(self):
+        self.__store_values()
+        
+    def post_step_callback(self): pass
+    
+    def derivs(self, t, x):
+        return self.sim.derivs(t, x)
+        
+    def post_integration(self):
+        """
+        Run this at the end
+        """
+        # Cache the values
+        self.sim.derivs(self.t0, self.xold)
+        self.__store_values()
+        
+        V, dV = self.sim.CVs.volumes(self.t0)
+        Nexist = self.sim.CVs.Nexist
+        if sorted(self.sim.stateVariables) == ['D','T']:
+            self.sim.CVs.updateStates('T',self.xnew[0:Nexist],'D',self.xnew[Nexist:2*Nexist])
+        elif sorted(self.sim.stateVariables) == ['M','T']:
+            self.sim.CVs.updateStates('T',self.xnew[0:Nexist],'D',self.xnew[Nexist:2*Nexist]/V)
+        else:
+            raise NotImplementedError
+            
+class EulerIntegrator(IntegratorMixin, integrators.AbstractSimpleEulerODEIntegrator):
+    """ 
+    Mixin class using the functions defined in IntegratorMixin and the generalized simple ODE 
+    """
+    def __init__(self, sim, x_state):
+        IntegratorMixin.__init__(self, sim, x_state)
+        
+class HeunIntegrator(IntegratorMixin, integrators.AbstractHeunODEIntegrator):
+    """ 
+    Mixin class using the functions defined in IntegratorMixin and the generalized Heun ODE integrator
+    """
+    def __init__(self, sim, x_state):
+        IntegratorMixin.__init__(self, sim, x_state)
+        
+class RK45Integrator(IntegratorMixin, integrators.AbstractRK45ODEIntegrator):
+    """ 
+    Mixin class using the functions defined in IntegratorMixin and the generalized RK45 integrator
+    """
+    def __init__(self, sim, x_state):
+        IntegratorMixin.__init__(self, sim, x_state)
 
 class PDSimCore(object):
     """
@@ -115,6 +239,7 @@ class PDSimCore(object):
         self.solvers = dummy()
         self.solvers.lump_eb_history = []
         self.solvers.hdisc_history = []
+        self.solvers.initial_states_history = []
         
         self.verbosity = 0
         
@@ -140,7 +265,6 @@ class PDSimCore(object):
         """
         if self.__hasLiquid__==True:
             raise NotImplementedError
-            #return np.hstack([self.T[:,i],self.m[:,i],self.xL[:,i]])
         else:
             VarList=np.array([])
             exists_indices = np.array(self.CVs.exists_indices)
@@ -181,7 +305,6 @@ class PDSimCore(object):
             raise NotImplementedError
 #             self.T[:,i]=x[0:self.NCV]
 #             self.m[:,i]=x[self.NCV:2*self.NCV]
-#             self.xL[:,i]=x[2*self.NCV:3*self.NCV]
         else: # self.__hasLiquid__==False
             for iS, s in enumerate(self.stateVariables):
                 if s=='T':
@@ -296,7 +419,6 @@ class PDSimCore(object):
             
             #For each tube, update the flow going through it
             #Tube.mdot is always a positive value
-            print 'Tube mdots',mdot1, mdot2
             Tube.mdot = max(abs(mdot1), abs(mdot2))
             
         self.mdot = self.FlowsProcessed.mean_mdot[self.key_inlet]
@@ -361,15 +483,17 @@ class PDSimCore(object):
         """
         
         h1 = inlet_state.h
-        h2s = PropsSI('H','S',inlet_state.s*1000,'P',p_outlet*1000, inlet_state.Fluid)/1000
+        out_state = inlet_state.copy()
+        out_state.update(dict(S = inlet_state.s, P = p_outlet))
+        h2s = out_state.h
         if p_outlet > inlet_state.p:
             # Compressor Mode
             h2 = h1 + (h2s-h1)/eta_a
-            return PropsSI('T','H',h2*1000,'P',p_outlet*1000, inlet_state.Fluid)
         else:
             # Expander Mode
             h2 = h1 + (h2s-h1)*eta_a
-            return PropsSI('T','H',h2*1000,'P',p_outlet*1000, inlet_state.Fluid)
+        out_state.update(dict(H = h2, P = p_outlet))
+        return out_state.T
     
     def reset_initial_state(self):
         """
@@ -490,7 +614,6 @@ class PDSimCore(object):
         self.dV = self.T.copy()
         self.rho = self.T.copy()
         self.Q = self.T.copy()
-        self.xL = self.T.copy()
         self.xValves = np.zeros((2*len(self.Valves),N))
         
         # Initialize the core class that contains the arrays and the derivs
@@ -518,7 +641,6 @@ class PDSimCore(object):
         self.dV.fill(np.nan)
         self.rho.fill(np.nan)
         self.Q.fill(np.nan)
-        self.xL.fill(np.nan)
         
         self.FlowStorage=[]
         
@@ -556,426 +678,6 @@ class PDSimCore(object):
         for Tube in self.Tubes:
             self.Tubes_hdict[Tube.key1]=Tube.State1.get_h()
             self.Tubes_hdict[Tube.key2]=Tube.State2.get_h()
-        
-    def cycle_SimpleEuler(self,N,x_state,tmin=0,tmax=2*pi):
-        """
-        The simple Euler PDSim ODE integrator
-        
-        Parameters
-        ----------
-        N : integer
-            Number of steps taken.  There will be N+1 entries in the state matrices
-        x_state : 
-            The initial values of the variables (ONLY the state variables, no valves)
-        tmin : float, optional
-            Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
-        tmax : float, optional
-            Ending value for the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``] 
-        
-        """
-        #Do some initialization - create arrays, etc.
-        self.pre_cycle(x_state)
-        
-        #Step variables
-        t0=tmin
-        h=(tmax-tmin)/(N)
-        
-        # Get the beginning of the cycle configured
-        # Put a copy of the values into the matrices
-        xold = x_state.copy()
-        #Add zeros for the valves as they are assumed to start closed and at rest
-        if self.__hasValves__:
-            xold.extend(empty_arraym(len(self.Valves)*2))
-        self._put_to_matrices(xold, 0)
-        
-        for Itheta in range(N):
-            #Once every 100 steps check if you are supposed to abort
-            if self._check_cycle_abort(Itheta):
-                return 'abort'
-                  
-            #Call the step callback if provided
-            if self.callbacks.step_callback is not None:
-                h = self.callbacks.step_callback(t0, h, Itheta)
-                disable = self.callbacks.step_callback.disable_adaptive
-                if disable:
-                    print 'CV have changed'
-                    xold = self._get_from_matrices(Itheta)
-            
-            # Step 1: derivatives evaluated at old values of t = t0
-            f1 = self.derivs(t0, xold)
-            xnew = xold+h*f1
-            
-            #Store at the current index (first run at index 0)
-            self.t[Itheta] = t0
-            self._put_to_matrices(xold, Itheta)
-            self.FlowStorage.append(self.Flows.get_deepcopy())
-            
-            # Everything from this step is finished, now update for the next
-            # step coming
-            t0+=h
-            xold = xnew
-            
-        #Run this at the end at index N-1
-        #Run this at the end
-        V,dV=self.CVs.volumes(t0)
-        #Stored at the old value
-        self.t[N]=t0
-        
-        self._put_to_matrices(xnew, N)
-        
-        #ensure you end up at the right place
-        assert abs(t0-tmax)<1e-10
-        
-        self.derivs(t0,xold)
-        self.FlowStorage.append(self.Flows.get_deepcopy())
-        
-        if sorted(self.stateVariables) == ['D','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
-        elif sorted(self.stateVariables) == ['M','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
-        else:
-            raise NotImplementedError
-        
-        # last index is Itheta, number of entries in FlowStorage is Ntheta
-        print 'Number of steps taken', N
-        self.Itheta = N
-        self.Ntheta = N+1
-        self.post_cycle()
-        
-    def cycle_Heun(self, N, x_state, tmin = 0, tmax = 2*pi):
-        """
-        Use the Heun method (modified Euler method)
-        
-        Parameters
-        ----------
-        N : integer
-            Number of steps to take (N+1 entries in the state vars matrices)
-        x_state : 
-            The initial values of the variables (only the state variables)
-        tmin : float
-            Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
-        tmax : float
-            Ending value for the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``] 
-        
-        """
-        #Do some initialization - create arrays, etc.
-        self.pre_cycle()
-        
-        #Start at an index of 0
-        Itheta=0
-        t0=tmin
-        h=(tmax-tmin)/(N)
-        
-        # Get the beginning of the cycle configured
-        # Put a copy of the values into the matrices
-        self._put_to_matrices(x_state.copy(), 0)
-    
-        for Itheta in range(N):
-            
-            #Once every 100 steps check if you are supposed to abort
-            if self._check_cycle_abort(Itheta):
-                return 'abort'
-            
-            if self.callbacks.step_callback!=None:
-                self.callbacks.step_callback(t0,h,Itheta)
-                
-            xold=self._get_from_matrices(Itheta)
-                        
-            # Step 1: derivatives evaluated at old values
-            f1=self.derivs(t0,xold)
-            xtemp=xold+h*f1
-            
-            #Stored at the starting value of the step
-            self.t[Itheta]=t0+h
-            self._put_to_matrices(xold,Itheta)
-            self.FlowStorage.append(self.Flows.get_deepcopy())
-            
-            #Step 2: Evaluated at predicted step
-            f2=self.derivs(t0+h,xtemp)
-            xnew = xold + h/2.0*(f1 + f2)
-            
-            t0+=h
-            xold = xnew
-            
-        #ensure you end up at the right place
-        assert abs(t0-tmax)<1e-10
-        
-        #Run this at the end
-        V,dV=self.CVs.volumes(t0)
-        #Stored at the old value
-        self.t[N]=t0
-        self.derivs(t0,xold)
-        self._put_to_matrices(xnew,N)
-        self.FlowStorage.append(self.Flows.get_deepcopy())
-        if sorted(self.stateVariables) == ['D','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
-        elif sorted(self.stateVariables) == ['M','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/V)
-        else:
-            raise NotImplementedError
-        
-        print 'Number of steps taken', N,'len(FlowStorage)',len(self.FlowStorage)
-        self.Itheta = N
-        self.Ntheta = N+1
-        self.post_cycle()
-        return
-        
-    def cycle_RK45(self,
-                   x_state,
-                   tmin=0,
-                   tmax=2.0*pi,
-                   hmin=1e-4,
-                   eps_allowed=1e-10,
-                   step_relax=0.9,
-                   valves_callback = None,
-                   UseCashKarp=True,
-                   **kwargs):
-        """
-        
-        This function implements an adaptive Runge-Kutta-Feldberg 4th/5th order
-        solver for the system of equations
-        
-        Parameters
-        ----------
-        x_state : arraym
-            The initial values of the variables (only the state variables)
-        hmin : float
-            Minimum step size, something like 1e-5 usually is good.  Don't make this too big or you may not be able to get a stable solution
-        tmin : float
-            Starting value of the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
-        tmax : float
-            Ending value for the independent variable.  ``t`` is in the closed range [``tmin``, ``tmax``]
-        eps_allowed : float
-            Maximum absolute error of any CV per step allowed.  Don't make this parameter too big or you may not be able to get a stable solution.  Also don't make it too small because then you are going to run into truncation error.
-        step_relax : float, optional
-            The relaxation factor that is used in the step resizing algorithm.  Should be less than 1.0; you can play with this parameter to improve the adaptive resizing, but should not be necessary.
-        
-        Notes
-        -----
-        
-        Mathematically the adaptive solver can be expressed as::
-        
-            k1=h*dy(xn                                                                   ,t)
-            k2=h*dy(xn+1.0/4.0*k1                                                        ,t+1.0/4.0*h)
-            k3=h*dy(xn+3.0/32.0*k1+9.0/32.0*k2                                           ,t+3.0/8.0*h)
-            k4=h*dy(xn+1932.0/2197.0*k1-7200.0/2197.0*k2+7296.0/2197.0*k3                ,t+12.0/13.0*h)
-            k5=h*dy(xn+439.0/216.0*k1-8.0*k2+3680.0/513.0*k3-845.0/4104.0*k4             ,t+h)
-            k6=h*dy(xn-8.0/27.0*k1+2.0*k2-3544.0/2565.0*k3+1859.0/4104.0*k4-11.0/40.0*k5 ,t+1.0/2.0*h)
-
-        where the function dy(y,t) returns a vector of the ODE expressions.
-        The new value is calculated from::
-        
-            xnplus=xn+gamma1*k1+gamma2*k2+gamma3*k3+gamma4*k4+gamma5*k5+gamma6*k6
-
-        In the adaptive solver, the errors for a given step can be calculated from::
-
-            error=1.0/360.0*k1-128.0/4275.0*k3-2197.0/75240.0*k4+1.0/50.0*k5+2.0/55.0*k6
-
-        If the maximum absolute error is above allowed error, the step size is decreased and the step is 
-        tried again until the error is below tolerance.  If the error is better than required, the step
-        size is increased to minimize the number of steps required.
-        
-        Before the step is run, a callback the ``step_callback`` method of this class is called.  In the ``step_callback`` callback function you can do anything you want, but you must return 
-        """
-        
-        #Do some initialization - create arrays, etc.
-        self.pre_cycle()
-        
-        #Start at an index of 0
-        Itheta = 0
-        t0 = tmin
-        h = hmin
-        
-        # Get the beginning of the cycle configured
-        # Put a copy of the values into the matrices
-        xold = x_state.copy()
-        #Add zeros for the valves as they are assumed to start closed and at rest
-        if self.__hasValves__:
-            xold.extend(empty_arraym(len(self.Valves)*2))
-        self._put_to_matrices(xold, 0)
-        
-        gamma1=16.0/135.0
-        gamma2=0.0
-        gamma3=6656.0/12825.0
-        gamma4=28561.0/56430.0
-        gamma5=-9.0/50.0
-        gamma6=2.0/55.0
-        
-        #t is the independent variable here, where t takes on values in the bounded range [tmin,tmax]
-        while (t0<tmax):
-            
-            #Once every 100 steps check if you are supposed to abort
-            if self._check_cycle_abort(Itheta):
-                return 'abort'
-            
-            stepAccepted=False
-            
-            while not stepAccepted:
-                
-                #Reset the flag
-                disableAdaptive=False
-                
-                if t0 + h > tmax:
-                    disableAdaptive = True
-                    h = tmax - t0
-            
-                if self.callbacks.step_callback is not None and disableAdaptive == False:
-                    #The user has provided a disabling function for the adaptive method
-                    #Call it to figure out whether to use the adaptive method or not
-                    #Pass it a copy of the compressor class and the current step size
-                    #The function can modify anything in the class to change flags, existence, merge, etc.
-                    h = self.callbacks.step_callback(t0, h, Itheta)
-                    disableAdaptive = self.callbacks.step_callback.disable_adaptive
-                    x = self._get_from_matrices(Itheta)
-                    
-                    if disableAdaptive and np.all(np.isfinite(x)):
-                        xold = self._get_from_matrices(Itheta)
-                else:
-                    disableAdaptive=False
-                    
-                if disableAdaptive == 'no_integrate':
-                    stepAccepted = True
-                    # Updates the state, calculates the volumes, prepares all the things needed for derivatives
-                    self.core.properties_and_volumes(self.CVs.exists_CV, t0+h+1e-10, STATE_VARS_TM, xold)
-                    # Store a copy of the flows for future use as well as a buffered set of state variables
-                    Flows_temporary = self.Flows.get_deepcopy()
-                    core_temporary = self.core.copy()
-                    xnew = xold.copy()
-                else:
-                    
-                    if h < hmin and not disableAdaptive:
-                        # Step is too small, just use the minimum step size
-                        h = 1.0*hmin
-                        disableAdaptive = True
-                
-                    if not UseCashKarp:
-                        ## Using RKF constants ##
-                        
-                        # Step 1: derivatives evaluated at old values
-                        f1=self.derivs(t0,xold)
-                        xnew1=xold+h*(+1.0/4.0*f1)
-                        
-                        #Store a copy of the flows for future use as well as a buffered set of state variables
-                        Flows_temporary = self.Flows.get_deepcopy()
-                        core_temporary = self.core.copy()
-                        
-                        f2=self.derivs(t0+1.0/4.0*h,xnew1)
-                        xnew2=xold+h*(+3.0/32.0*f1+9.0/32.0*f2)
-        
-                        f3=self.derivs(t0+3.0/8.0*h,xnew2)
-                        xnew3=xold+h*(+1932.0/2197.0*f1-7200.0/2197.0*f2+7296.0/2197.0*f3)
-        
-                        f4=self.derivs(t0+12.0/13.0*h,xnew3)
-                        xnew4=xold+h*(+439.0/216.0*f1-8.0*f2+3680.0/513.0*f3-845.0/4104.0*f4)
-                        
-                        f5=self.derivs(t0+h,xnew4)
-                        xnew5=xold+h*(-8.0/27.0*f1+2.0*f2-3544.0/2565.0*f3+1859.0/4104.0*f4-11.0/40.0*f5)
-                        
-                        #Updated values at the next step
-                        f6=self.derivs(t0+h/2.0,xnew5)
-                        
-                        xnew=xold+h*(gamma1*f1 + gamma2*f2 + gamma3*f3 + gamma4*f4 + gamma5*f5 + gamma6*f6)
-                            
-                        error=h*(1.0/360.0*f1-128.0/4275.0*f3-2197.0/75240.0*f4+1.0/50.0*f5+2.0/55.0*f6)
-                    else:
-                        # Step 1: derivatives evaluated at old values
-                        f1=self.derivs(t0,xold)
-                        xnew1=xold+h*(1.0/5.0)*f1   
-                        
-                        #Store a copy of the flows for future use as well as a buffered set of state variables
-                        Flows_temporary = self.Flows.get_deepcopy()
-                        core_temporary = self.core.copy()
-                        
-                        f2=self.derivs(t0+1.0/5.0*h,xnew1)
-                        xnew2=xold+h*(+3.0/40.0*f1+9.0/40.0*f2)
-        
-                        f3=self.derivs(t0+3.0/10.0*h,xnew2)
-                        xnew3=xold+h*(3.0/10.0*f1-9.0/10.0*f2+6.0/5.0*f3)
-        
-                        f4=self.derivs(t0+3.0/5.0*h,xnew3)
-                        xnew4=xold+h*(-11.0/54.0*f1+5.0/2.0*f2-70/27.0*f3+35.0/27.0*f4)
-                        
-                        f5=self.derivs(t0+h,xnew4)
-                        xnew5=xold+h*(1631.0/55296*f1+175.0/512.0*f2+575.0/13824.0*f3+44275.0/110592.0*f4+253.0/4096.0*f5)
-                        
-                        f6=self.derivs(t0+7/8*h,xnew5)
-                        
-                        #Updated values at the next step using 5-th order
-                        xnew=xold+h*(37/378*f1 + 250/621*f3 + 125/594*f4 + 512/1771*f6)
-                        
-                        error = h*(-277/64512*f1+6925/370944*f3-6925/202752*f4-277.0/14336*f5+277/7084*f6)
-    
-                    max_error=np.sqrt(np.sum(np.power(error,2)))
-                    
-                    # If the error is too large, make the step size smaller and try
-                    # the step again
-                    if (max_error > eps_allowed):
-                        if not disableAdaptive:
-                            # Take a smaller step next time, try again on this step
-                            # But only if adaptive mode is on
-    #                        print 'downsizing', h,
-                            h *= step_relax*(eps_allowed/max_error)**(0.3)
-    #                        print h, eps_allowed, max_error
-                            stepAccepted=False
-                        else:
-                            # Accept the step regardless of whether the error 
-                            # is too large or not
-                            stepAccepted = True
-                    else:
-                        stepAccepted = True
-                
-            #This block is for saving of values at the end of the step
-            #
-            #Store crank angle at the current index (first run at Itheta=0)
-            self.t[Itheta] = t0
-
-            # Use the copy that was stored before
-            self.core = core_temporary.copy()
-            
-            # Store the values for volumes and state vars in the matrices
-            # In the first step this will over-write the values in the matrices 
-            self._put_to_matrices(xold, Itheta)
-            
-            # Store the flows for the beginning of the step
-            self.FlowStorage.append(Flows_temporary)
-            
-            if Itheta >= 0.98*self.T.shape[1]:
-                debug_plots(self)
-                raise ValueError('98% of the maximum length of self.T reached, stopping calculation')
-            
-            t0 += h
-            Itheta += 1
-            xold = xnew
-            
-            #The error is already below the threshold
-            if (max_error < eps_allowed and disableAdaptive == False):
-#                print 'upsizing',h,
-                #Take a bigger step next time, since eps_allowed>max_error
-                h *= step_relax*(eps_allowed/max_error)**(0.2)
-#                print h, eps_allowed, max_error
-        
-        #Store crank angle at the last index (first run at Itheta=0)
-        self.t[Itheta] = t0
-        # Re-evaluate derivs at the starting value for the step in order 
-        # to use the correct values in the storage containers
-        self.derivs(t0, xold)
-        # Store the values for volumes and state vars in the matrices
-        self._put_to_matrices(xold, Itheta)
-        # Store the flows for the end
-        self.FlowStorage.append(self.Flows.get_deepcopy())
-
-        if sorted(self.stateVariables) == ['D','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist])
-        elif sorted(self.stateVariables) == ['M','T']:
-            self.CVs.updateStates('T',xnew[0:self.CVs.Nexist],'D',xnew[self.CVs.Nexist:2*self.CVs.Nexist]/self.core.V)
-        else:
-            raise NotImplementedError
-        
-        # last index is Itheta, number of steps is Itheta+1
-        print 'Itheta steps taken', Itheta+1
-        self.Itheta = Itheta
-        self.Ntheta = Itheta+1
-        self.post_cycle()
         
     def calc_boundary_work(self):
         """
@@ -1069,13 +771,14 @@ class PDSimCore(object):
         # Can't use intermediate temperature because the state might be two-phase
         # for some conditions and you are better off just calculating the enthalpy
         # directly
-        h2s = PropsSI('H','P',outletState.p*1000,'S',s1*1000,outletState.Fluid)/1000
+        temp = outletState.copy()
+        temp.update(dict(P=outletState.p, S=s1))
+        h2s = temp.h
         
         self.eta_a = (h2s-h1)/(h2-h1)
         self.Wdot_i = self.mdot*(h2s-h1)
         # self.Qamb is positive if heat is being added to the lumped mass
         self.Wdot = self.mdot*(h2-h1)-self.Qamb
-
     
     def _check_cycle_abort(self, index, I = 100):
         """
@@ -1289,24 +992,44 @@ class PDSimCore(object):
         
         try:
             t1 = clock()
+            # Run the pre-cycle code
+            self.pre_cycle()
+
             if cycle_integrator == 'Euler':
                 # Default to 7000 steps if not provided
-                N = getattr(self,'EulerN', 7000)
-                aborted = self.cycle_SimpleEuler(N, X, **cycle_integrator_options)
+                N = getattr(self,'EulerN', 7000)                
+                integrator = EulerIntegrator(self, X)
+                aborted = integrator.do_integration(N, 0, 2*math.pi)
             elif cycle_integrator == 'Heun':
                 # Default to 7000 steps if not provided
                 N = getattr(self,'HeunN', 7000)
-                aborted = self.cycle_Heun(N, X, **cycle_integrator_options)
+                integrator = HeunIntegrator(self, X)
+                aborted = integrator.do_integration(N, 0, 2*math.pi)
             elif cycle_integrator == 'RK45':
                 # Default to tolerance of 1e-8 if not provided
                 eps_allowed = getattr(self,'RK45_eps', 1e-8)
-                aborted = self.cycle_RK45(X, eps_allowed=eps_allowed, **cycle_integrator_options)
+                integrator = RK45Integrator(self, X)
+                aborted = integrator.do_integration(0, 2*math.pi, eps_allowed=eps_allowed)
             else:
                 raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
+            
+            if aborted == False:
+                integrator.post_integration()
+                
+                self.Itheta = integrator.Itheta
+                self.Ntheta = self.Itheta + 1
+
+                # Make sure we got the right number of things
+                assert self.Ntheta == len(self.FlowStorage)
+                self.post_cycle()
+            
         except ValueError as VE:
             # debug_plots(self)
             raise
         
+        if aborted is None:
+            aborted = False
+                    
         #  Quit if you have aborted in one of the cycle solvers
         if aborted == 'abort':
             return None
@@ -1316,7 +1039,6 @@ class PDSimCore(object):
         
         mdot_out = self.FlowsProcessed.mean_mdot[self.key_outlet]
         mdot_in = self.FlowsProcessed.mean_mdot[self.key_inlet]
-        print 'Mass flow difference',(mdot_out+mdot_in)/mdot_out*100,' %'
         
         # We need to find the key at the inlet to the outlet tube.
         Tube = self.Tubes[self.key_outlet]
@@ -1334,9 +1056,7 @@ class PDSimCore(object):
         h_outlet_Tube = self.Tubes.Nodes[key_outtube_inlet].h
         # Residual is the difference of these two terms
         # We put it in kW by multiplying by flow rate
-        print 'h_outlet_Tube',h_outlet_Tube
-        print 'self.h_outlet_pump_set',self.h_outlet_pump_set
-        self.resid_Td = mdot_out * (h_outlet_Tube - self.h_outlet_pump_set)
+        self.resid_Td = 0.1*(h_outlet_Tube - self.h_outlet_pump_set)
         
     def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45', OneCycle = False, cycle_integrator_options = None, plot_every_cycle = False):
         """
@@ -1383,25 +1103,34 @@ class PDSimCore(object):
             
             if self.Abort():
                 return
+                
+            errors, X = self.callbacks.endcycle_callback()
+            error_metric = np.sqrt(np.sum(np.power(errors, 2)))
             
             ###  -----------------------------------
             ###         The lump temperatures
             ###  -----------------------------------
+                
             self.solvers.lump_eb_history.append([self.Tlumps, self.lumps_resid])
             
             if len(self.solvers.lump_eb_history) == 1:
                 
-                T, EB = self.solvers.lump_eb_history[0]
+                T, EB = self.solvers.lump_eb_history[-1]
                 
                 #  T and EB are one-element lists, get floats
-                _T = T[0]
-                _EB = EB[0]
+                _T, _EB = T[0], EB[0]
             
-                #  If the first step, use a large thermal mass to make the step
-                lump_thermal_inertia = 1.6/(2*np.pi)
+                # Use the thermal mass to make the step
+                # Here is the logic:
+                # Instantaneous energy balance given by
+                # dU/dt = m*c*(dT/dt) = sum(Qdot)
+                # and if dt = one cycle period (seconds/rev) DeltaT = 2*pi/omega
+                # DELTAT = sum(Qdot)*Deltat/(m*c)
+                thermal_capacitance = 0.49*0.001 # [kJ/K]
+                Deltat = (2*np.pi)/self.omega # [s]
             
                 #  Update the lump temperatures
-                self.Tlumps = [_T + _EB/lump_thermal_inertia]
+                self.Tlumps = [_T + _EB*Deltat/thermal_capacitance]
             
             else:
                 
@@ -1413,7 +1142,7 @@ class PDSimCore(object):
                 Tn1, EBn1, Tn2, EBn2 = [np.array(l) for l in Tn1, EBn1, Tn2, EBn2]
                 
                 #  Use the relaxed secant method to find the solution 
-                Tnew = Tn1 - 0.5*EBn1*(Tn1-Tn2)/(EBn1-EBn2)
+                Tnew = Tn1 - 0.7*EBn1*(Tn1-Tn2)/(EBn1-EBn2)
             
                 #  Update the lump temperatures    
                 self.Tlumps = Tnew.tolist()
@@ -1421,8 +1150,6 @@ class PDSimCore(object):
             ###  -----------------------------------
             ###        The discharge enthalpy
             ###  -----------------------------------
-            
-            errors, X = self.callbacks.endcycle_callback()
             
             #  The outlet tube
             outlet_tube = self.Tubes[self.key_outlet]
@@ -1434,52 +1161,38 @@ class PDSimCore(object):
             elif outlet_tube.key2 == self.key_outlet:
                 key_outtube_inlet = outlet_tube.key1
                 key_outtube_outlet = outlet_tube.key2
+                
+            if error_metric < 0.1*epsilon and abs(self.lumps_resid[0]) < epsilon:
+
+                # Each time that we get here and we are significantly below the threshold, store the values
             
-            #  Get the current value for the outlet enthalpy
-            h_outlet = self.Tubes[self.key_outlet].State2.get_h()
-                
-            self.solvers.hdisc_history.append([h_outlet,self.resid_Td])
-            
-            if True: #max(np.abs(self.lumps_resid)) > epsilon or len(self.solvers.hdisc_history) == 1:
-                
-                #  Here we are going to solve the tube in the flow direction
-                #  since the energy balance on the lumps 
-                print 'Solving outlet tube in the flow direction'
-                
-                #  Save the old state of the outlet tube
-                old_fixed = outlet_tube.fixed
-                
-                #  Set the inlet state to be fixed
-                outlet_tube.fixed = 1
-                
-                #  Update the inlet state of the outlet tube based on the output of
-                #  the pump set
-                self.Tubes.Nodes[key_outtube_inlet].update_ph(self.Tubes.Nodes[self.key_outlet].p,self.h_outlet_pump_set)
-                
-                #  Run the outlet tube
-                outlet_tube.TubeFcn(outlet_tube)
-                
-                #  Calculate the outlet enthalpy
+                #  Get the current value for the outlet enthalpy of the machine
                 h_outlet = self.Tubes[self.key_outlet].State2.get_h()
+                    
+                # Store the values in the list of values
+                self.solvers.hdisc_history.append([h_outlet,self.resid_Td])
+
+                if len(self.solvers.hdisc_history) == 1:
+                    # The first time we get here, perturb the discharge enthalpy
+                    self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, h_outlet + 5)
+                else:
+                    #  Get the values from the history
+                    hdn1, EBn1 = self.solvers.hdisc_history[-1]
+                    hdn2, EBn2 = self.solvers.hdisc_history[-2]
+                    
+                    #  Use the relaxed secant method to find the solution 
+                    hdnew = hdn1 - 0.75*EBn1*(hdn1-hdn2)/(EBn1-EBn2)
+                    
+                    #  Reset the outlet enthalpy of the outlet tube based on our new
+                    #  value for it
+                    self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, hdnew)
+
+                print self.solvers.hdisc_history
                 
-                #  Reset the outlet enthalpy of the outlet tube
-                self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, h_outlet)
+            print 'new outlet T', self.Tubes.Nodes[self.key_outlet].T
                 
-                #  Reset which state is fixed
-                outlet_tube.fixed = old_fixed
-                
-            else:
-                
-                #  Get the values from the history
-                hdn1, EBn1 = self.solvers.hdisc_history[-1]
-                hdn2, EBn2 = self.solvers.hdisc_history[-2]
-                
-                #  Use the relaxed secant method to find the solution 
-                hdnew = hdn1 - 0.5*EBn1*(hdn1-hdn2)/(EBn1-EBn2)
-                
-                #  Reset the outlet enthalpy of the outlet tube based on our new
-                #  value for it
-                self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, hdnew)
+            # Store a copy of the initial temperatures of the chambers
+            self.solvers.initial_states_history.append(self.T[:,0].copy())
                 
             if OneCycle:
                 print 'Quitting due to OneCycle being set to True'
@@ -1493,16 +1206,19 @@ class PDSimCore(object):
                 return
             
             #  Reset the flag for the fixed side of the outlet tube
-            outlet_tube.fixed = old_fixed
+            #outlet_tube.fixed = old_fixed
             
-            from PDSim.misc.error_bar import error_ascii_bar
+            mdot_out = abs(self.FlowsProcessed.mean_mdot[self.key_outlet])
+            mdot_in = abs(self.FlowsProcessed.mean_mdot[self.key_inlet])
+            mdot_error = (mdot_out/mdot_in-1)*100
             
             print '==========='
             print '|| # {i:03d} ||'.format(i=i)
             print '==========='
-            print error_ascii_bar(abs(self.lumps_resid[0]),epsilon), 'energy balance ', self.lumps_resid[0], ' Tlumps: ',self.Tlumps,'K'
-            print error_ascii_bar(abs(self.resid_Td),epsilon), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg', self.Tubes.Nodes[key_outtube_inlet].h, 'kJ/kg'
-            print error_ascii_bar(np.sqrt(np.sum(np.power(errors, 2))),epsilon), 'cycle-cycle    ',np.sqrt(np.sum(np.power(errors, 2)))
+            print error_ascii_bar(abs(self.lumps_resid[0]), epsilon), 'energy balance kW ', self.lumps_resid[0], ' Tlumps: ',self.Tlumps,'K'
+            print error_ascii_bar(abs(self.resid_Td), epsilon), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg', self.Tubes.Nodes[key_outtube_inlet].h, 'kJ/kg'
+            print error_ascii_bar(error_metric, epsilon), 'cycle-cycle    ', error_metric
+            print error_ascii_bar(abs(mdot_error), 1), 'mdot [%]', mdot_error, '|| in:', mdot_in*1000, 'g/s || out:', mdot_out*1000, 'g/s '
             
             worst_error = max(abs(self.lumps_resid[0]), abs(self.resid_Td), np.sqrt(np.sum(np.power(errors, 2))))
             i += 1
@@ -1511,6 +1227,10 @@ class PDSimCore(object):
         if self.Abort():
             print 'Quitting OBJECTIVE_CYCLE loop in core.solve'
             return None #  Stop
+        else:
+            if len(self.solvers.hdisc_history) == 0:
+                # Store the values in the list of values
+                self.solvers.hdisc_history.append([self.Tubes[self.key_outlet].State2.get_h(),self.resid_Td])
             
     def solve(self,
               key_inlet = None,
@@ -1528,6 +1248,7 @@ class PDSimCore(object):
               eps_cycle = 0.001,
               eps_energy_balance = 0.01,
               cycle_integrator_options = None,
+              max_number_of_steps = 40000,
               **kwargs):
         """
         This is the driving function for the PDSim model.  It can be extended through the 
@@ -1570,6 +1291,8 @@ class PDSimCore(object):
             Energy balance convergence criterion
         cycle_integrator_options : dictionary
             A dictionary of options to be passed to the cycle integrator
+        max_number_of_steps : int
+            Maximum number of steps allowed per rotation
         
         Notes
         -----
@@ -1626,7 +1349,7 @@ class PDSimCore(object):
             self.pre_solve()
             
         # This runs before the model starts at all
-        self.pre_run()
+        self.pre_run(N = max_number_of_steps)
         
         # Check which method is used to do aborting
         if Abort is None and pipe_abort is not None:
@@ -1771,7 +1494,6 @@ class PDSimCore(object):
         self.V = self.V[:,0:self.Ntheta]
         self.dV = self.dV[:,0:self.Ntheta]
         self.h = self.h[:,0:self.Ntheta]
-        self.xL = self.xL[:,0:self.Ntheta]
         self.xValves = self.xValves[:,0:self.Ntheta]
         
         print 'mdot*(h2-h1),P-v,Qamb', self.Wdot, self.Wdot_pv, self.Qamb
@@ -1781,9 +1503,11 @@ class PDSimCore(object):
         
         # Restructure the history for easier writing to file and more clear description of what the things are
         hdisc_history = zip(*self.solvers.hdisc_history)
-        self.solvers.hdisc_history = dict(Td = np.array(hdisc_history[0]), hd_error = np.array(hdisc_history[1]))
+        self.solvers.hdisc_history = dict(hd = np.array(hdisc_history[0]), hd_error = np.array(hdisc_history[1]))
         lump_eb_history = zip(*self.solvers.lump_eb_history)
         self.solvers.lump_eb_history = dict(Tlumps = np.array(lump_eb_history[0]), lump_eb_error = np.array(lump_eb_history[1]))
+        self.solvers.initial_states_history = np.array(zip(*self.solvers.initial_states_history)).T
+
         
     def derivs(self, theta, x):
         """
@@ -1977,14 +1701,13 @@ class PDSimCore(object):
                 newCV = self.CVs[newkey]
                 # There can't be any overlap between keys
                 if newkey in newT:
-                    raise KeyError
+                    raise KeyError('newkey [' + newkey + '] is already in newT; becomes keys overlap but should not')
                 #What the state variables were at the start of the rotation
                 oldT[newkey]=self.T[Inew, 0]
                 old_rho[newkey]=self.rho[Inew, 0]
                 #What they are at the end of the rotation
                 newT[newkey]=self.T[Iold,self.Itheta]
                 new_rho[newkey]=self.rho[Iold,self.Itheta]
-                
                 errorT[newkey]=(oldT[newkey]-newT[newkey])/newT[newkey]
                 error_rho[newkey]=(old_rho[newkey]-new_rho[newkey])/new_rho[newkey]
                 #Update the list of keys for setting the exist flags

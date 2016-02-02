@@ -7,7 +7,10 @@ cimport numpy as np
 cimport cpython.array
 from libc.stdlib cimport calloc, free, realloc
 from libc.string cimport memcpy
-from cpython cimport bool
+
+
+cdef extern from "CoolPropTools.h" namespace "CoolProp":
+    bint _ValidNumber "ValidNumber"(double)
 
 cdef class AnnotatedValue(object):
     """
@@ -127,6 +130,8 @@ cdef class arraym(object):
         #If a zero or negative length passed in, don't allocate memory, but set length flag 
         if N <= 0:
             self.N = 0
+            return
+        elif N == self.N:
             return
         
         if self.data == NULL:
@@ -444,13 +449,24 @@ cdef class arraym(object):
             self.data = new_data
             #Set the length
             self.N = N
+            
+    cpdef bool all_finite(self):
+        """
+        Return True if all entries in the array are valid (not NAN, INF, etc.)
+        """
+        cdef int i
+        for i in range(self.N):
+            if not _ValidNumber(self.data[i]):
+                return False
+        return True
         
     def __getslice__(self, Py_ssize_t i, Py_ssize_t j):
         return self.slice(i,j)
     
+    @cython.returns(double)
     def __iter__(self):
         for i in range(self.N):
-            yield float(self.data[i])
+            yield self.data[i]
         
     def __repr__(self):
         return str(list(self))

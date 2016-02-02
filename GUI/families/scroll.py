@@ -284,6 +284,7 @@ SolverInputsPanel:
   integrator_options: {epsRK45 : 1e-7}
   eps_cycle : 0.002 # Cycle-Cycle convergence tolerance (RSSE) [-]
   eps_energy_balance : 0.05 # Energy balance convergence tolerance (RSSE) [-]
+  outlet_temperature_guesss : -1 # <0 means use adiabatic efficiency to guess
 
 """
 )

@@ -1,6 +1,8 @@
 from CoolProp.State import State as StateClass
 from CoolProp.State cimport State as StateClass
 
+from CoolProp.constants_header cimport parameters
+
 from libcpp cimport bool
 
 from PDSim.flow.flow import FlowPathCollection
@@ -41,25 +43,25 @@ cdef class ControlVolume(object):
 
 cdef class CVScore(object):
     cdef list array_list
-    cpdef update_size(self, int N)
-    cdef build_all(self, int N)
-    cdef free_all(self)
-    cpdef copy(self)
-    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, arraym parray, arraym Tarray)
-
-cdef class CVArrays(CVScore):
-
-    # Storage arrays
-    cdef public arraym T,p,h,rho,V,dV,cp,cv,m,v,dpdT_constV,Q,xL,dudxL
-    
-    # Property derivative arrays
-    cdef public arraym drhodtheta, dTdtheta, dmdtheta, dxLdtheta, summerdm, summerdT, summerdxL, property_derivs
     
     # Other variables
     cdef int state_vars, N
     cdef double omega
     
+    # Storage arrays that are always required
+    cdef public arraym T,p,h,rho,V,dV,cp,cv,m,v,dpdT_constV,Q
+    
+    # Property derivative arrays
+    cdef public arraym summerdm, summerdT, drhodtheta, dTdtheta, dmdtheta, property_derivs
+    
+    cpdef update_size(self, int N)
+    cdef build_all(self, int N)
+    cdef free_all(self)
+    cpdef copy(self)
+    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, arraym parray, arraym Tarray)
     cpdef just_volumes(self, list CVs, double theta)
+
+cdef class CVArrays(CVScore):
     cpdef properties_and_volumes(self, list CVs, double theta, int state_vars, arraym x)
     cpdef calculate_derivs(self, double omega, bint has_liquid)
 
@@ -74,3 +76,4 @@ cdef class ControlVolumeCollection(object):
     cpdef updateStates(self, str name1, arraym array1, str name2, arraym array2)
     cpdef volumes(self, double theta, bint as_dict = *)
     cpdef at(self, int i)
+    cpdef get(self, parameters key, double factor=*)
