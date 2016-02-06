@@ -196,7 +196,7 @@ cdef class CVScore(object):
             setattr(CVA, array_name, <arraym>arr.copy())
         return CVA
 
-    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, arraym parray, arraym Tarray):
+    cpdef calculate_flows(self, FlowPathCollection Flows):
         """
         Calculate the flows between tubes and control volumes and sum up the
         flow-related terms
@@ -221,12 +221,9 @@ cdef class CVScore(object):
         Parameters
         ----------
         Flows : :class:`FlowPathCollection <PDSim.flow.flow.FlowPathCollection>` instance
-        harray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
-        parray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
-        Tarray : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
         """
 
-        Flows.calculate(harray, parray, Tarray)
+        Flows.calculate()
         Flows.sumterms(self.summerdT, self.summerdm)
         
     cpdef just_volumes(self, list CVs, double theta):

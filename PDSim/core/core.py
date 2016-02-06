@@ -1532,18 +1532,8 @@ class PDSimCore(object):
         # Updates the state, calculates the volumes, prepares all the things needed for derivatives
         self.core.properties_and_volumes(self.CVs.exists_CV, theta, STATE_VARS_TM, x)
         
-        #  Join the enthalpies of the CV in existence and the tubes
-        harray = self.core.h.copy()
-        harray.extend(self.Tubes.get_h())
-        #  Join the pressures of the CV in existence and the tubes
-        parray = self.core.p.copy()
-        parray.extend(self.Tubes.get_p())
-        #  Join the pressures of the CV in existence and the tubes
-        Tarray = self.core.T.copy()
-        Tarray.extend(self.Tubes.get_T())
-        
         # Calculate the flows and sum up all the terms
-        self.core.calculate_flows(self.Flows, harray, parray, Tarray)
+        self.core.calculate_flows(self.Flows)
         
         # Calculate the heat transfer terms if provided
         if self.callbacks.heat_transfer_callback is not None:
@@ -1556,11 +1546,7 @@ class PDSimCore(object):
         # Calculate the derivative terms and set the derivative of the state vector
         self.core.calculate_derivs(self.omega, False)
         
-        #Liquid not yet supported
-        if self.__hasLiquid__:
-            raise NotImplementedError()
-        
-        #Add the derivatives for the valves
+        # Add the derivatives for the valves
         if self.__hasValves__:
             # 
             offset = len(self.stateVariables)*self.CVs.Nexist
