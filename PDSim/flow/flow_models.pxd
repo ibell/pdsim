@@ -18,6 +18,8 @@ from libc.math cimport exp, log, M_PI as pi, M_E as e, sqrt
 
 cpdef double IsentropicNozzle(double A, State State_up, State State_down, int other_output=*)
 
+cpdef double TwoPhaseNozzle(double A, State State_up, State State_down, double psi, double sigma = *)
+
 cdef class FlowFunction(object):
     cpdef double call(self, FlowPath FP) except *
     cpdef resize(self, int Nvalues)
