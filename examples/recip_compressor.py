@@ -5,15 +5,18 @@ import sys, os
 
 from PDSim.flow.flow import FlowPath
 from PDSim.flow import flow_models
-from PDSim.core.containers import ControlVolume
-from PDSim.core.core import Tube,PDSimCore
+from PDSim.core.containers import ControlVolume,Tube
+from PDSim.core.core import PDSimCore
 from PDSim.plot.plots import debug_plots
 from PDSim.misc.datatypes import arraym
 from CoolProp import State
 from CoolProp import CoolProp as CP
-from PDSim.flow.flow_models import ValveModel
+#from PDSim.flow.flow_models import ValveModel
 from PDSim.recip.core import Recip
-    
+
+from Debug_ValveModelClass import ValveModel
+
+
 def Compressor():
     recip=Recip()
     

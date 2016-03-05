@@ -1,6 +1,5 @@
 from __future__ import division
 from math import pi,cos,sin,sqrt
-from scipy.integrate import simps
 from PDSim.misc.scipylike import trapz
 from PDSim.flow import flow_models
 from PDSim.core.core import PDSimCore
@@ -159,10 +158,10 @@ class Recip(PDSimCore,_Recip):
         return self.h_shell*self.A_shell*(self.Tamb-self.Tlumps[0]) #[kW]
         
     def lump_energy_balance_callback(self):
-        #Mean heat transfer rate from gas to lump using Simpson's method for numerical integration
+        #Mean heat transfer rate from gas to lump using trapezoidal method for numerical integration
         #Note: Qdot_from_gas has opposite sign of heat transfer TO the gas as calculated in the heat_transfer_callback
         #Note: Qdot_from_gas will likely be less than 0 because heat is being removed and delivered to the gas
-        self.Qdot_from_gas = -simps(self.Q[0,0:self.Itheta],self.t[0:self.Itheta])/(self.t[self.Itheta-1]-self.t[0]) #[kW]
+        self.Qdot_from_gas = -trapz(self.Q[0,0:self.Itheta],self.t[0:self.Itheta])/(self.t[self.Itheta-1]-self.t[0]) #[kW]
         #Mechanical losses are added to the lump
         self.Wdot_mechanical = self.mechanical_losses() #[kW]
         #Heat transfer between the shell and the ambient

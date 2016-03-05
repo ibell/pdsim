@@ -1,12 +1,9 @@
-[submodule "externals/coolprop"]
-	path = externals/coolprop
-	url = https://github.com/ibell/coolprop
 [submodule "externals/quantities"]
 	path = externals/quantities
 	url = https://github.com/python-quantities/python-quantities.git
 [submodule "externals/scipy-sphinx-theme"]
 	path = externals/scipy-sphinx-theme
 	url = https://github.com/scipy/scipy-sphinx-theme
-[submodule "externals/msgpack-c"]
-	path = externals/msgpack-c
-	url = https://github.com/msgpack/msgpack-c
+[submodule "externals/coolprop"]
+	path = externals/coolprop
+	url = https://github.com/coolprop/coolprop

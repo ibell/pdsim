@@ -13,6 +13,7 @@ Contents:
    install_build
    API
    command_line_options
+   notebooks/index
     
 PDSim is a software package developed to enable quasi-steady simulation of positive displacement compressors and expanders.  
 

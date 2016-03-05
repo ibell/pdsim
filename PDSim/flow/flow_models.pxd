@@ -20,6 +20,9 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, int ot
 
 cdef class FlowFunction(object):
     cpdef double call(self, FlowPath FP) except *
+    cpdef resize(self, int Nvalues)
+    cpdef public arraym flows
+    cpdef public int Nflows
     
 cdef class PyFlowFunctionWrapper(FlowFunction):
     cdef dict kwargs
@@ -31,8 +34,6 @@ cdef class IsentropicNozzleWrapper(FlowFunction):
     cpdef double call(self, FlowPath FP) except *
     
 cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State State_down, double delta, int Type, double t = *, double ro = *)
-
-cpdef double TwoPhaseNozzle(double A, State State_up, State State_down, double psi, double sigma = *)
 
 cdef class ValveModel(object):
     cdef public double E,A_port,A_valve,d_valve,l_valve,a_valve,h_valve,rho_valve,d_port,m_eff,C_D,k_valve,x_stopper

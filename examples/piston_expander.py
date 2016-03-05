@@ -140,7 +140,7 @@ class PistonExpander(PDSimCore):
 ###    Part 3. Execution of code    ###
 #######################################
         
-def Expander():
+def Expander(**kwargs):
 
     expander = PistonExpander() #Instantiate the class
     
@@ -198,7 +198,7 @@ def Expander():
                                lumps_energy_balance_callback = expander.lump_energy_balance_callback)
     expander.solve(key_inlet='inlet.1',
                    key_outlet='outlet.2',
-                   solver_method = 'Euler',
+                   solver_method = kwargs.get('solver_method', 'Euler'),
                    OneCycle = False,
                    UseNR = True,
                    plot_every_cycle = False
@@ -209,6 +209,6 @@ def Expander():
     
 if __name__=='__main__':    
     #If this file is run directly, this code will be run
-    Expander()
-
-    
+    Expander(solver_method = 'Euler')
+    Expander(solver_method = 'Heun')
+    Expander(solver_method = 'RK45')

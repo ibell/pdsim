@@ -661,7 +661,7 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
                         injection_superheat = state_vals[state_attrs.index('injection_state_superheat_'+I)]
                         injection_temp = injection_sat_temp + injection_superheat
                         import CoolProp.CoolProp as CP
-                        injection_pressure = CP.Props('P','T',injection_sat_temp,'Q',1.0,inletState.Fluid)
+                        injection_pressure = CP.PropsSI('P','T',injection_sat_temp,'Q',1.0,inletState.Fluid)/1000.0
                         self.Lines[i].state.set_state(inletState.Fluid,
                                                       T=injection_temp, 
                                                       P=injection_pressure)
@@ -729,7 +729,13 @@ class InjectionInputsPanel(pdsim_panels.PDPanel):
 VI_template = """           
         
 from PDSim.scroll.core import Port
-import scipy.interpolate
+
+# If scipy is available, use its spline interpolation function, otherwise, 
+# use our implementation (for packaging purposes)
+try:
+    import scipy.interpolate as interp
+except ImportError:
+    import PDSim.misc.scipylike as interp
 
 phi_list = {phi_list:s}
 involute_list = {involute_list:s}
@@ -796,7 +802,7 @@ for port in sim.fixed_scroll_ports:
     for partner in port.area_dict:
     
         #  Create a spline interpolator object for the area between port and the partner chamber
-        A_interpolator = scipy.interpolate.splrep(port.theta, port.area_dict[partner], k = 2, s = 0)
+        A_interpolator = interp.splrep(port.theta, port.area_dict[partner], k = 2, s = 0)
         
         #  Add the flow between the EVI control volume and the chamber through the port
         sim.add_flow(FlowPath(key1 = 'VITube'+str(port.parent+1)+'.2',

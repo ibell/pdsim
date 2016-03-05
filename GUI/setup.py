@@ -1,5 +1,5 @@
 import json, os, glob, sys
-    
+
 def get_defaults():
     this_folder = os.path.dirname(__file__)
     file_path = os.path.join(this_folder, 'cx_freeze_defaults.json')
@@ -49,8 +49,8 @@ def pack(options, argv = None):
         icon = None
         )
 
-    import os, glob2, numpy, scipy, PDSim
-    explore_dirs = [os.path.dirname(numpy.__file__), os.path.dirname(scipy.__file__), os.path.dirname(PDSim.__file__)]
+    import os, glob2, numpy, PDSim
+    explore_dirs = [os.path.dirname(numpy.__file__), os.path.dirname(PDSim.__file__)]
 
     for directory in explore_dirs:
         # Recursively find all .pyd files
@@ -93,19 +93,20 @@ def pack(options, argv = None):
     import subprocess
     # Further windows packaging things
     if sys.platform.startswith('win'):
-        pass
-        #~ if not os.path.exists(os.path.join('PDSimGUI','configs')):
-            #~ os.mkdir(os.path.join('PDSimGUI','configs'))
-        # packages_folder = os.path.normpath(os.path.join(os.path.dirname(numpy.__file__),'..'))+os.sep
+        if not os.path.exists(os.path.join('PDSimGUI','configs')):
+            os.mkdir(os.path.join('PDSimGUI','configs'))
+        # Compress the dll with upx
+        subprocess.call('upx PDSimGUI/*.*', stdout = sys.stdout, stderr = sys.stderr)
         # Make an installer using InnoSetup
-        # subprocess.call(['C:\Program Files (x86)\Inno Setup 5\Compil32.exe','/cc','package_gui.iss'])
+        subprocess.call(['C:\Program Files (x86)\Inno Setup 5\Compil32.exe','/cc','package_gui.iss'])
         # Rename the installer to include the PDSim version
-        #~ old_name = os.path.join('Output','SetupPDSimGUI.exe')
-        #~ import PDSim
-        #~ new_name = os.path.join('Output','SetupPDSimGUI_version-'+PDSim.__version__+'.exe')
-        #~ if os.path.exists(new_name):
-            #~ os.remove(new_name)
-        #~ os.rename(old_name, new_name)
+        old_name = os.path.join('Output','SetupPDSimGUI.exe')
+        import PDSim
+        new_name = os.path.join('Output','SetupPDSimGUI_version-'+PDSim.__version__+'.exe')
+        if os.path.exists(new_name):
+            os.remove(new_name)
+        os.rename(old_name, new_name)
+        
     # And we are done. That's a setup script :-D
 
 if __name__=='__main__':

@@ -141,7 +141,7 @@ class PURecip(PDSimCore):
 ###    Part 3. Execution of PURecip    ###
 ##########################################
         
-def Compressor():
+def Compressor(**kwargs):
 
     recip=PURecip()                     #Instantiate the model
     recip.Vdead = 0.5e-6                #Dead volume [m3]
@@ -194,17 +194,16 @@ def Compressor():
     t1=clock()
     recip.solve(key_inlet='inlet.1',
                 key_outlet='outlet.2',
-                solver_method = 'Euler',
+                solver_method = kwargs.get('solver_method', 'Euler'),
                 OneCycle = False,
                 UseNR = False
                 )
     print 'time taken',clock()-t1,'s'
     
-    
-    #debug_plots(recip)
+    debug_plots(recip)
     
 if __name__=='__main__':    
     #If this file is run directly, this code will be run
-    Compressor()
-
-    
+    Compressor(solver_method = 'Euler')
+    Compressor(solver_method = 'Heun')
+    Compressor(solver_method = 'RK45')

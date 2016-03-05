@@ -53,7 +53,8 @@ volume_units = {
 
 pressure_units = {
                   'kPa' : pq.kPa,
-                  'psia' : pq.psi
+                  'psia' : pq.psi,
+                  'torr' : pq.torr
                   }
 rev = pq.UnitQuantity('revolution', 2*np.pi*pq.radians, symbol='rev')
 
@@ -632,8 +633,9 @@ class OutputTreePanel(wx.Panel):
                 # If it is a dataset, write the dataset contents to the tree
                 if isinstance(objects[0][thing], h5py.Dataset):
                     for i, o in enumerate(objects):
-                        if not o[thing].shape: # It's a single element, perhaps a number or a string.  
-                                               # shape will be an empty tuple, hence not () is True
+                        if hasattr(o[thing], 'shape') and o[thing].shape == tuple(): 
+                            # It's a single element, perhaps a number or a string.  
+                            # shape will be an empty tuple, hence not () is True
                             self.tree.SetItemText(child, str(o[thing].value), i+1)
                         else:
                             # A place holder for now - will develop a frame to display the matrix
@@ -1963,11 +1965,18 @@ class StateChooser(wx.Dialog):
         self.SetSizer(sizer)
         self.Fluids.SetStringSelection(Fluid)
         
-        if CP.Props(Fluid,"Ttriple") < T < CP.Props(Fluid,"Tcrit"):
-            #Pressure from temperature and density
-            p = CP.Props('P','T',T,'D',rho,Fluid)
+        state = CP.State(Fluid, dict(T=T,D=rho))
+        Tt = state.Props(CoolProp.iT_triple)
+        Tc = state.Props(CoolProp.iT_critical)
+        pt = state.Props(CoolProp.iP_triple)
+        pc = state.Props(CoolProp.iP_critical)
+        if Tt < T < Tc and pt < state.p < pc:
+            # Pressure from temperature and density
+            state = CP.State(Fluid, dict(T=T,D=rho))
+            p = state.p
             #Saturation temperature
-            Tsat = CP.Props('T','P',p,'Q',1,Fluid)
+            state = CP.State(Fluid, dict(P=p,Q=1))
+            Tsat = state.T
             self.SC.Tsat1.SetValue(str(Tsat))
             self.SC.DTsh1.SetValue(str(T-Tsat))
             self.SC.T1.SetValue(str(T))
@@ -1975,7 +1984,8 @@ class StateChooser(wx.Dialog):
             self.SC.SetSelection(0) ## The page of Tsat,DTsh
         else:
             #Pressure from temperature and density
-            p = CP.Props('P','T',T,'D',rho,Fluid)
+            state = CP.State(Fluid, dict(T=T,D=rho))
+            p = state.p
             self.SC.T1.SetValue(str(T))
             self.SC.p1.SetValue(str(p))
             self.SC.SetSelection(1) ## The page of Tsat,DTsh
@@ -1986,6 +1996,12 @@ class StateChooser(wx.Dialog):
         self.SC.DTsh1.Bind(wx.EVT_KEY_UP,self.OnUpdateVals)
         self.SC.T1.Bind(wx.EVT_KEY_UP,self.OnUpdateVals)
         self.SC.p1.Bind(wx.EVT_KEY_UP,self.OnUpdateVals)
+
+        self.SC.Tsat1.Bind(wx.EVT_TEXT,self.OnUpdateVals)
+        self.SC.DTsh1.Bind(wx.EVT_TEXT,self.OnUpdateVals)
+        self.SC.T1.Bind(wx.EVT_TEXT,self.OnUpdateVals)
+        self.SC.p1.Bind(wx.EVT_TEXT,self.OnUpdateVals)
+
         self.AddFluid.Bind(wx.EVT_BUTTON,self.OnAddFluid)
         
         self.Fluids.Bind(wx.EVT_COMBOBOX, self.OnFlushVals)
@@ -2008,19 +2024,27 @@ class StateChooser(wx.Dialog):
         self.rho.SetValue("")
         
     def OnAddFluid(self, event = None):
-        dlg = wx.TextEntryDialog(None,"Enter the name of a fluid to add, e.g. REFPROP-WATER")
-        dlg.SetValue("REFPROP-R134A")
+        dlg = wx.TextEntryDialog(None,"Enter the name of a fluid to add, e.g. REFPROP::WATER")
+        dlg.SetValue("BICUBIC&REFPROP::R32[0.697614699375863]&R125[0.302385300624138]")
+        
         if dlg.ShowModal() == wx.ID_OK:
             # Check that you can get the molar mass of this fluid
             Fluid = dlg.GetValue().encode('ascii')
+            dlg.Destroy()
+            if 'BICUBIC' in Fluid or 'TTSE' in Fluid:
+                dlg3 = wx.MessageDialog(None,"Warning: If tables have not been created already for this fluid, it will take a while to build the tables")
+                dlg3.ShowModal()
+                dlg3.Destroy()
             try:
-                CP.Props(Fluid,'M')
+                state = CP.State(Fluid, dict(T=300,D=1e-10))
+                mm = state.MM
                 self.Fluids.Append(Fluid)
-            except ValueError:
-                dlg2 = wx.MessageDialog(None,"Unable to add this fluid (cannot retrieve its molar mass).  Did you type it properly?")
+            except ValueError as VE:
+                dlg2 = wx.MessageDialog(None,"Unable to add this fluid (cannot retrieve its molar mass).  Did you type it properly?  Error:" + str(VE))
                 dlg2.ShowModal()
                 dlg2.Destroy()
-        dlg.Destroy()
+        else:
+            dlg.Destroy()
         
     def OnKeyPress(self,event=None):
         """ cancel if Escape key is pressed """
@@ -2037,12 +2061,12 @@ class StateChooser(wx.Dialog):
         T=float(self.T.GetValue())
         p=float(self.p.GetValue())
         rho=float(self.rho.GetValue())
-        State(Fluid,dict(T = T, D = rho))
-        if CP.Phase(Fluid,T,p) not in ['Gas','Supercritical']:
-            dlg = wx.MessageDialog(None, message = "The phase is not gas or supercritical, cannot accept this state",caption='Invalid state')
-            dlg.ShowModal()
-            dlg.Destroy()
-            return
+        #State(Fluid,dict(T = T, D = rho))
+        #if CP.PhaseSI("T",T,"P",p*1000.0,Fluid) not in ['gas','supercritical','supercritical_gas']:
+        #    dlg = wx.MessageDialog(None, message = "The phase is not gas or supercritical, cannot accept this state",caption='Invalid state')
+        #    dlg.ShowModal()
+        #    dlg.Destroy()
+        #    return
         self.EndModal(wx.ID_OK)
     
     def GetValues(self):
@@ -2060,22 +2084,26 @@ class StateChooser(wx.Dialog):
         Fluid = str(self.Fluids.GetStringSelection())
         try:
             if PageNum == 0:
-                #Sat temperature and superheat are given
-                p=CP.Props('P','T',float(self.SC.Tsat1.GetValue()),'Q',1.0,Fluid)
-                T=float(self.SC.Tsat1.GetValue())+float(self.SC.DTsh1.GetValue())
-                rho=CP.Props('D','T',T,'P',p,Fluid)
+                # Sat temperature and superheat are given
+                Ts = float(self.SC.Tsat1.GetValue())
+                state = CP.State(Fluid, dict(T=Ts,Q=1))
+                p = state.p
+                T = Ts + float(self.SC.DTsh1.GetValue())
+                state = CP.State(Fluid, dict(T=T,P=p))
+                rho = state.rho
             elif PageNum == 1:
-                #Temperature and pressure are given
-                T=float(self.SC.T1.GetValue())
-                p=float(self.SC.p1.GetValue())
-                rho=CP.Props('D','T',T,'P',p,Fluid)
+                # Temperature and pressure are given
+                T = float(self.SC.T1.GetValue())
+                p = float(self.SC.p1.GetValue())
+                state = CP.State(Fluid, dict(T=T,P=p))
+                rho = state.rho
             else:
                 raise NotImplementedError
             
             self.T.SetValue(str(T))
             self.p.SetValue(str(p))
             self.rho.SetValue(str(rho))
-        except ValueError:
+        except ValueError as VE:
             return
         
 class StatePanel(wx.Panel):
@@ -2201,6 +2229,8 @@ class StateInputsPanel(PDPanel):
                     discTsat = ('Discharge saturation temperature [K]','K'),
                     suctTsat = ('Suction saturation temperature [K]','K'),
                     suctDTsh = ('Suction superheat [K]','K'),
+                    suctT = ('Suction temperature [K]','K'),
+                    suctp = ('Suction pressure [kPa]','kPa'),
                     )
     
     def __init__(self, parent, config, **kwargs):
@@ -2214,7 +2244,7 @@ class StateInputsPanel(PDPanel):
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer_for_omega = wx.BoxSizer(wx.HORIZONTAL)
         sizer_for_inletState = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_for_discState = wx.FlexGridSizer(cols = 2)
+        sizer_for_discState = wx.FlexGridSizer(cols = 3)
         
         # The list for all the annotated objects
         self.annotated_values = []
@@ -2231,24 +2261,46 @@ class StateInputsPanel(PDPanel):
         
         self.Tsat = StateVariablesShimClass(self, 300)
         self.DTsh = StateVariablesShimClass(self, 11.1)
+        self.suctT = StateVariablesShimClass(self, 300)
+        self.suctp = StateVariablesShimClass(self, 100)
         
         # Construct the coupled annotated terms for the suction state
         CAGO_suctTsat = CoupledAnnotatedGUIObject(AnnotatedValue('suctTsat', self.Tsat, *self.desc_map['suctTsat']), self.Tsat, handler = self.parse_coupled_parametric_terms)
         CAGO_suctDTsh = CoupledAnnotatedGUIObject(AnnotatedValue('suctDTsh', self.DTsh, *self.desc_map['suctDTsh']), self.DTsh, handler = self.parse_coupled_parametric_terms)
+        CAGO_suctT = CoupledAnnotatedGUIObject(AnnotatedValue('suctT', self.suctT, *self.desc_map['suctT']), self.suctT, handler = self.parse_coupled_parametric_terms)
+        CAGO_suctp = CoupledAnnotatedGUIObject(AnnotatedValue('suctp', self.suctp, *self.desc_map['suctp']), self.suctp, handler = self.parse_coupled_parametric_terms)
         
-        #Link required parameters
+        # Link required parameters
         CAGO_suctTsat.link_required_parameters([CAGO_suctDTsh])
         CAGO_suctDTsh.link_required_parameters([CAGO_suctTsat])
+        CAGO_suctT.link_required_parameters([CAGO_suctp])
+        CAGO_suctp.link_required_parameters([CAGO_suctT])
         
-        #Construct the discharge state
+        # Construct option objects for the variable used to set the discharge state
+        self.radio_discp = wx.RadioButton(self)
+        self.radio_discpratio = wx.RadioButton(self)
+        self.radio_discTsat = wx.RadioButton(self)
+        radios = [self.radio_discp, self.radio_discpratio, self.radio_discTsat]
+
+        # Construct the discharge state
         if 'pratio' in config['discharge']:
             pratio = config['discharge']['pratio']
             pressure = pratio * inletState.p
-            Tsat = CP.Props('T','P',pressure,'Q',1,inletState.Fluid)
+            try:
+                state = CP.State(inletState.Fluid, dict(P=pressure,Q=1))
+                Tsat = state.T
+            except ValueError:
+                Tsat = -1
+            self.radio_discpratio.SetValue(True)
         elif 'pressure' in config['discharge']:
             pressure = config['discharge']['pressure']
             pratio = pressure / inletState.p
-            Tsat = CP.Props('T','P',pressure,'Q',1,inletState.Fluid)
+            try:
+                state = CP.State(inletState.Fluid, dict(P=pressure,Q=1))
+                Tsat = state.T
+            except ValueError:
+                Tsat = -1
+            self.radio_discp.SetValue(True)
         else:
             raise ValueError('either pratio or pressure must be provided for discharge')
              
@@ -2257,14 +2309,19 @@ class StateInputsPanel(PDPanel):
             AnnotatedValue('discPratio', pratio, *self.desc_map['discPratio']),
             AnnotatedValue('discTsat', Tsat, *self.desc_map['discTsat'])
             ]
-        
-        AGO_disc = self.construct_items(disc_annotated_values, sizer_for_discState)
-        
+
+        AGO_disc = []
+        for i, (av, name, radio) in enumerate(zip(disc_annotated_values, ['pressure','pratio','Tsat'], radios)):
+            sizer_for_discState.Add(radio, -1)
+            AGO_disc.append(self.construct_items([av], sizer = sizer_for_discState))
+            radio.Bind(wx.EVT_RADIOBUTTON, self.OnChangeDischargeVariable)
+
+        # Bind events to listen for modifications
         AGO_disc[0].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'pressure'))
         AGO_disc[1].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'pratio'))
         AGO_disc[2].GUI_location.Bind(wx.EVT_KILL_FOCUS,lambda event: self.OnChangeDischargeValue(event, 'Tsat'))
         
-        self.main.register_GUI_objects([AGO_omega, CAGO_suctTsat, CAGO_suctDTsh] + AGO_disc)
+        self.main.register_GUI_objects([AGO_omega, CAGO_suctTsat, CAGO_suctDTsh, CAGO_suctT, CAGO_suctp] + AGO_disc)
         
         # Hack the discharge textctrl so that when they are updated using SetValue() they fire the EVT_KILL_FOCUS event
         def HackedSetValue(self, value):
@@ -2295,9 +2352,33 @@ class StateInputsPanel(PDPanel):
         sizer.Add(HeaderStaticText(self, 'Discharge State'), 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
         sizer.Add(sizer_for_discState, 0, wx.ALIGN_CENTER_HORIZONTAL)
-        
+
         self.SetSizer(sizer)
         sizer.Layout()
+
+        self.OnChangeDischargeVariable()
+
+        # If the inlet state changes, fire an even to update the discharge state
+        self.SuctionStatePanel.Bind(self.SuctionStatePanel.EVT_STATE_UPDATE_EVENT, self.OnChangeDischargeValue)
+
+    def OnChangeDischargeVariable(self, event = None, changed_parameter = ''):
+        """
+        Change which variable is held constant at the discharge state
+        """
+
+        # Only one can be active:
+        if self.radio_discp.GetValue():
+            self.main.get_GUI_object('discPressure').GUI_location.Enable()
+            for other in ['discPratio', 'discTsat']:
+                self.main.get_GUI_object(other).GUI_location.Disable()
+        elif self.radio_discpratio.GetValue():
+            self.main.get_GUI_object('discPratio').GUI_location.Enable()
+            for other in ['discPressure', 'discTsat']:
+                self.main.get_GUI_object(other).GUI_location.Disable()
+        elif self.radio_discTsat.GetValue():
+            self.main.get_GUI_object('discTsat').GUI_location.Enable()
+            for other in ['discPressure', 'discPratio', ]:
+                self.main.get_GUI_object(other).GUI_location.Disable()
         
     def OnChangeDischargeValue(self, event = None, changed_parameter = ''):
         """ 
@@ -2307,21 +2388,42 @@ class StateInputsPanel(PDPanel):
         suction_state = self.SuctionStatePanel.GetState()
         psuction = suction_state.p
         Fluid = suction_state.Fluid
+
+        # If changed_parameter not provided, use radios to figure out which to use
+        if not changed_parameter:
+            if self.radio_discp.GetValue():
+                changed_parameter = 'pressure'
+            elif self.radio_discpratio.GetValue():
+                changed_parameter = 'pratio'
+            elif self.radio_discTsat.GetValue():
+                changed_parameter = 'Tsat'
         
         if changed_parameter == 'pressure':
             pdisc = self.main.get_GUI_object_value('discPressure')
             pratio = pdisc / psuction
-            Tsat = CP.Props('T', 'P', pdisc, 'Q', 1.0, Fluid)
+            try:
+                state = CP.State(Fluid, dict(P=pdisc,Q=1))
+                Tsat = state.T
+            except ValueError:
+                Tsat = -1
             
         elif changed_parameter == 'pratio':
             pratio = self.main.get_GUI_object_value('discPratio')
             pdisc = psuction * pratio
-            Tsat = CP.Props('T', 'P', pdisc, 'Q', 1.0, Fluid)
+            try:
+                state = CP.State(Fluid, dict(P=pdisc,Q=1))
+                Tsat = state.T
+            except ValueError:
+                Tsat = -1
             
         elif changed_parameter == 'Tsat':
             Tsat = self.main.get_GUI_object_value('discTsat')
-            pdisc = CP.Props('P', 'T', Tsat, 'Q', 1.0, Fluid)
-            pratio = pdisc / psuction
+            try:
+                state = CP.State(Fluid, dict(T=Tsat,Q=1))
+                pdisc = state.p
+                pratio = pdisc / psuction
+            except ValueError:
+                pdisc = -1
             
         else:
             raise ValueError('Your parameter [{s:s}] is invalid for OnChangeDischargeValue.  Must be one of (pressure, pratio, Tsat)'.format(s = changed_parameter))
@@ -2352,12 +2454,18 @@ class StateInputsPanel(PDPanel):
         inletState = self.SuctionStatePanel.GetState()
         discPressure = self.main.get_GUI_object_value('discPressure')
         omega = self.main.get_GUI_object_value('omega')
+        outlet_temperature_guess = self.main.get_GUI_object('outlet_temperature_guess').GetValue()
     
         return textwrap.dedent(
             """
             inletState = State.State("{Ref:s}", {{'T': {Ti:s}, 'P' : {pi:s} }})
-    
-            T2s = sim.guess_outlet_temp(inletState,{po:s})
+            
+            outlet_temperature_guess = {outlet_temperature_guess:s} # [K]
+            if outlet_temperature_guess > 0:
+                # Use the specified guess for outlet temperature
+                T2s = outlet_temperature_guess 
+            else:
+                T2s = sim.guess_outlet_temp(inletState,{po:s})
             outletState = State.State("{Ref:s}", {{'T':T2s,'P':{po:s} }})
             
             # The rotational speed (over-written if motor map provided)
@@ -2366,6 +2474,7 @@ class StateInputsPanel(PDPanel):
                        Ti = str(inletState.T),
                        pi = str(inletState.p),
                        po = str(discPressure),
+                       outlet_temperature_guess = str(outlet_temperature_guess),
                        omega = str(omega)
                        )
             )
@@ -2377,14 +2486,21 @@ class StateInputsPanel(PDPanel):
         
         terms_keys = [t.key for t in terms]
         
+        Fluid = self.SuctionStatePanel.GetState().Fluid
+        
         if 'suctDTsh' in terms_keys and 'suctTsat' in terms_keys:
             Tsat = val_map['suctTsat']
             DTsh = val_map['suctDTsh']
             
-            Fluid = self.SuctionStatePanel.GetState().Fluid
-            p = CP.Props('P','T',Tsat,'Q',1,Fluid)
+            state = CP.State(Fluid, dict(T=Tsat,Q=1))
+            p = state.p
             
             self.SuctionStatePanel.set_state(Fluid, **dict(T = Tsat+DTsh, P = p))
+            
+            # Update the discharge pressure ratio (Tsat disc and pdisc do not change)
+            self.OnChangeDischargeValue(changed_parameter = 'pressure')
+        elif 'suctT' in terms_keys and 'suctp' in terms_keys:
+            self.SuctionStatePanel.set_state(Fluid, T = val_map['suctT'], P = val_map['suctp'])
             
             # Update the discharge pressure ratio (Tsat disc and pdisc do not change)
             self.OnChangeDischargeValue(changed_parameter = 'pressure')

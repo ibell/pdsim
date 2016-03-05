@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+    # -*- coding: utf-8 -*-
 
 from math import pi, cos, sin
 import textwrap
@@ -21,6 +21,13 @@ import pdsim_panels
 from pdsim_panels import LaTeXImageMaker, MotorChoices, PlotPanel
 from datatypes import HeaderStaticText, AnnotatedGUIObject
 from PDSim.scroll import scroll_geo
+
+# If scipy is available, use its optimization functions, otherwise, 
+# use our implementation (for packaging purposes)
+try:
+    from scipy import optimize
+except ImportError:
+    import PDSim.misc.solvers as optimize
 
 LabeledItem = pdsim_panels.LabeledItem
         
@@ -49,6 +56,93 @@ class ReadOnlyLaTeXLabel(wx.Panel):
     def SetValue(self, value):
         self.textbox.SetValue(value)
         
+class GeometryConverterChoicebook(wx.Choicebook):
+    def __init__(self, parent, id=-1, geo = None):
+        wx.Choicebook.__init__(self, parent, id)
+
+        self.pagePitch_thickness_height = wx.Panel(self)
+        self.AddPage(self.pagePitch_thickness_height,'Pitch, Thickness, Height')
+
+        self.pitch_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'Pitch [m]')
+        self.thickness_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'Thickness [m]')
+        self.height_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'Height [m]')
+        self.W0_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'W0 [rad]')
+        self.W1_label = wx.StaticText(self.pagePitch_thickness_height, -1, label = 'W1 [rad]')
+
+        self.pitch_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['pitch']))
+        self.thickness_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['thickness']))
+        self.height_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['height']))
+        self.W0_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['W0']))
+        self.W1_value = wx.TextCtrl(self.pagePitch_thickness_height, -1, value = str(geo['W1']))
+
+        sizer_for_outputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+
+        # Add all the output objects to the sizer for the outputs
+        sizer_for_outputs.AddMany([self.pitch_label, self.pitch_value,
+                                   self.thickness_label, self.thickness_value,
+                                   self.height_label, self.height_value,
+                                   self.W0_label, self.W0_value,
+                                   self.W1_label, self.W1_value
+                                   ])
+
+        self.pagePitch_thickness_height.SetSizer(sizer_for_outputs)
+        sizer_for_outputs.Layout()
+
+    def get_geo(self):
+        pitch = float(self.pitch_value.GetValue())
+        t = thickness = float(self.thickness_value.GetValue())
+        h = height = float(self.height_value.GetValue())
+        W1 = float(self.W1_value.GetValue())
+        W0 = float(self.W0_value.GetValue())
+
+        rb = base_radius = pitch/(2*pi)
+        ro = orbiting_radius = rb*pi - thickness
+
+        # Midline starting wrap angle
+        phi_m0 = -W0
+        # Initial angles based on offsets off the midline
+        phi_i0 = phi_m0+thickness/rb/2.0
+        phi_o0 = phi_m0-thickness/rb/2.0
+        phi_ie = W1-W0
+        phi_is = 0
+        phi_os = 0
+        
+        displacement = -2*pi*h*rb*ro*(3*pi-2*phi_ie+phi_i0+phi_o0)
+        volume_ratio = (3*pi-2*phi_ie+phi_i0+phi_o0)/(-2*phi_os-3*pi+phi_i0+phi_o0)
+
+        return dict(displacement = displacement,
+                    volume_ratio = volume_ratio,
+                    thickness = thickness,
+                    orbiting_radius = orbiting_radius,
+                    phi_fi0 = phi_i0,
+                    phi_fis = phi_is,
+                    phi_fos = phi_os,
+                    )
+
+class ConvertGeometryFrame(wx.Dialog):
+    """ A dialog for converting sets of geometries to the geometry definition used in paper of Bell, IJR, 2013 """
+    def __init__(self, geo = None):
+        wx.Dialog.__init__(self, None)
+
+        panel = wx.Panel(self)
+
+        self.GCS = GeometryConverterChoicebook(self, geo = geo)
+        self.OkButton = wx.Button(self,-1,"Ok")
+        self.OkButton.Bind(wx.EVT_BUTTON, self.OnOk)
+        
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        main_sizer.Add(self.GCS, 1, wx.EXPAND)
+        main_sizer.Add(self.OkButton, 1, wx.EXPAND)
+        self.SetSizer(main_sizer)
+        main_sizer.Layout()
+
+    def OnOk(self, event):
+        self.EndModal(wx.ID_OK)
+
+    def get_geo(self):
+        """ Get the geometry to be set as a dictionary """
+        return self.GCS.get_geo()
+
 class ScrollWrapAnglesFrame(wx.Frame):
     def __init__(self, geo):
         wx.Frame.__init__(self, None)
@@ -325,6 +419,8 @@ sim.geo.phi_ie_offset = {phi_ie_offset:s}
 
 """
         
+        
+
 class GeometryPanel(pdsim_panels.PDPanel):
     """
     The geometry panel of the scroll compressor
@@ -386,6 +482,13 @@ class GeometryPanel(pdsim_panels.PDPanel):
             
         self.ScrollWrapAnglesButton = wx.Button(scrolled_panel, label = 'View Scroll Wrap Angles')
         self.ScrollWrapAnglesButton.Bind(wx.EVT_BUTTON,self.OnShowWrapGeo)
+        self.ConvertGeometryButton = wx.Button(scrolled_panel, label = 'Convert Geometry')
+        self.ConvertGeometryButton.Bind(wx.EVT_BUTTON,self.OnConvertGeometry)
+
+        geosizer = wx.BoxSizer(wx.HORIZONTAL)
+        geosizer.Add(self.ScrollWrapAnglesButton, 1, wx.ALIGN_CENTER_HORIZONTAL)
+        geosizer.Add(self.ConvertGeometryButton, 1, wx.ALIGN_CENTER_HORIZONTAL)
+
         
         # Build the items and return the list of annotated GUI objects
         annotated_GUI_objects = self.construct_items(annotated_values, 
@@ -474,7 +577,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         sizer.AddSpacer(5)
         sizer.Add(plotwrapssizer, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
-        sizer.Add(self.ScrollWrapAnglesButton, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(geosizer, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
         sizer.Add(sizer_for_wrap_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
@@ -514,13 +617,12 @@ class GeometryPanel(pdsim_panels.PDPanel):
         def objective(phi):
             return cos(phi)+(phi-phi0)*sin(phi)
         
-        from scipy.optimize import newton
-        phi = newton(objective, phi0 + 0.3)
+        phi = optimize.newton(objective, phi0 + 0.3)
         if phi < phi0: phi += 2*pi
         
         while phi < phie:
             phiv.append(phi)
-            phi = newton(objective, phi + pi)
+            phi = optimize.newton(objective, phi + pi)
         
         phiv.append(phi)
         
@@ -551,6 +653,34 @@ class GeometryPanel(pdsim_panels.PDPanel):
         
         frm = ScrollWrapAnglesFrame(self.Scroll.geo)
         frm.Show()
+
+    def OnConvertGeometry(self, event = None):
+        if event is not None: event.Skip()
+    
+        def get(key):
+            # Compact code to get a parameter from the main database
+            return self.main.get_GUI_object_value(key)
+
+        W0 = self.Scroll.geo.t/(2*self.Scroll.geo.rb)-self.Scroll.geo.phi_fi0
+        W1_minus_W0 = self.Scroll.geo.phi_fie-self.Scroll.geo.phi_fis
+        geo = dict(pitch = 2*pi*self.Scroll.geo.rb,
+                   thickness = self.Scroll.geo.t,
+                   height = self.Scroll.geo.h,
+                   W0 = W0,
+                   W1 = W1_minus_W0 + W0
+                   )
+
+        frm = ConvertGeometryFrame(geo = geo)
+        if frm.ShowModal() == wx.ID_OK:
+            geo = frm.get_geo()
+
+            self.main.get_GUI_object('t').SetValue(str(geo['thickness']))
+            self.main.get_GUI_object('Vdisp').SetValue(str(geo['displacement']))
+            self.main.get_GUI_object('Vratio').SetValue(str(geo['volume_ratio']))
+            self.main.get_GUI_object('ro').SetValue(str(geo['orbiting_radius']))
+            for key in ['phi_fi0','phi_fos','phi_fis']:
+                self.main.get_GUI_object(key).SetValue(str(geo[key]))
+        frm.Destroy()
         
     def OnAnimate(self, event = None):
         
