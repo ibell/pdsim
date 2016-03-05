@@ -16,7 +16,7 @@ from Cython.Distutils import build_ext
 from Cython.Distutils.extension import Extension
 import sys, shutil, os, glob
 
-version = '2.9'
+version = '3.0'
 
 if len(sys.argv) == 1:
    #sys.argv += ['clean','develop']
@@ -121,8 +121,8 @@ package_data = package_pxd_files
 setup(
   name = 'PDSim',
   version = version,
-  author = "Ian Bell",
-  author_email='ian.h.bell@gmail.com',
+  author = "Ian Bell, Davide Ziviani",
+  author_email='ian.h.bell@gmail.com, ziviani.dvd@gmail.com',
   url='http://pdsim.sourceforge.net',
   description = """A flexible open-source framework for the quasi-steady-state simulation of positive displacement machines including compressors and expanders""",
   packages = ['PDSim','PDSim.core','PDSim.flow','PDSim.plot','PDSim.scroll','PDSim.misc','PDSim.recip','PDSim.misc.clipper'],
