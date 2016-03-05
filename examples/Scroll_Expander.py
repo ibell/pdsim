@@ -385,16 +385,16 @@ class ScrollExpander(core.Scroll):
             
         return disable, h
     
-    def pre_run(self):
+    def pre_run(self, N = 40000):
         """
         Intercepts the call to pre_run and does some scroll processing, then 
         calls the base class function
         """
         
         #Call the base class function        
-        PDSimCore.pre_run(self)
+        PDSimCore.pre_run(self, N = N)
                 
-#def Expander(Tinlet,pinlet,poutlet,N,Tamb):
+
 def Expander():    
     SE = ScrollExpander()
     
@@ -408,21 +408,6 @@ def Expander():
     Tamb = 304
     Liq = 'Duratherm_LT'
     SE.xL = 0.5   #Liquid fraction
-    
-    #Flood_Prop = State_Flooded(Ref,Liq,Tinlet,pinlet,xL)
-    #SE.Entropy = Flood_Prop.s_mix(Ref,Liq,Tinlet,pinlet,xL)
-    
-    #SE.h_mix_in = h_m(Ref,"POE",Tinlet,pinlet,xL)
-    #SE.rho_mix_in = rho_m(Ref,"POE",Tinlet,pinlet,xL)
-    #SE.v_mix_in = 1/SE.rho_mix_in
-    #Guess outlet temperature
-    #SE.Toutlet_s = newton(lambda T:s_m(Ref,"POE",T,poutlet,xL)-SE.s_mix_in,Tinlet)
-    #Mixture properties at inlet
-    #SE.s_mix_out = s_m(Ref,"POE",SE.Toutlet_s,poutlet,xL)
-    #SE.h_mix_out = h_m(Ref,"POE",SE.Toutlet_s,poutlet,xL)
-    #SE.rho_mix_out = rho_m(Ref,"POE",SE.Toutlet_s,poutlet,xL)
-    #SE.v_mix_out = 1/SE.rho_mix_out
-    #SE.mdot_guess_mix = SE.rho_mix_in*SE.Vdisp/SE.Vratio*SE.omega/(2*pi)
     
     SE.Tamb = Tamb #Ambient temperature
     SE.omega = (N*2*pi)/60 #Rotational speed
@@ -540,17 +525,27 @@ def Expander():
     SE.Qwall = SE.wrap_heat_transfer
     
 ## Calculations
-    SE.connect_callbacks(step_callback = SE.step_callback, heat_transfer_callback = SE.heat_transfer_callback,lumps_energy_balance_callback = SE.lump_energy_balance_callback,endcycle_callback= SE.endcycle_callback)
+    SE.connect_callbacks(step_callback = SE.step_callback, 
+                        heat_transfer_callback = SE.heat_transfer_callback,
+                        lumps_energy_balance_callback = SE.lump_energy_balance_callback,
+                        endcycle_callback= SE.endcycle_callback)
 
     SE.RK45_eps = 1e-6
     SE.eps_cycle = 0.003
     
-    SE.precond_solve(key_inlet='inlet.1',key_outlet='outlet.2',solver_method='RK45',UseNR = False,OneCycle = False,plot_every_cycle= False,hmin = 1e-8)
-    
-    #del SE.FlowStorage
-    #from PDSim.misc.hdf5 import HDF5Writer
-    #h5 = HDF5Writer()
-    #h5.write_to_file(SE, 'exp_data.h5')
+    try:
+        SE.precond_solve(key_inlet='inlet.1',
+                        key_outlet='outlet.2',
+                        solver_method='RK45',
+                        UseNR = False,
+                        OneCycle = False,
+                        plot_every_cycle= False,
+                        #hmin = 1e-3
+                        eps_cycle = 3e-3
+                        )
+    except BaseException as E:
+        print(E)
+        raise
 
     mass = SE.mdot
     work = SE.Wdot_shaft
