@@ -60,17 +60,14 @@ class RollingPistonCompressor(PDSimCore):
         
         dVdtheta = (self.Hc*self.Rc**2/2)* (-((1/a-1)*a**2*cos(theta))/(sqrt(1-(1/a-1)**2*(sin(theta))**2)) - a**2 + (1-a)**2*(-cos(2*theta))-a*(1-a)*cos(theta)*sqrt(1-(1/a-1)**2*(sin(theta))**2)+ ((1/a-1)**2*a*(1-a)*(sin(theta))**2*cos(theta)  )/(sqrt(1-(1/a-1)**2*(sin(theta))**2)) + 1   ) - (self.b*self.Hc*self.Rc/2)*( (1-a)*sin(theta)+ ((1-a)**2*sin(theta)*cos(theta))/(sqrt((1-a)**2*(cos(theta))**2+2*a-1))  )
         
-        return abs(V),dVdtheta
+        return abs(V),abs(dVdtheta)
 
 
     def Vc_dVc_ParkYC(self,theta):
     
         V,dVdtheta = self.V_dV_ParkYC(2*pi - theta)
         
-        if V < 0.0:
-            raise Exception('V is negative!')
-
-        return V,dVdtheta
+        return abs(V),abs(dVdtheta)
     
     def x_theta(self,x):
         """
@@ -361,7 +358,7 @@ def GeometryPlot():
         Vs_ParkYC[i],dVs_ParkYC[i]=rolling.V_dV_ParkYC(theta[i])
 
 
-    f, (ax1) = pylab.subplots(1, 2,figsize=(10,6))
+    f,ax1 = pylab.subplots(1, 1,figsize=(10,6))
     f.subplots_adjust(bottom=0.15,left= 0.1)  
     ax1.plot(theta,V_ParkYC*1e6,'r--',lw = 2,label = 'Vc Park Y.C.')
     ax1.plot(theta,dV_ParkYC*1e6,'r-.',lw = 2,label = 'dVc Park Y.C.')
@@ -376,7 +373,7 @@ def GeometryPlot():
     pylab.show()
     
 
-def RollingCompressor():
+def RollingCompressor(**kwargs):
 
     rolling=RollingPistonCompressor()                               #Instantiate the model
     rolling.e = 5.0e-3                                                #Eccentricity [m]
@@ -477,7 +474,7 @@ def RollingCompressor():
     t1=clock()
     rolling.solve(key_inlet='inlet.1',
                 key_outlet='outlet.2',
-                solver_method = 'Euler',
+                solver_method = kwargs.get('solver_method', 'Euler'),
                 OneCycle = False,
                 UseNR = False,
                 #cycle_integrator_options = dict(tmax = 2*pi)
@@ -489,5 +486,7 @@ def RollingCompressor():
 if __name__=='__main__':    
     
     GeometryPlot()
-    RollingCompressor()
+    RollingCompressor(solver_method = 'Euler')
+    RollingCompressor(solver_method = 'Heun')
+    RollingCompressor(solver_method = 'RK45')
     
