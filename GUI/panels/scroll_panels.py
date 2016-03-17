@@ -1121,6 +1121,20 @@ class OSCrossSectionFrame(wx.Frame):
         sizer.Layout()
         
         self.SetSize(sizer.GetMinSize())
+
+class MechanicalLossesChoices(wx.Choicebook):
+    def __init__(self, parent):
+        wx.Choicebook.__init__(self, parent, -1)
+        
+        self.page_mech_normal=wx.Panel(self)
+        self.AddPage(self.page_mech_normal,'Normal Mechanical Losses')
+        
+        self.page_spec_eta_mech=wx.Panel(self)
+        self.AddPage(self.page_spec_eta_mech,'Specified Mechanical Efficiency')
+        
+        self.page_spec_mech_losses=wx.Panel(self)
+        self.AddPage(self.page_spec_mech_losses, 'Specified Mechanical Losses')
+        
         
 class MechanicalLossesPanel(pdsim_panels.PDPanel):
     
@@ -1160,6 +1174,8 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
                     pin2_ybeta_offset = ('Offset of pin #2 in +y_beta direction [m]','m',0.0),
                     pin3_xbeta_offset = ('Offset of pin #3 in +x_beta direction [m]','m',0.0),
                     pin4_xbeta_offset = ('Offset of pin #4 in +x_beta direction [m]','m',0.0),
+                    specified_mechanical_efficiency = ('Specified mechanical efficiency [-]','-',0.9),
+                    specified_mechanical_losses_kW = ('Specified mechanical losses [kW]','kW',0.0)
                     )
     
     def __init__(self, parent, config, **kwargs):
@@ -1224,10 +1240,64 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
             self.motor_choices.MCT.update_from_configfile(values)
         else:
             raise ValueError('Your combination of motor terms is not valid')
+            
+        self.keys_for_config = []
+        
+        self.mechanical_model_choices = MechanicalLossesChoices(scrolled_panel)
+        
+        if 'specified_mechanical_efficiency' in config:
+            self.mechanical_model_choices.SetSelection(1)
+        elif 'specified_mechanical_losses_kW' in config:
+            self.mechanical_model_choices.SetSelection(2)
+        
+        #----------------------------------------------------------------------
+        # The sizer for all the specified mechanical efficiency terms
+        sizer_for_spec_etamech_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+        
+        # Loop over the inputs
+        annotated_values = self.get_annotated_values(['specified_mechanical_efficiency'])
+        
+        # Build the items and return the list of annotated GUI objects, add to existing list
+        AGO = self.construct_items(annotated_values,
+                                   sizer = sizer_for_spec_etamech_inputs,
+                                   parent = self.mechanical_model_choices.page_spec_eta_mech)
+        self.main.register_GUI_objects(AGO)
+                                                      
+        #----------------------------------------------------------------------
+        # The sizer for all the specified mechanical losses terms
+        sizer_for_spec_mech_losses_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+        
+        # Loop over the inputs
+        annotated_values = self.get_annotated_values(['specified_mechanical_losses_kW'])
+            
+        # Build the items and return the list of annotated GUI objects, add to existing list
+        AGO = self.construct_items(annotated_values,
+                                   sizer = sizer_for_spec_mech_losses_inputs,
+                                   parent = self.mechanical_model_choices.page_spec_mech_losses)
+        self.main.register_GUI_objects(AGO)
+                                                      
+        #----------------------------------------------------------------------
+        # The sizer for all the orbiting scroll terms
+        sizer_for_orbiting_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
+        
+        # Loop over the inputs
+        keys = ['scroll_plate_thickness', 'scroll_plate_diameter','scroll_density', 'scroll_added_mass']
+        annotated_values = self.get_annotated_values(keys)
+            
+        # Build the items and return the list of annotated GUI objects, add to existing list
+        annotated_GUI_objects = self.construct_items(annotated_values,
+                                                     sizer = sizer_for_orbiting_inputs,
+                                                     parent = scrolled_panel)
+        self.main.register_GUI_objects(annotated_GUI_objects)
+        
+        self.MassButton = wx.Button(scrolled_panel,label='Calculate')
+        sizer_for_orbiting_inputs.Add(wx.StaticText(scrolled_panel,label = 'Orbiting Scroll Mass [kg]'))
+        sizer_for_orbiting_inputs.Add(self.MassButton)
+        self.MassButton.Bind(wx.EVT_BUTTON,self.OnCalculateScrollMass)
         
         annotated_GUI_objects = []
         self.config = config
-        self.keys_for_config = []
+        
         
         #----------------------------------------------------------------------
         # The sizer for all the heat transfer terms
@@ -1254,7 +1324,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         # Build the items and return the list of annotated GUI objects, add to existing list
         annotated_GUI_objects += self.construct_items(annotated_values,
                                                       sizer = sizer_for_journal_inputs,
-                                                      parent = scrolled_panel)
+                                                      parent = self.mechanical_model_choices.page_mech_normal)
         
         #----------------------------------------------------------------------
         # The sizer for all the Oldham ring terms
@@ -1271,25 +1341,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         # Build the items and return the list of annotated GUI objects, add to existing list
         annotated_GUI_objects += self.construct_items(annotated_values,
                                                       sizer = sizer_for_oldham_inputs,
-                                                      parent = scrolled_panel)
-        
-        #----------------------------------------------------------------------
-        # The sizer for all the orbiting scroll terms
-        sizer_for_orbiting_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
-        
-        # Loop over the inputs
-        keys = ['scroll_plate_thickness', 'scroll_plate_diameter','scroll_density', 'scroll_added_mass']
-        annotated_values = self.get_annotated_values(keys)
-            
-        # Build the items and return the list of annotated GUI objects, add to existing list
-        annotated_GUI_objects += self.construct_items(annotated_values,
-                                                      sizer = sizer_for_orbiting_inputs,
-                                                      parent = scrolled_panel)
-        
-        self.MassButton = wx.Button(scrolled_panel,label='Calculate')
-        sizer_for_orbiting_inputs.Add(wx.StaticText(scrolled_panel,label = 'Orbiting Scroll Mass [kg]'))
-        sizer_for_orbiting_inputs.Add(self.MassButton)
-        self.MassButton.Bind(wx.EVT_BUTTON,self.OnCalculateScrollMass)
+                                                      parent = self.mechanical_model_choices.page_mech_normal)
         
         #----------------------------------------------------------------------
         # The sizer for all the thrust bearing terms
@@ -1302,10 +1354,10 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         # Build the items and return the list of annotated GUI objects, add to existing list
         annotated_GUI_objects += self.construct_items(annotated_values,
                                                       sizer = sizer_for_thrust_inputs,
-                                                      parent = scrolled_panel)
+                                                      parent = self.mechanical_model_choices.page_mech_normal)
         
-         #----------------------------------------------------------------------
-        # The sizer for all the thrust bearing terms
+        #----------------------------------------------------------------------
+        # The sizer for all the general bearing terms
         sizer_for_general_inputs = wx.FlexGridSizer(cols = 2, vgap = 4, hgap = 4)
         
         # Loop over the inputs
@@ -1314,7 +1366,9 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         # Build the items and return the list of annotated GUI objects, add to existing list
         annotated_GUI_objects += self.construct_items(annotated_values,
                                                       sizer = sizer_for_general_inputs,
-                                                      parent = scrolled_panel)
+                                                      parent = self.mechanical_model_choices.page_mech_normal)
+                                                      
+        
         
         # Register terms in the GUI database
         self.main.register_GUI_objects(annotated_GUI_objects)
@@ -1323,6 +1377,35 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         
         self.ViewButton = wx.Button(scrolled_panel, label='View Cross-Section')
         self.ViewButton.Bind(wx.EVT_BUTTON, self.OnViewCrossSection)
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(HeaderStaticText(self.mechanical_model_choices.page_mech_normal, 'General Mechanical Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_general_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(20)
+        sizer.Add(HeaderStaticText(self.mechanical_model_choices.page_mech_normal, 'Bearing Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_journal_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(20)
+        sizer.Add(HeaderStaticText(self.mechanical_model_choices.page_mech_normal, 'Oldham Ring Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_oldham_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(20)
+        sizer.Add(HeaderStaticText(self.mechanical_model_choices.page_mech_normal, 'Thrust Bearing Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(5)
+        sizer.Add(sizer_for_thrust_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
+        self.mechanical_model_choices.page_mech_normal.SetSizer(sizer)
+        sizer.Layout()
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(sizer_for_spec_etamech_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
+        self.mechanical_model_choices.page_spec_eta_mech.SetSizer(sizer)
+        sizer.Layout()
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(sizer_for_spec_mech_losses_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
+        self.mechanical_model_choices.page_spec_mech_losses.SetSizer(sizer)
+        sizer.Layout()
         
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.ViewButton,0,wx.ALIGN_CENTER_HORIZONTAL)
@@ -1334,34 +1417,22 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         sizer.AddSpacer(5)
         sizer.Add(sizer_for_HT_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(20)
-        sizer.Add(HeaderStaticText(scrolled_panel, 'General Mechanical Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
-        sizer.AddSpacer(5)
-        sizer.Add(sizer_for_general_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
-        sizer.AddSpacer(20)
-        sizer.Add(HeaderStaticText(scrolled_panel, 'Bearing Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
-        sizer.AddSpacer(5)
-        sizer.Add(sizer_for_journal_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
-        sizer.AddSpacer(20)
-        sizer.Add(HeaderStaticText(scrolled_panel, 'Oldham Ring Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
-        sizer.AddSpacer(5)
-        sizer.Add(sizer_for_oldham_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
-        sizer.AddSpacer(20)
         sizer.Add(HeaderStaticText(scrolled_panel, 'Orbiting Scroll Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
         sizer.Add(sizer_for_orbiting_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(20)
-        sizer.Add(HeaderStaticText(scrolled_panel, 'Thrust Bearing Inputs'), 0, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.Add(HeaderStaticText(scrolled_panel, 'Mechanical Loss Models'), 0, wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(5)
-        sizer.Add(sizer_for_thrust_inputs,0,wx.ALIGN_CENTER_HORIZONTAL)
-        
+        sizer.Add(self.mechanical_model_choices,0,wx.ALIGN_CENTER_HORIZONTAL)
+        sizer.AddSpacer(20)
         scrolled_panel.SetSizer(sizer)
         main_sizer.Add(scrolled_panel, 1, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL)
         self.SetSizer(main_sizer)
-        
         sizer.Layout()
                     
     def get_config_chunk(self):
         configdict = {}
+        keys_for_config = list(self.keys_for_config)
         
         if self.motor_choices.GetSelection() == 0:
             configdict['eta_motor'] = float(self.motor_choices.eta_motor.GetValue())
@@ -1371,7 +1442,21 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
             configdict['eta_motor_coeffs'] = c[1]
             configdict['omega_motor_coeffs'] = c[2]
             
-        for key in self.keys_for_config:
+        if self.mechanical_model_choices.GetSelection() == 0:
+            for key in ['specified_mechanical_efficiency',
+                        'specified_mechanical_losses_kW']:
+                if key in keys_for_config:
+                    keys_for_config.pop(keys_for_config.index(key))
+        elif self.mechanical_model_choices.GetSelection() == 1:
+            for key in ['specified_mechanical_losses_kW']:
+                if key in keys_for_config:
+                    keys_for_config.pop(keys_for_config.index(key))
+        elif self.mechanical_model_choices.GetSelection() == 2:
+            for key in ['specified_mechanical_efficiency']:
+                if key in keys_for_config:
+                    keys_for_config.pop(keys_for_config.index(key))
+            
+        for key in keys_for_config:
             configdict[key] = self.main.get_GUI_object_value(key)
             
         return configdict
@@ -1424,24 +1509,39 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
             val = self.main.get_GUI_object_value(term)
             motor_chunk += 'sim.{name:s} = {value:s}\n'.format(name = term,
                                                                value = str(val))
-         
-        #Terms that go in the mech struct
-        for term in ['mu_oil','detailed_analysis','journal_tune_factor',
-                'D_upper_bearing','L_upper_bearing','c_upper_bearing',
-                'D_crank_bearing','L_crank_bearing','c_crank_bearing',
-                'D_lower_bearing','L_lower_bearing','c_lower_bearing',
-                'thrust_friction_coefficient', 'thrust_ID', 'thrust_OD', 
-                'L_ratio_bearings','scroll_plate_thickness',
-                'scroll_density','oldham_key_friction_coefficient', 
-                'oldham_ring_radius', 'oldham_key_width', 'oldham_mass', 
-                'oldham_thickness', 'oldham_key_height','oldham_rotation_beta',
-                'scroll_plate_diameter','scroll_added_mass','pin1_ybeta_offset',
-                'pin2_ybeta_offset','pin3_xbeta_offset','pin4_xbeta_offset'
-                ]:
+        
+        # Terms that always go in the mech struct
+        for term in ['scroll_plate_thickness','scroll_plate_diameter','scroll_added_mass','scroll_density']:
             val = self.main.get_GUI_object_value(term)
             motor_chunk += 'sim.mech.{name:s} = {value:s}\n'.format(name = term,
-                                                                    value = str(val)) 
-            
+                                                                    value = str(val))
+        
+        if self.mechanical_model_choices.GetSelection() == 0:
+            #Terms that go in the mech struct
+            for term in ['mu_oil','detailed_analysis','journal_tune_factor',
+                    'D_upper_bearing','L_upper_bearing','c_upper_bearing',
+                    'D_crank_bearing','L_crank_bearing','c_crank_bearing',
+                    'D_lower_bearing','L_lower_bearing','c_lower_bearing',
+                    'thrust_friction_coefficient', 'thrust_ID', 'thrust_OD', 
+                    'L_ratio_bearings', 'oldham_key_friction_coefficient', 
+                    'oldham_ring_radius', 'oldham_key_width', 'oldham_mass', 
+                    'oldham_thickness', 'oldham_key_height','oldham_rotation_beta',
+                    'pin1_ybeta_offset','pin2_ybeta_offset','pin3_xbeta_offset','pin4_xbeta_offset'
+                    ]:
+                val = self.main.get_GUI_object_value(term)
+                motor_chunk += 'sim.mech.{name:s} = {value:s}\n'.format(name = term,
+                                                                        value = str(val))
+        elif self.mechanical_model_choices.GetSelection() == 1:
+            for term in ['specified_mechanical_efficiency']:
+                val = self.main.get_GUI_object_value(term)
+                motor_chunk += 'sim.mech.{name:s} = {value:s}\n'.format(name = term,
+                                                                        value = str(val)) 
+        elif self.mechanical_model_choices.GetSelection() == 2:
+            for term in ['specified_mechanical_losses_kW']:
+                val = self.main.get_GUI_object_value(term)
+                motor_chunk += 'sim.mech.{name:s} = {value:s}\n'.format(name = term,
+                                                                        value = str(val)) 
+        
         # Handle the orbiting scroll mass plus any additional mass
         motor_chunk += 'm, zcm = sim.calculate_scroll_mass()\nsim.mech.orbiting_scroll_mass = m\nsim.mech.scroll_zcm__thrust_surface = zcm\n'
         
