@@ -1483,6 +1483,12 @@ class Scroll(PDSimCore, _Scroll):
             mid uses the average of upstream and downstream pressures
             
             high uses the pressure downstream of the machine 
+            
+        Returns
+        -------
+            Wdot_losses: float
+            
+                The total mechanical losses in kW
 
         """
         
@@ -1521,9 +1527,13 @@ class Scroll(PDSimCore, _Scroll):
             warnings.warn('mech.journal_tune_factor not provided; using 1.0')
             self.mech.journal_tune_factor = 1.0
             
-        if hasattr(self.mech,'detailed_analysis') and self.mech.detailed_analysis == True:
+        if hasattr(self.mech,'specified_mechanical_efficiency') and isinstance(self.mech.specified_mechanical_efficiency, float):
+            return (1-self.mech.specified_mechanical_efficiency)*self.Wdot_pv
+        elif hasattr(self.mech,'specified_mechanical_losses_kW') and isinstance(self.mech.specified_mechanical_losses_kW, float):
+            return self.mech.specified_mechanical_losses_kW
+        elif hasattr(self.mech,'detailed_analysis') and self.mech.detailed_analysis == True:
             self.detailed_mechanical_analysis()
-            return self.forces.Wdot_total_mean
+            return self.forces.Wdot_total_mean # [kW]
         else:
             #Conduct the calculations for the bearings [N]
             W_OSB = np.sqrt((self.forces.summed_Fr + self.forces.inertial)**2+self.forces.summed_Ft**2)*1000
