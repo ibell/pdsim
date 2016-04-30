@@ -19,8 +19,8 @@ import sys, shutil, os, glob
 version = '2.9'
 
 if len(sys.argv) == 1:
-   #sys.argv += ['clean','develop']
-   sys.argv += ['clean','install']
+   sys.argv += ['clean','develop']
+   #sys.argv += ['clean','install']
     
 #Modify the __init__ file with this version string
 fName = os.path.join('PDSim','__init__.py')
@@ -110,6 +110,7 @@ for pyx_file in pyx_list:
     ext_module_list.append(Extension(ext_name,
                                      sources,
                                      language='c++',
+                                     define_macros = [('SWIG',None)], # Workaround to remove dependency on rapidjson in Configuration.h
                                      cython_c_in_temp=True
                                      )
                            )
