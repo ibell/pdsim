@@ -5,8 +5,8 @@ import sys, os
 
 from PDSim.flow.flow import FlowPath
 from PDSim.flow import flow_models
-from PDSim.core.containers import ControlVolume
-from PDSim.core.core import Tube,PDSimCore
+from PDSim.core.containers import Tube, ControlVolume
+from PDSim.core.core import PDSimCore
 from PDSim.plot.plots import debug_plots
 from PDSim.misc.datatypes import arraym
 from CoolProp import State
@@ -40,13 +40,14 @@ def Compressor():
     recip.shell_volume = 100e-6
     #Calculate Vdisp
     recip.pre_solve()
+    recip.Vdisp = recip.Vdisp()
     
     Ref='R410A'
     inletState=State.State(Ref,dict(T=289.15, D=33.1))
     p_outlet = inletState.p*2.5
     T2s = recip.guess_outlet_temp(inletState,p_outlet)
     outletState=State.State(Ref,{'T':T2s,'P':p_outlet})
-    mdot_guess = inletState.rho*recip.Vdisp()*recip.omega/(2*pi)
+    mdot_guess = inletState.rho*recip.Vdisp*recip.omega/(2*pi)
     
     #First add the control volumes.
     recip.add_CV( ControlVolume(key='A',
@@ -66,7 +67,7 @@ def Compressor():
                              fixed=2,TubeFcn=recip.TubeCode) )
     
     recip.add_flow(FlowPath(key1='shell', key2='inlet.2', MdotFcn=recip.Inlet))
-    recip.add_flow(FlowPath(key1='shell', key2='A', MdotFcn=recip.Suction))
+    recip.add_flow(FlowPath(key1='inlet.2', key2='A', MdotFcn=recip.Suction))
     recip.add_flow(FlowPath(key1='outlet.1', key2='A', MdotFcn=recip.Discharge))
     recip.add_flow(FlowPath(key1='shell', key2='A', MdotFcn=recip.PistonLeakage))
 
@@ -118,7 +119,7 @@ def Compressor():
     t1=clock()
     recip.precond_solve(key_inlet='inlet.1',
                         key_outlet='outlet.2',
-                        solver_method = 'Euler',
+                        solver_method = 'RK45',
                         OneCycle = False,
                         UseNR = True,
                         )
