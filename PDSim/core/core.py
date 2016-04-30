@@ -277,9 +277,12 @@ class PDSimCore(object):
                     VarList = np.append(VarList, self.m[exists_indices,i])
                 else:
                     raise KeyError
+            
             if self.__hasValves__:
-                VarList+=list(self.xValves[:,i])
-                
+
+                ValveList = list(self.xValves[:,i])
+                VarList = np.append( VarList,ValveList)
+
             return arraym(VarList)
         
     def _statevars_to_dict(self,x):
@@ -759,9 +762,10 @@ class PDSimCore(object):
 
         try:
             Vdisp = self.Vdisp
+
         except:
             Vdisp = self.Vdisp()
-            
+
         self.eta_v = self.mdot / (self.omega/(2*pi)*Vdisp*inletState.rho)
 
         h1 = inletState.h
@@ -1551,6 +1555,10 @@ class PDSimCore(object):
             # 
             offset = len(self.stateVariables)*self.CVs.Nexist
             for i, valve in enumerate(self.Valves):
+                if x[offset+2+i*2-1] < -10:
+                    x[offset+2+i*2-1]=0.0
+                if x[offset+i*2] > valve.x_stopper and x[offset+2+i*2-1] > 0.0 :
+                    x[offset+2+i*2-1]=0.0 
                 # Get the values from the input array for this valve
                 xvalve = x[offset+i*2:offset+2+i*2]
                 # Set the values in the valve class
