@@ -1759,8 +1759,9 @@ class MainFrame(wx.Frame):
             "A graphical user interface for the PDSim model\n\n"+
             "wx version: "+wx.__version__+
             wx_unicode+
-            "CoolProp version: "+CoolProp.__version__,
-            350, wx.ClientDC(self))
+            "CoolProp version: "+CoolProp.__version__+'\n'+
+            "CoolProp revision: "+CoolProp.__gitrevision__,
+            500, wx.ClientDC(self))
         info.WebSite = ("http://pdsim.sourceforge.net", "PDSim home page")
         info.Developers = [ "Ian Bell", "Craig Bradshaw"]
 

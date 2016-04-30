@@ -58,7 +58,7 @@ cdef class CVScore(object):
     cdef build_all(self, int N)
     cdef free_all(self)
     cpdef copy(self)
-    cpdef calculate_flows(self, FlowPathCollection Flows, arraym harray, arraym parray, arraym Tarray)
+    cpdef calculate_flows(self, FlowPathCollection Flows)
     cpdef just_volumes(self, list CVs, double theta)
 
 cdef class CVArrays(CVScore):

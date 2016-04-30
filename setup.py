@@ -130,7 +130,7 @@ setup(
                           ),
   package_dir = {'PDSim':'PDSim',},
   package_data = package_data,
-  include_dirs = [numpy.get_include(), CoolProp.get_include_directory(), "PDSim/misc/clipper", "PDSim/misc/spline", "externals/coolprop/externals/msgpack-c/include"],
+  include_dirs = [numpy.get_include(), CoolProp.get_include_directory(), "PDSim/misc/clipper", "PDSim/misc/spline"],
 )
 
 try:

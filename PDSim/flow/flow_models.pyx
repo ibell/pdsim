@@ -51,21 +51,34 @@ cdef class PyFlowFunctionWrapper(FlowFunction):
     
     In this way, functions defined at the python level can still be used by the Cython code
     """
-    def __init__(self,Function,kwargs):
+    def __init__(self, Function, kwargs, Nflows = 1):
         self.Function = Function
         self.kwargs = kwargs
+        self.resize(Nflows)
         
     cpdef double call(self, FlowPath FP) except *:
+        """
+        Call the flow path function, and store the flows that are calculated 
+        in the values arraym instance
+        """
         cdef double dval
-        try:
-            val = self.Function(FP, **self.kwargs)
-            dval = <double?> val
+
+        # Get whatever you are going to get from the flow function
+        val = self.Function(FP, **self.kwargs)    
+
+        # If it is an arraym (or a subclass thereof)
+        if isinstance(val, arraym):
+            if (<arraym>val).N != self.Nflows:
+                raise ValueError("The size of your returned flow vector ["+str((<arraym>val).N)+"] is not equal to specified size ["+str(self.Nflows)+"]")
+            self.flows.set_data((<arraym>val).data, (<arraym>val).N)
+        else:
+            if self.Nflows == 1:
+                # Try to cast to double
+                dval = <double?> val
+                # Store the value
+                self.flows[0] = dval
             return dval
-#        except ValueError as VE:
-#            print VE, 
-#            raise ValueError("Wrapped function in PyFlowFunctionWrapper did not return a floating point value; returned "+str(val))
-        except:
-            raise
+        
     
     def __reduce__(self):
         if not isinstance(self.Function,str):
@@ -91,6 +104,10 @@ cdef class IsentropicNozzleWrapper(FlowFunction):
         return IsentropicNozzle(FP.A,
                                 FP.State_up,
                                 FP.State_down)
+
+    def __init__(self):
+        cdef int Nvalues = 1
+        self.resize(Nvalues)
         
     def __reduce__(self):
         return makeIsentropicNozzleWrapper, ({},)
@@ -126,15 +143,17 @@ cdef class FlowFunction(object):
          The mass flow rate in kg/s
      
     """
+    def __init__(self, Nvalues = 1):
+        self.resize(Nvalues)
+
+    cpdef resize(self, int Nflows):
+        """ Resize the storage arraym """
+        self.flows = arraym()
+        self.flows.set_size(Nflows)
+        self.Nflows = Nflows
+
     cpdef double call(self, FlowPath FP) except *:
         pass
-        
-    @cython.returns(cython.double)
-    def __call__(self, FlowPath FP):
-        """
-        This special method calls the call() function of the derived class
-        """
-        return self.call(FP)
     
 cpdef double pow(double x, double y):
     return x**y

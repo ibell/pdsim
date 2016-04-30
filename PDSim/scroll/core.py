@@ -1086,8 +1086,8 @@ class Scroll(PDSimCore, _Scroll):
         tplate = getattr(self.mech,'scroll_plate_thickness')
         rho = getattr(self.mech,'scroll_density')
         mplus = getattr(self.mech,'scroll_added_mass')
-        Lbearing = getattr(self.mech,'L_crank_bearing')
-        Dijournal = getattr(self.mech,'D_crank_bearing')
+        Lbearing = getattr(self.mech,'L_crank_bearing',0)
+        Dijournal = getattr(self.mech,'D_crank_bearing',0)
         Dplate = getattr(self.mech,'scroll_plate_diameter')
         Dojournal = 1.5*Dijournal
         
@@ -1483,6 +1483,12 @@ class Scroll(PDSimCore, _Scroll):
             mid uses the average of upstream and downstream pressures
             
             high uses the pressure downstream of the machine 
+            
+        Returns
+        -------
+            Wdot_losses: float
+            
+                The total mechanical losses in kW
 
         """
         
@@ -1521,9 +1527,13 @@ class Scroll(PDSimCore, _Scroll):
             warnings.warn('mech.journal_tune_factor not provided; using 1.0')
             self.mech.journal_tune_factor = 1.0
             
-        if hasattr(self.mech,'detailed_analysis') and self.mech.detailed_analysis == True:
+        if hasattr(self.mech,'specified_mechanical_efficiency') and isinstance(self.mech.specified_mechanical_efficiency, float):
+            return (1-self.mech.specified_mechanical_efficiency)*self.Wdot_pv
+        elif hasattr(self.mech,'specified_mechanical_losses_kW') and isinstance(self.mech.specified_mechanical_losses_kW, float):
+            return self.mech.specified_mechanical_losses_kW
+        elif hasattr(self.mech,'detailed_analysis') and self.mech.detailed_analysis == True:
             self.detailed_mechanical_analysis()
-            return self.forces.Wdot_total_mean
+            return self.forces.Wdot_total_mean # [kW]
         else:
             #Conduct the calculations for the bearings [N]
             W_OSB = np.sqrt((self.forces.summed_Fr + self.forces.inertial)**2+self.forces.summed_Ft**2)*1000
@@ -2411,13 +2421,20 @@ class Scroll(PDSimCore, _Scroll):
         #   M =  |   0      0     -h  | = Fy*h *i - Fx * h * j
         #        |   Fx     Fy    0   |
         #
-        self.forces.summed_Mx +=  self.forces.Fy_bearing_simple*(self.mech.D_crank_bearing/2)
-        self.forces.summed_My += -self.forces.Fx_bearing_simple*(self.mech.D_crank_bearing/2)
+        if hasattr(self.mech,'D_crank_bearing'):
+            self.forces.summed_Mx +=  self.forces.Fy_bearing_simple*(self.mech.D_crank_bearing/2)
+            self.forces.summed_My += -self.forces.Fx_bearing_simple*(self.mech.D_crank_bearing/2)
+        else:
+            self.forces.summed_Mx += 0
+            self.forces.summed_My += 0
         
         self.forces.Moverturn_thrust = np.sum(self.forces.Fz*np.sqrt((self.forces.cy - self.forces.ypin)**2+(self.forces.cx - self.forces.xpin)**2),axis=0)
         self.forces.Moverturn_gas = (self.mech.scroll_plate_thickness + self.geo.h/2)*np.sum(np.sqrt(self.forces.Fx**2+self.forces.Fy**2),axis=0)
         self.forces.Moverturn_inertia = (self.mech.scroll_zcm__thrust_surface)*np.sqrt(Fcy**2+Fcx**2)
-        self.forces.Moverturn_bearing = (self.mech.D_crank_bearing/2)*np.sqrt(self.forces.Fx_bearing_simple**2+self.forces.Fy_bearing_simple**2)
+        if hasattr(self.mech,'D_crank_bearing'):
+            self.forces.Moverturn_bearing = (self.mech.D_crank_bearing/2)*np.sqrt(self.forces.Fx_bearing_simple**2+self.forces.Fy_bearing_simple**2)
+        else:
+            self.forces.Moverturn_bearing = None
         self.forces.Moverturn = np.sqrt(self.forces.summed_Mx**2+self.forces.summed_My**2)
         
 #        import matplotlib.pyplot as plt
@@ -2860,6 +2877,8 @@ class Scroll(PDSimCore, _Scroll):
                 '/mech/orbiting_scroll_mass':'Mass of orbiting scroll [kg]',
                 '/mech/scroll_density':'Scroll density [kg]',
                 '/mech/scroll_plate_thickness':'Scroll plate thickness [m]',
+                '/mech/scroll_added_mass':'Scroll added mass [kg]',
+                '/mech/scroll_plate_diameter':'Scroll plate diameter [m]',
                 '/mech/thrust_ID':'Thrust bearing inner diameter [m]',
                 '/mech/thrust_OD':'Thrust bearing outer diameter [m]',
                 '/mech/thrust_friction_coefficient':'Thrust bearing friction coefficient [m]'
