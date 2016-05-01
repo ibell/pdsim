@@ -1465,10 +1465,12 @@ class PDSimCore(object):
                 '/Wdot_pv':'Mechanical power calculated as the integral of -pdV [kW]',
                 '/Wdot_electrical':'Electrical power of the machine [kW]',
                 '/Wdot_forces':'Mechanical power calculated from the mechanical analysis [kW]',
+                '/mdot':'Mass flow rate [kg/s]',
                 '/motor/eta_motor':'Motor efficiency [-]',
                 '/motor/losses':'Losses generated in the motor [kW]',
                 '/motor/suction_fraction':'Fraction of the motor losses that are added to the suction gas [-]',
                 '/motor/type':'The model used to simulate the motor',
+                '/omega':'Rotational speed [rad/s]',
                 '/run_index':'A unique identifier for runs in a batch'
                 }
         
