@@ -5,15 +5,7 @@ cimport cython
 from libcpp.vector cimport vector
 
 from CoolProp.CoolProp cimport State as State
-#from CoolProp.CoolProp cimport constants_header
 cimport CoolProp.constants_header as constants
-#from CoolProp cimport AbstractState as cAbstractState
-    
-cdef extern from "Python.h":
-    char* __FILE__
-
-cdef extern from "Python.h":
-    int __LINE__
 
 cdef class StateFlooded(State):
 
