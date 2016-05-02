@@ -44,8 +44,8 @@ cdef class Spline:
         if number_t is double:
             return self.thisptr.interpolate(x)
         else:
-            # Select the vector<double> specializatiuon of the interpolation function
-            return np.array(self.thisptr.interpolate(<vector[double]>x))
+            # Select the vector<double> specialization of the interpolation function
+            return np.array(self.thisptr.interpolate_vec( x ))
         
 cpdef Spline splrep(vector[double] x, vector[double] y, k = 3, s = 0):
     """
@@ -64,4 +64,4 @@ cpdef splev(number_t x, Spline spl):
     if number_t is double:
         return spl.interpolate(x)
     else:
-        return np.array(spl.interpolate(x))
+        return np.array(spl.interpolate_vec(x))
