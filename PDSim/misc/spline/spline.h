@@ -4,6 +4,8 @@
  *
  * From http://shiftedbits.org/2011/01/30/cubic-spline-interpolation/
  *
+ * IHB(05/01/2016): Removed overload and renamed the interpolate function (cython cannot disambiguate the functions)
+ *
  */
 #include <algorithm>
 #include <vector>
@@ -85,7 +87,7 @@ public:
     }
     
     /* Evaluate at multiple locations, assuming xx is sorted ascending */
-    std::vector<Y> interpolate(const std::vector<X>& xx) const {
+    std::vector<Y> interpolate_vec(const std::vector<X>& xx) const {
         if (mElements.size() == 0) return std::vector<Y>(xx.size());
         
         typename std::vector<X>::const_iterator it;
