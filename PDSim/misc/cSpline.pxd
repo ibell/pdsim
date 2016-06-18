@@ -8,7 +8,7 @@ cdef extern from "spline.h":
         Spline(vector[T] x, vector[V] y) except +ValueError
         
         ## Interpolate function
-        vector[V] interpolate(vector[T] x) except +ValueError
+        vector[V] interpolate_vec(vector[T] x) except +ValueError
         
         ## Interpolate function
         V interpolate(T x) except +ValueError
