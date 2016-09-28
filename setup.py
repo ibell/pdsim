@@ -71,7 +71,7 @@ def clean():
             
 # Try to remove the generated files in the source tree 
 # if you are doing an install to the normal location
-if '--inplace' not in sys.argv or '--clean' in sys.argv:
+if '--clean' in sys.argv:
     clean()
     if '--clean' in sys.argv:
         sys.argv.remove('--clean')
