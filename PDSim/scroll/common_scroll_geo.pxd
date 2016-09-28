@@ -15,10 +15,12 @@ cdef class HTAnglesClass:
     
 cdef class CVInvolute:
     cdef public double phi_max, phi_min, phi_0
+    cdef public double dphi_max_dtheta, dphi_min_dtheta
     cdef public int involute
     
 cdef class CVInvolutes:
     cdef public CVInvolute Inner, Outer
+    cdef public bint has_line_1, has_line_2
 
 cdef enum involute_index:
     INVOLUTE_FI
@@ -95,6 +97,8 @@ cpdef double_or_numpy plus_one(double_or_numpy x)
 cpdef double Gr(double phi, geoVals geo, double theta, int inv)
 cpdef double dGr_dphi(double phi, geoVals geo, double theta, int inv)
 cpdef double dGr_dtheta(double phi, geoVals geo, double theta, int inv)
+
+cpdef VdV_common(double theta, geoVals geo, CVInvolutes inv)
 
 cpdef double involute_heat_transfer(double hc, double hs, double  rb, 
                                   double phi1, double phi2, double phi0, 

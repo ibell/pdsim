@@ -39,8 +39,64 @@ cdef class CVInvolutes:
         s += "Inner.involute = {i:s}\n".format(i=involute_index_to_key(self.Inner.involute))
         s += "Inner.phi_0 = {i:g}\n".format(i=self.Inner.phi_0)
         s += "Inner.phi_max = {i:g}\n".format(i=self.Inner.phi_max)
-        s += "Inner.phi_min = {i:g}".format(i=self.Inner.phi_min)
+        s += "Inner.phi_min = {i:g}\n".format(i=self.Inner.phi_min)
+        s += "has_line_1 = {i:g}\n".format(i=self.has_line_1)
+        s += "has_line_2 = {i:g}".format(i=self.has_line_2)
         return s
+
+cpdef VdV_common(double theta, geoVals geo, CVInvolutes inv):
+    """
+    Evaluate V and dV/dtheta in a generalized manner for a chamber
+    """
+    cdef double A_i, A_o, A_line_1 = 0, A_line_2 = 0, x_1, x_2, y_1, y_2
+    cdef double dA_line_1_dtheta = 0, dA_line_2_dtheta = 0, dx_1_dtheta, dy_1_dtheta, dx_2_dtheta, dy_2_dtheta
+
+    ## ------------------------ VOLUME -------------------------------
+
+    A_i = 0.5*(Gr(inv.Outer.phi_max, geo, theta, inv.Outer.involute) - Gr(inv.Outer.phi_min, geo, theta, inv.Outer.involute))
+    if inv.has_line_1:
+        _coords_inv_d_int(inv.Outer.phi_max, geo, theta, inv.Outer.involute, &x_1, &y_1)
+        _coords_inv_d_int(inv.Inner.phi_max, geo, theta, inv.Inner.involute, &x_2, &y_2)
+        A_line_1 = 0.5*(x_1*y_2 - x_2*y_1)
+    A_o = 0.5*(Gr(inv.Inner.phi_min, geo, theta, inv.Inner.involute) - Gr(inv.Inner.phi_max, geo, theta, inv.Inner.involute))
+    if inv.has_line_2:
+        _coords_inv_d_int(inv.Inner.phi_min, geo, theta, inv.Inner.involute, &x_1, &y_1)
+        _coords_inv_d_int(inv.Outer.phi_min, geo, theta, inv.Outer.involute, &x_2, &y_2)
+        A_line_2 = 0.5*(x_1*y_2 - x_2*y_1)
+    print('CMN', A_i , A_line_1 , A_o , A_line_2)
+    
+    V = geo.h*(A_i + A_line_1 + A_o + A_line_2)
+    
+    ## ------------------------ DERIVATIVE -------------------------------
+    
+    dA_i_dtheta = 0.5*(dGr_dphi(inv.Outer.phi_max, geo, theta, inv.Outer.involute)*inv.Outer.dphi_max_dtheta
+                      +dGr_dtheta(inv.Outer.phi_max, geo, theta, inv.Outer.involute)
+                      -dGr_dphi(inv.Outer.phi_min, geo, theta, inv.Outer.involute)*inv.Outer.dphi_min_dtheta
+                      -dGr_dtheta(inv.Outer.phi_min, geo, theta, inv.Outer.involute)
+                      )
+
+    if inv.has_line_1:
+        coords_inv_dtheta(inv.Outer.phi_max, geo, theta, inv.Outer.involute, &dx_1_dtheta, &dy_1_dtheta)
+        coords_inv_dtheta(inv.Inner.phi_max, geo, theta, inv.Inner.involute, &dx_2_dtheta, &dy_2_dtheta)
+        dA_line_1_dtheta = 0.5*(x_1*dy_2_dtheta + y_2*dx_1_dtheta - x_2*dy_1_dtheta - y_1*dx_2_dtheta)
+    
+    dA_o_dtheta = 0.5*(dGr_dphi(inv.Inner.phi_min, geo, theta, inv.Inner.involute)*inv.Inner.dphi_min_dtheta
+                       +dGr_dtheta(inv.Inner.phi_min, geo, theta, inv.Inner.involute)
+                       -dGr_dphi(inv.Inner.phi_max, geo, theta, inv.Inner.involute)*inv.Inner.dphi_max_dtheta
+                       -dGr_dtheta(inv.Inner.phi_max, geo, theta, inv.Inner.involute)
+                       )
+
+    if inv.has_line_2:
+        coords_inv_dtheta(inv.Inner.phi_min, geo, theta, inv.Inner.involute, &dx_1_dtheta, &dy_1_dtheta)
+        coords_inv_dtheta(inv.Outer.phi_min, geo, theta, inv.Outer.involute, &dx_2_dtheta, &dy_2_dtheta)
+        dA_line_2_dtheta = 0.5*(x_1*dy_2_dtheta + y_2*dx_1_dtheta - x_2*dy_1_dtheta - y_1*dx_2_dtheta)
+
+    dV = geo.h*(dA_i_dtheta + dA_line_1_dtheta + dA_o_dtheta + dA_line_2_dtheta)
+    
+    cdef VdVstruct VdV = VdVstruct.__new__(VdVstruct)
+    VdV.V = V
+    VdV.dV = dV
+    return VdV
         
 cpdef bytes involute_index_to_key(int index):
     """
