@@ -63,7 +63,6 @@ cpdef VdV_common(double theta, geoVals geo, CVInvolutes inv):
         _coords_inv_d_int(inv.Inner.phi_min, geo, theta, inv.Inner.involute, &x_1, &y_1)
         _coords_inv_d_int(inv.Outer.phi_min, geo, theta, inv.Outer.involute, &x_2, &y_2)
         A_line_2 = 0.5*(x_1*y_2 - x_2*y_1)
-    print('CMN', A_i , A_line_1 , A_o , A_line_2)
     
     V = geo.h*(A_i + A_line_1 + A_o + A_line_2)
     
