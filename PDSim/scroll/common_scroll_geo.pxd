@@ -12,21 +12,21 @@ cdef class VdVstruct:
 
 cdef class HTAnglesClass:
     cdef public double phi_1_i, phi_2_i, phi_1_o, phi_2_o, phi_i0, phi_o0
-    
-cdef class CVInvolute:
-    cdef public double phi_max, phi_min, phi_0
-    cdef public double dphi_max_dtheta, dphi_min_dtheta
-    cdef public int involute
-    
-cdef class CVInvolutes:
-    cdef public CVInvolute Inner, Outer
-    cdef public bint has_line_1, has_line_2
 
 cdef enum involute_index:
     INVOLUTE_FI
     INVOLUTE_FO
     INVOLUTE_OI
-    INVOLUTE_OO
+    INVOLUTE_OO    
+
+cdef class CVInvolute:
+    cdef public double phi_max, phi_min, phi_0
+    cdef public double dphi_max_dtheta, dphi_min_dtheta
+    cdef public involute_index involute
+    
+cdef class CVInvolutes:
+    cdef public CVInvolute Inner, Outer
+    cdef public bint has_line_1, has_line_2
     
 cdef enum sides:
     UP
@@ -99,6 +99,12 @@ cpdef double dGr_dphi(double phi, geoVals geo, double theta, int inv)
 cpdef double dGr_dtheta(double phi, geoVals geo, double theta, int inv)
 
 cpdef VdV(double theta, geoVals geo, CVInvolutes inv)
+cpdef dict forces(double theta, geoVals geo, CVInvolutes inv, double A)
+cpdef double fxA(double phi, geoVals geo, double theta, involute_index inv)
+cpdef double fyA(double phi, geoVals geo, double theta, involute_index inv)
+cpdef double fFx_p(double phi, geoVals geo, double theta, involute_index inv)
+cpdef double fFy_p(double phi, geoVals geo, double theta, involute_index inv)
+cpdef double fMO_p(double phi, geoVals geo, double theta, involute_index inv)
 
 cpdef double involute_heat_transfer(double hc, double hs, double  rb, 
                                   double phi1, double phi2, double phi0, 

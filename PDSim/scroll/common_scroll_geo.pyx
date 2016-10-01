@@ -97,6 +97,60 @@ cpdef VdV(double theta, geoVals geo, CVInvolutes inv):
     VdV.dV = dV
     return VdV
 
+cpdef dict forces(double theta, geoVals geo, CVInvolutes inv, double A):
+    """
+    Evaluate the force terms for a control volume
+    """
+    cdef double xA_line_1 = 0, xA_line_2 = 0, yA_line_1 = 0, yA_line_2 = 0, 
+    cdef double x_1 = 0, x_2 = 0, y_1 = 0, y_2 = 0, c
+    cdef CVInvolute orbiting_involute
+
+    ## ------------------------ FORCE CENTROID -------------------------------
+
+    xA_outer = fxA(inv.Outer.phi_max, geo, theta, inv.Outer.involute) - fxA(inv.Outer.phi_min, geo, theta, inv.Outer.involute)
+    yA_outer = fyA(inv.Outer.phi_max, geo, theta, inv.Outer.involute) - fyA(inv.Outer.phi_min, geo, theta, inv.Outer.involute)
+    if inv.has_line_1:
+        _coords_inv_d_int(inv.Outer.phi_max, geo, theta, inv.Outer.involute, &x_1, &y_1)
+        _coords_inv_d_int(inv.Inner.phi_max, geo, theta, inv.Inner.involute, &x_2, &y_2)
+        xA_line_1 = -(y_1 - y_2)*(x_1**2 + x_1*x_2 + x_2**2)/6
+        yA_line_1 = -(y_1 - y_2)*(2*x_1*y_1 + x_1*y_2 + x_2*y_1 + 2*x_2*y_2)/6
+    xA_inner = fxA(inv.Inner.phi_min, geo, theta, inv.Inner.involute) - fxA(inv.Inner.phi_max, geo, theta, inv.Inner.involute)
+    yA_inner = fyA(inv.Inner.phi_min, geo, theta, inv.Inner.involute) - fyA(inv.Inner.phi_max, geo, theta, inv.Inner.involute)
+    if inv.has_line_2:
+        _coords_inv_d_int(inv.Inner.phi_min, geo, theta, inv.Inner.involute, &x_1, &y_1)
+        _coords_inv_d_int(inv.Outer.phi_min, geo, theta, inv.Outer.involute, &x_2, &y_2)
+        xA_line_2 = -(y_1 - y_2)*(x_1**2 + x_1*x_2 + x_2**2)/6
+        yA_line_2 = -(y_1 - y_2)*(2*x_1*y_1 + x_1*y_2 + x_2*y_1 + 2*x_2*y_2)/6
+
+    cx = (xA_inner + xA_line_1 + xA_outer + xA_line_2)/A
+    cy = (yA_inner + yA_line_1 + yA_outer + yA_line_2)/A
+
+    # The forces we want here are the forces on the orbiting scroll, only one of the 
+    # involutes of the control volume (Inner or Outer) can be for the orbiting scroll.  
+    # Find it, and get a reference to it
+    #
+    # If the orbiting scroll is the inner involute of the control volume, then you need
+    # to swap the sign on the force terms too (see the constant c below)
+    if inv.Inner.involute == INVOLUTE_OO or inv.Inner.involute == INVOLUTE_OI:
+        orbiting_involute = inv.Inner
+        c = -1
+    else:
+        orbiting_involute = inv.Outer
+        c = 1
+
+    # Calculate the force terms divided by the pressure acting on the orbiting scroll
+    fx_p = c*(fFx_p(orbiting_involute.phi_max, geo, theta, orbiting_involute.involute) - fFx_p(orbiting_involute.phi_min, geo, theta, orbiting_involute.involute))
+    fy_p = c*(fFy_p(orbiting_involute.phi_max, geo, theta, orbiting_involute.involute) - fFy_p(orbiting_involute.phi_min, geo, theta, orbiting_involute.involute))
+    M_O_p = c*(fMO_p(orbiting_involute.phi_max, geo, theta, orbiting_involute.involute) - fMO_p(orbiting_involute.phi_min, geo, theta, orbiting_involute.involute))
+
+    return dict(cx = cx,
+                cy = cy,
+                fz_p = A,
+                fx_p = fx_p,
+                fy_p = fy_p,
+                M_O_p = M_O_p
+                )
+
 cpdef double fxA(double phi, geoVals geo, double theta, involute_index inv):
     """
     The anti-derivative for the x-coordinate of the centroid
@@ -115,27 +169,26 @@ cpdef double fxA(double phi, geoVals geo, double theta, involute_index inv):
     
     cdef double Theta = geo.phi_fie - theta - pi/2, r_b = geo.rb, r_o = geo.ro
     
-    if inv == INVOLUTE_FI:
-        phi_0 = geo.phi_fi0
-        return r_b**3*(-3*(phi - phi_0)*((phi - phi_0)**2 - 6)*cos(phi) + (phi - phi_0)*((phi - phi_0)**2 - 3)*cos(phi)**3 
-                      + 3*(2*(phi - phi_0)**2 - 5)*sin(phi) + (3*(phi - phi_0)**2 - 1)*sin(phi)**3)/6
-    elif inv == INVOLUTE_FO:
-        phi_0 = geo.phi_fo0
-        return r_b**3*(-3*(phi - phi_0)*((phi - phi_0)**2 - 6)*cos(phi) + (phi - phi_0)*((phi - phi_0)**2 - 3)*cos(phi)**3 
-                      + 3*(2*(phi - phi_0)**2 - 5)*sin(phi) + (3*(phi - phi_0)**2 - 1)*sin(phi)**3)/6
-    elif inv == INVOLUTE_OO:
-        phi_0 = geo.phi_oo0 
-    elif inv == INVOLUTE_OI:
-        phi_0 = geo.phi_oi0
-    else:
-        raise ValueError("Involute is invalid")
-    
-    return -r_b*(-phi*r_b*r_o*(phi**2 - 3*phi*phi_0 + 3*phi_0**2 + 3)*cos(Theta)/3 
+    if inv == INVOLUTE_FO or inv == INVOLUTE_FI:
+        if inv == INVOLUTE_FO:
+            phi_0 = geo.phi_fo0
+        else:
+            phi_0 = geo.phi_fi0
+        # return r_b**3*(-3*(phi - phi_0)*((phi - phi_0)**2 - 6)*cos(phi) + (phi - phi_0)*((phi - phi_0)**2 - 3)*cos(phi)**3 + 3*(2*(phi - phi_0)**2 - 5)*sin(phi) + (3*(phi - phi_0)**2 - 1)*sin(phi)**3)/6
+        return r_b**3*((-3*phi + 3*phi_0)*((phi - phi_0)**2 - 6)*cos(phi) + (phi - phi_0)*((phi - phi_0)**2 - 3)*cos(phi)**3 + (3*(phi - phi_0)**2 - 1)*sin(phi)**3 + (6*(phi - phi_0)**2 - 15)*sin(phi))/6
+    elif inv == INVOLUTE_OO or inv == INVOLUTE_OI:
+        if inv == INVOLUTE_OO:
+            phi_0 = geo.phi_oo0 
+        else:
+            phi_0 = geo.phi_oi0
+        return -r_b*(-phi*r_b*r_o*(phi**2 - 3*phi*phi_0 + 3*phi_0**2 + 3)*cos(Theta)/3 
                 + r_b**2*(phi - phi_0)*((phi - phi_0)**2 - 3)*cos(phi)**3/3 
                 + r_b**2*(3*(phi - phi_0)**2 - 1)*sin(phi)**3/3 + 2*r_b*r_o*(phi - phi_0)*cos(Theta)*cos(phi)**2 
                 - (phi - phi_0)*(r_b**2*((phi - phi_0)**2 - 6) + r_o**2*cos(Theta)**2)*cos(phi) 
                 + (r_b**2*(2*(phi - phi_0)**2 - 5) + r_b*r_o*((phi - phi_0)**2 - 1)*cos(Theta)*cos(phi) + r_o**2*cos(Theta)**2)*sin(phi)
                 )/2
+    else:
+        raise ValueError("Involute is invalid")
                         
 cpdef double fyA(double phi, geoVals geo, double theta, involute_index inv):
     """
