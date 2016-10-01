@@ -98,7 +98,7 @@ cpdef double Gr(double phi, geoVals geo, double theta, int inv)
 cpdef double dGr_dphi(double phi, geoVals geo, double theta, int inv)
 cpdef double dGr_dtheta(double phi, geoVals geo, double theta, int inv)
 
-cpdef VdV_common(double theta, geoVals geo, CVInvolutes inv)
+cpdef VdV(double theta, geoVals geo, CVInvolutes inv)
 
 cpdef double involute_heat_transfer(double hc, double hs, double  rb, 
                                   double phi1, double phi2, double phi0, 
