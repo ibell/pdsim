@@ -96,6 +96,158 @@ cpdef VdV_common(double theta, geoVals geo, CVInvolutes inv):
     VdV.V = V
     VdV.dV = dV
     return VdV
+
+cpdef double fxA(double phi, geoVals geo, double theta, involute_index inv):
+    """
+    The anti-derivative for the x-coordinate of the centroid
+    
+    Parameters
+    ----------
+    phi : float
+        The involute angle
+    geo : geoVals
+        The structure with the geometry obtained from get_geo()
+    theta : float
+        The crank angle, between 0 and 2*pi
+    inv : involute_index
+        The key for the involute to be considered
+    """
+    
+    cdef double Theta = geo.phi_fie - theta - pi/2, r_b = geo.rb, r_o = geo.ro
+    
+    if inv == INVOLUTE_FI:
+        phi_0 = geo.phi_fi0
+        return r_b**3*(-3*(phi - phi_0)*((phi - phi_0)**2 - 6)*cos(phi) + (phi - phi_0)*((phi - phi_0)**2 - 3)*cos(phi)**3 
+                      + 3*(2*(phi - phi_0)**2 - 5)*sin(phi) + (3*(phi - phi_0)**2 - 1)*sin(phi)**3)/6
+    elif inv == INVOLUTE_FO:
+        phi_0 = geo.phi_fo0
+        return r_b**3*(-3*(phi - phi_0)*((phi - phi_0)**2 - 6)*cos(phi) + (phi - phi_0)*((phi - phi_0)**2 - 3)*cos(phi)**3 
+                      + 3*(2*(phi - phi_0)**2 - 5)*sin(phi) + (3*(phi - phi_0)**2 - 1)*sin(phi)**3)/6
+    elif inv == INVOLUTE_OO:
+        phi_0 = geo.phi_oo0 
+    elif inv == INVOLUTE_OI:
+        phi_0 = geo.phi_oi0
+    else:
+        raise ValueError("Involute is invalid")
+    
+    return -r_b*(-phi*r_b*r_o*(phi**2 - 3*phi*phi_0 + 3*phi_0**2 + 3)*cos(Theta)/3 
+                + r_b**2*(phi - phi_0)*((phi - phi_0)**2 - 3)*cos(phi)**3/3 
+                + r_b**2*(3*(phi - phi_0)**2 - 1)*sin(phi)**3/3 + 2*r_b*r_o*(phi - phi_0)*cos(Theta)*cos(phi)**2 
+                - (phi - phi_0)*(r_b**2*((phi - phi_0)**2 - 6) + r_o**2*cos(Theta)**2)*cos(phi) 
+                + (r_b**2*(2*(phi - phi_0)**2 - 5) + r_b*r_o*((phi - phi_0)**2 - 1)*cos(Theta)*cos(phi) + r_o**2*cos(Theta)**2)*sin(phi)
+                )/2
+                        
+cpdef double fyA(double phi, geoVals geo, double theta, involute_index inv):
+    """
+    The anti-derivative for the y-coordinate of the centroid
+    
+    Parameters
+    ----------
+    phi : float
+        The involute angle
+    geo : geoVals
+        The structure with the geometry obtained from get_geo()
+    theta : float
+        The crank angle, between 0 and 2*pi
+    inv : involute_index
+        The key for the involute to be considered
+    """
+    
+    cdef double Theta = geo.phi_fie - theta - pi/2, r_b = geo.rb, r_o = geo.ro
+    
+    if inv == INVOLUTE_FI:
+        phi_0 = geo.phi_fi0
+        return r_b**3*(-(phi - phi_0)*((phi - phi_0)**2 - 3)*sin(phi)**3 + 6*(phi - phi_0)*sin(phi) 
+                       - 3*(2*(phi - phi_0)**2 - 3)*cos(phi) + (3*(phi - phi_0)**2 - 1)*cos(phi)**3)/3
+    elif inv == INVOLUTE_FO:
+        phi_0 = geo.phi_fo0
+        return r_b**3*(-(phi - phi_0)*((phi - phi_0)**2 - 3)*sin(phi)**3 + 6*(phi - phi_0)*sin(phi) 
+                      - 3*(2*(phi - phi_0)**2 - 3)*cos(phi) + (3*(phi - phi_0)**2 - 1)*cos(phi)**3)/3
+    elif inv == INVOLUTE_OO:
+        phi_0 = geo.phi_oo0
+    elif inv == INVOLUTE_OI:
+        phi_0 = geo.phi_oi0
+    else:
+        raise ValueError("Involute is invalid")
+
+    return -r_b*(-r_b**2*(phi - phi_0)*((phi - phi_0)**2 - 3)*sin(phi)**3/3 - r_b**2*(2*(phi - phi_0)**2 - 3)*cos(phi) 
+    + r_b**2*(3*(phi - phi_0)**2 - 1)*cos(phi)**3/3 - r_b*r_o*(phi - phi_0 - 1)*(phi - phi_0 + 1)*cos(Theta)/2 
+    + r_b*(4*r_b*(phi - phi_0) + 2*r_o*(phi - phi_0)*cos(Theta + phi) + r_o*((phi - phi_0)**2 - 1)*sin(Theta + phi))*sin(phi)/2 
+    - r_o*(r_b*(phi**3 - 3*phi**2*phi_0 + 3*phi*phi_0**2 - 3*phi + 6*phi_0) + 6*r_o*(phi - phi_0)*cos(Theta)*cos(phi) - 6*r_o*sin(phi)*cos(Theta))*sin(Theta)/6)
+
+cpdef double fFx_p(double phi, geoVals geo, double theta, involute_index inv):
+    """
+    The anti-derivative of the x-coordinate force term (Table 2)
+    
+    Parameters
+    ----------
+    phi : float
+        The involute angle
+    geo : geoVals
+        The structure with the geometry obtained from get_geo()
+    theta : float
+        The crank angle, between 0 and 2*pi
+    inv : involute_index
+        The key for the involute to be considered
+    """
+    if inv == INVOLUTE_FI:
+        return geo.h*geo.rb*((geo.phi_fi0-phi)*cos(phi)+sin(phi))
+    elif inv == INVOLUTE_OO:
+        return geo.h*geo.rb*((geo.phi_oo0-phi)*cos(phi)+sin(phi))
+    elif inv == INVOLUTE_FO:
+        return geo.h*geo.rb*((phi-geo.phi_fo0)*cos(phi)-sin(phi))
+    elif inv == INVOLUTE_OI:
+        return geo.h*geo.rb*((phi-geo.phi_oi0)*cos(phi)-sin(phi))
+    else:
+        raise ValueError("Involute is invalid")
+
+cpdef double fFy_p(double phi, geoVals geo, double theta, involute_index inv):
+    """
+    The anti-derivative of the y-coordinate force term (Table 2)
+    
+    Parameters
+    ----------
+    phi : float
+        The involute angle
+    geo : geoVals
+        The structure with the geometry obtained from get_geo()
+    theta : float
+        The crank angle, between 0 and 2*pi
+    inv : involute_index
+        The key for the involute to be considered
+    """
+    if inv == INVOLUTE_FI:
+        return geo.h*geo.rb*((geo.phi_fi0-phi)*sin(phi)-cos(phi))
+    elif inv == INVOLUTE_OO:
+        return geo.h*geo.rb*((geo.phi_oo0-phi)*sin(phi)-cos(phi))
+    elif inv == INVOLUTE_FO:
+        return geo.h*geo.rb*((phi-geo.phi_fo0)*sin(phi)+cos(phi))
+    elif inv == INVOLUTE_OI:
+        return geo.h*geo.rb*((phi-geo.phi_oi0)*sin(phi)+cos(phi))
+    else:
+        raise ValueError("Involute is invalid")
+        
+cpdef double fMO_p(double phi, geoVals geo, double theta, involute_index inv):
+    """
+    The anti-derivative of the spinning moment calculation (Table 2)
+    
+    Parameters
+    ----------
+    phi : float
+        The involute angle
+    geo : geoVals
+        The structure with the geometry obtained from get_geo()
+    theta : float
+        The crank angle, between 0 and 2*pi
+    inv : involute_index
+        The key for the involute to be considered
+    """
+    if inv == INVOLUTE_OO:
+        return geo.h*geo.rb**2*phi/2.0*(phi-2*geo.phi_oo0)
+    elif inv == INVOLUTE_OI:
+        return -geo.h*geo.rb**2*phi/2.0*(phi-2*geo.phi_oi0)
+    else:
+        return 1e99
         
 cpdef bytes involute_index_to_key(int index):
     """
