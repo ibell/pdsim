@@ -98,7 +98,7 @@ cpdef double Gr(double phi, geoVals geo, double theta, int inv)
 cpdef double dGr_dphi(double phi, geoVals geo, double theta, int inv)
 cpdef double dGr_dtheta(double phi, geoVals geo, double theta, int inv)
 
-cpdef VdV(double theta, geoVals geo, CVInvolutes inv)
+cpdef VdVstruct VdV(double theta, geoVals geo, CVInvolutes inv)
 cpdef dict forces(double theta, geoVals geo, CVInvolutes inv, double A)
 cpdef double fxA(double phi, geoVals geo, double theta, involute_index inv)
 cpdef double fyA(double phi, geoVals geo, double theta, involute_index inv)

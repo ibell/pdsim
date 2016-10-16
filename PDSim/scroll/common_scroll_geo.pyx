@@ -44,7 +44,7 @@ cdef class CVInvolutes:
         s += "has_line_2 = {i:g}".format(i=self.has_line_2)
         return s
 
-cpdef VdV(double theta, geoVals geo, CVInvolutes inv):
+cpdef VdVstruct VdV(double theta, geoVals geo, CVInvolutes inv):
     """
     Evaluate V and dV/dtheta in a generalized manner for a chamber
     """
