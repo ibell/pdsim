@@ -2,6 +2,8 @@
 Created on 2 oct. 2012 by maxime - Updated by Ian Bell
 
 @author: ibell
+Updated 2016/10/20 
+@author: Davide Ziviani
 '''
 from __future__ import division
 import sys
@@ -20,7 +22,7 @@ scale_factor = 10000000
 #Rescale the dimensions to go from float to long
 scaled_x = [_*scale_factor for _ in x]
 scaled_y = [_*scale_factor for _ in y]
-clip.add_polygon([pair for pair in zip(scaled_x,scaled_y)])
+clip.subject_polygon([pair for pair in zip(scaled_x,scaled_y)])
 plt.plot(x,y)
 
 t = np.linspace(0,2*np.pi,1000)
@@ -28,7 +30,7 @@ x = 0.5+0.55*np.cos(t)
 y = 0.5+0.55*np.sin(t)
 scaled_x = [_*scale_factor for _ in x]
 scaled_y = [_*scale_factor for _ in y]
-clip.sub_polygon([pair for pair in zip(scaled_x,scaled_y)])
+clip.clip_polygon([pair for pair in zip(scaled_x,scaled_y)])
 plt.plot(x,y)
 
 sol = clip.execute(pyclipper.INTERSECTION)
