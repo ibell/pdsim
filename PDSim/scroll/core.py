@@ -2322,8 +2322,8 @@ class Scroll(PDSimCore, _Scroll):
         for CVkey in self.CVs.keys:
             try:
                 geo_components = [self.CVs[CVkey].ForceFcn(theta, self.geo) for theta in self.t[_slice]]
-            except:
-                print 'no forces for ', CVkey               
+            except BaseException as BE:
+                print 'no forces for', CVkey, 'with error:', BE             
                 geo_components = []
                 
             if geo_components:
