@@ -315,7 +315,8 @@ class AbstractRK45ODEIntegrator(AbstractODEIntegrator):
                     else:
                         self.stepAccepted = True
                 else:
-                    print('accepted')
+                    pass
+                    # print('accepted')
             
             self.t0 += self.h
             self.Itheta += 1
