@@ -8,6 +8,9 @@ import numpy as np
 from CoolProp.CoolProp import Props
 import h5py
 
+import matplotlib.pyplot as plt
+from cycler import cycler
+
 class Plot(wx.Panel):
     def __init__(self, parent, id = -1, dpi = None, **kwargs):
         wx.Panel.__init__(self, parent, id=id, **kwargs)
@@ -58,6 +61,11 @@ class PlotNotebook(wx.Panel):
     def add(self,name="plot"):
         page = Plot(self.nb)
         self.nb.AddPage(page,name)
+        page.figure.gca().set_prop_cycle(
+            cycler('color', ['r', 'g', 'b', 'y', 'm', 'c']) *
+            cycler('linestyle', ['-', '--', '-.'])
+            )
+
         return page.figure
     
     def build_main_page(self):
