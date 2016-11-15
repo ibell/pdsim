@@ -1160,7 +1160,6 @@ class ParaSelectDialog(wx.Dialog):
 
 class ParametricOption(wx.Panel):
     
-    
     def __init__(self, parent, GUI_objects):
         wx.Panel.__init__(self, parent)
         
@@ -1476,6 +1475,7 @@ class ParametricPanel(PDPanel):
             self.BuildButton.Enable()
         # Get all the registered GUI objects
         GUI_objects = self.main.get_GUI_object_dict()
+
         # Create the option panel
         option = ParametricOption(self, GUI_objects)
         # Make it either structured or unstructured
@@ -1664,13 +1664,16 @@ class ParametricPanel(PDPanel):
         
     def build_all_scripts(self):
         sims = []
+
+        # Freshen the GUI_map
+        self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().itervalues()} 
         
         # Column index 1 is the list of parameters
         for Irow in range(self.ParaList.GetItemCount()):
             # Loop over all the rows that are checked
             if self.ParaList.IsChecked(Irow):
                 
-                #Empty lists for this run
+                # Empty lists for this run
                 vals, names = [], []
                 
                 # Each row corresponds to one run of the model
@@ -1698,7 +1701,7 @@ class ParametricPanel(PDPanel):
                             if o not in coupled_objects:
                                 raise KeyError("Coupled object [{o:s}] not found".format(o = o))
                     
-                    #Pass all the coupled objects to the handler
+                    # Pass all the coupled objects to the handler
                     o.handler(coupled_objects,keys,vals)
                 else:
                     print 'no coupled objects'
@@ -1707,10 +1710,10 @@ class ParametricPanel(PDPanel):
                 for key,val in zip(keys,vals):
                     self.main.set_GUI_object_value(key, val)
                 
-                #Build the simulation script using the GUI parameters
+                # Build the simulation script using the GUI parameters
                 script_name = self.main.build_simulation_script(run_index = Irow)
                             
-                #Add sim to the list (actually append the path to the script)
+                # Add sim to the list (actually append the path to the script)
                 sims.append(script_name)
                 
         # Check that there is a difference between the files generated 
