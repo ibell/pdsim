@@ -48,7 +48,7 @@ cpdef VdVstruct VdV(double theta, geoVals geo, CVInvolutes inv):
     """
     Evaluate V and dV/dtheta in a generalized manner for a chamber
     """
-    cdef double A_i, A_o, A_line_1 = 0, A_line_2 = 0, x_1, x_2, y_1, y_2
+    cdef double A_i, A_o, A_line_1 = 0, A_line_2 = 0, x_1, x_2, y_1, y_2, dx_1_dphi=0, dy_1_dphi=0, dx_2_dphi=0, dy_2_dphi=0
     cdef double dA_line_1_dtheta = 0, dA_line_2_dtheta = 0, dx_1_dtheta, dy_1_dtheta, dx_2_dtheta, dy_2_dtheta
 
     ## ------------------------ VOLUME -------------------------------
@@ -77,6 +77,12 @@ cpdef VdVstruct VdV(double theta, geoVals geo, CVInvolutes inv):
     if inv.has_line_1:
         coords_inv_dtheta(inv.Outer.phi_max, geo, theta, inv.Outer.involute, &dx_1_dtheta, &dy_1_dtheta)
         coords_inv_dtheta(inv.Inner.phi_max, geo, theta, inv.Inner.involute, &dx_2_dtheta, &dy_2_dtheta)
+        _dcoords_inv_dphi_int(inv.Outer.phi_max, geo, theta, inv.Outer.involute, &dx_1_dphi, &dy_1_dphi)
+        dx_1_dtheta += dx_1_dphi*inv.Outer.dphi_max_dtheta
+        dy_1_dtheta += dy_1_dphi*inv.Outer.dphi_max_dtheta
+        _dcoords_inv_dphi_int(inv.Inner.phi_max, geo, theta, inv.Inner.involute, &dx_2_dphi, &dy_2_dphi)
+        dx_2_dtheta += dx_2_dphi*inv.Inner.dphi_max_dtheta
+        dy_2_dtheta += dy_2_dphi*inv.Inner.dphi_max_dtheta
         dA_line_1_dtheta = 0.5*(x_1*dy_2_dtheta + y_2*dx_1_dtheta - x_2*dy_1_dtheta - y_1*dx_2_dtheta)
     
     dA_o_dtheta = 0.5*(dGr_dphi(inv.Inner.phi_min, geo, theta, inv.Inner.involute)*inv.Inner.dphi_min_dtheta
@@ -88,6 +94,14 @@ cpdef VdVstruct VdV(double theta, geoVals geo, CVInvolutes inv):
     if inv.has_line_2:
         coords_inv_dtheta(inv.Inner.phi_min, geo, theta, inv.Inner.involute, &dx_1_dtheta, &dy_1_dtheta)
         coords_inv_dtheta(inv.Outer.phi_min, geo, theta, inv.Outer.involute, &dx_2_dtheta, &dy_2_dtheta)
+
+        _dcoords_inv_dphi_int(inv.Inner.phi_min, geo, theta, inv.Inner.involute, &dx_1_dphi, &dy_1_dphi)
+        dx_1_dtheta += dx_1_dphi*inv.Inner.dphi_min_dtheta
+        dy_1_dtheta += dy_1_dphi*inv.Inner.dphi_min_dtheta
+        _dcoords_inv_dphi_int(inv.Outer.phi_min, geo, theta, inv.Outer.involute, &dx_2_dphi, &dy_2_dphi)
+        dx_2_dtheta += dx_2_dphi*inv.Outer.dphi_min_dtheta
+        dy_2_dtheta += dy_2_dphi*inv.Outer.dphi_min_dtheta
+
         dA_line_2_dtheta = 0.5*(x_1*dy_2_dtheta + y_2*dx_1_dtheta - x_2*dy_1_dtheta - y_1*dx_2_dtheta)
 
     dV = geo.h*(dA_i_dtheta + dA_line_1_dtheta + dA_o_dtheta + dA_line_2_dtheta)
@@ -612,6 +626,28 @@ cdef _coords_inv_d_int(double phi, geoVals geo,double theta, int flag, double *x
     elif flag == INVOLUTE_OO:
         x[0] = -rb*cos(phi)-rb*(phi-geo.phi_oo0)*sin(phi)+ro*cos(om)
         y[0] = -rb*sin(phi)+rb*(phi-geo.phi_oo0)*cos(phi)+ro*sin(om)
+    else:
+        raise ValueError('flag not valid')
+
+cdef _dcoords_inv_dphi_int(double phi, geoVals geo,double theta, int flag, double *dxdphi, double *dydphi):
+    """
+    Internal function that does the calculation for derivatives with respect to phi
+    """
+    cdef double phi_0
+    if flag == INVOLUTE_FI or flag == INVOLUTE_FO:
+        if flag == INVOLUTE_FI: 
+            phi_0 = geo.phi_fi0
+        else: 
+            phi_0 = geo.phi_fo0
+        dxdphi[0] = geo.rb*(phi-phi_0)*cos(phi)
+        dydphi[0] = geo.rb*(phi-phi_0)*sin(phi)
+    elif flag == INVOLUTE_OI or flag == INVOLUTE_OO:
+        if flag == INVOLUTE_OI: 
+            phi_0 = geo.phi_oi0
+        else: 
+            phi_0 = geo.phi_oo0
+        dxdphi[0] = -geo.rb*(phi-phi_0)*cos(phi)
+        dydphi[0] = -geo.rb*(phi-phi_0)*sin(phi) 
     else:
         raise ValueError('flag not valid')
     

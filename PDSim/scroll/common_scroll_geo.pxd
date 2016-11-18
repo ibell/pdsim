@@ -79,6 +79,7 @@ cpdef tuple _coords_inv_d(double phi, geoVals geo, double theta, flag = *)
 
 cdef _coords_inv_d_int(double phi, geoVals geo, double theta, int flag, double *x, double *y)
 cdef coords_inv_dtheta(double phi, geoVals geo, double theta, int inv, double *dx, double *dy)
+cdef _dcoords_inv_dphi_int(double phi, geoVals geo,double theta, int flag, double *dxdphi, double *dydphi)
 
 cpdef long get_compressor_CV_index(str key) except *
 cpdef long get_compression_chamber_index(long path, long alpha)
