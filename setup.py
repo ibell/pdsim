@@ -61,7 +61,7 @@ pyx_list = [
 def clean():
     for pyx_file in pyx_list:
         f_root = pyx_file.rsplit('.',1)[0]
-        for ending in ['.pyd','.so']:
+        for ending in ['.pyd','.so','.h','.cpp']:
             fname = f_root+ending
             try:
                 os.remove(fname)
