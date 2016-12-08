@@ -143,14 +143,17 @@ cpdef dict forces(double theta, geoVals geo, CVInvolutes inv, double A):
     # involutes of the control volume (Inner or Outer) can be for the orbiting scroll.  
     # Find it, and get a reference to it
     #
-    # If the orbiting scroll is the inner involute of the control volume, then you need
+    # If the orbiting scroll is the outer involute of the control volume, then you need
     # to swap the sign on the force terms too (see the constant c below)
+    # 
+    # The force terms are calculated based on the normal vector pointing TOWARDS the 
+    # scroll wrap!
     if inv.Inner.involute == INVOLUTE_OO or inv.Inner.involute == INVOLUTE_OI:
         orbiting_involute = inv.Inner
-        c = -1
+        c = 1
     else:
         orbiting_involute = inv.Outer
-        c = 1
+        c = -1
 
     # Calculate the force terms divided by the pressure acting on the orbiting scroll
     fx_p = c*(fFx_p(orbiting_involute.phi_max, geo, theta, orbiting_involute.involute) - fFx_p(orbiting_involute.phi_min, geo, theta, orbiting_involute.involute))
