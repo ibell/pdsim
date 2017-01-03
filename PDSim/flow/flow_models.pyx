@@ -391,26 +391,13 @@ cdef class ValveModel(object):
     """
     
     #Give Cython type definitions for terms
-    # @cython.locals(d_valve=cython.double,d_port=cython.double,C_D=cython.double,
-    #                h_valve=cython.double,a_valve=cython.double, l_valve=cython.double, 
-    #                rho_valve=cython.double,E=cython.double,x_stopper=cython.double,
-    #                key_up=cython.bytes,key_down=cython.bytes)
     @cython.locals(d_valve=cython.double,d_port=cython.double,C_D=cython.double,
                     rho_valve=cython.double,x_stopper=cython.double,
                     m_eff = cython.double, k_valve = cython.double,x_tr=cython.double,
                     key_up=cython.bytes,key_down=cython.bytes)
     def __init__(self, d_valve, d_port, C_D, rho_valve, x_stopper,m_eff,k_valve,x_tr,key_up, key_down):
         
-        
-        #I=(d_valve*h_valve**3)/12  #Moment of Intertia for discharge valve,[m^4]
-        #k_valve=(6*E*I)/(a_valve**2*(3*l_valve-a_valve))    #Valve stiffness
-        #m_eff=(1/3)*rho_valve*l_valve*d_valve*h_valve      #Effective mass of valve reeds
-        
-        #self.E = E
         self.rho_valve = rho_valve
-        #self.a_valve = a_valve
-        #self.l_valve = l_valve
-        #self.h_valve = h_valve
         self.d_valve = d_valve
         self.d_port = d_port
         self.A_valve = pi*d_valve**2/4.0
@@ -421,7 +408,7 @@ cdef class ValveModel(object):
         self.x_stopper = x_stopper
         self.key_up = key_up
         self.key_down = key_down
-        self.x_tr = x_tr #0.25*(self.d_port**2/self.d_valve)
+        self.x_tr = x_tr 
         
         self. xv = empty_arraym(2)
         
@@ -461,14 +448,13 @@ cdef class ValveModel(object):
         self.xv = xv.copy()
         #If valve opening is less than zero, just use zero (the valve is closed)
         if self.xv.get_index(0) < 0.0 and self.xv.get_index(1) < 1e-15:
-            #print 'closed, desired position is',self.xv.get_index(0),' and velocity is',self.xv.get_index(1)
+
             self.xv.set_index(0, 0.0)
             self.xv.set_index(1, 0.0)
         #If it predicts a valve opening greater than max opening, just use the max opening
         elif self.xv.get_index(0) > self.x_stopper and self.xv.get_index(1) > 0.0:
             self.xv.set_index(0, self.x_stopper)
             self.xv.set_index(1, 0.0)
-        #print self.xv,'set_xv',xv
         
         
     cpdef double A(self):
@@ -531,8 +517,6 @@ cdef class ValveModel(object):
             self._pressure_dominant(f,x,xdot,rho,V,deltap)
         else:
             self._flux_dominant(f,x,xdot,rho,V)
-            
-        #print deltap, p_high, p_low, x, xdot, V, f,'valves'
             
         omega = Core.omega
         out_array.set_index(0, f.get_index(0)/omega)
