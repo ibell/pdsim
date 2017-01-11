@@ -779,8 +779,15 @@ class PDSimCore(object):
         temp.update(dict(P=outletState.p, S=s1))
         h2s = temp.h
         
-        self.eta_a = (h2s-h1)/(h2-h1)
-        self.Wdot_i = self.mdot*(h2s-h1)
+        if outletState.p > inletState.p:
+            # Compressor Mode
+            self.eta_a = (h2s-h1)/(h2-h1)
+            self.Wdot_i = self.mdot*(h2s-h1)
+        else:
+            # Expander Mode
+            self.eta_a = (h1-h2)/(h1-h2s)
+            self.Wdot_i = self.mdot*(h1-h2s) 
+            
         # self.Qamb is positive if heat is being added to the lumped mass
         self.Wdot = self.mdot*(h2-h1)-self.Qamb
     
