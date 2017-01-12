@@ -217,7 +217,13 @@ class PDSimCore(object):
         self.FlowStorage=[]
         
         self.Tubes = TubeCollection()
-        self.Tlumps = np.zeros((1,1))
+        
+        # A storage of Td and lump tempertures
+        if not hasattr(self,'Nlumps'):
+            self.Tlumps = np.zeros((1,1)) 
+        else:
+            self.Tlumps = np.zeros((self.Nlumps+1,1))
+            
         self.steps = []
         self.__hasValves__ = False
         
@@ -253,12 +259,11 @@ class PDSimCore(object):
         
         * Inlet state viscosity and conductivity must be greater than zero
         """
-        
         if self.inlet_state.get_visc() < 0:
             raise ValueError('Your inlet state viscosity is less than zero. Invalid fluid: ' +self.inlet_state.Fluid)
         if self.inlet_state.get_cond() < 0:
             raise ValueError('Your inlet state conductivity is less than zero. Invalid fluid: '+self.inlet_state.Fluid)
-            
+
     def _get_from_matrices(self,i):
         """
         Get values back from the matrices and reconstruct the state variable list
@@ -279,7 +284,8 @@ class PDSimCore(object):
                     raise KeyError
             
             if self.__hasValves__:
-
+                #print list(self.xValves[:,i])
+                #VarList+=list(self.xValves[:,i])
                 ValveList = list(self.xValves[:,i])
                 VarList = np.append( VarList,ValveList)
 
@@ -747,7 +753,7 @@ class PDSimCore(object):
                 self.lumps_resid = arraym(self.lumps_resid)
         else:
             raise ValueError('lumps_energy_balance_callback cannot be None')
-        
+
         if not hasattr(self,'Qamb'):
             self.Qamb = 0
         
@@ -779,8 +785,15 @@ class PDSimCore(object):
         temp.update(dict(P=outletState.p, S=s1))
         h2s = temp.h
         
-        self.eta_a = (h2s-h1)/(h2-h1)
-        self.Wdot_i = self.mdot*(h2s-h1)
+        if outletState.p > inletState.p:
+            # Compressor Mode
+            self.eta_a = (h2s-h1)/(h2-h1)
+            self.Wdot_i = self.mdot*(h2s-h1)
+        else:
+            # Expander Mode
+            self.eta_a = (h1-h2)/(h1-h2s)
+            self.Wdot_i = self.mdot*(h1-h2s)            
+            
         # self.Qamb is positive if heat is being added to the lumped mass
         self.Wdot = self.mdot*(h2-h1)-self.Qamb
     
@@ -1086,6 +1099,7 @@ class PDSimCore(object):
         
         # Consume the first element as the discharge temp 
         self.Td = float(Td_Tlumps0.pop(0))
+        
         # The rest are the lumps in order
         self.Tlumps = Td_Tlumps0   
         
@@ -1097,7 +1111,7 @@ class PDSimCore(object):
         i = 0
         worst_error = 1000
         while worst_error > epsilon:
-            
+
             #  Actually run the cycle, runs post_cycle at the end,
             #  sets the parameter lumps_resid in this class
             #  Also sets resid_Td
@@ -1114,43 +1128,68 @@ class PDSimCore(object):
             ###  -----------------------------------
             ###         The lump temperatures
             ###  -----------------------------------
-                
+    
             self.solvers.lump_eb_history.append([self.Tlumps, self.lumps_resid])
-            
-            if len(self.solvers.lump_eb_history) == 1:
+
+            if len(self.Tlumps) > 1:
                 
-                T, EB = self.solvers.lump_eb_history[-1]
+                # Use Multi Dim. Newton Raphson step for multi-lump temperatures
+                from numpy.linalg import inv
+                w = 1.0                
+                dx = 1
+                J = np.zeros((len(self.Tlumps),len(self.Tlumps)))
+                dx = dx*np.ones_like(self.Tlumps)                
+                r0 = self.lumps_resid
                 
-                #  T and EB are one-element lists, get floats
-                _T, _EB = T[0], EB[0]
-            
-                # Use the thermal mass to make the step
-                # Here is the logic:
-                # Instantaneous energy balance given by
-                # dU/dt = m*c*(dT/dt) = sum(Qdot)
-                # and if dt = one cycle period (seconds/rev) DeltaT = 2*pi/omega
-                # DELTAT = sum(Qdot)*Deltat/(m*c)
-                thermal_capacitance = 0.49*0.001 # [kJ/K]
-                Deltat = (2*np.pi)/self.omega # [s]
-            
-                #  Update the lump temperatures
-                self.Tlumps = [_T + _EB*Deltat/thermal_capacitance]
-            
-            else:
+                # Build the Jacobian matrix by columns
+                for jj in range(len(self.Tlumps)):
+                    delta = np.zeros_like(self.Tlumps)
+                    delta[jj] = dx[jj]
+                    self.Tlumps = self.Tlumps + delta
+                    ri = self.callbacks.lumps_energy_balance_callback()
+                    J[:,jj] = (np.array(ri)-r0)/delta[jj]
+                v = np.dot(-inv(J),r0)
+
+                Tnew = self.Tlumps + w*v
+
+            else:    
                 
-                #  Get the values from the history
-                Tn1, EBn1 = self.solvers.lump_eb_history[-1]
-                Tn2, EBn2 = self.solvers.lump_eb_history[-2]
+                # Use Relaed Secant Method for single lump temperature
+                if len(self.solvers.lump_eb_history) == 1:
+    
+                    T, EB = self.solvers.lump_eb_history[-1]
+                    
+                    #  T and EB are one-element lists, get floats
+                    _T, _EB = T[0], EB[0]
+    
+                    # Use the thermal mass to make the step
+                    # Here is the logic:
+                    # Instantaneous energy balance given by
+                    # dU/dt = m*c*(dT/dt) = sum(Qdot)
+                    # and if dt = one cycle period (seconds/rev) DeltaT = 2*pi/omega
+                    # DELTAT = sum(Qdot)*Deltat/(m*c)
+                    thermal_capacitance = 0.49*0.001 # [kJ/K]
+                    Deltat = (2*np.pi)/self.omega # [s]
                 
-                #  Convert to numpy arrays
-                Tn1, EBn1, Tn2, EBn2 = [np.array(l) for l in Tn1, EBn1, Tn2, EBn2]
+                    #  Use the relaxed method to find the solution
+                    Tnew = np.array([_T + _EB*Deltat/thermal_capacitance])
                 
-                #  Use the relaxed secant method to find the solution 
-                Tnew = Tn1 - 0.7*EBn1*(Tn1-Tn2)/(EBn1-EBn2)
-            
-                #  Update the lump temperatures    
-                self.Tlumps = Tnew.tolist()
-            
+                else:
+                    
+                    #  Get the values from the history
+                    Tn1, EBn1 = self.solvers.lump_eb_history[-1]
+                    Tn2, EBn2 = self.solvers.lump_eb_history[-2]
+                    
+                    #  Convert to numpy arrays
+                    Tn1, EBn1, Tn2, EBn2 = [np.array(l) for l in Tn1, EBn1, Tn2, EBn2]
+                    
+                    #  Use the relaxed secant method to find the solution 
+                    Tnew = Tn1 - 0.7*EBn1*(Tn1-Tn2)/(EBn1-EBn2)
+
+            #  Update the lump temperatures    
+            self.Tlumps = Tnew.tolist()
+
+                
             ###  -----------------------------------
             ###        The discharge enthalpy
             ###  -----------------------------------
@@ -1165,8 +1204,9 @@ class PDSimCore(object):
             elif outlet_tube.key2 == self.key_outlet:
                 key_outtube_inlet = outlet_tube.key1
                 key_outtube_outlet = outlet_tube.key2
-                
-            if error_metric < 0.1*epsilon and abs(self.lumps_resid[0]) < epsilon:
+            
+            
+            if error_metric < 0.1*epsilon and np.max(np.abs(self.lumps_resid)) < epsilon:
 
                 # Each time that we get here and we are significantly below the threshold, store the values
             
@@ -1191,9 +1231,9 @@ class PDSimCore(object):
                     #  value for it
                     self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, hdnew)
 
-                print self.solvers.hdisc_history
+                print 'hdisc_history:',self.solvers.hdisc_history
                 
-            print 'new outlet T', self.Tubes.Nodes[self.key_outlet].T
+            print 'New outlet T:', self.Tubes.Nodes[self.key_outlet].T,'K'
                 
             # Store a copy of the initial temperatures of the chambers
             self.solvers.initial_states_history.append(self.T[:,0].copy())
@@ -1219,7 +1259,7 @@ class PDSimCore(object):
             print '==========='
             print '|| # {i:03d} ||'.format(i=i)
             print '==========='
-            print error_ascii_bar(abs(self.lumps_resid[0]), epsilon), 'energy balance kW ', self.lumps_resid[0], ' Tlumps: ',self.Tlumps,'K'
+            print error_ascii_bar(abs(self.lumps_resid[0]), epsilon), 'energy balance kW ', self.lumps_resid, ' Tlumps: ',self.Tlumps,'K'
             print error_ascii_bar(abs(self.resid_Td), epsilon), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg', self.Tubes.Nodes[key_outtube_inlet].h, 'kJ/kg'
             print error_ascii_bar(error_metric, epsilon), 'cycle-cycle    ', error_metric
             print error_ascii_bar(abs(mdot_error), 1), 'mdot [%]', mdot_error, '|| in:', mdot_in*1000, 'g/s || out:', mdot_out*1000, 'g/s '
@@ -1381,7 +1421,12 @@ class PDSimCore(object):
             self.x_state = self._get_from_matrices(0)[0:len(self.stateVariables)*self.CVs.Nexist]
         
         if x0 is None:
-            x0 = [self.Tubes.Nodes[key_outlet].T, self.Tubes.Nodes[key_outlet].T]
+            # A storage of lump tempertures
+            if not hasattr(self,'Nlumps'):
+                x0 = [self.Tubes.Nodes[key_outlet].T, self.Tubes.Nodes[key_outlet].T]
+            else:
+                x0 = [self.Tubes.Nodes[key_outlet].T]*(self.Nlumps+1)
+        
 
         #  Actually run the solver
         self.OBJECTIVE_CYCLE(x0, self.x_state, 
@@ -1465,12 +1510,10 @@ class PDSimCore(object):
                 '/Wdot_pv':'Mechanical power calculated as the integral of -pdV [kW]',
                 '/Wdot_electrical':'Electrical power of the machine [kW]',
                 '/Wdot_forces':'Mechanical power calculated from the mechanical analysis [kW]',
-                '/mdot':'Mass flow rate [kg/s]',
                 '/motor/eta_motor':'Motor efficiency [-]',
                 '/motor/losses':'Losses generated in the motor [kW]',
                 '/motor/suction_fraction':'Fraction of the motor losses that are added to the suction gas [-]',
                 '/motor/type':'The model used to simulate the motor',
-                '/omega':'Rotational speed [rad/s]',
                 '/run_index':'A unique identifier for runs in a batch'
                 }
         
@@ -1556,6 +1599,7 @@ class PDSimCore(object):
         if self.__hasValves__:
             # 
             offset = len(self.stateVariables)*self.CVs.Nexist
+            #print 'x:',x[4:6]
             for i, valve in enumerate(self.Valves):
                 if x[offset+2+i*2-1] < -10:
                     x[offset+2+i*2-1]=0.0

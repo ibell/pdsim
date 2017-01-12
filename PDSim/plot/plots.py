@@ -1,4 +1,3 @@
-
 import wx
 import wx.aui
 import matplotlib as mpl
@@ -76,6 +75,7 @@ class PlotNotebook(wx.Panel):
         self.plot_buttons=[('Stepsize',self.stepsize_theta),
                            ('Volume v. crank angle',self.V_theta),
                            ('Derivative of Volume v. crank angle',self.dV_dtheta),
+                           ('Valve lift v. crank angle',self.valve_theta),
                            ('Temperature v. crank angle',self.T_theta),
                            ('Pressure v. crank angle',self.p_theta),
                            ('Pressure v. volume',self.p_V),
@@ -259,8 +259,8 @@ class PlotNotebook(wx.Panel):
         if isinstance(self.Sim, h5py.File):
             TTT = self.Sim.get('/solvers/initial_states_history').value
         else:
-            TTTT = self.Sim.solvers.initial_states_history
-        xx = np.array(range(TTT.shape[0]))
+            TTT = self.Sim.solvers.initial_states_history
+        xx = np.array(range(np.array(TTT).shape[0]))
         yy = TTT
         axes.plot(xx, yy, 'o-')
         axes.set_xlabel('Iteration Number')
@@ -272,8 +272,14 @@ class PlotNotebook(wx.Panel):
             Tlumps = self.Sim.get('/solvers/lump_eb_history/Tlumps').value
             lump_eb_error = self.Sim.get('/solvers/lump_eb_history/lump_eb_error').value
         else:
-            Tlumps = self.solvers.lump_eb_history.Tlumps
-            lump_eb_error = self.solvers.lump_eb_history.lump_eb_error
+            try:
+                # OneCycle == False, run post_solve()
+                Tlumps = self.Sim.solvers.lump_eb_history['Tlumps']
+                lump_eb_error = self.Sim.solvers.lump_eb_history['lump_eb_error']
+            except:
+                # OneCycle == True
+                Tlumps = [item[0] for item in self.Sim.solvers.lump_eb_history]
+                lump_eb_error = [item[1] for item in self.Sim.solvers.lump_eb_history]
             
         axes.plot(Tlumps, lump_eb_error, 'o-')
         axes.set_xlabel('Lump temperature [K]')
@@ -285,8 +291,15 @@ class PlotNotebook(wx.Panel):
             hd = self.Sim.get('/solvers/hdisc_history/hd').value
             hd_error = self.Sim.get('/solvers/hdisc_history/hd_error').value
         else:
-            hd = self.solvers.hdisc_history.hd
-            hd_error = self.solvers.hdisc_history.hd_error
+            try:
+                # OneCycle == False, run post_solve()
+                hd = self.Sim.solvers.hdisc_history['hd']
+                hd_error = self.Sim.solvers.hdisc_history['hd_error']
+            except:
+                # OneCycle == True
+                hd = [item[0] for item in self.Sim.solvers.hdisc_history]
+                hd_error = [item[1] for item in self.Sim.solvers.hdisc_history]
+
         axes.plot(hd, hd_error, 'o-')
         axes.set_xlabel('Discharge enthalpy [kJ/kg]')
         axes.set_ylabel('Discharge state error [kJ/kg]')
@@ -557,4 +570,3 @@ def debug_plots(Comp, plotparent=None, plot_names = None):
 
 if __name__ == "__main__":
     print "File for doing plots.  Don't run this file"
-
