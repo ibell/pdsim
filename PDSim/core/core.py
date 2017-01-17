@@ -1154,7 +1154,7 @@ class PDSimCore(object):
 
             else:    
                 
-                # Use Relaed Secant Method for single lump temperature
+                # Use Relaxed Secant Method for single lump temperature
                 if len(self.solvers.lump_eb_history) == 1:
     
                     T, EB = self.solvers.lump_eb_history[-1]
