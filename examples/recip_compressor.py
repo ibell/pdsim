@@ -79,33 +79,38 @@ def Compressor():
     C_D = 1.17              #Drag coefficient [-]
     d_valve = 0.007         #Valve Diameter [m]
     x_stopper = 0.0018      #Stopper location [m]
-    
+
+    I=(d_valve*h_valve**3)/12  #Moment of Intertia for valve,[m^4]
+    k_valve=(6*E*I)/(a_valve**2*(3*l_valve-a_valve))    #Valve stiffness
+    m_eff=(1/3)*rho_valve*l_valve*d_valve*h_valve      #Effective mass of valve reeds
+    x_tr_suction = 0.25*(recip.d_suction**2/d_valve)
+    x_tr_discharge = 0.25*(recip.d_discharge**2/d_valve)
+
     #The suction valve parameters
     recip.suction_valve=ValveModel(
           d_valve=d_valve,
           d_port=recip.d_suction,
           C_D=C_D,
-          h_valve=h_valve,
-          a_valve=a_valve,
-          l_valve=l_valve,
           rho_valve=rho_valve,
-          E=E,
           x_stopper=x_stopper,
+          m_eff = m_eff,
+          k_valve = k_valve,
+          x_tr = x_tr_suction,
           key_up='inlet.2',
           key_down='A'
           )
     recip.add_valve(recip.suction_valve)
+    
     #The discharge valve parameters
     recip.discharge_valve=ValveModel(
           d_valve=d_valve,
           d_port=recip.d_discharge,
           C_D=C_D,
-          h_valve=h_valve,
-          a_valve=a_valve,
-          l_valve=l_valve,
           rho_valve=rho_valve,
-          E=E,
           x_stopper=x_stopper,
+          m_eff = m_eff,
+          k_valve = k_valve,
+          x_tr = x_tr_discharge,
           key_up='A',
           key_down='outlet.1'
           )

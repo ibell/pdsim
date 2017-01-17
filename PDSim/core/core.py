@@ -792,7 +792,7 @@ class PDSimCore(object):
         else:
             # Expander Mode
             self.eta_a = (h1-h2)/(h1-h2s)
-            self.Wdot_i = self.mdot*(h1-h2s)            
+            self.Wdot_i = self.mdot*(h1-h2s)
             
         # self.Qamb is positive if heat is being added to the lumped mass
         self.Wdot = self.mdot*(h2-h1)-self.Qamb
