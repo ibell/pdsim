@@ -1880,13 +1880,13 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
     
     ################ Force Components #########
     #Arc 1
-    fx_p =-hs*geo.ra_arc1*(sin(geo.t2_arc1)-sin(geo.t1_arc1))
-    fy_p =+hs*geo.ra_arc1*(cos(geo.t2_arc1)-cos(geo.t1_arc1))
-    M_O_p  =-hs*geo.ra_arc1*((sin(geo.t2_arc1)-sin(geo.t1_arc1))*geo.ya_arc1+(cos(geo.t2_arc1)-cos(geo.t1_arc1))*geo.xa_arc1)
+    fx_p = -hs*geo.ra_arc1*(sin(geo.t2_arc1)-sin(geo.t1_arc1))
+    fy_p = +hs*geo.ra_arc1*(cos(geo.t2_arc1)-cos(geo.t1_arc1))
+    M_O_p =-hs*geo.ra_arc1*((sin(geo.t2_arc1)-sin(geo.t1_arc1))*geo.ya_arc1+(cos(geo.t2_arc1)-cos(geo.t1_arc1))*geo.xa_arc1)
     #Arc 2
-    fx_p+=+hs*geo.ra_arc2*(sin(geo.t2_arc2)-sin(geo.t1_arc2))
-    fy_p+=-hs*geo.ra_arc2*(cos(geo.t2_arc2)-cos(geo.t1_arc2))
-    M_O_p +=+hs*geo.ra_arc2*((sin(geo.t2_arc2)-sin(geo.t1_arc2))*geo.ya_arc2+(cos(geo.t2_arc2)-cos(geo.t1_arc2))*geo.xa_arc2)
+    fx_p += +hs*geo.ra_arc2*(sin(geo.t2_arc2)-sin(geo.t1_arc2))
+    fy_p += -hs*geo.ra_arc2*(cos(geo.t2_arc2)-cos(geo.t1_arc2))
+    M_O_p += +hs*geo.ra_arc2*((sin(geo.t2_arc2)-sin(geo.t1_arc2))*geo.ya_arc2+(cos(geo.t2_arc2)-cos(geo.t1_arc2))*geo.xa_arc2)
     
     #Line
     x1t=-geo.xa_arc1-geo.ra_arc1*cos(geo.t1_arc1)+ro*cos(om)
@@ -1915,18 +1915,12 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
     fy_p+=hs*((-phi_os+phi_i0-pi)*sin(phi_os)-cos(phi_os)-(phi_is-phi_i0)*sin(phi_is)-cos(phi_is))*rb
     M_O_p +=-(hs*(phi_os-phi_is+pi)*(phi_os+phi_is-2*phi_i0+pi)*rb*rb)/2
     
-    cx=ro*cos(om)/2.0
-    cy=ro*sin(om)/2.0
-    
-    #Axial force
-    fz_p = DD(theta,geo)[0]/hs
-    
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
-                      fz_p = fz_p,
+                      fz_p = DD(theta,geo)[0]/hs, # Axial force
                       M_O_p = M_O_p,
-                      cx = cx,
-                      cy = cy
+                      cx = ro*cos(om)/2.0,
+                      cy = ro*sin(om)/2.0
                       )
     
     if not poly:
