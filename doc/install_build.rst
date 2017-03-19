@@ -65,67 +65,11 @@ Windows
     
     In [0]: print yaml.__file__; print yaml.__version__
 
-#. Now go into the examples folder, and try to run the file simple_example.py, you should get output like::
+#. Now go into the examples folder, and start ipython, you should get output something like::
 
-    C:\Users\Belli\Documents\Code\pdsim-git\examples>python simple_example.py
-    Number of steps taken 7000
-    Elapsed time for cycle is 0.4413 s
-    Mass flow difference 2.03524833559  %
-    ===========
-    || # 000 ||
-    ===========
-    ||................|......@..........................|| energy balance  -0.0313473302944 [399.876899321797]
-    ||................|.....@...........................|| discharge state 0.0225653554386 445.300857982
-    ||................|...........@.....................|| cycle-cycle     0.145381939657
-    Number of steps taken 7000
-    Elapsed time for cycle is 0.437784 s
-    Mass flow difference 0.324805392183  %
-    ===========
-    || # 001 ||
-    ===========
-    ||................|......@..........................|| energy balance  -0.0312974294669 [361.27298241958306]
-    ||................|@................................|| discharge state 0.00386685157006 453.064795878
-    ||................|......@..........................|| cycle-cycle     0.024111213808
-    Number of steps taken 7000
-    Elapsed time for cycle is 0.439191 s
-    Mass flow difference -0.0570907915056  %
-    ===========
-    || # 002 ||
-    ===========
-    ||................|....@............................|| energy balance  -0.0156487147334 [341.97102396847896]
-    ||............@...|.................................|| discharge state -0.000716737604005 451.684013021
-    ||................|@................................|| cycle-cycle     0.00426059998124
-    Number of steps taken 7000
-    Elapsed time for cycle is 0.499563 s
-    Mass flow difference -0.0664255877057  %
-    ===========
-    || # 003 ||
-    ===========
-    ||................|..@..............................|| energy balance  -0.00782435736672 [332.3200447429269]
-    ||............@...|.................................|| discharge state -0.000807748849267 450.151035073
-    ||................|.@...............................|| cycle-cycle     0.0048139260336
-    Number of steps taken 7000
-    Elapsed time for cycle is 0.52113 s
-    Mass flow difference -0.0374442760086  %
-    ===========
-    || # 004 ||
-    ===========
-    ||................|@................................|| energy balance  -0.00391217868336 [327.49455513015084]
-    ||...........@....|.................................|| discharge state -0.000497721396576 449.251208618
-    ||................@.................................|| cycle-cycle     0.00279279716226
-    Number of steps taken 7000
-    Elapsed time for cycle is 0.49191 s
-    Mass flow difference -0.0184814204442  %
-    ===========
-    || # 005 ||
-    ===========
-    ||...............@|.................................|| energy balance  -0.00195608934168 [325.08181032376285]
-    ||.........@......|.................................|| discharge state -0.000286132835949 448.779806416
-    ||..............@.|.................................|| cycle-cycle     0.0014388268967
-    Ntheta is 7001
-    mdot*(h2-h1),P-v,Qamb 0.0874497858735 0.07491487626 -0.0119560893417
-    Mass flow rate is 0.503773487596 g/s
-    Volumetric efficiency is 88.6166506787 %
+.. ipython::
+
+    In [0]: %run 'examples/simple_example.py'
 
 #. Ok good, PDSim is working!
     
@@ -177,103 +121,17 @@ To uninstall PDSim, go to the site-packages folder corresponding to the installa
 Using conda environments
 ========================
 
-If you have multiple versions of python or PDSim floating around, it can be useful to use conda to create virtual environments that encapsulate the desired versions of each of the pieces.  This can be easily carried out at the command line.  For instance, we might create an environment (named ``pdsim_stable``) with the most up to date version of PDSim and CoolProp version 4.2.5.  This can be achieved using a command like::
+If you have multiple versions of python or PDSim floating around, it can be useful to use conda to create conda environments that encapsulate the desired versions of each of the pieces.  This can be easily carried out at the command line.  For instance, we might create an environment (named ``pdsim_stable``) with the most up to date version of PDSim and its dependencies.  There is a file called ``RTDenvironment.yml`` in the root of the repository.  This file can be used to create a conda environment with::
     
-    C:\Users\XXXX>c:\Miniconda32bit\Scripts\conda.exe create -n pdsim_stable python=2.7 matplotlib numpy scipy h5py cython pip wxpython pyyaml
-    Fetching package metadata: ..
-    Solving package specifications: .............
-    Package plan for installation in environment c:\Miniconda32bit\envs\pdsim_stable:
-
-    The following packages will be downloaded:
-
-        package                    |            build
-        ---------------------------|-----------------
-        cython-0.21                |           py27_0         1.6 MB
-        h5py-2.3.1                 |       np19py27_0         1.2 MB
-        matplotlib-1.4.0           |       np19py27_0        41.7 MB
-        numpy-1.9.0                |           py27_0        14.2 MB
-        pytz-2014.7                |           py27_0         169 KB
-        scipy-0.14.0               |       np19py27_0        33.1 MB
-        setuptools-5.8             |           py27_0         729 KB
-        six-1.8.0                  |           py27_0          15 KB
-        ------------------------------------------------------------
-                                               Total:        92.8 MB
-
-    The following packages will be linked:
-
-        package                    |            build
-        ---------------------------|-----------------
-        cython-0.21                |           py27_0   hard-link
-        dateutil-2.1               |           py27_2   hard-link
-        h5py-2.3.1                 |       np19py27_0   hard-link
-        matplotlib-1.4.0           |       np19py27_0   hard-link
-        numpy-1.9.0                |           py27_0   hard-link
-        pip-1.5.6                  |           py27_0   hard-link
-        pyparsing-2.0.1            |           py27_0   hard-link
-        pyqt-4.10.4                |           py27_0   hard-link
-        python-2.7.8               |                0   hard-link
-        pytz-2014.7                |           py27_0   hard-link
-        scipy-0.14.0               |       np19py27_0   hard-link
-        setuptools-5.8             |           py27_0   hard-link
-        six-1.8.0                  |           py27_0   hard-link
-        wxpython-3.0               |           py27_0   hard-link
-
-    Proceed ([y]/n)?
-    
-when you say yes, miniconda will fetch the required versions of the software packages, as in::
-
-    Fetching packages ...
-    cython-0.21-py 100% |###############################| Time: 0:00:02 654.50 kB/s
-    h5py-2.3.1-np1 100% |###############################| Time: 0:00:01   1.27 MB/s
-    matplotlib-1.4 100% |###############################| Time: 0:00:29   1.49 MB/s
-    numpy-1.9.0-py 100% |###############################| Time: 0:00:10   1.47 MB/s
-    pytz-2014.7-py 100% |###############################| Time: 0:00:00 362.89 kB/s
-    scipy-0.14.0-n 100% |###############################| Time: 0:00:21   1.59 MB/s
-    setuptools-5.8 100% |###############################| Time: 0:00:01 738.79 kB/s
-    six-1.8.0-py27 100% |###############################| Time: 0:00:00 181.98 kB/s
-    Extracting packages ...
-    [      COMPLETE      ] |#################################################| 100%
-    Linking packages ...
-    [      COMPLETE      ] |#################################################| 100%
-    #
-    # To activate this environment, use:
-    # > activate pdsim_stable
-    #
+    conda.exe create --n pdsim_stable --file RTDenvironment.yml
 
 To activate this new environment, you do::
 
-    C:\Users\XXXX>c:\Miniconda32bit\Scripts\activate pdsim_stable
-    Activating environment "pdsim_stable"...
+    activate pdsim_stable
 
-    [pdsim_stable] C:\Users\XXXX>
-    
-Normally you would just do ``activate pdsim_stable``, but on my machine, the default miniconda is 64-bit and it gets all confused if you don't call the activate script directly.  Once the environment has been populated, you can pull in the remaining packages using pip::
+If on linux/OSX, you need to do::
 
-    [pdsim_stable] C:\Users\Belli>pip install CoolProp==4.2.5 cx_Freeze glob2
-    Downloading/unpacking CoolProp==4.2.5
-    Downloading/unpacking cx-Freeze
-    Downloading/unpacking glob2
-      Downloading glob2-0.4.1.tar.gz
-      Running setup.py (path:c:\users\belli\appdata\local\temp\pip_build_Belli\glob2\setup.py) egg_info for package glob2
-
-    Installing collected packages: CoolProp, cx-Freeze, glob2
-      Running setup.py install for glob2
-
-    Successfully installed CoolProp cx-Freeze glob2
-    Cleaning up...
-    
-And you can check that the right things are setup by doing::
-
-    [pdsim_stable] C:\Users\Belli>python
-    Python 2.7.8 |Continuum Analytics, Inc.| (default, Jul  2 2014, 15:13:35) [MSC v.1500 32 bit (Intel)] on win32
-    Type "help", "copyright", "credits" or "license" for more information.
-    Anaconda is brought to you by Continuum Analytics.
-    Please check out: http://continuum.io/thanks and https://binstar.org
-    >>> import CoolProp
-    >>> CoolProp.__file__
-    'c:\\Miniconda32bit\\envs\\pdsim_stable\\lib\\site-packages\\CoolProp\\__init__.pyc'
-    
-The path should be to a file in your ``envs`` folder of the miniconda installation.
+    source activate pdsim_stable
 
 .. _Use-PDSim:
 

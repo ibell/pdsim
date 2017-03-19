@@ -6,5 +6,9 @@ dependencies:
   - matplotlib
   - IPython
   - cython
+  - wxpython
+  - pyyaml
   - pip:
     - CoolProp
+    - glob2
+    - cx_Freeze
