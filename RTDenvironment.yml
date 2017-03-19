@@ -5,7 +5,6 @@ dependencies:
   - scipy
   - matplotlib
   - IPython
+  - cython
   - pip:
-    - .
     - CoolProp
-    - Cython
