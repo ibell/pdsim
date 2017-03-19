@@ -19,14 +19,6 @@ import sys, shutil, os, glob
 
 version = '2.9'
 
-# For RTD, hack the comand line arguments to this function, converting from "install --force" 
-# to something that will not result in a compressed .egg file
-# see also: http://stackoverflow.com/q/6301003/1360263
-if len(sys.args) == 3 and sys.argv[1:3] == ['install','--force']:
-    print('old_argv', sys.argv)
-    sys.argv = sys.argv[0:2] + ['--single-version-externally-managed','--root=/']
-    print('new_argv', sys.argv)
-
 if len(sys.argv) == 1:
     sys.argv += ['clean','develop']
     #sys.argv += ['clean','install']
@@ -141,6 +133,7 @@ setup(
   package_dir = {'PDSim':'PDSim',},
   package_data = package_data,
   include_dirs = [numpy.get_include(), CoolProp.get_include_directory(), "PDSim/misc/clipper", "PDSim/misc/spline"],
+  zip_safe = False # no compressed egg; see http://stackoverflow.com/a/29124937/1360263
 )
 
 try:
