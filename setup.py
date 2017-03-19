@@ -1,3 +1,4 @@
+from __future__ import print_function
 try:
     import cython
 except:
@@ -18,9 +19,17 @@ import sys, shutil, os, glob
 
 version = '2.9'
 
+# For RTD, hack the comand line arguments to this function, converting from "install --force" 
+# to something that will not result in a compressed .egg file
+# see also: http://stackoverflow.com/q/6301003/1360263
+if len(sys.args) == 3 and sys.argv[1:3] == ['install','--force']:
+    print('old_argv', sys.argv)
+    sys.argv = sys.argv[0:2] + ['--single-version-externally-managed','--root=/']
+    print('new_argv', sys.argv)
+
 if len(sys.argv) == 1:
-   sys.argv += ['clean','develop']
-   #sys.argv += ['clean','install']
+    sys.argv += ['clean','develop']
+    #sys.argv += ['clean','install']
     
 #Modify the __init__ file with this version string
 fName = os.path.join('PDSim','__init__.py')
