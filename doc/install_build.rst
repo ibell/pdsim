@@ -123,15 +123,19 @@ Using conda environments
 
 If you have multiple versions of python or PDSim floating around, it can be useful to use conda to create conda environments that encapsulate the desired versions of each of the pieces.  This can be easily carried out at the command line.  For instance, we might create an environment (named ``pdsim_stable``) with the most up to date version of PDSim and its dependencies.  There is a file called ``RTDenvironment.yml`` in the root of the repository.  This file can be used to create a conda environment with::
     
-    conda.exe create --n pdsim_stable --file RTDenvironment.yml
+    conda env create --name pdsim_stable --file RTDenvironment.yml
 
-To activate this new environment, you do::
+To activate this new environment on windows, you do::
 
     activate pdsim_stable
 
 If on linux/OSX, you need to do::
 
     source activate pdsim_stable
+
+To remove the environment you created without confirmation (thanks to ``-y``), do::
+
+    conda env remove -y -n pdsim_stable
 
 .. _Use-PDSim:
 
