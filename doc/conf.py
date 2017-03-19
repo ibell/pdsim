@@ -26,6 +26,17 @@ import sys, os
 #sys.path.insert(0,os.path.abspath('..'))
 sys.path.append(os.path.abspath('..'))
 sys.path.append(os.path.abspath(os.path.join('..','GUI')))
+
+def run_apidoc(_):
+    """ Run sphinx.apidoc programmatically to autogenerate documentation for PDSim """
+    from sphinx.apidoc import main
+    import os
+    cur_dir = os.path.abspath(os.path.dirname(__file__))
+    output_path = os.path.join(cur_dir, 'PDSim_apidoc')
+    main(['-e', '-o', output_path, os.path.dirname(PDSim.__file__), '--force'])
+
+def setup(app):
+    app.connect('builder-inited', run_apidoc)
               
 extensions = ['sphinx.ext.autodoc', 
               'sphinx.ext.napoleon',
