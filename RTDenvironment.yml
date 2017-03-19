@@ -1,0 +1,9 @@
+name: pdsim_doc_build
+dependencies:
+  - python=2.7
+  - numpy
+  - scipy
+  - matplotlib
+  - IPython
+  - pip:
+    - CoolProp
