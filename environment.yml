@@ -1,0 +1,13 @@
+name: pdsim
+dependencies:
+  - python=2.7
+  - numpy
+  - scipy
+  - matplotlib
+  - IPython
+  - pyyaml
+  - h5py
+  - wxpython
+  - pip:
+    - CoolProp
+    - Cython
