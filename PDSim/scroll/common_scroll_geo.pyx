@@ -116,8 +116,8 @@ cpdef dict forces(double theta, geoVals geo, CVInvolutes inv, double A):
     Evaluate the force terms for a control volume
     """
     cdef double xA_line_1 = 0, xA_line_2 = 0, yA_line_1 = 0, yA_line_2 = 0, 
-    cdef double x_1 = 0, x_2 = 0, y_1 = 0, y_2 = 0, c
-    cdef CVInvolute orbiting_involute
+    cdef double x_1 = 0, x_2 = 0, y_1 = 0, y_2 = 0
+    cdef CVInvolute orbiting_scroll_involute
 
     ## ------------------------ FORCE CENTROID -------------------------------
 
@@ -141,24 +141,22 @@ cpdef dict forces(double theta, geoVals geo, CVInvolutes inv, double A):
 
     # The forces we want here are the forces on the orbiting scroll, only one of the 
     # involutes of the control volume (Inner or Outer) can be for the orbiting scroll.  
-    # Find it, and get a reference to it
-    #
-    # If the orbiting scroll is the outer involute of the control volume, then you need
-    # to swap the sign on the force terms too (see the constant c below)
+    # Find it, and get a reference to it. The force terms are calculated based on the normal 
+    # vector pointing TOWARDS the scroll wrap, with limits of integration of phi_min to phi_max,
+    # with phi_min < phi_max.  So this is always the right direction for the orbiting scroll.
     # 
-    # The force terms are calculated based on the normal vector pointing TOWARDS the 
-    # scroll wrap!
-    if inv.Inner.involute == INVOLUTE_OO or inv.Inner.involute == INVOLUTE_OI:
-        orbiting_involute = inv.Inner
-        c = 1
+    # inv.Outer.involute can be one of INVOLUTE_FI OR INVOLUTE_OI.  If it is INVOLUTE_FI, that means
+    # that inv.Inner.involute MUST be INVOLUTE_OO. In either case, the normal vector pointing TOWARDS
+    # the scroll wrap is pointing in the correct direction
+    if inv.Outer.involute == INVOLUTE_OI:
+        orbiting_scroll_involute = inv.Outer
     else:
-        orbiting_involute = inv.Outer
-        c = -1
+        orbiting_scroll_involute = inv.Inner
 
     # Calculate the force terms divided by the pressure acting on the orbiting scroll
-    fx_p = c*(fFx_p(orbiting_involute.phi_max, geo, theta, orbiting_involute.involute) - fFx_p(orbiting_involute.phi_min, geo, theta, orbiting_involute.involute))
-    fy_p = c*(fFy_p(orbiting_involute.phi_max, geo, theta, orbiting_involute.involute) - fFy_p(orbiting_involute.phi_min, geo, theta, orbiting_involute.involute))
-    M_O_p = c*(fMO_p(orbiting_involute.phi_max, geo, theta, orbiting_involute.involute) - fMO_p(orbiting_involute.phi_min, geo, theta, orbiting_involute.involute))
+    fx_p = (fFx_p(orbiting_scroll_involute.phi_max, geo, theta, orbiting_scroll_involute.involute) - fFx_p(orbiting_scroll_involute.phi_min, geo, theta, orbiting_scroll_involute.involute))
+    fy_p = (fFy_p(orbiting_scroll_involute.phi_max, geo, theta, orbiting_scroll_involute.involute) - fFy_p(orbiting_scroll_involute.phi_min, geo, theta, orbiting_scroll_involute.involute))
+    M_O_p = (fMO_p(orbiting_scroll_involute.phi_max, geo, theta, orbiting_scroll_involute.involute) - fMO_p(orbiting_scroll_involute.phi_min, geo, theta, orbiting_scroll_involute.involute))
 
     return dict(cx = cx,
                 cy = cy,
