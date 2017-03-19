@@ -7,7 +7,7 @@ except:
 try:
     import CoolProp
 except ImportError as IE:
-    print IE
+    print(IE)
     raise ImportError('The required python package CoolProp was not found or could not be imported.  Please go to coolprop.sf.net to obtain a copy')
     
 import warnings, setuptools
@@ -66,7 +66,7 @@ def clean():
             fname = f_root+ending
             try:
                 os.remove(fname)
-                print 'removed',fname
+                print('removed',fname)
             except OSError:
                 pass
             
