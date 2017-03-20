@@ -29,11 +29,15 @@ Compiler
 
 **WINDOWS** :
 
-*. Run the web installer for: `Microsoft Visual C++ Compiler for Python 2.7 <https://www.microsoft.com/en-us/download/details.aspx?id=44266>`_  (or install Visual Studio 9 2008 professional if you have access to it).
+Run the installer for `Microsoft Visual C++ Compiler for Python 2.7 <https://www.microsoft.com/en-us/download/details.aspx?id=44266>`_  (or install Visual Studio 9 2008 professional if you have access to it).
 
 **LINUX/OSX** :
 
-Your operating system might already come with a compiler.  In that case, you should not need to do anything else.
+Your operating system might already come with a compiler.  In that case, you should not need to do anything else.  On debian-base linux distros, you probably need to do something like::
+
+    sudo apt install g++
+
+On OSX, install Xcode, or install ``gcc`` via homebrew.
 
 Windows
 =======
