@@ -9,7 +9,7 @@ Converted IPython notebooks
 '''
 
 # Convert the notebooks
-subprocess.check_call('ipython nbconvert --to rst *.ipynb', shell = True, stdout = sys.stdout, stderr = sys.stderr)
+subprocess.check_call('jupyter nbconvert --to rst *.ipynb', shell = True, stdout = sys.stdout, stderr = sys.stderr)
 
 # Write the hidden table to make sphinx happy
 with open('index.rst', 'w') as fp:
