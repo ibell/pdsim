@@ -1,24 +1,48 @@
 Installation and Configuration
 ******************************
 
-Windows
-=======
+Prerequisites
+=============
 
-#. Run the web installer for Microsoft Visual Studio 2008 Express from `VS2008Express <http://go.microsoft.com/?linkid=7729279>`_
+git
+---
+
+**WINDOWS** :
 
 #. Install the most recent version of MSYSGit from `full MSYSGit installs <http://code.google.com/p/msysgit/downloads/list?can=2&q=%22Full+installer+for+official+Git+for+Windows%22>`_.  Accept all the defaults.
 
 #. Install TortoiseGit from `TortoiseGit installs <http://code.google.com/p/tortoisegit/wiki/Download>`_ (pick the right version for your operating system)
 
+**LINUX/OSX** :
+
+Your operating system should already come with git.  You should not need to do anything extra
+
+Anaconda/Miniconda
+------------------
+
 #. Download python using miniconda package: `Download link <http://conda.pydata.org/miniconda.html>`_.  Download the python 2.7 32-bit version of miniconda - the python 2.7 64-bit version should be fine too, but to compile you will require the professional version of Visual Studio.  So just stick with the 32-bit version of miniconda.  Do not use a python 3.x version!!  
 
 #. Run the installer. In the setup, if you are doing a clean install, it is safe to select the option "Add Anaconda to the system PATH environmental variable".  Otherwise, selecting this option will make this the default conda installation on your computer, which may or may not be what you want.  If you want Miniconda to live peaceably with an existing miniconda (64-bit?), make sure this option is unselected.
 
-#. Populate the python installation with necessary packages.  At the command prompt, do::
+Compiler
+--------
+
+**WINDOWS** : Two fine options:
+
+A) Run the web installer for Microsoft Visual Studio 2008 Express from `VS2008Express <http://go.microsoft.com/?linkid=7729279>`_ .  This will limit you to 32-bit builds. 
+
+B) Install the mingw conda package, with something like::
+
+    conda install mingw
+
+Windows
+=======
+
+#. Populate the root conda environment installation the with necessary packages (or see below about using conda environments).  At the command prompt, do::
 
     conda install matplotlib numpy scipy h5py cython pip wxpython pyyaml
   
-  If you installed Miniconda somewhere else (and/or Miniconda/Scripts is not on the PATH), you might need to give the full path to ``conda``, which would be something like ``c:\Miniconda32bit\Scripts\conda`` on my machine
+   If you installed Miniconda somewhere else (and/or Miniconda/Scripts is not on the PATH), you might need to give the full path to ``conda``, which would be something like ``c:\Miniconda32bit\Scripts\conda`` on my machine
 
 #. Check that when you go to a command prompt, you get output something like::
 
@@ -31,13 +55,15 @@ Windows
 
 #. Ok, python has been successfully installed.
     
-#. Now we are going to collect the source code for PDSim and CoolProp.  In Windows Explorer, go to a folder where you want to put the source code for PDSim and CoolProp.  Right-click and select "Git Clone..."
+#. Now we are going to collect the source code for PDSim.  In Windows Explorer, go to a folder where you want to put the source code for PDSim.  Right-click and select "Git Clone..."
 
-#. Use the URL ``https://github.com/ibell/pdsim``, and select the recursive option (which will force it to also install CoolProp and quantities as submodules of the PDSim repository)
+#. Use the URL ``https://github.com/ibell/pdsim``.
 
-#. Go into the folder you just created.  Run the script setup_coolprop.py (double-click on it), or at the command prompt::
+#. To install coolprop, at the command prompt execute::
 
-    python setup_coolprop.py
+    pip install coolprop
+
+   If you want to install the most recent version of coolprop (the above command will install the latest *STABLE* release), see `the instructions here <http://www.coolprop.org/coolprop/wrappers/Python/index.html#automatic-installation>`_
     
 #. Install PDSim using::
 
@@ -65,11 +91,11 @@ Windows
     
     In [0]: print yaml.__file__; print yaml.__version__
 
-#. Now go into the examples folder, and start ipython, you should get output something like::
+#. Now go into the doc folder, start IPython, the below code should yield output something like::
 
 .. ipython::
 
-    In [0]: %run 'examples/simple_example.py'
+    In [0]: %run '../examples/simple_example.py'
 
 #. Ok good, PDSim is working!
     
