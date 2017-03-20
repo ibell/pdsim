@@ -9,9 +9,9 @@ git
 
 **WINDOWS** :
 
-#. Install the most recent version of MSYSGit from `full MSYSGit installs <http://code.google.com/p/msysgit/downloads/list?can=2&q=%22Full+installer+for+official+Git+for+Windows%22>`_.  Accept all the defaults.
+#. Install the most recent version for windows from `git for windows <https://git-scm.com/download>`_.  Accept all the defaults.
 
-#. Install TortoiseGit from `TortoiseGit installs <http://code.google.com/p/tortoisegit/wiki/Download>`_ (pick the right version for your operating system)
+#. (optional, but strongly recommended) Install TortoiseGit from `TortoiseGit installs <http://code.google.com/p/tortoisegit/wiki/Download>`_ (pick the right version for your operating system)
 
 **LINUX/OSX** :
 
@@ -27,13 +27,13 @@ Anaconda/Miniconda
 Compiler
 --------
 
-**WINDOWS** : Two fine options:
+**WINDOWS** :
 
-A) Run the web installer for Microsoft Visual Studio 2008 Express from `VS2008Express <http://go.microsoft.com/?linkid=7729279>`_ .  This will limit you to 32-bit builds. 
+*. Run the web installer for: `Microsoft Visual C++ Compiler for Python 2.7 <https://www.microsoft.com/en-us/download/details.aspx?id=44266>`_  (or install Visual Studio 9 2008 professional if you have access to it).
 
-B) Install the mingw conda package, with something like::
+**LINUX/OSX** :
 
-    conda install mingw
+Your operating system might already come with a compiler.  In that case, you should not need to do anything else.
 
 Windows
 =======
