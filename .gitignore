@@ -45,3 +45,4 @@ PDSim/scroll/symm_scroll_geo.cpp
 PDSim/scroll/symm_scroll_geo.html
 PDSim/scroll/symm_scroll_geo.so
 doc/_build
+doc/PDSim_apidoc
