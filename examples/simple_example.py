@@ -202,8 +202,12 @@ def Compressor(**kwargs):
     
     #debug_plots(recip)
     
-if __name__=='__main__':    
-    #If this file is run directly, this code will be run
+def run_all():
     Compressor(solver_method = 'Euler')
     Compressor(solver_method = 'Heun')
     Compressor(solver_method = 'RK45')
+
+if __name__=='__main__':    
+    #If this file is run directly, this code will be run
+    Compressor(solver_method = 'Euler')
+    # run_all()
