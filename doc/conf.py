@@ -41,7 +41,6 @@ def run_prebuild(_):
     if not os.path.exists(nb_index_fname):
       print('converting jupyter notebooks to RST')
       sys.path.append(nb_dir)
-      print(nb_dir)
       import compile_notebooks
       compile_notebooks.convert_notebooks()
 
