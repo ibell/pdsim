@@ -9,6 +9,8 @@ dependencies:
   - wxpython
   - pyyaml
   - h5py
+  - jupyter
+  - nbconvert
   - pip:
     - CoolProp
     - glob2

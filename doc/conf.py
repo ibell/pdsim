@@ -27,16 +27,26 @@ import sys, os
 sys.path.append(os.path.abspath('..'))
 sys.path.append(os.path.abspath(os.path.join('..','GUI')))
 
-def run_apidoc(_):
-    """ Run sphinx.apidoc programmatically to autogenerate documentation for PDSim """
+def run_prebuild(_):
+
+    # Run sphinx.apidoc programmatically to autogenerate documentation for PDSim
     from sphinx.apidoc import main
-    import os
     cur_dir = os.path.abspath(os.path.dirname(__file__))
     output_path = os.path.join(cur_dir, 'PDSim_apidoc')
     main(['-e', '-o', output_path, os.path.dirname(PDSim.__file__), '--force'])
 
+    # Convert the notebooks to RST
+    nb_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'notebooks')
+    nb_index_fname = os.path.join(nb_dir, 'index.rst')
+    if not os.path.exists(nb_index_fname):
+      print('converting jupyter notebooks to RST')
+      sys.path.append(nb_dir)
+      print(nb_dir)
+      import compile_notebooks
+      compile_notebooks.convert_notebooks()
+
 def setup(app):
-    app.connect('builder-inited', run_apidoc)
+    app.connect('builder-inited', run_prebuild)
               
 extensions = ['sphinx.ext.autodoc', 
               'sphinx.ext.napoleon',
