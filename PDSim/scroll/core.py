@@ -817,7 +817,7 @@ class Scroll(PDSimCore, _Scroll):
         
         return thetav, area_dict
                     
-    def set_disc_geo(self,Type,r2=0.0):
+    def set_disc_geo(self,Type,r2=0.0,**kwargs):
         """
         Set the discharge geometry for the scrolls
         
@@ -830,7 +830,7 @@ class Scroll(PDSimCore, _Scroll):
             raise ValueError("You must determine scroll wrap geometry by calling Setscroll_geo before setting discharge geometry.")
         
         #Use the compiled code
-        scroll_geo.setDiscGeo(self.geo,Type,r2)
+        scroll_geo.setDiscGeo(self.geo,Type,r2,**kwargs)
         
     def auto_add_CVs(self,inletState,outletState):
         """
