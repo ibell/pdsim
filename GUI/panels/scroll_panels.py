@@ -268,7 +268,11 @@ class DischargePortCoordinatesTable(wx.grid.Grid):
             wx.TheClipboard.Close()
 
         data = do.GetText()
-        rows = data.strip().replace('\r','').split('\n')
+        if '\r' in data and '\n' not in data:
+            data = data.replace('\r','\n')
+        elif '\r\n' in data:
+            data = data.replace('\r\n','\n')    
+        rows = data.strip().split('\n')
         rows = [row.split('\t') for row in rows]
         
         try:
