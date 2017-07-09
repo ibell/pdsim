@@ -55,6 +55,8 @@ cdef class PyFlowFunctionWrapper(FlowFunction):
         self.Function = Function
         self.kwargs = kwargs
         self.resize(Nflows)
+        self.__name__ = Function.__name__
+        self.__strf__ = str(Function)
         
     cpdef double call(self, FlowPath FP) except *:
         """
@@ -137,10 +139,9 @@ cdef class FlowFunction(object):
      
      See also PyFlowFunctionWrapper
      
-     Returns
-     -------
-     mdot : float
-         The mass flow rate in kg/s
+     Returns:
+         mdot : float
+             The mass flow rate in kg/s
      
     """
     def __init__(self, Nvalues = 1):
@@ -486,13 +487,11 @@ cdef class ValveModel(object):
         """
         Return the position and velocity as an arraym for the valve
         
-        Parameters
-        ----------
-        Core : :class:`PDSimCore <PDSim.core.core.PDSimCore>` instance
+        Parameters:
+            Core : :class:`PDSimCore <PDSim.core.core.PDSimCore>` instance
         
-        Returns
-        -------
-        out_array : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
+        Returns:
+            out_array : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
         
         """ 
         cdef double omega
@@ -551,22 +550,21 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, int ot
     """
     The mass flow rate is calculated by using isentropic flow model
     
-    Parameters
-    ----------
+    Parameters:
     
-    A : double
-        Throat area of the nozzle [m\ :math:`^2`\ ]
-    State_up : :class:`State <CoolProp.State.State>` instance
-        Upstream ``State`` instance
-    State_down : :class:`State <CoolProp.State.State>` instance
-        Downstream ``State`` instance
-    other_output : int
-        Default is to return the mass flow rate, can over-ride by passing ``flow_models.OUTPUT_VELOCITY`` or ``flow_models.OUTPUT_MA`` instead
+        A : double
+            Throat area of the nozzle [m\ :math:`^2`\ ]
+        State_up : :class:`State <CoolProp.State.State>` instance
+            Upstream ``State`` instance
+        State_down : :class:`State <CoolProp.State.State>` instance
+            Downstream ``State`` instance
+        other_output : int
+            Default is to return the mass flow rate, can over-ride by passing ``flow_models.OUTPUT_VELOCITY`` or ``flow_models.OUTPUT_MA`` instead
         
-    Returns
-    -------
-    out : double
-        Default is to return the mass flow rate, can over-ride by passing flags in the other_output variable
+    Returns:
+
+        out : double
+            Default is to return the mass flow rate, can over-ride by passing flags in the other_output variable
     
     """
     

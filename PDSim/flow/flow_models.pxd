@@ -23,9 +23,10 @@ cdef class FlowFunction(object):
     cpdef resize(self, int Nvalues)
     cpdef public arraym flows
     cpdef public int Nflows
+    cpdef public __name__, __strf__
     
 cdef class PyFlowFunctionWrapper(FlowFunction):
-    cdef dict kwargs
+    cdef public dict kwargs
     cdef public object Function
     
     cpdef double call(self, FlowPath FP) except *
