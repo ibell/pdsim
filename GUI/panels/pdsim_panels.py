@@ -923,13 +923,19 @@ class OutputTreePanel(wx.Panel):
             return
         
         rows = []
-        for i in range(val.shape[0]):
-            #  row as a list
-            r = val[i,:].tolist()
+        if len(val.shape) == 1: # single row
             #  entries of r as strings
-            r = [str(v) for v in r]
+            r = [str(v) for v in val.tolist()]
             #  add to rows
             rows.append(','.join(r))
+        elif val.shape[0] > 1:
+            for i in range(val.shape[0]):
+                #  row as a list
+                r = val[i,:].tolist()
+                #  entries of r as strings
+                r = [str(v) for v in r]
+                #  add to rows
+                rows.append(','.join(r))
         s = '\n'.join(rows)
         
         f = open(file_path, 'w')
