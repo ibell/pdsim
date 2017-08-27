@@ -510,7 +510,7 @@ cdef class geoVals:
             s+=atr+': '+str(getattr(self,atr))+'\n'
         return s
         
-    cpdef double val_if_symmetric(self, double val):
+    cpdef double val_if_symmetric(self, double val) except *:
         """ Returns the value if symmetric, throws ValueError otherwise """
         if self.is_symmetric():
             return val
