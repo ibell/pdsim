@@ -719,7 +719,7 @@ class Scroll(PDSimCore, _Scroll):
         
         return thetav, partners
     
-    def poly_intersection_with_cvs(self, x, y, N, multiple_solns = 'sum'):
+    def poly_intersection_with_cvs(self, x, y, N, multiple_solns = 'sum', CVcoords = scroll_geo.CVcoords):
         """
         For a given polygon, determine the intersection area between a polygon
         and each of the control volumes in the compressor.  This can be useful
@@ -736,6 +736,9 @@ class Scroll(PDSimCore, _Scroll):
             Number of elements in the crank angle array
         multiple_solns : str, optional, one of 'sum','error','warning', default is sum
             What to do when there are multiple intersection polygons
+        CVcoords : function 
+            The function that can provide the x,y coordinates for a given control volume,
+            by default `scroll_geo.CVcoords`
             
         Returns
         ------
@@ -761,12 +764,12 @@ class Scroll(PDSimCore, _Scroll):
         scaled_xpoly = x*scale_factor
         scaled_ypoly = y*scale_factor
         
-        #  Find all the CVs that do have some overlap with this port
+        #  Find all the CVs that do have some overlap with this polygon
         for CVkey in self.CVs.keys:
             
             #  Just try once to see if the key is acceptable
             try:
-                xcv, ycv = scroll_geo.CVcoords(CVkey, self.geo, 0)
+                xcv, ycv = CVcoords(CVkey, self.geo, 0)
             except KeyError:
                 #  Not acceptable, skip this control volume
                 continue
@@ -775,7 +778,7 @@ class Scroll(PDSimCore, _Scroll):
             
             for i, theta in enumerate(thetav):
                 
-                #  Calculate the port free area between the port and the chamber
+                #  Calculate the free area between the polygon and the chamber
                 try:
                     xcv, ycv = scroll_geo.CVcoords(CVkey, self.geo, theta)
                 except ValueError:
