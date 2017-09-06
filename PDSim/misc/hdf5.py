@@ -22,8 +22,8 @@ class HDF5Writer(object):
             try:
                 #Get the attribute
                 value = getattr(struct, thing)
-                
-            except AttributeError:
+            except (AttributeError,ValueError) as E:
+                print(thing, E)
                 #If it can't get the attribute, just go to the next thing
                 continue
             
@@ -47,11 +47,12 @@ class HDF5Writer(object):
                 continue
             
             import inspect
-            #Skip methods, functions, built-in functions and routines
+            #Skip methods, functions, built-in functions, routines, and modules
             if (inspect.ismethod(value)
                 or inspect.isfunction(value)
                 or inspect.isbuiltin(value)
-                or inspect.isroutine(value)):
+                or inspect.isroutine(value)
+                or inspect.ismodule(value)):
                     continue
             
             if type(value) is types.DictType:
