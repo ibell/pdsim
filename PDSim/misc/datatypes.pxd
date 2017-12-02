@@ -18,7 +18,7 @@ cdef class listm(list):
     """
     See http://docs.cython.org/src/userguide/special_methods.html
     """
-
+    
 cdef class arraym(object):
 
     cdef double* data
@@ -29,7 +29,7 @@ cdef class arraym(object):
     cpdef set_size(self, int N)
     cpdef dealloc(self)
     cpdef arraym copy(self)
-    cdef arraym slice(self, int i, int j)
+    cdef arraym slice(self, int i, int j, int step = *)
     cpdef extend(self, arraym array2)
     cpdef double get_index(self, int i) except *
     cpdef double set_index(self, int i, double val) except *

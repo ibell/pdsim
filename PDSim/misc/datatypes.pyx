@@ -373,12 +373,7 @@ cdef class arraym(object):
         arr.set_data(self.data, self.N)
         return arr
     
-    def __setitem__(self,int i, double y):
-        self.data[i]=y
-        
-    @cython.returns(double)
-    def __getitem__(self, int i):
-        return self.data[i]
+    
     
     cpdef double get_index(self, int i) except *:
         """
@@ -413,9 +408,11 @@ cdef class arraym(object):
         for i in range(self.N):
             self.data[i] = fillval
     
-    cdef arraym slice(self, int i, int j):
+    cdef arraym slice(self, int i, int j, int step = 1):
         cdef int k
         cdef arraym arr = arraym()
+        if step != 1:
+            raise IndexError('Step size must be 1')
         if j < i:
             raise IndexError('Indices must be increasing')
         if j == i:
@@ -459,9 +456,19 @@ cdef class arraym(object):
             if not _ValidNumber(self.data[i]):
                 return False
         return True
-        
-    def __getslice__(self, Py_ssize_t i, Py_ssize_t j):
-        return self.slice(i,j)
+    
+    def __setitem__(self, int i, double y):
+        self.data[i]=y
+
+    def __getitem__(self, _in):
+        if isinstance(_in, int):
+            return self.data[_in]
+        else:
+            # _in is a slice
+            if _in.step is None:
+                return self.slice(_in.start, _in.stop)
+            else:
+                return self.slice(_in.start, _in.stop, _in.step)  
     
     @cython.returns(double)
     def __iter__(self):
