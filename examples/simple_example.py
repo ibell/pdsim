@@ -198,7 +198,7 @@ def Compressor(**kwargs):
                 OneCycle = False,
                 UseNR = False
                 )
-    print 'time taken',clock()-t1,'s'
+    print('time taken',clock()-t1,'s')
     
     #debug_plots(recip)
     

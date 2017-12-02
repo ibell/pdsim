@@ -190,7 +190,7 @@ def Compressor(Te = 273, Tc = 300, f = None, OneCycle = False, Ref = 'R410A'):
         print(E)
         raise
 
-    print 'time taken', clock()-t1
+    print('time taken', clock()-t1)
     
     #del ScrollComp.FlowStorage
     #from PDSim.misc.hdf5 import HDF5Writer

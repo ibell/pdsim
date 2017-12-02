@@ -128,7 +128,7 @@ def Compressor():
                         OneCycle = False,
                         UseNR = True,
                         )
-    print 'time taken', clock()-t1
+    print('time taken', clock()-t1)
     
     debug_plots(recip)
     

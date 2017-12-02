@@ -203,7 +203,7 @@ def Expander(**kwargs):
                    UseNR = True,
                    plot_every_cycle = False
                    )
-    print 'time taken',clock()-t1,'s'
+    print('time taken',clock()-t1,'s')
     
     #debug_plots(expander)
     
