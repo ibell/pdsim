@@ -1,6 +1,6 @@
 
 import copy
-import cPickle
+import pickle
 from flow_models import PyFlowFunctionWrapper
 
 from CoolProp.State import State as StateClass
@@ -316,7 +316,7 @@ cdef class FlowPath(object):
         
     def __getstate__(self):
         d={}
-        d['MdotFcn']=cPickle.dumps(self.MdotFcn)
+        d['MdotFcn']=pickle.dumps(self.MdotFcn)
         d.update(self.__cdict__().copy())
         return d
         
@@ -334,7 +334,7 @@ cdef class FlowPath(object):
         
 def rebuildFlowPath(d):
     FP = FlowPath()
-    FP.MdotFcn = cPickle.loads(d.pop('MdotFcn'))
+    FP.MdotFcn = pickle.loads(d.pop('MdotFcn'))
     for item in d:
         setattr(FP,item,d[item])
     return FP
