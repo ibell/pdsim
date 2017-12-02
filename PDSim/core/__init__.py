@@ -1,4 +1,3 @@
-import motor # To force cx_freeze to import motor.py
 
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
