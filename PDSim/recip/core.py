@@ -201,4 +201,4 @@ class Recip(PDSimCore,_Recip):
         self.eta_oi = self.Wdot_i/self.Wdot_electrical
         
 if __name__=='__main__':
-    print "Running this file doesn't do anything"
+    print("Running this file doesn't do anything")

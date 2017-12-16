@@ -15,6 +15,6 @@ y3 = psc.splev(x2, spl)
 plt.plot(x, y, 'o', x2, y2, x2, y3)
 plt.show()
 
-print y
+print(y)
 for y in y2:
-    print y
+    print(y)

@@ -54,7 +54,7 @@ if __name__=='__main__':
         Fb = F_t*c*epsilon/D*np.sin(phi)+2*pi*mu*omega_bar*L/(c*np.sqrt(1-epsilon**2))*(D/2)**2
         f = Fb/F_t
         
-        print f
+        print(f)
         
         #plt.plot(t,c*(1-epsilon)*1e6,'o')
     #    plt.plot(kappa,-zeta,'o')

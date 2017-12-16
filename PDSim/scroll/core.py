@@ -280,7 +280,7 @@ class Scroll(PDSimCore, _Scroll):
         """
         
         if plot:
-            print 'plotting of disc port blockage is on'
+            print('plotting of disc port blockage is on')
             
         from PDSim.misc.clipper import pyclipper
         
@@ -291,7 +291,7 @@ class Scroll(PDSimCore, _Scroll):
             xport = self.geo.xa_arc1 + 0.9*self.geo.ra_arc1*np.cos(np.linspace(0,2*pi,100))
             yport = self.geo.ya_arc1 + 0.9*self.geo.ra_arc1*np.sin(np.linspace(0,2*pi,100))
         
-        print 'caching discharge port blockage, please wait...',
+        print('caching discharge port blockage, please wait...', end=' ')
         # Scale the floating points to long integers
         scaled_xport = xport*scale_factor
         scaled_yport = yport*scale_factor
@@ -427,9 +427,9 @@ class Scroll(PDSimCore, _Scroll):
             plt.close()
             
         if plot:
-            print 'making animation in disc_ani.gif'
+            print('making animation in disc_ani.gif')
             subprocess.check_call('convert disc_0*.png disc_ani.gif',shell=True)
-            print 'removing disc_0*.png'
+            print('removing disc_0*.png')
             for file in glob.glob('disc_0*.png'):
                 os.remove(file)
         
@@ -439,7 +439,7 @@ class Scroll(PDSimCore, _Scroll):
         self.spline_Adisc_C1_N = interp.splrep(t, self.Adisc_c1_N, k = 2, s = 0) # C1_N and port
         self.spline_Adisc_C1_Nm1 = interp.splrep(t, self.Adisc_c1_Nm1, k = 2, s = 0) #C1_{N-1} and port
         
-        print 'done'
+        print('done')
             
     @property
     def theta_d(self):
@@ -1336,7 +1336,7 @@ class Scroll(PDSimCore, _Scroll):
             #Build the volume vector using the old set of control volumes (pre-merge)
             V,dV=self.CVs.volumes(t)
             
-            print 'merging'
+            print('merging')
             
             if self.__hasLiquid__==False:
 
@@ -1563,7 +1563,7 @@ class Scroll(PDSimCore, _Scroll):
             # Get the mean losses over one cycle
             self.losses.bearings  = np.trapz(self.losses.summed[_slice], theta)/theta_range
             
-            print 'mechanical losses: ', self.losses.bearings
+            print('mechanical losses: ', self.losses.bearings)
             return self.losses.bearings #[kW]
     
     def post_cycle(self):
@@ -1596,7 +1596,7 @@ class Scroll(PDSimCore, _Scroll):
         # First check if this run uses any virtual sensors
         if not hasattr(self.sensors,'T') and not hasattr(self.sensors,'coords'): return
         
-        print 'preparing to calculate sensor profiles, this could take a while'
+        print('preparing to calculate sensor profiles, this could take a while')
         for x,y in self.sensors.coords:
             theta, partners = self.determine_partner_CVs(x, y, theta = self.t)
 
@@ -1882,8 +1882,8 @@ class Scroll(PDSimCore, _Scroll):
             #
             return self.lump_energy_balance_callback()[0]
         
-        print OBJECTIVE(T0-50)
-        print OBJECTIVE(T0+50)
+        print(OBJECTIVE(T0-50))
+        print(OBJECTIVE(T0+50))
         return optimize.newton(OBJECTIVE, T0)
         
     def lump_energy_balance_callback(self):
@@ -1969,13 +1969,13 @@ class Scroll(PDSimCore, _Scroll):
 #        self.suction_heating()
         
         if self.verbosity > 0:
-            print 'At this iteration'
-            print '    Electrical power:', self.Wdot_electrical,'kW'
-            print '    Mass flow rate:', self.mdot,'kg/s'
+            print('At this iteration')
+            print('    Electrical power:', self.Wdot_electrical,'kW')
+            print('    Mass flow rate:', self.mdot,'kg/s')
             if hasattr(self,'Wdot_i'):
-                print '    Over. isentropic:', self.eta_oi,'-'
+                print('    Over. isentropic:', self.eta_oi,'-')
             if hasattr(self,'eta_v'):
-                print '    Volumetric:', self.eta_v,'-'
+                print('    Volumetric:', self.eta_v,'-')
         
         #Want to return a list
         return [Qnet]
@@ -2326,7 +2326,7 @@ class Scroll(PDSimCore, _Scroll):
             try:
                 geo_components = [self.CVs[CVkey].ForceFcn(theta, self.geo) for theta in self.t[_slice]]
             except BaseException as BE:
-                print 'no forces for', CVkey, 'with error:', BE             
+                print('no forces for', CVkey, 'with error:', BE)             
                 geo_components = []
                 
             if geo_components:
@@ -2657,7 +2657,7 @@ class Scroll(PDSimCore, _Scroll):
                                   + self.forces.Wdot_thrust)
         
         self.forces.Wdot_total_mean = np.trapz(self.forces.Wdot_total, theta)/(2*pi)
-        print self.forces.Wdot_total_mean,'average mechanical losses'
+        print(self.forces.Wdot_total_mean,'average mechanical losses')
             
         import matplotlib.pyplot as plt
             

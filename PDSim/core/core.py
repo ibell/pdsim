@@ -828,12 +828,12 @@ class PDSimCore(object):
         
         #  If you received an abort request, set a flag in the simulation
         if self.pipe_abort.poll() and self.pipe_abort.recv():
-            print 'received an abort request'
+            print('received an abort request')
             self._want_abort = True
         
         #  If the run has timed out, quit
         if clock() - self.start_time > self.timeout:
-            print 'run timed out'
+            print('run timed out')
             self._want_abort = True
             
         return self._want_abort
@@ -1046,7 +1046,7 @@ class PDSimCore(object):
             return None
         
         t2 = clock()
-        print 'Elapsed time for cycle is {0:g} s'.format(t2-t1)
+        print('Elapsed time for cycle is {0:g} s'.format(t2-t1))
         
         mdot_out = self.FlowsProcessed.mean_mdot[self.key_outlet]
         mdot_in = self.FlowsProcessed.mean_mdot[self.key_inlet]
@@ -1198,22 +1198,22 @@ class PDSimCore(object):
                     #  value for it
                     self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, hdnew)
 
-                print self.solvers.hdisc_history
+                print(self.solvers.hdisc_history)
                 
-            print 'new outlet T', self.Tubes.Nodes[self.key_outlet].T
+            print('new outlet T', self.Tubes.Nodes[self.key_outlet].T)
                 
             # Store a copy of the initial temperatures of the chambers
             self.solvers.initial_states_history.append(self.T[:,0].copy())
                 
             if OneCycle:
-                print 'Quitting due to OneCycle being set to True'
+                print('Quitting due to OneCycle being set to True')
                 return
                 
             if plot_every_cycle:
                 debug_plots(self)
             
             if self.Abort():
-                print 'Quitting because Abort flag hit'
+                print('Quitting because Abort flag hit')
                 return
             
             #  Reset the flag for the fixed side of the outlet tube
@@ -1223,20 +1223,20 @@ class PDSimCore(object):
             mdot_in = abs(self.FlowsProcessed.mean_mdot[self.key_inlet])
             mdot_error = (mdot_out/mdot_in-1)*100
             
-            print '==========='
-            print '|| # {i:03d} ||'.format(i=i)
-            print '==========='
-            print error_ascii_bar(abs(self.lumps_resid[0]), epsilon), 'energy balance kW ', self.lumps_resid[0], ' Tlumps: ',self.Tlumps,'K'
-            print error_ascii_bar(abs(self.resid_Td), epsilon), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg', self.Tubes.Nodes[key_outtube_inlet].h, 'kJ/kg'
-            print error_ascii_bar(error_metric, epsilon), 'cycle-cycle    ', error_metric
-            print error_ascii_bar(abs(mdot_error), 1), 'mdot [%]', mdot_error, '|| in:', mdot_in*1000, 'g/s || out:', mdot_out*1000, 'g/s '
+            print('===========')
+            print('|| # {i:03d} ||'.format(i=i))
+            print('===========')
+            print(error_ascii_bar(abs(self.lumps_resid[0]), epsilon), 'energy balance kW ', self.lumps_resid[0], ' Tlumps: ',self.Tlumps,'K')
+            print(error_ascii_bar(abs(self.resid_Td), epsilon), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg', self.Tubes.Nodes[key_outtube_inlet].h, 'kJ/kg')
+            print(error_ascii_bar(error_metric, epsilon), 'cycle-cycle    ', error_metric)
+            print(error_ascii_bar(abs(mdot_error), 1), 'mdot [%]', mdot_error, '|| in:', mdot_in*1000, 'g/s || out:', mdot_out*1000, 'g/s ')
             
             worst_error = max(abs(self.lumps_resid[0]), abs(self.resid_Td), np.sqrt(np.sum(np.power(errors, 2))))
             i += 1
         
         #  If the abort function returns true, quit this loop
         if self.Abort():
-            print 'Quitting OBJECTIVE_CYCLE loop in core.solve'
+            print('Quitting OBJECTIVE_CYCLE loop in core.solve')
             return None #  Stop
         else:
             if len(self.solvers.hdisc_history) == 0:
@@ -1486,7 +1486,7 @@ class PDSimCore(object):
         for k, v in attrs_dict.iteritems():
             dataset = hf.get(k)
             if dataset is None:
-                print 'bad key',k
+                print('bad key',k)
             else:
                 dataset.attrs['note'] = v
         hf.close()
@@ -1497,7 +1497,7 @@ class PDSimCore(object):
         """      
 
         #Resize all the matrices to keep only the real data
-        print 'Ntheta is', self.Ntheta
+        print('Ntheta is', self.Ntheta)
         self.t = self.t[  0:self.Ntheta]
         self.T = self.T[:,0:self.Ntheta]
         self.p = self.p[:,0:self.Ntheta]
@@ -1509,10 +1509,10 @@ class PDSimCore(object):
         self.h = self.h[:,0:self.Ntheta]
         self.xValves = self.xValves[:,0:self.Ntheta]
         
-        print 'mdot*(h2-h1),P-v,Qamb', self.Wdot, self.Wdot_pv, self.Qamb
-        print 'Mass flow rate is',self.mdot*1000,'g/s'
-        print 'Volumetric efficiency is',self.eta_v*100,'%'
-        print 'Adiabatic efficiency is',self.eta_a*100,'%'
+        print('mdot*(h2-h1),P-v,Qamb', self.Wdot, self.Wdot_pv, self.Qamb)
+        print('Mass flow rate is',self.mdot*1000,'g/s')
+        print('Volumetric efficiency is',self.eta_v*100,'%')
+        print('Adiabatic efficiency is',self.eta_a*100,'%')
         
         # Restructure the history for easier writing to file and more clear description of what the things are
         hdisc_history = zip(*self.solvers.hdisc_history)
@@ -1784,4 +1784,4 @@ class PDSimCore(object):
 if __name__=='__main__':
     PC = PDSimCore()
     PC.attach_HDF5_annotations('runa.h5')
-    print 'This is the base class that is inherited by other compressor types.  Running this file doesn\'t do anything'
+    print('This is the base class that is inherited by other compressor types.  Running this file doesn\'t do anything')

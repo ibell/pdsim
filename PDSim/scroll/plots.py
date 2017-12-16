@@ -125,13 +125,13 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         elif geo.phi_os-(geo.phi_is-pi)>1e-12:
             r2max=(-b+sqrt(b**2-4.0*a*c))/(2.0*a)
         else:
-            print 'error with starting angles phi_os %.16f phi_is-pi %.16f' %(geo.phi_os,geo.phi_is-pi)
+            print('error with starting angles phi_os %.16f phi_is-pi %.16f' %(geo.phi_os,geo.phi_is-pi))
             
         if type(r2) is not float and r2=='PMP':
             r2=r2max
             
         if r2>r2max:
-            print 'r2 is too large, max value is : %0.5f' %(r2max)
+            print('r2 is too large, max value is : %0.5f' %(r2max))
         
         xarc2 =  x_os+nx_os*r2
         yarc2 =  y_os+ny_os*r2
@@ -195,13 +195,13 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         elif geo.phi_os-(geo.phi_is-pi)<1e-12:
             r2max=-c/b
         else:
-            print 'error with starting angles phi_os %.16f phi_is-pi %.16f' %(geo.phi_os,geo.phi_is-pi)
+            print('error with starting angles phi_os %.16f phi_is-pi %.16f' %(geo.phi_os,geo.phi_is-pi))
             
         if type(r2) is not float and r2=='PMP':
             r2=r2max
                 
         if r2>r2max:
-            print 'r2 is too large, max value is : %0.5f' %(r2max)
+            print('r2 is too large, max value is : %0.5f' %(r2max))
         
         xarc2 =  x_os+nx_os*r2
         yarc2 =  y_os+ny_os*r2
@@ -277,7 +277,7 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
 #        pylab.plot(xint,yint,'^')
 #        pylab.show()
     else:
-        print 'Type not understood:',Type
+        print('Type not understood:',Type)
 
 def circle(xo,yo,r,N=100):
     x=np.zeros(N)
@@ -1060,7 +1060,7 @@ class ScrollAnimForm(wx.Frame):
         import glob
         for file in glob.glob('frame_*.png'):
             os.remove(file)
-        print 'all done - saved to frames.gif'
+        print('all done - saved to frames.gif')
         
     def OnApplyLayers(self, event):
         self.remove_orbiting_layers()
@@ -1292,7 +1292,7 @@ class ScrollAnimForm(wx.Frame):
                 self.frame_counter = self.frame_counter_start = 0
             fName = 'frame_{i:04d}.png'.format(i=self.frame_counter)
             self.ax.figure.savefig(fName)
-            print 'saving', fName
+            print('saving', fName)
             self.frame_counter += 1
             if self.frame_counter == self.N-1:
                 self.OnDoneSavingAnimation()

@@ -67,7 +67,7 @@ def OBJECTIVE(phi_star, epsilon, plot = False, output = False):
         change=np.max(np.max(np.abs(f[1:N-1,1:N-1]/df[1:N-1,1:N-1])));
 
         if count % 1000 == 0:
-            print change
+            print(change)
             
         count += 1
         
@@ -88,11 +88,11 @@ def OBJECTIVE(phi_star, epsilon, plot = False, output = False):
         Fb2 = dPHI*dY*TwoDGriddedIntegrate(integrand,N)
         Fb3 = TwoDGriddedIntegrate2(PHI,Y,integrand)
         mu_rb_c = Fb3/Wr # mu*r_b/c
-        print 'Fb1,Fb2,Fb3',Fb1,Fb2,Fb3
-        print 'B_j', B_j
-        print 'mu*rb/c', mu_rb_c
+        print('Fb1,Fb2,Fb3',Fb1,Fb2,Fb3)
+        print('B_j', B_j)
+        print('mu*rb/c', mu_rb_c)
         #print 'mu*rb/c', mu_rb_c/12.8
-        print 'PHI_angle', PHI_angle/pi*180
+        print('PHI_angle', PHI_angle/pi*180)
         plt.contour(PHI,Y,H/2*DPDPHI+1/H)
         plt.show()
     
@@ -103,7 +103,7 @@ def OBJECTIVE(phi_star, epsilon, plot = False, output = False):
     return np.sum(3*P[N-1,N//2+1]-4*P[N-2,N//2+1]+P[N-3,N//2+1])/(2*dPHI)
         
 if __name__=='__main__':
-    print optimize.newton.__doc__; quit()
+    print(optimize.newton.__doc__); quit()
     phi_star = optimize.newton(OBJECTIVE, pi, args = (0.6,), tol = 0.004)
     
     OBJECTIVE(phi_star,0.6,plot = True, output = True)

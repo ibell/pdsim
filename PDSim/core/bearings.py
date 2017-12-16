@@ -313,14 +313,14 @@ if __name__ == '__main__':
                         eta_0 = 0.0086,
                         omega = 301.9402420413402)
     
-    print d['epsilon']
+    print(d['epsilon'])
     
-    print 'The following is the output from example 11.1 in Hamrock'
-    print journal_bearing_design(r_b = 0.02, 
+    print('The following is the output from example 11.1 in Hamrock')
+    print(journal_bearing_design(r_b = 0.02, 
                         L = 0.04, 
                         design = 'load', 
                         W = 2200, 
                         eta_0 = 0.17, 
                         omega = 3600/60.0*2*pi
-                        )
+                        ))
     

@@ -256,13 +256,13 @@ class ScrollExpander(core.Scroll):
             #Overall isentropic efficiency
             self.eta_oi = self.Wdot_electrical/self.Wdot_i
         
-        print 'At this iteration'
-        print '    Electrical power:', self.Wdot_electrical,'kW'
-        print '    Mass flow rate:', self.mdot,'kg/s'
+        print('At this iteration')
+        print('    Electrical power:', self.Wdot_electrical,'kW')
+        print('    Mass flow rate:', self.mdot,'kg/s')
         if hasattr(self,'Wdot_i'):
-            print '    Over. isentropic:', self.eta_oi,'-'
+            print('    Over. isentropic:', self.eta_oi,'-')
         if hasattr(self,'eta_v'):
-            print '    Volumetric:', self.eta_v,'-'
+            print('    Volumetric:', self.eta_v,'-')
         
         #Want to return a list
         return [Qnet]
@@ -323,7 +323,7 @@ class ScrollExpander(core.Scroll):
             self.__before_discharge2__=True
         elif self.__before_discharge2__==True:
             #At the discharge angle
-            print 'At the discharge angle'
+            print('At the discharge angle')
             ########################
             #Reassign chambers
             ########################
@@ -365,7 +365,7 @@ class ScrollExpander(core.Scroll):
             #Build the volume vector using the old set of control volumes (pre-merge)
             V,dV=self.CVs.volumes(t)
             
-            print 'splitting'
+            print('splitting')
             
             if self.__hasLiquid__==False:
 

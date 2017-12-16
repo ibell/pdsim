@@ -118,7 +118,7 @@ class PlotNotebook(wx.Panel):
                 sizer.Add(btn)
                 btn.Bind(wx.EVT_BUTTON, callbackfcn)
         else:
-            print 'could not add more buttons particular to current family:', self.family
+            print('could not add more buttons particular to current family:', self.family)
             
         page.SetSizer(sizer)
         self.nb.AddPage(page,"Main")
@@ -556,5 +556,5 @@ def debug_plots(Comp, plotparent=None, plot_names = None):
     app.MainLoop()
 
 if __name__ == "__main__":
-    print "File for doing plots.  Don't run this file"
+    print("File for doing plots.  Don't run this file")
 

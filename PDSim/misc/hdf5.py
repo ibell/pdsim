@@ -23,7 +23,7 @@ class HDF5Writer(object):
                 #Get the attribute
                 value = getattr(struct, thing)
             except (AttributeError,ValueError) as E:
-                print(thing, E)
+                print((thing, E))
                 #If it can't get the attribute, just go to the next thing
                 continue
             
@@ -92,5 +92,5 @@ class HDF5Writer(object):
             if key in f:
                 del f[key]
             else:
-                print 'Could not prune this key from HFD5 file:',key
+                print('Could not prune this key from HFD5 file:',key)
         f.close()

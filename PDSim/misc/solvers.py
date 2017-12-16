@@ -120,8 +120,8 @@ def Broyden(f, x0, dx=1e-5, args=(), kwargs = {}, ytol=1e-5, Nfd = 1, J0 = None,
                 J0 = None
             #Get the difference vector
             x1=x0-w*np.dot(inv(A0),F0)
-            print 'Broyden x0', x0
-            print 'Broyden x1', x1
+            print('Broyden x0', x0)
+            print('Broyden x1', x1)
             #Just do one step and stop
             if JustOneStep==True:
                 return x1
@@ -152,7 +152,7 @@ def Broyden(f, x0, dx=1e-5, args=(), kwargs = {}, ytol=1e-5, Nfd = 1, J0 = None,
             A0=A1
             
             for err in error_vec:
-                print error_ascii_bar(err[0],ytol)
+                print(error_ascii_bar(err[0],ytol))
             iter+=1
         else:
             raise ValueError('Reached maximum number of iterations without getting below ytol RMS error')
