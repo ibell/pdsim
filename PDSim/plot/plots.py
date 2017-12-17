@@ -260,7 +260,7 @@ class PlotNotebook(wx.Panel):
             TTT = self.Sim.get('/solvers/initial_states_history').value
         else:
             TTTT = self.Sim.solvers.initial_states_history
-        xx = np.array(range(TTT.shape[0]))
+        xx = np.array(list(range(TTT.shape[0])))
         yy = TTT
         axes.plot(xx, yy, 'o-')
         axes.set_xlabel('Iteration Number')

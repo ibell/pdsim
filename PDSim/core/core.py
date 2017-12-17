@@ -317,7 +317,7 @@ class PDSimCore(object):
                     self.m[exists_indices, i] = x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)]
             #Left over terms are for the valves
             if self.__hasValves__:
-                self.xValves[range(len(self.Valves)*2), i] = arraym(x[Ns*Nexist:len(x)])
+                self.xValves[list(range(len(self.Valves)*2)), i] = arraym(x[Ns*Nexist:len(x)])
             
             # In the first iteration, self.core has not been filled, so do not 
             # overwrite with the values in self.core.m and self.core.rho
@@ -451,7 +451,7 @@ class PDSimCore(object):
         calculate the mean heat transfer rate over the course of the cycle 
         """
         self.HTProcessed=struct()
-        r = range(self.Ntheta)
+        r = list(range(self.Ntheta))
         
         #Remove all the NAN placeholders and replace them with zero values
         self.Q[np.isnan(self.Q)] = 0.0
