@@ -1,10 +1,10 @@
 #cython: embedsignature=True
 
-from __future__ import division, print_function
+from __future__ import division, print_function, absolute_import
 import numpy as np
 from numpy.linalg import inv
 from numpy import array,dot
-from error_bar import error_ascii_bar
+from .error_bar import error_ascii_bar
 
 def MultiDimNewtRaph(f,x0,dx=1e-6,args=(),ytol=1e-5,w=1.0,JustOneStep=False):
     """
