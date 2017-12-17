@@ -405,64 +405,69 @@ cdef coords_inv_dtheta(double phi, geoVals geo, double theta, int inv, double *d
     else:
         raise ValueError('flag not valid')
     
-cpdef long get_compressor_CV_index(str key) except *:
+cpdef long get_compressor_CV_index(object _key) except *:
     """
     Returns the index defined in the ``compressor_CV_indices`` enum. 
     """
+    cdef bytes key
+    try:
+        key = _key.encode('utf8')
+    except AttributeError:
+        key = _key
     
-    if key == 'sa':
+    if key == b'sa':
         return keyIsa
-    elif key == 's1':
+    elif key == b's1':
         return keyIs1
-    elif key == 's2':
+    elif key == b's2':
         return keyIs2
-    elif key == 'd1':
+    elif key == b'd1':
         return keyId1
-    elif key == 'd2':
+    elif key == b'd2':
         return keyId2
-    elif key == 'dd':
+    elif key == b'dd':
         return keyIdd
-    elif key == 'ddd':
+    elif key == b'ddd':
         return keyIddd
-    elif key == 'c1.1':
+    elif key == b'c1.1':
         return keyIc1_1
-    elif key == 'c2.1':
+    elif key == b'c2.1':
         return keyIc2_1
-    elif key == 'c1.2':
+    elif key == b'c1.2':
         return keyIc1_2
-    elif key == 'c2.2':
+    elif key == b'c2.2':
         return keyIc2_2
-    elif key == 'c1.3':
+    elif key == b'c1.3':
         return keyIc1_3
-    elif key == 'c2.3':
+    elif key == b'c2.3':
         return keyIc2_3
-    elif key == 'c1.4':
+    elif key == b'c1.4':
         return keyIc1_4
-    elif key == 'c2.4':
+    elif key == b'c2.4':
         return keyIc2_4
-    elif key == 'c1.5':
+    elif key == b'c1.5':
         return keyIc1_5
-    elif key == 'c2.5':
+    elif key == b'c2.5':
         return keyIc2_5
-    elif key == 'c1.6':
+    elif key == b'c1.6':
         return keyIc1_6
-    elif key == 'c2.6':
+    elif key == b'c2.6':
         return keyIc2_6
-    elif key == 'c1.7':
+    elif key == b'c1.7':
         return keyIc1_7
-    elif key == 'c2.7':
+    elif key == b'c2.7':
         return keyIc2_7
-    elif key == 'c1.8':
+    elif key == b'c1.8':
         return keyIc1_8
-    elif key == 'c2.8':
+    elif key == b'c2.8':
         return keyIc2_8
-    elif key == 'c1.9':
+    elif key == b'c1.9':
         return keyIc1_9
-    elif key == 'c2.9':
+    elif key == b'c2.9':
         return keyIc2_9
-    elif key == 'c1.10':
+    elif key == b'c1.10':
         return keyIc1_10
-    elif key == 'c2.10':
+    elif key == b'c2.10':
         return keyIc2_10
     else:
         return -1

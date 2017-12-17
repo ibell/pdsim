@@ -8,7 +8,7 @@ from CoolProp.State cimport State as StateClass
 
 import cython
 
-cpdef tuple sumterms_given_CV(bytes key, list Flows):
+cpdef tuple sumterms_given_CV(key, list Flows):
     """
     A function to sum all the mdot terms for a given control volume
     
@@ -228,6 +228,8 @@ cdef class FlowPath(object):
             self.MdotFcn = PyFlowFunctionWrapper(MdotFcn, MdotFcn_kwargs, Nflows = Nflows)
         
         self.MdotFcn_str = str(MdotFcn).encode('ascii')
+        self.m_key_up = b''
+        self.m_key_down = b''
             
     cpdef dict __cdict__(self, AddStates=False):
         """
@@ -310,6 +312,46 @@ cdef class FlowPath(object):
         self.mdot = (<FlowFunction>self.MdotFcn).call(self)
         
         self.edot = abs(self.mdot*((self.h_up - self.h_down)-298.15*(self.State_up.get_s()-self.State_down.get_s())  ))
+        
+    property key1:
+        """ The string key corresponding to the first node """
+        def __set__(self, val):
+            try:
+                self.m_key1 = val.encode('utf8')
+            except AttributeError:
+                self.m_key1 = val
+        def __get__(self):
+            return self.m_key1.decode('utf8')
+    
+    property key2:
+        """ The string key corresponding to the second node """
+        def __set__(self, val):
+            try:
+                self.m_key2 = val.encode('utf8')
+            except AttributeError:
+                self.m_key2 = val
+        def __get__(self):
+            return self.m_key2.decode('utf8')
+        
+    property key_up:
+        """The string key corresponding to the upstream node"""
+        def __set__(self, val):
+            try:
+                self.m_key_up = val.encode('utf8')
+            except AttributeError:
+                self.m_key_up = val
+        def __get__(self):
+            return self.m_key_up.decode('utf8')
+        
+    property key_down:
+        """ The string key corresponding to the downstream node """
+        def __set__(self, val):
+            try:
+                self.m_key_down = val.encode('utf8')
+            except AttributeError:
+                self.m_key_down = val
+        def __get__(self):
+            return self.m_key_down.decode('utf8')
         
     def __reduce__(self):
         return rebuildFlowPath,(self.__getstate__(),)

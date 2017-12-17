@@ -8,6 +8,19 @@ cdef public enum STATE_VARS:
     
 cimport CoolProp.constants_header as constants
 from CoolProp import constants
+
+cdef bytes to_bytes(object val):
+    try:
+        return val.encode('utf8')
+    except AttributeError:
+        return val
+    
+cdef object to_pystring(object val):
+    try:
+        return val.decode('utf8')
+    except AttributeError:
+        return val
+    
     
 cdef class Tube(object):
     """
@@ -76,6 +89,24 @@ cdef class Tube(object):
         self.L=L
         self.ID=ID
         self.OD=OD
+        
+    property key1:
+        def __set__(self, val):
+            try:
+                self.m_key1 = val.encode('utf8')
+            except AttributeError:
+                self.m_key1 = val
+        def __get__(self):
+            return self.m_key1.decode('utf8')
+    
+    property key2:
+        def __set__(self, val):
+            try:
+                self.m_key2 = val.encode('utf8')
+            except AttributeError:
+                self.m_key2 = val
+        def __get__(self):
+            return self.m_key2.decode('utf8')
         
 cdef class TubeCollection(list):
     
@@ -149,7 +180,7 @@ cdef class TubeCollection(list):
         for Tube in self:
             if Tube.key1 == key or Tube.key2 == key:
                 return Tube
-        raise KeyError
+        raise KeyError(key)
 
 cdef class CVScore(object):
     """
@@ -401,7 +432,25 @@ cdef class ControlVolume(object):
         self.exists = exists
         self.V_dV_kwargs = VdVFcn_kwargs
         self.discharge_becomes = discharge_becomes.encode('ascii') if discharge_becomes is not None else key.encode('ascii')
-        self.becomes = becomes if becomes is not None else key.encode('ascii')
+        if becomes is not None:
+            if isinstance(becomes, list):
+                self.becomes = [to_pystring(_b) for _b in becomes]
+            else:
+                self.becomes = to_pystring(becomes)
+        else:
+            self.becomes = to_pystring(self.key)
+        
+    property key:
+        def __set__(self, val):
+            self.m_key = to_bytes(val)
+        def __get__(self):
+            return self.m_key.decode('utf8')
+    
+    property discharge_becomes:
+        def __set__(self, val):
+            self.m_discharge_becomes = to_bytes(val)
+        def __get__(self):
+            return self.m_discharge_becomes.decode('utf8')
         
 cdef class ControlVolumeCollection(object):
     """
@@ -435,12 +484,13 @@ cdef class ControlVolumeCollection(object):
         """
         Can index based on integer index or string key
         """
+        k = to_pystring(k)
         if k in self.keys:
             return self.CVs[self.keys.index(k)]
         elif k in range(self.N):
             return self.CVs[k]
         else:
-            raise KeyError('Your key [{key:s}] of type [{_type:s}] is invalid'.format(key = k,_type = str(type(k))))
+            raise KeyError('Your key [{key}] of type [{_type}] is invalid'.format(key = k,_type = str(type(k))))
             
     def __len__(self):
         return len(self.CVs)
@@ -479,7 +529,7 @@ cdef class ControlVolumeCollection(object):
         self.Nexist = len(self.exists_CV)
     
     def index(self,key):
-        return self.keys.index(key)
+        return self.keys.index(to_pystring(key))
         
     cpdef get(self, parameters key, double factor = 1.0):
         """

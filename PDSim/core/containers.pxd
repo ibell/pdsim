@@ -23,7 +23,7 @@ cdef class TubeCollection(list):
     cpdef update(self)
     
 cdef class Tube(object):
-    cdef public bytes key1,key2
+    cdef bytes m_key1,m_key2
     cdef public int fixed
     cdef public StateClass State1, State2
     cdef public object TubeFcn
@@ -33,7 +33,7 @@ cdef class Tube(object):
     
 cdef class ControlVolume(object):
     cdef public long keyIndex
-    cdef public bytes key, discharge_becomes
+    cdef bytes m_key, m_discharge_becomes
     cdef public object becomes
     cdef public object V_dV
     cdef public dict V_dV_kwargs

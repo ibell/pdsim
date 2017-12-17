@@ -1502,7 +1502,7 @@ class Scroll(PDSimCore, _Scroll):
         # Find the tube with the inlet node
         Tube = self.Tubes[self.key_inlet]
         # Get the state that is not the inlet state
-        if Tube.key1 == 'self.key_inlet':
+        if Tube.key1 == b'self.key_inlet':
             shell_pressure_val = Tube.State2.p
         else:
             shell_pressure_val = Tube.State1.p

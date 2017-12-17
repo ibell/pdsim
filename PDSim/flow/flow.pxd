@@ -33,17 +33,7 @@ cdef class FlowPathCollection(list):
 #Make a stripped down class with the necessary terms included
 cdef class FlowPath(object):
     
-    cdef public bytes key_up
-    """The string key corresponding to the upstream node"""
-    
-    cdef public bytes key_down
-    """ The string key corresponding to the downstream node """
-    
-    cdef public bytes key1
-    """ The string key corresponding to the first node """
-    
-    cdef public bytes key2
-    """ The string key corresponding to the second node """
+    cdef bytes m_key_up,m_key_down,m_key1,m_key2
     
     cdef public bint exists, key1_exists, key2_exists, key_up_exists, key_down_exists
     

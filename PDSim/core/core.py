@@ -4,6 +4,7 @@ import math
 from math import pi
 from time import clock
 import inspect
+import six
 
 ##--  Package imports  --
 from PDSim.flow import flow,flow_models
@@ -753,7 +754,7 @@ class PDSimCore(object):
         # The total mass flow rate
         self.mdot = self.FlowsProcessed.mean_mdot[self.key_inlet]
         
-        for key, State in self.Tubes.Nodes.iteritems():
+        for key, State in six.iteritems(self.Tubes.Nodes):
             if key == self.key_inlet:
                  inletState = State
             if key == self.key_outlet:
@@ -1514,9 +1515,9 @@ class PDSimCore(object):
         print('Adiabatic efficiency is',self.eta_a*100,'%')
         
         # Restructure the history for easier writing to file and more clear description of what the things are
-        hdisc_history = zip(*self.solvers.hdisc_history)
+        hdisc_history = list(zip(*self.solvers.hdisc_history))
         self.solvers.hdisc_history = dict(hd = np.array(hdisc_history[0]), hd_error = np.array(hdisc_history[1]))
-        lump_eb_history = zip(*self.solvers.lump_eb_history)
+        lump_eb_history = list(zip(*self.solvers.lump_eb_history))
         self.solvers.lump_eb_history = dict(Tlumps = np.array(lump_eb_history[0]), lump_eb_error = np.array(lump_eb_history[1]))
         self.solvers.initial_states_history = np.array(zip(*self.solvers.initial_states_history)).T
 
@@ -1774,7 +1775,7 @@ class PDSimCore(object):
         """
         for Flow in self.Flows:
             if hasattr(Flow.MdotFcn, 'Function'):
-                if isinstance(Flow.MdotFcn.Function, basestring):
+                if isinstance(Flow.MdotFcn.Function, six.string_types):
                     if hasattr(self,Flow.MdotFcn.Function):
                         Flow.MdotFcn.Function = getattr(self, Flow.MdotFcn.Function)
                     else:   
