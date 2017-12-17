@@ -8,6 +8,12 @@ from CoolProp.State cimport State as StateClass
 
 import cython
 
+cdef bytes to_bytes(object val):
+    if isinstance(val, bytes):
+        return <bytes>val
+    else:
+        return val.encode('utf8')
+
 cpdef tuple sumterms_given_CV(key, list Flows):
     """
     A function to sum all the mdot terms for a given control volume
@@ -277,12 +283,12 @@ cdef class FlowPath(object):
         """
         Calculate the flow path
         """
-        
-        if self.State1.get_p() > self.State2.get_p():
+        cdef double p1 = self.State1.get_p(), p2 = self.State2.get_p()
+        if p1 > p2:
             # The pressure in chamber 1 is higher than chamber 2
             # and thus the flow is from chamber 1 to 2
-            self.key_up = self.key1
-            self.key_down = self.key2
+            self.m_key_up = self.m_key1
+            self.m_key_down = self.m_key2
             self.State_up = self.State1
             self.State_down = self.State2
             self.key_up_exists = self.key1_exists
@@ -291,9 +297,11 @@ cdef class FlowPath(object):
             self.key_down_Index = self.key2Index
             self.ikey_up = self.ikey1
             self.ikey_down = self.ikey2
+            self.p_up = p1
+            self.p_down = p2
         else:
-            self.key_up = self.key2
-            self.key_down = self.key1
+            self.m_key_up = self.m_key2
+            self.m_key_down = self.m_key1
             self.State_up = self.State2
             self.State_down = self.State1
             self.key_up_exists = self.key2_exists
@@ -302,12 +310,12 @@ cdef class FlowPath(object):
             self.key_down_Index = self.key1Index
             self.ikey_up = self.ikey2
             self.ikey_down = self.ikey1
+            self.p_up = p2
+            self.p_down = p1
 
         self.T_up = self.State_up.get_T()
         self.h_up = self.State_up.get_h()
         self.h_down = self.State_down.get_h()
-        self.p_up = self.State_up.get_p()
-        self.p_down = self.State_down.get_p()
             
         self.mdot = (<FlowFunction>self.MdotFcn).call(self)
         
@@ -316,40 +324,28 @@ cdef class FlowPath(object):
     property key1:
         """ The string key corresponding to the first node """
         def __set__(self, val):
-            try:
-                self.m_key1 = val.encode('utf8')
-            except AttributeError:
-                self.m_key1 = val
+            self.m_key1 = to_bytes(val)
         def __get__(self):
             return self.m_key1.decode('utf8')
     
     property key2:
         """ The string key corresponding to the second node """
         def __set__(self, val):
-            try:
-                self.m_key2 = val.encode('utf8')
-            except AttributeError:
-                self.m_key2 = val
+            self.m_key2 = to_bytes(val)
         def __get__(self):
             return self.m_key2.decode('utf8')
         
     property key_up:
         """The string key corresponding to the upstream node"""
         def __set__(self, val):
-            try:
-                self.m_key_up = val.encode('utf8')
-            except AttributeError:
-                self.m_key_up = val
+            self.m_key_up = to_bytes(val)
         def __get__(self):
             return self.m_key_up.decode('utf8')
         
     property key_down:
         """ The string key corresponding to the downstream node """
         def __set__(self, val):
-            try:
-                self.m_key_down = val.encode('utf8')
-            except AttributeError:
-                self.m_key_down = val
+            self.m_key_down = to_bytes(val)
         def __get__(self):
             return self.m_key_down.decode('utf8')
         

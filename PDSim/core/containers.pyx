@@ -10,10 +10,10 @@ cimport CoolProp.constants_header as constants
 from CoolProp import constants
 
 cdef bytes to_bytes(object val):
-    try:
+    if isinstance(val, bytes):
+        return <bytes>val
+    else:
         return val.encode('utf8')
-    except AttributeError:
-        return val
     
 cdef object to_pystring(object val):
     try:
