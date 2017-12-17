@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import division, absolute_import
 
 import math
 from math import pi
@@ -7,10 +7,9 @@ import inspect
 
 ##--  Package imports  --
 from PDSim.flow import flow,flow_models
-from containers import STATE_VARS_TM, CVArrays
+from .containers import STATE_VARS_TM, CVArrays, ControlVolumeCollection,TubeCollection
 from PDSim.flow.flow import FlowPathCollection
-from containers import ControlVolumeCollection,TubeCollection
-import integrators
+from . import integrators
 from PDSim.plot.plots import debug_plots
 from PDSim.misc.datatypes import arraym, empty_arraym
 import PDSim.core.callbacks
@@ -35,25 +34,25 @@ import pylab
 ## CoolProp imports
 from CoolProp.State import State
 
-def _pickle_method(method):
-    func_name = method.im_func.__name__
-    obj = method.im_self
-    cls = method.im_class
-    return _unpickle_method, (func_name, obj, cls)
+#def _pickle_method(method):
+    #func_name = method.im_func.__name__
+    #obj = method.im_self
+    #cls = method.im_class
+    #return _unpickle_method, (func_name, obj, cls)
 
-def _unpickle_method(func_name, obj, cls):
-    for cls in cls.mro():
-        try:
-            func = cls.__dict__[func_name]
-        except KeyError:
-            pass
-        else:
-            break
-        return func.__get__(obj, cls)
+#def _unpickle_method(func_name, obj, cls):
+    #for cls in cls.mro():
+        #try:
+            #func = cls.__dict__[func_name]
+        #except KeyError:
+            #pass
+        #else:
+            #break
+        #return func.__get__(obj, cls)
 
-import copy_reg
-import types
-copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
+#import copy_reg
+#import types
+#copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 
 # An empty class for storage
 class struct(object):
@@ -1150,7 +1149,7 @@ class PDSimCore(object):
                 Tn2, EBn2 = self.solvers.lump_eb_history[-2]
                 
                 #  Convert to numpy arrays
-                Tn1, EBn1, Tn2, EBn2 = [np.array(l) for l in Tn1, EBn1, Tn2, EBn2]
+                Tn1, EBn1, Tn2, EBn2 = [np.array(l) for l in [Tn1, EBn1, Tn2, EBn2]]
                 
                 #  Use the relaxed secant method to find the solution 
                 Tnew = Tn1 - 0.7*EBn1*(Tn1-Tn2)/(EBn1-EBn2)

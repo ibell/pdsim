@@ -215,8 +215,8 @@ cdef class FlowPath(object):
         
     def __init__(self, key1='', key2='', MdotFcn=None, MdotFcn_kwargs={}, Nflows = 1):
         
-        self.key1 = key1
-        self.key2 = key2
+        self.key1 = key1.encode('ascii')
+        self.key2 = key2.encode('ascii')
         
         # You are passing in a pre-wrapped function - will be nice and fast since
         # all the calls will stay at the C++ layer
@@ -227,7 +227,7 @@ cdef class FlowPath(object):
             # the Python level which will make them nice to deal with but slow
             self.MdotFcn = PyFlowFunctionWrapper(MdotFcn, MdotFcn_kwargs, Nflows = Nflows)
         
-        self.MdotFcn_str = str(MdotFcn)
+        self.MdotFcn_str = str(MdotFcn).encode('ascii')
             
     cpdef dict __cdict__(self, AddStates=False):
         """

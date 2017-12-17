@@ -43,8 +43,8 @@ cdef class Tube(object):
         exists : boolean
             ``True`` if the tube exists
         """
-        self.key1 = key1
-        self.key2 = key2
+        self.key1 = key1.encode('ascii')
+        self.key2 = key2.encode('ascii')
         self.fixed = fixed
         
         #: Additional heat to be added to the tube
@@ -466,7 +466,7 @@ cdef class ControlVolumeCollection(object):
         
         # For all CV - whether they exist or not
         # both indices and keys are in the same order
-        self.indices = range(0,len(self.keys))
+        self.indices = list(range(0,len(self.keys)))
         
         self.exists_indices = [i for i in self.indices if self.CVs[i].exists]
         self.exists_keys = [self.keys[i] for i in self.exists_indices]
