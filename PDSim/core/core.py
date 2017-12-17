@@ -964,7 +964,7 @@ class PDSimCore(object):
             callargs = inspect.getcallargs(lumps_energy_balance_callback)
             # Either a non-bound method is provided, or bound method is provided, in which case you get self,t as the values
             # t is a subclass of float, and self is subclass of PDSimCore
-            sig_ok = len(callargs) == 0 or (len(callargs) == 1 and isinstance(callargs.values()[0],PDSimCore))
+            sig_ok = len(callargs) == 0 or (len(callargs) == 1 and isinstance(list(callargs.values())[0],PDSimCore))
             
             if lumps_energy_balance_callback is not None and sig_ok:  #Do functional introspection here where the ``True`` is
                 self.callbacks.lumps_energy_balance_callback = PDSim.core.callbacks.WrappedLumpsEnergyBalanceCallback(self, lumps_energy_balance_callback)
