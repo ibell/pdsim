@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import division, print_function
 from math import pi,cos,sin,sqrt
 from PDSim.misc.scipylike import trapz
 from PDSim.flow import flow_models

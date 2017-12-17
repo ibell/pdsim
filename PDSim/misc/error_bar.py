@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from math import log10, isnan
 
 def error_ascii_bar(val, tol, N = 50, min_p = -5, max_p = 2):

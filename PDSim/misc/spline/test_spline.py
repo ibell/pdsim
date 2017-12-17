@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import numpy as np
 import scipy.interpolate as sc
 import matplotlib.pyplot as plt
