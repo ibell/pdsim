@@ -15,7 +15,7 @@ For illustrative purposes only!
 ##########################################
 
 #Here we import some python packages
-from __future__ import division
+from __future__ import division, print_function
 from math import pi, cos, sin
 from time import clock
 import os, sys

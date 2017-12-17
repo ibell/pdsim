@@ -1,7 +1,7 @@
 ## This file is meant for experimentation with PDSim features and may not
 ## work for you.  Caveat emptor!!
 #
-from __future__ import division
+from __future__ import division, print_function
 
 # If being run from the folder that contains the PDSim source tree, 
 # remove the current location from the python path and use the 

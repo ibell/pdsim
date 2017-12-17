@@ -1,3 +1,4 @@
+from __future__ import print_function
 from scroll_compressor import Compressor
 import CoolProp.CoolProp as CP
 #CP.set_debug_level(1)
