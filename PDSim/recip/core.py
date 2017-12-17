@@ -1,10 +1,10 @@
-from __future__ import division, print_function
+from __future__ import division, print_function, absolute_import
 from math import pi,cos,sin,sqrt
 from PDSim.misc.scipylike import trapz
 from PDSim.flow import flow_models
 from PDSim.core.core import PDSimCore
 from PDSim.misc.datatypes import arraym
-from _recip import _Recip
+from ._recip import _Recip
 
 class Recip(PDSimCore,_Recip):
     """

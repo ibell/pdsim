@@ -1,4 +1,4 @@
-from __future__ import division, print_function
+from __future__ import division, print_function, absolute_import
 ##--- package imports
 from PDSim.misc.datatypes import arraym
 from PDSim.core.containers import ControlVolume
@@ -8,7 +8,7 @@ from PDSim.flow import flow_models
 from PDSim.plot.plots import debug_plots
 from PDSim.core.bearings import journal_bearing
 from PDSim.scroll import scroll_geo, symm_scroll_geo
-from _scroll import _Scroll
+from ._scroll import _Scroll
 
 ##--- non-package imports
 import warnings

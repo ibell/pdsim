@@ -1,8 +1,8 @@
-from __future__ import print_function
+from __future__ import print_function, absolute_import
 
 from math import pi,sqrt,log
-import numpy as np    
-from _bearings import calculate_epsilon_short, calculate_epsilon_long
+import numpy as np
+from ._bearings import calculate_epsilon_short, calculate_epsilon_long
 
 class struct: pass
 
