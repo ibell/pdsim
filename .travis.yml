@@ -32,6 +32,7 @@ install:
     fi
   - pip install -vvv --pre --trusted-host www.coolprop.dreamhosters.com --find-links http://www.coolprop.dreamhosters.com/binaries/Python/ -U --force-reinstall CoolProp
   - python setup.py install # Install PDSim
+  - conda list # Print all the stuff installed in this environment
   
 # command to run tests
 script: 
