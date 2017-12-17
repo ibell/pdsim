@@ -23,8 +23,13 @@ install:
   # Useful for debugging any issues with conda
   - conda info -a
 
-  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy matplotlib wxpython h5py cython
+  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy matplotlib h5py cython
   - source activate test-environment
+  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
+      conda install wxpython
+    else
+      pip -vvv install --pre -f https://wxpython.org/Phoenix/snapshot-builds/linux/gtk2/ubuntu-14.04/ --only-binary wxPython wxPython
+    fi
   
   - pip install -vvv --pre --trusted-host www.coolprop.dreamhosters.com --find-links http://www.coolprop.dreamhosters.com/binaries/Python/ -U --force-reinstall CoolProp
   - python setup.py install # Install PDSim
