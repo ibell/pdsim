@@ -22,8 +22,8 @@ version = '2.9'
 if len(sys.argv) == 1:
     sys.argv += ['clean','develop']
     #sys.argv += ['clean','install']
-    
-#Modify the __init__ file with this version string
+
+# Modify the __init__ file with this version string
 fName = os.path.join('PDSim','__init__.py')
 lines = open(fName,'r').readlines()
 fp = open(fName,'w')
@@ -33,15 +33,10 @@ for line in lines:
     fp.write(line+'\n')
 fp.close()
 
-import Cython
-
-#This will generate HTML to show where there are still pythonic bits hiding out
-Cython.Compiler.Options.annotate = True
-
-#Get the numpy include folder
+# Get the numpy include folder
 import numpy
 
-#Each of the Pure-Python or PYX files in this list will be compiled to a python module       
+# Each of the Pure-Python or PYX files in this list will be compiled to a python module       
 pyx_list = [
             "PDSim/core/_bearings.pyx",
             "PDSim/core/containers.pyx",
@@ -69,7 +64,7 @@ def clean():
                 print('removed',fname)
             except OSError:
                 pass
-            
+
 # Try to remove the generated files in the source tree 
 # if you are doing an install to the normal location
 if '--clean' in sys.argv:
@@ -81,7 +76,7 @@ for i in range(len(pyx_list)-1,-1,-1):
     if not os.path.exists(pyx_list[i]):
         warnings.warn(pyx_list[i]+' was not found')
         pyx_list.pop(i)
-    
+
 pxd_files = []
 ext_module_list = []
 package_pxd_files = {}
@@ -92,11 +87,11 @@ for pyx_file in pyx_list:
     if os.path.exists(pxd_file):
         sources+=[pxd_file]
     pxd_files.append(pxd_file)
-    
+
     # Add sources for clipper module
     if pyx_file.find('pyclipper') > -1:
         sources += [os.path.join('PDSim','misc','clipper','clipper.cpp')]
-    
+
     #Build an extension with the sources
     ext_name = pyx_file.rsplit('.',1)[0].replace('/','.')
     
@@ -130,6 +125,7 @@ setup(
   cmdclass={'build_ext': build_ext},
   ext_modules = cythonize(ext_module_list, 
                           compiler_directives=dict(profile = True, embedsignature = True),
+                          annotate=True
                           ),
   package_dir = {'PDSim':'PDSim',},
   package_data = package_data,
