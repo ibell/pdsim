@@ -1,13 +1,13 @@
 channels:
   - conda-forge
 dependencies:
-  - python=2.7
+  - python
   - numpy
   - scipy
   - matplotlib
   - pyyaml
   - h5py
-  - wxpython
+#  - wxpython
   - pip:
     - CoolProp
     - Cython
