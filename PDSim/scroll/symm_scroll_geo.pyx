@@ -593,7 +593,7 @@ def radial_leakage_pairs(geo):
     return remove_duplicates(pairs)
     
 
-cpdef HTAnglesClass HT_angles(double theta, geoVals geo, bytes key):
+cpdef HTAnglesClass HT_angles(double theta, geoVals geo, key):
     """
     Return the heat transfer bounding angles for the given control volume
     

@@ -19,7 +19,7 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
 
 cpdef int getNc(double theta, geoVals geo) except *
 
-cpdef HTAnglesClass HT_angles(double theta, geoVals geo, bytes key)
+cpdef HTAnglesClass HT_angles(double theta, geoVals geo, key)
 
 cpdef tuple SA(double theta, geoVals geo, bint poly=*, bint use_offset = *, double Vremove = *)
 cpdef dict SA_forces(double theta, geoVals geo, bint poly = *, bint use_offset = *)
