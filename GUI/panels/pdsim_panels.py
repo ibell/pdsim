@@ -1,4 +1,5 @@
 # -*- coding: latin-1 -*-
+from __future__ import print_function
 
 # Python imports
 import warnings, codecs, textwrap,os, itertools, difflib, zipfile, types
@@ -575,7 +576,7 @@ class OutputTreePanel(wx.Panel):
 #            self.tree.SetItemText(child, str(v), 1)
 #            
 #        t2 = clock()
-#        print t2 - t1, 'to get all the items'
+#        print(t2 - t1, 'to get all the items')
             
         self.runs = runs
         self.Disable()
@@ -652,13 +653,13 @@ class OutputTreePanel(wx.Panel):
                     try:
                         _recursive_hdf5_add(child, [o[thing] for o in objects])
                     except KeyError as KE:
-                        print KE
+                        print(KE)
         
         t1 = clock()
         _recursive_hdf5_add(self.root, self.runs)
         t2 = clock()
         
-        print t2-t1,'secs elapsed to load output tree'
+        print(t2-t1,'secs elapsed to load output tree')
         
         self.tree.Expand(self.root)
 
@@ -829,7 +830,7 @@ class OutputTreePanel(wx.Panel):
         
         os.startfile(fName)
         
-        print 'summary sheet', time.clock() - t1       
+        print('summary sheet', time.clock() - t1)      
         
     def OnActivate(self, evt):
         
@@ -976,8 +977,8 @@ class OutputTreePanel(wx.Panel):
         self.tree.MoveAfterInTabOrder()
         #Skip column 0 which is the header column
         values = [self.tree.GetItemText(item, col) for col in range(1, self.tree.ColumnCount)]
-        print 'Not currently implemented'
-        print 'row values', values
+        print('Not currently implemented')
+        print('row values', values)
     
     def OnRemoveCol(self, event, col):
         
@@ -1710,7 +1711,7 @@ class ParametricPanel(PDPanel):
                     # Pass all the coupled objects to the handler
                     o.handler(coupled_objects,keys,vals)
                 else:
-                    print 'no coupled objects'
+                    print('no coupled objects')
                 
                 # Set the value in the GUI
                 for key,val in zip(keys,vals):

@@ -1,9 +1,12 @@
+from __future__ import print_function
+
 import wx, sys, time, os
 from multiprocessing import Process, Pipe, freeze_support, cpu_count, allow_connection_pickling
 from threading import Thread
 from datatypes import InfiniteList
 from PDSimGUI import pdsim_home_folder
 import wx.lib.agw.pybusyinfo as PBI
+
 
 class RedirectText2Pipe(object):
     """
@@ -59,7 +62,7 @@ class Run1(Process):
         #Get the module name (file name without the .py)
         script_name = self.script_name.split('.', 1)[0]
         
-        print 'About to run the script file', os.path.join(pdsim_home_folder,self.script_name)
+        print('About to run the script file', os.path.join(pdsim_home_folder,self.script_name))
 
         #Import the script module
         script_module = __import__(script_name, globals(), locals(), [], -1)
@@ -99,11 +102,11 @@ class Run1(Process):
             # Prune off undesired keys as provided by get_prune_keys function
             HDF5.prune(hdf5_path, self.sim.get_prune_keys())
             self.sim.attach_HDF5_annotations(hdf5_path)
-            print 'Wrote hdf5 file to', hdf5_path
+            print('Wrote hdf5 file to', hdf5_path)
             
             # Send simulation result back to calling thread
             self.pipe_results.send(hdf5_path)
-            print 'Sent simulation back to calling thread',
+            print('Sent simulation back to calling thread',end='')
             # Wait for an acknowledgment of receipt
             while not self.pipe_results.poll():
                 time.sleep(0.1)
@@ -112,10 +115,10 @@ class Run1(Process):
                 if not ack_key == 'ACK':
                     raise KeyError
                 else:
-                    print 'Acknowledgment of receipt accepted'
+                    print('Acknowledgment of receipt accepted')
                     break
         else:
-            print 'Acknowledging completion of abort'
+            print('Acknowledging completion of abort')
             self.pipe_abort.send('ACK')
         
 class WorkerThreadManager(Thread):
@@ -280,14 +283,14 @@ class RedirectedWorkerThread(Thread):
             time.sleep(0.1)
         
         if self._want_abort == True:
-            print self.name+": Process has aborted successfully"
+            print(self.name+": Process has aborted successfully")
         else:
             wx.CallAfter(self.stdout_target.AppendText, self.name+": Process is done")
             if hdf5_path is not None:
                 "Send the data back to the GUI"
                 wx.CallAfter(self.done_callback, hdf5_path)
             else:
-                print "Didn't get any simulation data"
+                print("Didn't get any simulation data")
         return 1
         
     def abort(self):

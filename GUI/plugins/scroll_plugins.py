@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import sys
 sys.path.append('..')
 
@@ -764,7 +766,7 @@ for phi,involute,offset,D,parent,X_d,X_d_backflow in zip(phi_list,involute_list,
     p.X_d_backflow = X_d_backflow
     sim.fixed_scroll_ports.append(p)
     
-print mdot_guess*0.1
+print(mdot_guess*0.1)
 for i,(L,ID,T,D) in enumerate(zip(Ltube_list,IDtube_list,Ttube_list,RHOtube_list)):
     sim.add_tube(Tube(key1 = 'VITube'+str(i+1)+'.1',
                       key2 = 'VITube'+str(i+1)+'.2',
@@ -963,7 +965,7 @@ class ScrollInjectionPlugin(pdsim_plugins.PDSimPlugin):
 #        self.simulation = sim
 
 if __name__=='__main__':
-    print 'I am not meant to be run directly'
+    print('I am not meant to be run directly')
         
         
         

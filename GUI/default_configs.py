@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 
 from families.scroll import scroll_yaml
 from families.recip_compressor import recip_yaml
@@ -13,5 +14,5 @@ def get_defaults(family):
         raise ValueError('Your machine family [{f:s}] was not found'.format(f=family))
         
 if __name__=='__main__':
-    print get_defaults('recip')
+    print(get_defaults('recip'))
     

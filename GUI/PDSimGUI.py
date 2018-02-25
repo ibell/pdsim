@@ -1,4 +1,5 @@
 # -*- coding: latin-1 -*-
+from __future__ import print_function
 
 import matplotlib
 matplotlib.use('WXAgg')
@@ -262,7 +263,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
                               eps_cycle = {eps_cycle:s},
                               max_number_of_steps = {max_number_of_steps:s}
                               )
-            print 'time taken',time.clock()-t1
+            print('time taken',time.clock()-t1)
             """.format(RK_eps = self.IC.RK45_eps.GetValue(),
                        eps_cycle = str(eps_cycle),
                        max_number_of_steps = str(max_number_of_steps),
@@ -410,13 +411,13 @@ class WriteOutputsPanel(wx.Panel):
             s = '\n'.join(rows)
             
             #Actually write to file
-            print 'writing data to ',os.path.join(dir_path,file+'.csv')
+            print('writing data to ',os.path.join(dir_path,file+'.csv'))
             fp = open(os.path.join(dir_path, file+'.csv'),'w')
             fp.write(headers+'\n')
             fp.write(s)
             fp.close()
             
-        print 'You selected: %s\n' % dir_path
+        print('You selected: %s\n' % dir_path)
 
 class RunToolBook(wx.Panel):
     def __init__(self,parent):
@@ -658,7 +659,7 @@ class FileOutputDialog(wx.Dialog):
             s = '\n'.join(rows)
             
             #Actually write to file
-            print 'writing data to ',os.path.join(dir_path,file+'.csv')
+            print('writing data to ',os.path.join(dir_path,file+'.csv'))
             fp = open(os.path.join(dir_path,file+'.csv'),'w')
             fp.write(headers+'\n')
             fp.write(s)
@@ -743,7 +744,7 @@ class OutputDataPanel(pdsim_panels.PDPanel):
             file_paths = FD.GetPaths()
             for file in file_paths:
                 self.OutputTree.add_runs(h5py.File(file,'r'))
-                print 'added',file
+                print('added',file)
         FD.Destroy()
 
     def OnRefresh(self, event):
@@ -1288,7 +1289,7 @@ class MainFrame(wx.Frame):
             # issues with scripts being run that should not be when they are attempted to be imported
             lines = open(py_file, 'r').read()
             if not '__name__' in lines or not '__main__' in lines:
-                print py_file + ": could not be loaded because it does not contain 'if __name__ == __main__:' (this guards against scripts being run on import)"
+                print(py_file + ": could not be loaded because it does not contain 'if __name__ == __main__:' (this guards against scripts being run on import)")
                 continue
             
             try:
@@ -1296,8 +1297,8 @@ class MainFrame(wx.Frame):
                 mod = __import__(root)
             except Exception as E:
                 import traceback
-                print 'Error importing module', py_file, '::'
-                print traceback.print_exc()
+                print('Error importing module', py_file, '::')
+                print(traceback.print_exc())
                 continue
             
             for term in dir(mod):
@@ -1450,7 +1451,7 @@ class MainFrame(wx.Frame):
         # see http://aspn.activestate.com/ASPN/Mail/Message/wxpython-users/3575899
         # created by Andrea Gavana
         time.sleep(1)        
-        print 'taking screenshot'
+        print('taking screenshot')
         # adjust widths for Linux (figured out by John Torres 
         # http://article.gmane.org/gmane.comp.python.wxpython/67327)
         if sys.platform == 'linux2':
@@ -1493,7 +1494,7 @@ class MainFrame(wx.Frame):
         img = bmp.ConvertToImage()
         fileName = "screenshot.png"
         img.SaveFile(fileName, wx.BITMAP_TYPE_PNG)
-        print '...saved as screenshot..png'
+        print('...saved as screenshot..png')
         
     def OnManagePluginFolders(self, event):
         plugin_dirs = GUIconfig.get('plugin_dirs', default = [])
@@ -1577,7 +1578,7 @@ class MainFrame(wx.Frame):
         
             GUIconfig.set('plugin_dirs', plugin_dirs)
         else:
-            print 'closed'
+            print('closed')
             
         dlg.Destroy()
         
@@ -1637,7 +1638,7 @@ class MainFrame(wx.Frame):
             #Get the file path
             file_path=FD.GetPath()
             
-            print 'Writing configuration file to ', file_path   
+            print('Writing configuration file to ', file_path)
             
             #Build the config file entry
             string_list = []
@@ -1682,10 +1683,10 @@ class MainFrame(wx.Frame):
             my_dict = self.get_GUI_object_dict()
             
             if not sorted(check_dict.keys()) == sorted(my_dict.keys()):
-                print 'Not all the keys are the same'
+                print('Not all the keys are the same')
             else:
                 for k in check_dict.iterkeys():
-                    print 'Different key: ',check_dict[k].GetValue(),my_dict[k].GetValue()
+                    print('Different key: ',check_dict[k].GetValue(),my_dict[k].GetValue())
                     
             # Write current location to config
             current_path,fname = os.path.split(file_path)
@@ -1734,9 +1735,9 @@ class MainFrame(wx.Frame):
         
         # Add results from the pipe to the GUI
         if not self.results_list.empty():
-            print 'readying to get simulation; ',
+            print('readying to get simulation; ',end='')
             sim = self.results_list.get()
-            print 'got a simulation'
+            print('got a simulation')
             
             self.MTB.OutputsTB.DataPanel.add_runs([sim])
             
