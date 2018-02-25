@@ -32,7 +32,7 @@ from PDSim.flow import flow_models
 from PDSim.misc.datatypes import arraym
 from PDSim.core.containers import ControlVolume, Tube
 from PDSim.core.core import PDSimCore
-from PDSim.plot.plots import debug_plots
+
 
 #Imports from CoolProp (fluid property database)
 from CoolProp import State
@@ -200,7 +200,8 @@ def Compressor(**kwargs):
                 )
     print('time taken',clock()-t1,'s')
     
-    #debug_plots(recip)
+    # from PDSim.plot.plots import debug_plots
+    # debug_plots(recip)
     
 def run_all():
     Compressor(solver_method = 'Euler')

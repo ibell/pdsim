@@ -25,7 +25,7 @@ from PDSim.flow import flow_models
 from PDSim.misc.datatypes import empty_arraym
 from PDSim.core.containers import ControlVolume, Tube
 from PDSim.core.core import PDSimCore
-from PDSim.plot.plots import debug_plots
+
 
 #Imports from CoolProp (fluid property database)
 from CoolProp import State
@@ -205,7 +205,8 @@ def Expander(**kwargs):
                    )
     print('time taken',clock()-t1,'s')
     
-    #debug_plots(expander)
+    # from PDSim.plot.plots import debug_plots
+    # debug_plots(expander)
     
 if __name__=='__main__':    
     #If this file is run directly, this code will be run

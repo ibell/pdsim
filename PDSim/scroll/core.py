@@ -5,7 +5,7 @@ from PDSim.core.containers import ControlVolume
 from PDSim.flow.flow import FlowPath
 from PDSim.core.core import PDSimCore
 from PDSim.flow import flow_models
-from PDSim.plot.plots import debug_plots
+
 from PDSim.core.bearings import journal_bearing
 from PDSim.scroll import scroll_geo, symm_scroll_geo
 from ._scroll import _Scroll
@@ -2622,7 +2622,8 @@ class Scroll(PDSimCore, _Scroll):
             for i in _slice:
                 self.forces.Fkey[:,i] = np.linalg.solve(A[:,:,i], b[:,i])
         
-                #debug_plots(self)
+                # from PDSim.plot.plots import debug_plots
+                # debug_plots(self)
             F1, F2, F3, F4 = self.forces.Fkey
         
             # Bearing forces on the scroll re-calculated based on force balances in the x- and y-axes

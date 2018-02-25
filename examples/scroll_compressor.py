@@ -15,10 +15,9 @@ from PDSim.scroll import scroll_geo
 from PDSim.core.core import struct
 from PDSim.scroll.core import Scroll
 from PDSim.core.containers import ControlVolume, Tube
-from PDSim.plot.plots import debug_plots
-from PDSim.scroll.plots import plotScrollSet
 from PDSim.core.motor import Motor
-
+# from PDSim.scroll.plots import plotScrollSet
+# from PDSim.plot.plots import debug_plots # (Uncomment if you want to do the debug_plots)
 from CoolProp import State
 from CoolProp import CoolProp as CP
 

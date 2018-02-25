@@ -11,7 +11,6 @@ from PDSim.flow import flow,flow_models
 from .containers import STATE_VARS_TM, CVArrays, ControlVolumeCollection,TubeCollection
 from PDSim.flow.flow import FlowPathCollection
 from . import integrators
-from PDSim.plot.plots import debug_plots
 from PDSim.misc.datatypes import arraym, empty_arraym
 import PDSim.core.callbacks
 from PDSim.misc.error_bar import error_ascii_bar
@@ -1210,6 +1209,7 @@ class PDSimCore(object):
                 return
                 
             if plot_every_cycle:
+                from PDSim.plot.plots import debug_plots
                 debug_plots(self)
             
             if self.Abort():
