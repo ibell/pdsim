@@ -990,7 +990,10 @@ class PDSimCore(object):
         # Make cycle_integrator_options an empty dictionary if not provided
         if cycle_integrator_options is None:
             cycle_integrator_options = {}
-            
+            tmax = 2*math.pi
+        else:
+            tmax = cycle_integrator_options['tmax']
+                
         X = arraym(X)
                 
         # (1). First, run all the tubes
@@ -1009,17 +1012,17 @@ class PDSimCore(object):
                 # Default to 7000 steps if not provided
                 N = getattr(self,'EulerN', 7000)                
                 integrator = EulerIntegrator(self, X)
-                aborted = integrator.do_integration(N, 0, 2*math.pi)
+                aborted = integrator.do_integration(N, 0, tmax)
             elif cycle_integrator == 'Heun':
                 # Default to 7000 steps if not provided
                 N = getattr(self,'HeunN', 7000)
                 integrator = HeunIntegrator(self, X)
-                aborted = integrator.do_integration(N, 0, 2*math.pi)
+                aborted = integrator.do_integration(N, 0, tmax)
             elif cycle_integrator == 'RK45':
                 # Default to tolerance of 1e-8 if not provided
                 eps_allowed = getattr(self,'RK45_eps', 1e-8)
                 integrator = RK45Integrator(self, X)
-                aborted = integrator.do_integration(0, 2*math.pi, eps_allowed=eps_allowed)
+                aborted = integrator.do_integration(0, tmax, eps_allowed=eps_allowed)
             else:
                 raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
             
