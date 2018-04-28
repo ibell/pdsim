@@ -33,7 +33,7 @@ def run_prebuild(_):
     from sphinx.apidoc import main
     cur_dir = os.path.abspath(os.path.dirname(__file__))
     output_path = os.path.join(cur_dir, 'PDSim_apidoc')
-    main(['-e', '-o', output_path, os.path.dirname(PDSim.__file__), '--force'])
+    main(argv=['-e', '-o', output_path, os.path.dirname(PDSim.__file__), '--force'])
 
     # Convert the notebooks to RST
     nb_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'notebooks')
