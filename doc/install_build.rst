@@ -79,21 +79,21 @@ Windows
 
     In [0]: import CoolProp,matplotlib,Cython,PDSim,wx,numpy,scipy,yaml
     
-    In [0]: print CoolProp.__file__; print CoolProp.__version__
+    In [0]: CoolProp.__version__, CoolProp.__file__
     
-    In [0]: print matplotlib.__file__; print matplotlib.__version__
+    In [0]: matplotlib.__version__, matplotlib.__file__
     
-    In [0]: print Cython.__file__; print Cython.__version__
+    In [0]: Cython.__version__, Cython.__file__
     
-    In [0]: print PDSim.__file__; print PDSim.__version__
+    In [0]: PDSim.__version__, PDSim.__file__
     
-    In [0]: print wx.__file__; print wx.version()
+    In [0]: wx.version(), wx.__file__
     
-    In [0]: print numpy.__file__; print numpy.__version__
+    In [0]: numpy.__version__, numpy.__file__
     
-    In [0]: print scipy.__file__; print scipy.__version__
+    In [0]: scipy.__version__, scipy.__file__
     
-    In [0]: print yaml.__file__; print yaml.__version__
+    In [0]: yaml.__version__, yaml.__file__
 
 #. Now go into the doc folder, start IPython, the below code should yield output something like::
 
