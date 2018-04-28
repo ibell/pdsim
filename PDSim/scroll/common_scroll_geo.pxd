@@ -8,10 +8,39 @@ cimport cython
 from libc.math cimport sqrt,sin,cos,tan,atan2,acos,floor,M_PI as pi,pow
 
 cdef class VdVstruct:
-    cdef public double V,dV
+    """
+    A struct with values for volume and derivative of volume w.r.t. crank angle
+    """
+
+    cdef public double V
+    """ Volume [m^3] """
+
+    cdef public double dV
+    """ Derivative of volume with respect to crank angle [m^3/radian] """
 
 cdef class HTAnglesClass:
-    cdef public double phi_1_i, phi_2_i, phi_1_o, phi_2_o, phi_i0, phi_o0
+    """
+    A struct with angles associated with the calculations needed for the assesment
+    of heat transfer in the chambers of the scroll compressor
+    """
+
+    cdef public double phi_1_i
+    """ Maximum involute angle on the inner involute of the wrap that forms the outer wall of the CV"""
+    
+    cdef public double phi_2_i
+    """ Minimum involute angle on the inner involute of the wrap that forms the outer wall of the CV"""
+        
+    cdef public double phi_1_o
+    """ Maximum involute angle on the outer involute of the wrap that forms the inner wall of the CV"""
+        
+    cdef public double phi_2_o
+    """ Minimum involute angle on the outer involute of the wrap that forms the inner wall of the CV"""
+
+    cdef public double phi_i0
+    """ The initial angle on the inner involute of the wrap that forms the outer wall of the CV"""
+
+    cdef public double phi_o0
+    """ The initial angle on the outer involute of the wrap that forms the inner wall of the CV"""
 
 cdef enum involute_index:
     INVOLUTE_FI
@@ -20,13 +49,37 @@ cdef enum involute_index:
     INVOLUTE_OO    
 
 cdef class CVInvolute:
-    cdef public double phi_max, phi_min, phi_0
-    cdef public double dphi_max_dtheta, dphi_min_dtheta
+    """
+    A simple struct to contain the involute angles
+    """
+
+    cdef public double phi_max
+    """ The maximum involute angle along this involute """
+
+    cdef public double phi_min
+    """ The minimum involute angle along this involute """
+    
+    cdef public double phi_0
+    """ The initial involute angle along this involute """
+
+    cdef public double dphi_max_dtheta
+    """ The derivative of phi_max w.r.t. crank angle """
+    
+    cdef public double dphi_min_dtheta
+    """ The derivative of phi_min w.r.t. crank angle """
+
     cdef public involute_index involute
+    """ The involute_index of this involute """
     
 cdef class CVInvolutes:
-    cdef public CVInvolute Inner, Outer
-    cdef public bint has_line_1, has_line_2
+    cdef public CVInvolute Inner
+    """ The values for the inner involute of this chamber """
+    cdef public CVInvolute Outer
+    """ The values for the outer involute of this chamber """
+    cdef public bint has_line_1 
+    """ Boolean for existence of the line #1 """
+    cdef public bint has_line_2
+    """ Boolean for existence of the line #2 """
     
 cdef enum sides:
     UP
