@@ -116,6 +116,7 @@ cdef class geoVals:
     
     cpdef bint is_symmetric(self)
     cpdef double val_if_symmetric(self, double val) except *
+    cpdef copy_inplace(self, geoVals target)
 
 cpdef bytes involute_index_to_key(int index)
 

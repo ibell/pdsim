@@ -521,6 +521,13 @@ cdef class geoVals:
             return val
         else:
             raise ValueError('Symmetric angle requested (phi_ie, phi_is, phi_i0, etc.) but the geometry is not symmetric')
+
+    cpdef copy_inplace(self, geoVals target):
+        """
+        For a provided target class, copy over all attributes
+        """
+        for atr in geoValsvarlist:
+            setattr(target,atr,getattr(self, atr))
             
     property phi_ie:
         """ Inner Ending Angle """
