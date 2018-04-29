@@ -17,7 +17,7 @@ from Cython.Distutils import build_ext
 from Cython.Distutils.extension import Extension
 import sys, shutil, os, glob
 
-version = '2.9'
+version = '2.10'
 
 if len(sys.argv) == 1:
     sys.argv += ['clean','develop']
@@ -119,7 +119,7 @@ setup(
   author = "Ian Bell",
   author_email='ian.h.bell@gmail.com',
   url='http://pdsim.sourceforge.net',
-  requirements=['CoolProp','cython','quantities'],
+  requires=['CoolProp','cython','quantities'],
   description = """A flexible open-source framework for the quasi-steady-state simulation of positive displacement machines including compressors and expanders""",
   packages = ['PDSim','PDSim.core','PDSim.flow','PDSim.plot','PDSim.scroll','PDSim.misc','PDSim.recip','PDSim.misc.clipper'],
   cmdclass={'build_ext': build_ext},
@@ -132,12 +132,4 @@ setup(
   include_dirs = [numpy.get_include(), CoolProp.get_include_directory(), "PDSim/misc/clipper", "PDSim/misc/spline"],
   zip_safe = False # no compressed egg; see http://stackoverflow.com/a/29124937/1360263
 )
-
-try:
-    import quantities
-    print('quantities package found, no need to install from source')
-except ImportError:
-    print('quantities package not found, will install from sources in externals/quantities.  Please hold on.')
-    import subprocess
-    subprocess.check_output('python setup.py install', shell = True, cwd=os.path.join('externals','quantities'))
     
