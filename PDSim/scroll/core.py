@@ -9,6 +9,7 @@ from PDSim.flow import flow_models
 from PDSim.core.bearings import journal_bearing
 from PDSim.scroll import scroll_geo, symm_scroll_geo
 from ._scroll import _Scroll
+from PDSim.scroll.scroll_geo import set_scroll_geo
 
 ##--- non-package imports
 import warnings
@@ -567,59 +568,12 @@ class Scroll(PDSimCore, _Scroll):
         else:
             return scroll_geo.DDD(theta,self.geo)[0:2]        
         
-    def set_scroll_geo(self,Vdisp,Vratio,Thickness,OrbitingRadius,phi_i0=0.0,phi_os=0.3, phi_is = pi):
+    def set_scroll_geo(self, *args, **kwargs):
         """
-        Provide the following parameters.  The rest will be calculated by the geometry code
-        
-        ==============  ===================================================================================
-        Vdisp           Displacement in compressor mode [m^3]
-        Vratio          Volume ratio (compression chambers at discharge angle / displacement volume) [-]
-        Thickness       Thickness of scroll wrap [m]
-        OrbitingRadius  Orbiting radius of the orbiting scroll [m]
-        ==============  ===================================================================================
-        
-        Optional parameters are 
-        
-        phi_i0
-        phi_os
-        phi_is
+        Delegates to scroll_geo.set_scroll_geo to calculate the scroll geometry
         """
-        
-        ## Determine the geometry by using the imposed parameters for the scroll wraps
-        def f(x,phi_i0,phi_os,Vdisp_goal,Vratio_goal,t_goal,ro_goal):
-            phi_ie=x[0]
-            phi_o0=x[1]
-            hs=x[2]
-            rb=x[3]
-            t=rb*(phi_i0-phi_o0)
-            ro=rb*pi-t
-            Vdisp=-2*pi*hs*rb*ro*(3*pi-2*phi_ie+phi_i0+phi_o0)
-            Vratio=(3*pi-2*phi_ie+phi_i0+phi_o0)/(-2*phi_os-3*pi+phi_i0+phi_o0)
 
-            r1=Vdisp-Vdisp_goal
-            r2=Vratio-Vratio_goal
-            r3=t-t_goal
-            r4=ro-ro_goal
-            return [r1,r2,r3,r4]
-        
-        phi_ie,phi_o0,hs,rb = fsolve(f,[20,1.3,0.03,0.003],args=(phi_i0,phi_os,Vdisp,Vratio,Thickness,OrbitingRadius))
-        phi_oe=phi_ie
-        self.geo.h=hs
-        self.geo.rb=rb
-        self.geo.phi_fi0=phi_i0
-        self.geo.phi_fis=phi_is
-        self.geo.phi_fie=phi_ie
-        self.geo.phi_fo0=phi_o0
-        self.geo.phi_fos=phi_os
-        self.geo.phi_foe=phi_oe
-        self.geo.phi_oi0=phi_i0
-        self.geo.phi_ois=phi_is
-        self.geo.phi_oie=phi_ie
-        self.geo.phi_oo0=phi_o0
-        self.geo.phi_oos=phi_os
-        self.geo.phi_ooe=phi_oe
-        self.geo.ro=rb*pi-Thickness
-        self.geo.t=Thickness
+        set_scroll_geo(*args, geo=self.geo, **kwargs)
         
         #Set the flags to ensure all parameters are fresh
         self.__Setscroll_geo__=True
