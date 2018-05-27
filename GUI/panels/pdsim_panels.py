@@ -233,10 +233,10 @@ def LaTeXImageMaker(LaTeX,parent,**kwargs):
     return wx.StaticBitmap(parent, bitmap = mathtext_to_wxbitmap(LaTeX), **kwargs)        
         
 class PlotPanel(wx.Panel):
-    def __init__(self, parent, toolbar = False, **kwargs):
+    def __init__(self, parent, toolbar = False, figsize=(2,2), **kwargs):
         wx.Panel.__init__(self, parent, **kwargs)
         sizer = wx.BoxSizer(wx.VERTICAL)
-        self.figure = mpl.figure.Figure(dpi=100, figsize=(2, 2))
+        self.figure = mpl.figure.Figure(dpi=100, figsize=figsize)
         self.canvas = WXCanvas(self, -1, self.figure)
         
         sizer.Add(self.canvas)
