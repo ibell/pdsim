@@ -404,7 +404,64 @@ cdef coords_inv_dtheta(double phi, geoVals geo, double theta, int inv, double *d
         dy[0] = -ro*cos(om)
     else:
         raise ValueError('flag not valid')
+
+cpdef tuple sortAnglesCCW(double t1, double t2):
+    """
+    Sort angles so that t2>t1 in a counter-clockwise sense
+    idea from `StackOverflow <http://stackoverflow.com/questions/242404/sort-four-points-in-clockwise-order>`_
+    more description: `SoftSurfer <http://softsurfer.com/Archive/algorithm_0101/algorithm_0101.htm>`_
+
+    If the signed area of the triangle formed between the points on a unit circle with angles t1 and t2
+    and the origin is positive, the angles are sorted counterclockwise. Otherwise, the angles
+    are sorted in a counter-clockwise manner.  Here we want the angles to be sorted CCW, so
+    if area is negative, swap angles
     
+    Area obtained from the cross product of a vector from origin 
+    to 1 and a vector to point 2, so use right hand rule to get 
+    sign of cross product with unit length
+    """
+
+    if (cos(t1)*sin(t2)-cos(t2)*sin(t1)<0):
+        # Swap angles
+        t1,t2 = t2,t1
+    while (t1 > t2):
+        # Make t2 bigger than t1
+        t2=t2 + 2*pi;
+    return (t1,t2)
+
+cpdef tuple sortAnglesCW(double t1, double t2):
+
+    """
+    Sort angles so that t2>t1 in a clockwise sense
+    idea from `StackOverflow <http://stackoverflow.com/questions/242404/sort-four-points-in-clockwise-order>`_
+    more description: `SoftSurfer <http://softsurfer.com/Archive/algorithm_0101/algorithm_0101.htm>`_
+
+    If the signed area of the triangle formed between the points on a unit circle with angles t1 and t2
+    and the origin is positive, the angles are sorted counterclockwise. Otherwise, the angles
+    are sorted in a counter-clockwise manner.  Here we want the angles to be sorted CCW, so
+    if area is negative, swap angles
+    
+    Area obtained from the cross product of a vector from origin 
+    to 1 and a vector to point 2, so use right hand rule to get 
+    sign of cross product with unit length
+    """
+
+    while (cos(t1)*sin(t2)-sin(t1)*cos(t2)>0):
+        # Swap angles
+        t1,t2 = t2,t1
+    # Make t1 between 0 and 2pi
+    while (t1<0 or t1> 2.0*pi):
+        if t1>2.0*pi:
+            t1=t1-2*pi
+        else:
+            t1=t1+2*pi
+    # Want t2 to be less than t1, but no more than 2*pi less
+    while (t2<t1 and t1-t2>2*pi):
+        t2=t2 + 2*pi
+    while (t2>t1):
+        t2=t2 - 2*pi
+    return (t1, t2)
+
 cpdef long get_compressor_CV_index(object _key) except *:
     """
     Returns the index defined in the ``compressor_CV_indices`` enum. 
