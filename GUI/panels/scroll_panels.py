@@ -851,6 +851,10 @@ class GeometryPanel(pdsim_panels.PDPanel):
                     core += chunk
                     
         return core
+
+    def get_geo(self):
+        """ Get the geometry class from this panel """
+        return self.Scroll.geo
         
         
 class FlowOptions(pdsim_panels.PDPanel):
