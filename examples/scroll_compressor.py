@@ -191,11 +191,10 @@ def Compressor(Te = 273, Tc = 300, f = None, OneCycle = False, Ref = 'R410A'):
 
     print('time taken', clock()-t1)
     
-    #del ScrollComp.FlowStorage
-    #from PDSim.misc.hdf5 import HDF5Writer
-    #h5 = HDF5Writer()
-    #import CoolProp
-    #h5.write_to_file(ScrollComp, 'CPgit_'+CoolProp.__gitrevision__+'.h5')
+    del ScrollComp.FlowStorage
+    from PDSim.misc.hdf5 import HDF5Writer
+    h5 = HDF5Writer()
+    h5.write_to_file(ScrollComp, 'scroll_compressor.h5')
     
     return ScrollComp
     

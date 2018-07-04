@@ -3,6 +3,7 @@ from __future__ import print_function
 import h5py
 import numpy as np
 import types
+import six 
 
 class StubClass():
     def __init__(self,d):
@@ -18,38 +19,41 @@ class HDF5Writer(object):
     def _recursive_write(self, f, struct):
         
         for thing in dir(struct):
-            #Skip everything starting with '_'
+            # Skip everything starting with '_'
             if thing.startswith('_'):
                 continue
             try:
-                #Get the attribute
+                # Get the attribute
                 value = getattr(struct, thing)
             except (AttributeError,ValueError) as E:
                 print((thing, E))
-                #If it can't get the attribute, just go to the next thing
+                # If it can't get the attribute, just go to the next thing
                 continue
             
-            #If it is an integer, floating point value, or numpy array
-            if isinstance(value,(int, float)):
-                #Save it as a value, go to next thing
+            # If it is an integer, floating point value, or numpy array
+            if isinstance(value, (int, float)):
+                # Save it as a value, go to next thing
                 f.create_dataset(thing, data = value)
                 continue
             elif isinstance(value, np.ndarray):
-                
                 if not value.shape: # value.shape is an empty tuple
-                    # It's a one-element numpy array
-                    f.create_dataset(thing, data = value)
+                    # It's a one-element numpy array, or empty
+                    if not value or not value.shape or min(value.shape) == 0:
+                        continue
+                    else:
+                        print(value, len(value), type(value))
+                        f.create_dataset(thing, data = value)
                 else:
-                    #Save it with compression, go to next thing
+                    # Save it with compression, go to next thing
                     f.create_dataset(thing, data = value, compression = 'gzip')
                 continue
-            elif isinstance(value, basestring):
+            elif isinstance(value, six.string_types):
                 str_type = h5py.new_vlen(str)
                 f.create_dataset(thing, dtype=str_type, data = value)
                 continue
             
             import inspect
-            #Skip methods, functions, built-in functions, routines, and modules
+            # Skip methods, functions, built-in functions, routines, and modules
             if (inspect.ismethod(value)
                 or inspect.isfunction(value)
                 or inspect.isbuiltin(value)
@@ -57,7 +61,7 @@ class HDF5Writer(object):
                 or inspect.ismodule(value)):
                     continue
             
-            if type(value) is types.DictType:
+            if isinstance(value, dict):
                 dict_group = f.create_group(thing)
                 # Recurse into the entries in the dictionary by turning the 
                 # dictionary into a class
@@ -65,14 +69,14 @@ class HDF5Writer(object):
             
             elif isinstance(value, (list,tuple)):
                 dict_group = f.create_group(thing)
-                #Convert to numpy array
-                #List/Tuple to a class
+                # Convert to numpy array
+                # List/Tuple to a class
                 cls = StubClass({str(i):v for i,v in enumerate(value)})
-                #Write class recursively
+                # Write class recursively
                 self._recursive_write(dict_group, cls)
             else:
                 f.create_group(thing)
-                #Recurse into the class
+                # Recurse into the class
                 self._recursive_write(f[thing], value)
         
     def write_to_file(self, struct, fName):
