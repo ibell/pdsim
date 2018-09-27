@@ -1,7 +1,6 @@
 language: python
 python:
   - "2.7"
-  - "3.5"
   
 # command to install dependencies
 install: 
@@ -40,6 +39,12 @@ script:
   - python simple_example.py
   - python scroll_compressor.py
   - python piston_expander.py
+  
+deploy:
+  provider: pypi
+  user: ibell
+  distributions: "bdist_wheel" # Your distributions here
+  password: "Your password"
 
 notifications:
   email:
