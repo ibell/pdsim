@@ -53,10 +53,7 @@ artifacts:
 deploy_script:
   - echo "Starting Artifact Deployment"
   # populate pypirc file for twine
-  - echo [distutils]                                  > %USERPROFILE%\\.pypirc
-  - echo index-servers =                             >> %USERPROFILE%\\.pypirc
-  - echo     pypi                                    >> %USERPROFILE%\\.pypirc
-  - echo [pypi]                                      >> %USERPROFILE%\\.pypirc
+  - echo [pypi]                                       > %USERPROFILE%\\.pypirc
   - echo username=belli                              >> %USERPROFILE%\\.pypirc
   - echo password=%PYPI_PASSWORD%                    >> %USERPROFILE%\\.pypirc
   # upload to pypi for windows
