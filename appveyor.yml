@@ -37,12 +37,12 @@ install:
   - ECHO "Installed PDSim"
 
 test_script:
-    - "pushd examples && %PYTHON%/python simple_example.py"
+    - "cd examples && %PYTHON%/python simple_example.py"
 
 after_test:
   - ECHO "DONE!"
   - ECHO "BUILDING WHEELS..."
-  - popd
+  - cd ..
   - "%PYTHON%/python setup.py bdist_wheel --plat-name=%PLAT_NAME%"
   
 artifacts:
