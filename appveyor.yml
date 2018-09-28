@@ -43,12 +43,17 @@ after_test:
   - ECHO "DONE!"
   - ECHO "BUILDING WHEELS..."
   - "%PYTHON%/python setup.py bdist_wheel --plat-name=%PLAT_NAME%"
+  
+artifacts:
+  - path: dist\*
+    name: pypi_artifacts
 
 # Thanks to https://github.com/AndrewAnnex/SpiceyPy/blob/master/appveyor.yml
 deploy_script:
+  - ls -l dist\*.*
   - echo "Starting Artifact Deployment"
   # populate pypirc file for twine
-  - echo [distutils]                                 >> %USERPROFILE%\\.pypirc
+  - echo [distutils]                                  > %USERPROFILE%\\.pypirc
   - echo index-servers =                             >> %USERPROFILE%\\.pypirc
   - echo     pypi                                    >> %USERPROFILE%\\.pypirc
   - echo [pypi]                                      >> %USERPROFILE%\\.pypirc
@@ -58,4 +63,4 @@ deploy_script:
   - set PATH=%BK_PATH%
   - set HOME=%USERPROFILE%
   - ps: If ($env:APPVEYOR_REPO_TAG -eq "true" -And $env:APPVEYOR_REPO_BRANCH -eq "master") { Invoke-Expression "twine upload --skip-existing dist/*.whl" 2>$null } Else { write-output "Not on a tag on master, won't deploy to pypi"}
-  - echo "Finished Artifact Deployment"
+  - echo "Finished Artifact Deployment to PYPI"
