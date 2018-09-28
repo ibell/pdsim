@@ -1,54 +1,44 @@
 language: python
 python:
-  - "2.7"
-  
-# command to install dependencies
-install: 
-  - git submodule update --init --recursive
-  
-  - sudo apt-get update
-  # We do this conditionally because it saves us some downloading if the
-  # version is the same.
-  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-      wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
-    else
-      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-    fi
-  - bash miniconda.sh -b -p $HOME/miniconda
-  - export PATH="$HOME/miniconda/bin:$PATH"
-  - hash -r
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update -q conda
-  # Useful for debugging any issues with conda
-  - conda info -a
-
-  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy matplotlib h5py cython
-  - source activate test-environment
-  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-      conda install wxpython;
-    else
-      pip -vvv install --pre -f https://wxpython.org/Phoenix/snapshot-builds/linux/gtk2/ubuntu-14.04/ --only-binary wxPython wxPython;
-    fi
-  - pip install -vvv --pre --trusted-host www.coolprop.dreamhosters.com --find-links http://www.coolprop.dreamhosters.com/binaries/Python/ -U --force-reinstall CoolProp
-  - python setup.py install # Install PDSim
-  - conda list # Print all the stuff installed in this environment
-  
-# command to run tests
-script: 
-  - cd examples
-  - python simple_example.py
-  - python scroll_compressor.py
-  - python piston_expander.py
-  
+- '2.7'
+install:
+- git submodule update --init --recursive
+- sudo apt-get update
+- if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh
+  -O miniconda.sh; else wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+  -O miniconda.sh; fi
+- bash miniconda.sh -b -p $HOME/miniconda
+- export PATH="$HOME/miniconda/bin:$PATH"
+- hash -r
+- conda config --set always_yes yes --set changeps1 no
+- conda update -q conda
+- conda info -a
+- conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy matplotlib
+  h5py cython
+- source activate test-environment
+- if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then conda install wxpython; else pip
+  -vvv install --pre -f https://wxpython.org/Phoenix/snapshot-builds/linux/gtk2/ubuntu-14.04/
+  --only-binary wxPython wxPython; fi
+- pip install -vvv --pre --trusted-host www.coolprop.dreamhosters.com --find-links
+  http://www.coolprop.dreamhosters.com/binaries/Python/ -U --force-reinstall CoolProp
+- python setup.py install
+- conda list
+script:
+- cd examples
+- python simple_example.py
+- python scroll_compressor.py
+- python piston_expander.py
 deploy:
   provider: pypi
-  user: ibell
-  distributions: "bdist_wheel" # Your distributions here
-  password: "Your password"
-
+  user: belli
+  distributions: bdist_wheel
+  password:
+    secure: lMd4RExdT51duTZy8sUNCN8Yj0nZh2WAw7z50X1vBAgnshCAMRmPjREKU5QQoxXHwPf6b0xlbARQieNtDaNIGBodkJviFSByhcHO9a69/WW8OL+C+pAwNZWcjfv+ZifQatq+tEvjxoQqD5Szq9AMnrS3jmtuL9XdH0N4UkYRMck=
+  on:
+    tags: true
 notifications:
   email:
     recipients:
-      - ian.h.bell@gmail.com
-    on_success: never # default: change
-    on_failure: always # default: always
+    - ian.h.bell@gmail.com
+    on_success: never
+    on_failure: always
