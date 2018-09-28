@@ -1,0 +1,59 @@
+environment:
+
+    PYPI_PASSWORD:
+        secure: ojP0ftEgmrZcijN49vQEPz39rkcPyOxtjwNp5hUYkdKxQq47DwkiaWOnVA11nog637VUmRnHb07uXwvrhK4bbg==
+
+    global:
+        PYTHON: "C:\\conda"
+        MINICONDA_VERSION: "latest"
+        CMD_IN_ENV: "cmd /E:ON /V:ON /C .\\ci-helpers\\appveyor\\windows_sdk.cmd"
+        PYTHON_ARCH: "64" # needs to be set for CMD_IN_ENV to succeed. If a mix
+                          # of 32 bit and 64 bit builds are needed, move this
+                          # to the matrix section.
+        CONDA_DEPENDENCIES: "Cython scipy numpy matplotlib"
+        #PIP_DEPENDENCIES: "objgraph"
+
+    matrix:
+        - PYTHON_VERSION: "2.7"
+          NUMPY_VERSION: "stable"
+
+matrix:
+    fast_finish: true
+
+platform:
+    -x64
+
+os: Visual Studio 2008
+
+install:
+    - "git clone git://github.com/ibell/pdsim"
+    - "powershell ci-helpers/appveyor/install-miniconda.ps1"
+    - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
+    - "%CMD_IN_ENV% python setup.py install"
+
+# Not a .NET project, we build Astropy in the install step instead
+build: false
+
+test_script:
+    - "cd examples && %CMD_IN_ENV% python simple.example.py"
+
+after_test:
+  - ECHO "DONE!"
+  - ECHO "BUILDING WHEELS..."
+  - "%PYTHON%/python setup.py bdist_wheel --plat-name=%PLAT_NAME%"
+
+# Thanks to https://github.com/AndrewAnnex/SpiceyPy/blob/master/appveyor.yml
+deploy_script:
+  - echo "Starting Artifact Deployment"
+  # populate pypirc file for twine
+  - echo [distutils]                                 >> %USERPROFILE%\\.pypirc
+  - echo index-servers =                             >> %USERPROFILE%\\.pypirc
+  - echo     pypi                                    >> %USERPROFILE%\\.pypirc
+  - echo [pypi]                                      >> %USERPROFILE%\\.pypirc
+  - echo username=ibell                              >> %USERPROFILE%\\.pypirc
+  - echo password=%PYPI_PASSWORD%                    >> %USERPROFILE%\\.pypirc
+  # upload to pypi for windows
+  - set PATH=%BK_PATH%
+  - set HOME=%USERPROFILE%
+  - ps: If ($env:APPVEYOR_REPO_TAG -eq "true" -And $env:APPVEYOR_REPO_BRANCH -eq "master") { Invoke-Expression "twine upload --skip-existing dist/*.whl" 2>$null } Else { write-output "Not on a tag on master, won't deploy to pypi"}
+- echo "Finished Artifact Deployment"
