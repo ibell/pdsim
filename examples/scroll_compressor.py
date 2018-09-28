@@ -16,8 +16,15 @@ from PDSim.core.core import struct
 from PDSim.scroll.core import Scroll
 from PDSim.core.containers import ControlVolume, Tube
 from PDSim.core.motor import Motor
-# from PDSim.scroll.plots import plotScrollSet
-# from PDSim.plot.plots import debug_plots # (Uncomment if you want to do the debug_plots)
+try:
+    from PDSim.scroll.plots import plotScrollSet
+    from PDSim.plot.plots import debug_plots # (Uncomment if you want to do the debug_plots)
+    plotting = True
+except ImportError as IE:
+    print(IE)
+    print('Plotting is disabled')
+    plotting = False
+    
 from CoolProp import State
 from CoolProp import CoolProp as CP
 
@@ -26,9 +33,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 import time
 
-def Compressor(Te = 273, Tc = 300, f = None, OneCycle = False, Ref = 'R410A'):
+def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref = 'R410A', HDF5file='scroll_compressor.h5'):
 
-    ScrollComp=Scroll()
+    ScrollComp = ScrollClass()
     #This runs if the module code is run directly 
     
     ScrollComp.set_scroll_geo(83e-6, 3.3, 0.005, 0.006) #Set the scroll wrap geometry
@@ -194,9 +201,9 @@ def Compressor(Te = 273, Tc = 300, f = None, OneCycle = False, Ref = 'R410A'):
     del ScrollComp.FlowStorage
     from PDSim.misc.hdf5 import HDF5Writer
     h5 = HDF5Writer()
-    h5.write_to_file(ScrollComp, 'scroll_compressor.h5')
+    h5.write_to_file(ScrollComp, HDF5file)
     
     return ScrollComp
     
 if __name__=='__main__':
-    Compressor()
+    Compressor(Scroll)
