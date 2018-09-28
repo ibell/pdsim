@@ -31,7 +31,7 @@ script:
 deploy:
   provider: pypi
   user: belli
-  distributions: bdist_wheel
+  distributions: sdist bdist_wheel
   password:
     secure: lMd4RExdT51duTZy8sUNCN8Yj0nZh2WAw7z50X1vBAgnshCAMRmPjREKU5QQoxXHwPf6b0xlbARQieNtDaNIGBodkJviFSByhcHO9a69/WW8OL+C+pAwNZWcjfv+ZifQatq+tEvjxoQqD5Szq9AMnrS3jmtuL9XdH0N4UkYRMck=
   on:
