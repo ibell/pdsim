@@ -15,9 +15,16 @@ from distutils.core import setup
 from Cython.Build import cythonize
 from Cython.Distutils import build_ext
 from Cython.Distutils.extension import Extension
-import sys, shutil, os, glob
+import sys, shutil, os, glob, subprocess
 
-version = '2.10'
+# Get the hash of the git revision
+git_hash = '????'
+try:
+    git_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD'])
+except:
+    print('Unable to extract the git revision, set to default')
+    
+version = '2.10.0' + '.' + git_hash
 
 if len(sys.argv) == 1:
     sys.argv += ['clean','develop']
