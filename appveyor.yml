@@ -51,7 +51,6 @@ artifacts:
 
 # Thanks to https://github.com/AndrewAnnex/SpiceyPy/blob/master/appveyor.yml
 deploy_script:
-  - ls -l dist\*.*
   - echo "Starting Artifact Deployment"
   # populate pypirc file for twine
   - echo [distutils]                                  > %USERPROFILE%\\.pypirc
