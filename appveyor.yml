@@ -1,38 +1,40 @@
+
+
+# Not a .NET project, we build Astropy in the install step instead
+build: false
+
+# Taken from SpiceyPy with some modification
 environment:
+  global:
+      WITH_COMPILER: "cmd /E:ON /V:ON /C .\\appveyor\\windows_sdk.cmd"
+  PYPI_PASSWORD:
+    secure: ojP0ftEgmrZcijN49vQEPz39rkcPyOxtjwNp5hUYkdKxQq47DwkiaWOnVA11nog637VUmRnHb07uXwvrhK4bbg==
 
-    PYPI_PASSWORD:
-        secure: ojP0ftEgmrZcijN49vQEPz39rkcPyOxtjwNp5hUYkdKxQq47DwkiaWOnVA11nog637VUmRnHb07uXwvrhK4bbg==
-
-    global:
-        PYTHON: "C:\\conda"
-        MINICONDA_VERSION: "latest"
-        CMD_IN_ENV: "cmd /E:ON /V:ON /C .\\ci-helpers\\appveyor\\windows_sdk.cmd"
-        PYTHON_ARCH: "64" # needs to be set for CMD_IN_ENV to succeed. If a mix
-                          # of 32 bit and 64 bit builds are needed, move this
-                          # to the matrix section.
-        CONDA_DEPENDENCIES: "Cython scipy numpy matplotlib"
-        #PIP_DEPENDENCIES: "objgraph"
-
-    matrix:
-        - PYTHON_VERSION: "2.7"
-          NUMPY_VERSION: "stable"
-
-matrix:
-    fast_finish: true
+  matrix:
+      - PYTHON: "C:\\Python27-x64"
+        PYTHON_VERSION: "2.7.x"
+        ARCH: "64"
+        PLAT_NAME: "win-amd64"
+        PY_TAG: "cp27"
 
 platform:
     -x64
 
-os: Visual Studio 2008
-
 install:
-    - "git clone git://github.com/ibell/pdsim"
-    - "powershell ci-helpers/appveyor/install-miniconda.ps1"
-    - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
-    - "%CMD_IN_ENV% python setup.py install"
+  # Log out the python version just so we know it
+  - ECHO "%PYTHON_VERSION%"
 
-# Not a .NET project, we build Astropy in the install step instead
-build: false
+  # update path to use installed pip
+  - set PATH=%PYTHON%\\scripts;%PATH%
+
+  # Download things we absolutely need
+  - pip install wheel twine six pytest
+  - pip install numpy
+
+  # Now install PDSim
+  - "%PYTHON%/python setup.py install"
+
+  - ECHO "Installed PDSim"
 
 test_script:
     - "cd examples && %CMD_IN_ENV% python simple.example.py"
