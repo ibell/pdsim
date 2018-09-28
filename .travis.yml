@@ -28,6 +28,7 @@ script:
 - python simple_example.py
 - python scroll_compressor.py
 - python piston_expander.py
+- cd ..
 deploy:
   provider: pypi
   user: belli
