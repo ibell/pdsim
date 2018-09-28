@@ -8,7 +8,7 @@ environment:
   global:
       WITH_COMPILER: "cmd /E:ON /V:ON /C .\\appveyor\\windows_sdk.cmd"
   PYPI_PASSWORD:
-    secure: ojP0ftEgmrZcijN49vQEPz39rkcPyOxtjwNp5hUYkdKxQq47DwkiaWOnVA11nog637VUmRnHb07uXwvrhK4bbg==
+    secure: JjNZdPH3xLhd2obfOsF5YA==
 
   matrix:
       - PYTHON: "C:\\Python27-x64"
@@ -37,7 +37,7 @@ install:
   - ECHO "Installed PDSim"
 
 test_script:
-    - "cd examples && %CMD_IN_ENV% python simple.example.py"
+    - "cd examples && %CMD_IN_ENV% python simple_example.py"
 
 after_test:
   - ECHO "DONE!"
@@ -52,7 +52,7 @@ deploy_script:
   - echo index-servers =                             >> %USERPROFILE%\\.pypirc
   - echo     pypi                                    >> %USERPROFILE%\\.pypirc
   - echo [pypi]                                      >> %USERPROFILE%\\.pypirc
-  - echo username=ibell                              >> %USERPROFILE%\\.pypirc
+  - echo username=belli                              >> %USERPROFILE%\\.pypirc
   - echo password=%PYPI_PASSWORD%                    >> %USERPROFILE%\\.pypirc
   # upload to pypi for windows
   - set PATH=%BK_PATH%
