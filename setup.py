@@ -20,25 +20,31 @@ import sys, shutil, os, glob, subprocess
 # Get the hash of the git revision
 git_hash = '????'
 try:
-    git_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD'])
+    git_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
 except:
-    print('Unable to extract the git revision, set to default')
+    print('Unable to extract the git revision, set to placeholder')
+
+# Get the branch of the git revision
+git_branch = '????'
+try:
+    git_branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).strip()
+except:
+    print('Unable to extract the git branch, set to placeholder')
     
-version = '2.10.0' + '.' + git_hash
+version = '2.10.0'
 
 if len(sys.argv) == 1:
     sys.argv += ['clean','develop']
     #sys.argv += ['clean','install']
 
-# Modify the __init__ file with this version string
+# Create the __init__ file with this version string
 fName = os.path.join('PDSim','__init__.py')
-lines = open(fName,'r').readlines()
-fp = open(fName,'w')
-for line in lines:
-    if line.startswith('__version__'):
-        line = "__version__ = '" + version + "'"
-    fp.write(line+'\n')
-fp.close()
+lines = []
+lines.append("__version__ = '" + version + "'")
+lines.append("__git_revision__ = '" + git_hash + "'")
+lines.append("__git_branch__ = '" + git_branch + "'")
+with open(fName,'w') as fp:
+    fp.write('\n'.join(lines)+'\n')
 
 # Get the numpy include folder
 import numpy
