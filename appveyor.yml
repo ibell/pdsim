@@ -7,8 +7,9 @@ build: false
 environment:
   global:
       WITH_COMPILER: "cmd /E:ON /V:ON /C .\\appveyor\\windows_sdk.cmd"
-  PYPI_PASSWORD:
+  TWINE_PASSWORD:
     secure: JjNZdPH3xLhd2obfOsF5YA==
+  TWINE_USERNAME: ibell
 
   matrix:
       - PYTHON: "C:\\Python27-x64"
@@ -52,10 +53,6 @@ artifacts:
 # Thanks to https://github.com/AndrewAnnex/SpiceyPy/blob/master/appveyor.yml
 deploy_script:
   - echo "Starting Artifact Deployment"
-  # populate pypirc file for twine
-  - echo [pypi]                                       > %USERPROFILE%\\.pypirc
-  - echo username=belli                              >> %USERPROFILE%\\.pypirc
-  - echo password=%PYPI_PASSWORD%                    >> %USERPROFILE%\\.pypirc
   # upload to pypi for windows
   - set PATH=%BK_PATH%
   - set HOME=%USERPROFILE%
