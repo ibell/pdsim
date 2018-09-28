@@ -28,7 +28,7 @@ install:
   - set PATH=%PYTHON%\\scripts;%PATH%
 
   # Download things we absolutely need
-  - pip install wheel twine six numpy wxpython cython
+  - pip install wheel twine six numpy wxpython cython h5py
   - pip install --pre --trusted-host www.coolprop.dreamhosters.com --find-links http://www.coolprop.dreamhosters.com/binaries/Python/ -U --force-reinstall CoolProp
 
   # Now install PDSim
