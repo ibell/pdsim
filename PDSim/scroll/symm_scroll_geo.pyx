@@ -5,7 +5,7 @@ import cython
 
 import matplotlib.pyplot as plt
 
-cimport .common_scroll_geo as comm
+cimport PDSim.scroll.common_scroll_geo as comm
 from .common_scroll_geo cimport sides, compressor_CV_indices, get_compression_chamber_index, geoVals, coords_inv, coords_norm, matchpair, min2, max2
 from common_scroll_geo import polycentroid, polyarea
         
