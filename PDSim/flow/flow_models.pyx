@@ -209,7 +209,7 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
             Fluid=State2.Fluid
             Tmean=State2.T
         else:
-            print 'fixed not provided'
+            print('fixed not provided')
             #raise AttributeError
         
         if fixed==1:
@@ -460,7 +460,7 @@ cdef class ValveModel(object):
         
     cpdef double A(self):
         if self.xv is None:
-            print 'self.xv is None'
+            print('self.xv is None')
         cdef double x = self.xv.get_index(0)
         if x >= self.x_tr:
             return self.A_port
