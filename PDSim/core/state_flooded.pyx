@@ -322,9 +322,9 @@ cdef class StateFlooded(State):
        e_m = h_mix - h_mix_ref - T0_ref*(s_mix) # - s_mix_ref
     
        if isnan(e_m) == True:
-           print 'e_m is a NaN'
+           print('e_m is a NaN')
        if isinf(e_m) == True:
-           print 'e_m is Infinite'
+           print('e_m is Infinite')
        else:
            return e_m
 
@@ -737,13 +737,13 @@ cdef class StateFlooded(State):
             iter = iter+1
             
             if iter > 50:
-                print 'dPdT_const_v not converging'
+                print('dPdT_const_v not converging')
             
         
         if isnan((P2-P1)/delta) == True:
-            print 'dpdt_v is a NaN'
+            print('dpdt_v is a NaN')
         if isinf((P2-P1)/delta) == True:
-            print 'dpdt_v is Infinite'
+            print('dpdt_v is Infinite')
         else:
             return (P2-P1)/delta
        

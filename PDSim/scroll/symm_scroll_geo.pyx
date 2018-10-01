@@ -5,10 +5,8 @@ import cython
 
 import matplotlib.pyplot as plt
 
-
-
-cimport common_scroll_geo as comm
-from common_scroll_geo cimport sides, compressor_CV_indices, get_compression_chamber_index, geoVals, coords_inv, coords_norm, matchpair, min2, max2
+cimport .common_scroll_geo as comm
+from .common_scroll_geo cimport sides, compressor_CV_indices, get_compression_chamber_index, geoVals, coords_inv, coords_norm, matchpair, min2, max2
 from common_scroll_geo import polycentroid, polyarea
         
 cpdef CVcoords(CVkey, geoVals geo, double theta):
@@ -233,7 +231,7 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
             r2=r2max
             
         if r2>r2max:
-            print 'r2 is too large, max value is : %0.5f' %(r2max)
+            print('r2 is too large, max value is : %0.5f' %(r2max))
         
         xarc2 =  x_os+nx_os*r2
         yarc2 =  y_os+ny_os*r2
@@ -309,13 +307,13 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
         elif geo.phi_fos-(geo.phi_fis-pi)<1e-8:
             r2max=-c/b
         else:
-            print 'error with starting angles phi_os %.16f phi_is-pi %.16f' %(geo.phi_os,geo.phi_fis-pi)
+            print('error with starting angles phi_os %.16f phi_is-pi %.16f' %(geo.phi_os,geo.phi_fis-pi))
             
         if type(r2) is not float and r2=='PMP':
             r2=r2max
                 
         if r2>r2max:
-            print 'r2 is too large, max value is : %0.5f' %(r2max)
+            print('r2 is too large, max value is : %0.5f' %(r2max))
         
         xarc2 =  x_os+nx_os*r2
         yarc2 =  y_os+ny_os*r2
@@ -442,7 +440,7 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
     if matchpair(key1,key2,comm.keyIs2,comm.keyIsa) or matchpair(key1,key2,comm.keyIs1,comm.keyIsa):
         phi_max = geo.phi_fie
         phi_min = geo.phi_fie - theta
-        #print geo.phi_fie, geo.phi_fie - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0, geo.phi_oo0, geo.phi_fi0
+        #print(geo.phi_fie, geo.phi_fie - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0, geo.phi_oo0, geo.phi_fi0)
     # The suction chambers only in contact with each other beyond theta = pi
     elif matchpair(key1,key2,comm.keyIs1,comm.keyIs2):
         if theta > pi:
@@ -463,8 +461,8 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
                 phi_max = geo.phi_fie - theta - pi
                 phi_min = geo.phi_fis
         elif theta > theta_d(geo):
-            print 'theta = ', theta,theta_d(geo)
-            print 'Nc: {Nc:d}'.format(Nc=Nc)
+            print('theta = ', theta,theta_d(geo))
+            print('Nc: {Nc:d}'.format(Nc=Nc))
             raise KeyError('Nc: {Nc:d} sort {sort:s}'.format(Nc=Nc, sort = str(tuple(key1,key2))))
     
     if Nc >= 1 and phi_max > 1e90:
@@ -486,7 +484,7 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
                 phi_max = geo.phi_fie - theta - 2*pi
                 phi_min = geo.phi_fis
         elif Nc == 1 and theta > theta_d(geo):
-            print 'Nc: {Nc:d} key1: {k1:s} key2: {k2:s} theta: {theta:f} theta_d: {theta_d:f}'.format(Nc=Nc,k1=key1,k2=key2,theta = theta,theta_d = theta_d(geo))
+            print('Nc: {Nc:d} key1: {k1:s} key2: {k2:s} theta: {theta:f} theta_d: {theta_d:f}'.format(Nc=Nc,k1=key1,k2=key2,theta = theta,theta_d = theta_d(geo)))
             raise KeyError
                 
     #Nc > 1
@@ -788,7 +786,7 @@ cpdef tuple SA(double theta, geoVals geo, bint poly=False, bint use_offset = Tru
             VIa=h*rb**2/6.0*((phi_ie-phi_o0)**3-(phi_ie-(theta-pi)-phi_o0)**3)
             dVIa=h*rb**2/2.0*((phi_ie-(theta-pi)-phi_o0)**2)
             
-#            print 'I phi',phi_ie,phi_ie-(theta-pi)
+#            print('I phi',phi_ie,phi_ie-(theta-pi))
             
             VIb=h*rb*ro/2.0*((phi_ie-pi+B+phi_ie_offset-phi_o0)*sin(B+phi_ie_offset+theta)+cos(B+phi_ie_offset+theta))
             dVIb=h*rb*ro*(B_prime+1)/2.0*((phi_ie-pi+B+phi_ie_offset-phi_o0)*cos(B+phi_ie_offset+theta)-sin(B+phi_ie_offset+theta))
@@ -865,8 +863,8 @@ cpdef dict SA_forces(double theta, geoVals geo, bint poly = False, bint use_offs
 #    fxp_poly=np.sum(dfxp_poly)
 #    fyp_poly=np.sum(dfyp_poly)
 #    
-#    print 'fx_p',fx_p,fxp_poly
-#    print 'fy_p',fy_p,fyp_poly
+#    print('fx_p',fx_p,fxp_poly)
+#    print('fy_p',fy_p,fyp_poly)
     
     return exact_dict
 
@@ -994,32 +992,32 @@ cpdef tuple S1(double theta, geoVals geo, bint poly=False, double theta_0_volume
 #            (xo,yo)=coords_inv(phi, geo, theta, 'fi')
 #            pylab.gca().plot(xo,yo,'-',lw=2)
 #            pylab.gca().fill(np.r_[xo[::-1],0], np.r_[yo[::-1],0],'k',alpha = 0.5)
-#            print 'VO',h*polyarea(np.r_[xo[::-1],0], np.r_[yo[::-1],0]),VO
+#            print('VO',h*polyarea(np.r_[xo[::-1],0], np.r_[yo[::-1],0]),VO)
 #            
 #            #VI calc
 #            phi=np.linspace(phi_ie+phi_ie_offset-pi+B,phi_ie-pi-theta,2000)
 #            (xo,yo)=coords_inv(phi, geo, theta, 'oo')
 #            pylab.gca().plot(xo,yo,'-',lw=2)
 #            pylab.gca().fill(np.r_[xo[::-1],0], np.r_[yo[::-1],0],'g',alpha = 0.5)
-#            print 'VI', h*polyarea(np.r_[xo[::-1],0], np.r_[yo[::-1],0]), VI
+#            print('VI', h*polyarea(np.r_[xo[::-1],0], np.r_[yo[::-1],0]), VI)
 #            VI_poly = h*polyarea(np.r_[xo[::-1],0], np.r_[yo[::-1],0])
 #            
 #            phi=np.linspace(phi_ie+phi_ie_offset-pi+B,phi_ie-pi-theta,2000)
 #            (xo,yo)=coords_inv(phi, geo, theta, 'fo')
 #            pylab.gca().fill(np.r_[xo[::-1],0], np.r_[yo[::-1],0],'b',alpha = 0.3,lw=5)
-#            print 'VIa', h*polyarea(np.r_[xo[::-1],0], np.r_[yo[::-1],0]), VIa
+#            print('VIa', h*polyarea(np.r_[xo[::-1],0], np.r_[yo[::-1],0]), VIa)
 #            
 #            x1,y1 = 0.0,0.0
 #            x2,y2 = coords_inv(phi_ie-pi+B+phi_ie_offset, geo, theta, 'fo')
 #            x3,y3 = ro*cos(phi_ie-pi/2-theta),ro*sin(phi_ie-pi/2-theta)
 #            pylab.gca().fill(np.r_[x1,x2,x3,x1], np.r_[y1,y2,y3,y1],'r',alpha = 0.8)
-#            print 'VIb',h*polyarea(np.r_[x1,x2,x3,x1], np.r_[y1,y2,y3,y1]),VIb
+#            print('VIb',h*polyarea(np.r_[x1,x2,x3,x1], np.r_[y1,y2,y3,y1]),VIb)
 #            
 #            x1,y1 = 0.0,0.0
 #            x2,y2 = coords_inv(phi_ie-pi-theta, geo, theta, 'fo')
 #            x3,y3 = ro*cos(phi_ie-pi/2-theta),ro*sin(phi_ie-pi/2-theta)
 #            pylab.gca().fill(np.r_[x1,x2,x3,x1], np.r_[y1,y2,y3,y1],'y',alpha=0.8)
-#            print 'VIc',h*polyarea(np.r_[x1,x2,x3,x1], np.r_[y1,y2,y3,y1]), VIc
+#            print('VIc',h*polyarea(np.r_[x1,x2,x3,x1], np.r_[y1,y2,y3,y1]), VIc)
 #            
 #            pylab.show()
             
@@ -1972,7 +1970,7 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
         rOy=y_oarc1-geo.ro*sin(phi_ie-pi/2-theta)
         rOy=(rOy[1:L]+rOy[0:L-1])/2
         MO_poly=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
-        print 'Arc1',np.sum(dfxp_poly),np.sum(dfyp_poly)
+        print('Arc1',np.sum(dfxp_poly),np.sum(dfyp_poly))
         #Arc2
         L=len(nx_oarc2)
         dA=hs*np.sqrt(np.power(x_oarc2[1:L]-x_oarc2[0:L-1],2)+np.power(y_oarc2[1:L]-y_oarc2[0:L-1],2))
@@ -1985,7 +1983,7 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
         rOy=y_oarc2-geo.ro*sin(phi_ie-pi/2-theta)
         rOy=(rOy[1:L]+rOy[0:L-1])/2
         MO_poly+=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
-        print 'Arc2',np.sum(dfxp_poly),np.sum(dfyp_poly)
+        print('Arc2',np.sum(dfxp_poly),np.sum(dfyp_poly))
         #Involute
         L=len(y_oinv)
         dA=hs*np.sqrt(np.power(x_oinv[1:L]-x_oinv[0:L-1],2)+np.power(y_oinv[1:L]-y_oinv[0:L-1],2))
@@ -1998,7 +1996,7 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
         rOy=y_oinv-geo.ro*sin(phi_ie-pi/2-theta)
         rOy=(rOy[1:L]+rOy[0:L-1])/2
         MO_poly+=np.sum(rOx*dfyp_poly-rOy*dfxp_poly)
-        print 'Involute',np.sum(dfxp_poly),np.sum(dfyp_poly)
+        print('Involute',np.sum(dfxp_poly),np.sum(dfyp_poly))
         #Line
         x1t=-geo.xa_arc1-geo.ra_arc1*cos(geo.t1_arc1)+ro*cos(om)
         y1t=-geo.ya_arc1-geo.ra_arc1*sin(geo.t1_arc1)+ro*sin(om)
@@ -2020,7 +2018,7 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
             rx=(x1t+x2t)/2-ro*cos(om)
             ry=(y2t+y2t)/2-ro*sin(om)
             MO_poly+=rx*hs*ny*L-ry*hs*nx*L
-            print 'Line',hs*nx*L,hs*ny*L
+            print('Line',hs*nx*L,hs*ny*L)
             
         poly_dict = dict(MO_poly = MO_poly,
                          fxp_poly = fxp_poly,
@@ -2162,4 +2160,4 @@ if __name__=='__main__':
         cos(%theta-phi_ie),[phi_ie,phi_0,theta]])$
     trigsimp(trigreduce(expand(%)));
     """
-    print 'This is the base file with scroll geometry.  Running this file doesn\'t do anything'
+    print('This is the base file with scroll geometry.  Running this file doesn\'t do anything')

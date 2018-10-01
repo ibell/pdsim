@@ -273,7 +273,7 @@ XOR = ctXor
 #===========================================================
 # OffsetPolygons(const Polygons &in_polys, Polygons &out_polys,  double delta, JoinType jointype = jtSquare, double MiterLimit = 2);
 def offset( pypolygons, delta=100,  jointype = jtSquare, double MiterLimit = 2):
-    print "Offset polygon"
+    print("Offset polygon")
     cdef Polygon poly =  Polygon() 
     cdef IntPoint a
     cdef Polygons polys =  Polygons()
@@ -288,17 +288,17 @@ def offset( pypolygons, delta=100,  jointype = jtSquare, double MiterLimit = 2):
     OffsetPolygons( polys, solution,  delta,  jointype, MiterLimit)
     n = solution.size()
     sol = []
-    print "Solution is made of %i loops"%n  
+    print("Solution is made of %i loops"%n )
 
     cdef IntPoint point
     for i in range(n):
         poly = solution[i]
         m = poly.size()
-        print "loop has %i points"%m
+        print("loop has %i points"%m)
         loop = []
         for i in range(m):
             point = poly[i]
-            print point.X ,point.Y
+            print(point.X ,point.Y)
             loop.append([point.X ,point.Y])
         sol.append(loop)
     return sol
@@ -433,7 +433,7 @@ cdef class Pyclipper:
             b = IntPoint(p[0], p[1])
             hole.push_back(b)
             
-        print hole.size()
+        print(hole.size())
 
         cdef Polygons clip =  Polygons() 
         clip.push_back(hole)  
@@ -444,17 +444,17 @@ cdef class Pyclipper:
 
         self.thisptr.Run(ctDifference, solution, pftEvenOdd, pftEvenOdd)
         n = solution.size()
-        print "Solution is made of %i loops"%n  
+        print("Solution is made of %i loops"%n  )
         cdef Polygon poly
         cdef IntPoint point
         for i in range(n):
             poly = solution[i]
             m = poly.size()
-            print "First loop has %i points"%m
+            print("First loop has %i points"%m)
             
             for i in range(m):
                 point = poly[i]
-                print point.X ,point.Y
+                print(point.X ,point.Y)
 
 
 

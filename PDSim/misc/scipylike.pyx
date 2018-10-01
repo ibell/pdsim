@@ -2,6 +2,8 @@ import cython
 import numpy as np
 cimport numpy as np
 from libcpp.vector cimport vector
+# A header defining the Spline class
+from PDSim.misc cimport cSpline
 
 def trapz(np.ndarray[np.float_t] y, np.ndarray[np.float_t] x):
     """
@@ -21,10 +23,7 @@ def trapz(np.ndarray[np.float_t] y, np.ndarray[np.float_t] x):
         sum += (y[i]+y[i+1])/2.0*(x[i+1]-x[i])
     
     return sum
-    
-# A header defining the Spline class
-cimport cSpline 
-    
+        
 ctypedef fused number_t:
     double
     vector[double]

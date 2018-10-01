@@ -818,7 +818,7 @@ cpdef tuple coords_norm(phi_vec, geoVals geo, double theta,flag="fi"):
             nx[i] = +sin(phi)
             ny[i] = -cos(phi)
         else:
-            print "Uh oh... error in coords_norm"
+            print("Uh oh... error in coords_norm")
     return (nx,ny)
     
 cdef double x_antideriv(double phi, double phi_0):

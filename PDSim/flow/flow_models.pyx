@@ -286,16 +286,16 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
             
             State1.update({'T':T1,'P':p-DELTAP/1000})
         
-#        print 'T1',T1
-#        print 'T2_star',T2_star
-#        print 'T2',T2
-#        print 'p',p
-#        print 'mdot',mdot
-#        print 'others: ID,L,alpha,cp',ID,L,alpha,cp
-#        print 'DELTAP',DELTAP
-#        print 'Fluid',Fluid
-#        print 'Q_add', Q_add
-#        print 'Q', Q
+#        print('T1',T1)
+#        print('T2_star',T2_star)
+#        print('T2',T2)
+#        print('p',p)
+#        print('mdot',mdot)
+#        print('others: ID,L,alpha,cp',ID,L,alpha,cp)
+#        print('DELTAP',DELTAP)
+#        print('Fluid',Fluid)
+#        print('Q_add', Q_add)
+#        print('Q', Q)
         
         return Q/1000.0
 
@@ -522,7 +522,7 @@ cdef class ValveModel(object):
         out_array.set_index(1, f.get_index(1)/omega)
         
         if abs(x) < 1e-15 and xdot < -1e-12:
-            #print 'stationary valve'
+            #print('stationary valve')
             out_array.set_index(0, 0.0)
             out_array.set_index(1, 0.0)
         
