@@ -3,7 +3,7 @@ import numpy as np
 cimport numpy as np
 from libcpp.vector cimport vector
 # A header defining the Spline class
-from PDSim.misc cimport cSpline
+cimport PDSim.misc.cSpline as cSpline
 
 def trapz(np.ndarray[np.float_t] y, np.ndarray[np.float_t] x):
     """

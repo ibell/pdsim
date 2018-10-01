@@ -1,6 +1,6 @@
 
 from PDSim.flow import flow_models
-from PDSim.flow cimport flow_models
+cimport PDSim.flow.flow_models as flow_models
 
 from PDSim.flow.flow_models import FlowFunction
 from PDSim.flow.flow_models cimport FlowFunction

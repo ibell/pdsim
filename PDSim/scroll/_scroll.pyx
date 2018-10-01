@@ -1,9 +1,10 @@
 # cython: profile=True
 from PDSim.flow import flow_models
-from PDSim.flow cimport flow_models
+cimport PDSim.flow.flow_models as flow_models
 
 from PDSim.scroll import common_scroll_geo, symm_scroll_geo
-from PDSim.scroll cimport common_scroll_geo, symm_scroll_geo
+cimport PDSim.scroll.common_scroll_geo as common_scroll_geo
+cimport PDSim.scroll.symm_scroll_geo as symm_scroll_geo
 
 from libc.math cimport M_PI as pi
 
