@@ -1,7 +1,7 @@
 
 import copy
 import pickle
-from flow_models import PyFlowFunctionWrapper
+from .flow_models import PyFlowFunctionWrapper
 
 from CoolProp.State import State as StateClass
 from CoolProp.State cimport State as StateClass
