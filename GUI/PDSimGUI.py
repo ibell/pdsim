@@ -18,6 +18,10 @@ sys.path.append(os.path.abspath('plugins'))
 #Imports from wx package
 import wx
 from wx.lib.wordwrap import wordwrap
+try:
+    from wx import SplashScreen as wxSplashScreen
+except ImportError:
+    from wx.adv import SplashScreen as wxSplashScreen
 #wx.SetDefaultPyEncoding('latin-1')
 
 #Provided by python
@@ -1824,8 +1828,8 @@ class MySplashScreen(wx.SplashScreen):
         splashDuration = 2000 # milliseconds
         # Call the constructor with the above arguments in exactly the
         # following order.
-        wx.SplashScreen.__init__(self, aBitmap, splashStyle,
-                                 splashDuration, parent)
+        wxSplashScreen.__init__(self, aBitmap, splashStyle,
+                                splashDuration, parent)
         self.Bind(wx.EVT_CLOSE, self.OnExit)
 
         wx.Yield()
