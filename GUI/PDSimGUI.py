@@ -18,7 +18,7 @@ sys.path.append(os.path.abspath('plugins'))
 #Imports from wx package
 import wx
 from wx.lib.wordwrap import wordwrap
-wx.SetDefaultPyEncoding('latin-1')
+#wx.SetDefaultPyEncoding('latin-1')
 
 #Provided by python
 import codecs
@@ -450,7 +450,7 @@ class RunToolBook(wx.Panel):
         self.log_ctrls = []
         
         # Make one log box for each thread possible on this machine 
-        for thread in range(cpu_count()-1):
+        for thread in range(max(1,cpu_count()-1)):
             # Make the textbox
             log_ctrl = wx.TextCtrl(nb, style = wx.TE_MULTILINE|wx.TE_READONLY)
             # Add the page to the notebook
