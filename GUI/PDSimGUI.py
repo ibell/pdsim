@@ -1816,7 +1816,7 @@ class MainFrame(wx.Frame):
             dlg.ShowModal()
             dlg.Destroy()
 
-class MySplashScreen(wx.SplashScreen):
+class MySplashScreen(wxSplashScreen):
     """
     Create a splash screen widget.
     """
