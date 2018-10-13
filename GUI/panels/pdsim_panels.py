@@ -17,7 +17,7 @@ import numpy as np
 
 import matplotlib as mpl
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as WXCanvas
-from matplotlib.backends.backend_wxagg import NavigationToolbar2Wx as WXToolbar
+from matplotlib.backends.backend_wxagg import NavigationToolbar2WxAgg as WXToolbar
 
 from PDSim.scroll import scroll_geo
 from PDSim.scroll.plots import plotScrollSet, ScrollAnimForm

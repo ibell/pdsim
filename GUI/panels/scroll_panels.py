@@ -10,7 +10,7 @@ from wx.lib.scrolledpanel import ScrolledPanel
 
 import matplotlib as mpl
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as WXCanvas
-from matplotlib.backends.backend_wxagg import NavigationToolbar2Wx as WXToolbar
+from matplotlib.backends.backend_wxagg import NavigationToolbar2WxAgg as WXToolbar
 
 import numpy as np
 
