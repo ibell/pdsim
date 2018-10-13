@@ -20,14 +20,14 @@ import sys, shutil, os, glob, subprocess
 # Get the hash of the git revision
 git_hash = '????'
 try:
-    git_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
+    git_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip().decode('ascii')
 except:
     print('Unable to extract the git revision, set to placeholder')
 
 # Get the branch of the git revision
 git_branch = '????'
 try:
-    git_branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).strip()
+    git_branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).strip().decode('ascii')
 except:
     print('Unable to extract the git branch, set to placeholder')
     
