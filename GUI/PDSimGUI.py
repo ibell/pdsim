@@ -28,9 +28,13 @@ except ImportError:
     from wx.adv import SPLASH_TIMEOUT as wxSPLASH_TIMEOUT
 #wx.SetDefaultPyEncoding('latin-1')
 
+
 #Provided by python
 import codecs
-from Queue import Queue
+try:
+    from Queue import Queue
+except ImportError:
+    from queue import Queue
 from multiprocessing import freeze_support, cpu_count
 import time
 import textwrap
