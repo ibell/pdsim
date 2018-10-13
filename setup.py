@@ -31,7 +31,7 @@ try:
 except:
     print('Unable to extract the git branch, set to placeholder')
     
-version = '2.10.0'
+version = '2.10.1'
 
 if len(sys.argv) == 1:
     sys.argv += ['clean','develop']
