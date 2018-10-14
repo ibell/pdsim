@@ -26,7 +26,6 @@ except ImportError:
     from wx.adv import SplashScreen as wxSplashScreen
     from wx.adv import SPLASH_CENTRE_ON_SCREEN as wxSPLASH_CENTRE_ON_SCREEN
     from wx.adv import SPLASH_TIMEOUT as wxSPLASH_TIMEOUT
-#wx.SetDefaultPyEncoding('latin-1')
 
 
 #Provided by python

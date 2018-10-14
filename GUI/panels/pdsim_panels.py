@@ -451,7 +451,7 @@ class PDPanel(wx.Panel):
                 raise TypeError('object of type [{t:s}] is not an AnnotatedValue'.format(t = type(o)))
                 
             # Build the GUI objects
-            label=wx.StaticText(parent, -1, o.annotation)
+            label=wx.StaticText(parent, -1, o.annotation.decode('latin-1'))
             
             if sizer is not None:
                 # Add the label to the sizer
@@ -1887,7 +1887,7 @@ def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True, toolti
     A convenience function that returns a tuple of StaticText and TextCtrl 
     items with the necessary label and values set
     """
-    label = wx.StaticText(parent,id,label)
+    label = wx.StaticText(parent,id,label.decode('latin-1'))
     thing = wx.TextCtrl(parent,id,value)
     if enabled==False:
         thing.Disable()
