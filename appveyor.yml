@@ -39,6 +39,7 @@ install:
 
 test_script:
     - "cd examples && %PYTHON%/python simple_example.py"
+    - %PYTHON%/python -c "import PDSim; print(PDSim.__git_revision__)"
 
 after_test:
   - ECHO "DONE!"
