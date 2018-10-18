@@ -47,6 +47,8 @@ lines.append("__git_revision__ = '" + git_hash + "'")
 lines.append("__git_branch__ = '" + git_branch + "'")
 with open(fName,'w') as fp:
     fp.write('\n'.join(lines)+'\n')
+print('to be written to __init__.py:')
+print('\n'.join(lines))
 
 # Get the numpy include folder
 import numpy
