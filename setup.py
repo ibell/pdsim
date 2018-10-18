@@ -21,17 +21,19 @@ import sys, shutil, os, glob, subprocess
 git_hash = '????'
 try:
     git_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip().decode('ascii')
-except:
+except BaseException as BE:
+    print('Error:',)
     print('Unable to extract the git revision, set to placeholder')
 
 # Get the branch of the git revision
 git_branch = '????'
 try:
     git_branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).strip().decode('ascii')
-except:
+except BaseException as BE:
+    print('Error:', BE)
     print('Unable to extract the git branch, set to placeholder')
     
-version = '2.10.1'
+version = '2.10.2'
 
 if len(sys.argv) == 1:
     sys.argv += ['clean','develop']
