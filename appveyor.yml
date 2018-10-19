@@ -9,7 +9,7 @@ environment:
       WITH_COMPILER: "cmd /E:ON /V:ON /C .\\appveyor\\windows_sdk.cmd"
   TWINE_PASSWORD:
     secure: JjNZdPH3xLhd2obfOsF5YA==
-  TWINE_USERNAME: ibell
+  TWINE_USERNAME: belli
 
   matrix:
       - PYTHON: "C:\\Python27-x64"
