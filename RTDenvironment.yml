@@ -6,7 +6,6 @@ dependencies:
   - matplotlib
   - IPython
   - cython
-  - wxpython
   - pyyaml
   - h5py
   - nbconvert
