@@ -1205,7 +1205,7 @@ class PDSimCore(object):
 
                 print(self.solvers.hdisc_history)
                 
-            print('new outlet T', self.Tubes.Nodes[self.key_outlet].T)
+            print('New outlet T:', self.Tubes.Nodes[self.key_outlet].T, 'K')
                 
             # Store a copy of the initial temperatures of the chambers
             self.solvers.initial_states_history.append(self.T[:,0].copy())
