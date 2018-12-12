@@ -164,6 +164,59 @@ class Scroll(PDSimCore, _Scroll):
                 return 0.0
         except ZeroDivisionError:
             return 0.0
+
+    def INTERPOLATING_LIQUID_NOZZLE_FLOW(
+        self, 
+        FlowPath, 
+        X_d = 1.0,
+        X_d_backflow = 0.8,
+        upstream_key = 'EVICIV',
+        A_interpolator = None,
+        DP_floor = 1e-10):
+        """
+        A generic flow of liquid with mass flow rate calculated from:
+
+        :math:`\dot m = C_d A \sqrt{2\rho\Delta p}`
+        
+        Furthermore, the area is determined through the use of the spline
+        interpolator.
+
+        See also: https://en.wikipedia.org/wiki/Discharge_coefficient
+        
+        Parameters
+        ----------
+        FlowPath : FlowPath instance
+            A fully-instantiated flow path model
+        X_d : float
+            Flow coefficient when the flow goes from ``upstream_key`` to the downstream key
+        X_d_backflow : float
+            Flow coefficient when the flow goes from downstream key to  ``upstream_key``
+        upstream_key : string
+            Key for the side of the flow path that is considered to be "upstream"
+        A_interpolator : float
+            throat area for isentropic nozzle model [:math:`m^2`]
+        DP_floor: float
+            The minimum pressure drop [kPa]
+            
+        Returns
+        -------
+        mdot : float
+            The mass flow through the flow path [kg/s]
+        """
+        FlowPath.A = interp.splev(self.theta, A_interpolator)
+        
+        try:
+            if FlowPath.State_up.p - FlowPath.State_down.p > DP_floor and abs(FlowPath.A) > 1e-15:
+                if FlowPath.key_up == upstream_key:
+                    _X_d = X_d # Normal flow into CV
+                else:
+                    _X_d = X_d_backflow # Backflow from CV
+                mdot = _X_d*FlowPath.A*(2*FlowPath.State_up.rho*(FlowPath.State_up.p-FlowPath.State_down.p)*1000)**0.5
+                return mdot
+            else:
+                return 0.0
+        except ZeroDivisionError:
+            return 0.0
             
     def calculate_port_areas(self):
         """ 
