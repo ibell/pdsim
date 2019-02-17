@@ -990,8 +990,10 @@ class PDSimCore(object):
         # Make cycle_integrator_options an empty dictionary if not provided
         if cycle_integrator_options is None:
             cycle_integrator_options = {}
+            tmin = 0.0
             tmax = 2*math.pi
         else:
+            tmin = cycle_integrator_options['tmin']
             tmax = cycle_integrator_options['tmax']
                 
         X = arraym(X)
@@ -1012,17 +1014,17 @@ class PDSimCore(object):
                 # Default to 7000 steps if not provided
                 N = getattr(self,'EulerN', 7000)                
                 integrator = EulerIntegrator(self, X)
-                aborted = integrator.do_integration(N, 0, tmax)
+                aborted = integrator.do_integration(N, tmin, tmax)
             elif cycle_integrator == 'Heun':
                 # Default to 7000 steps if not provided
                 N = getattr(self,'HeunN', 7000)
                 integrator = HeunIntegrator(self, X)
-                aborted = integrator.do_integration(N, 0, tmax)
+                aborted = integrator.do_integration(N, tmin, tmax)
             elif cycle_integrator == 'RK45':
                 # Default to tolerance of 1e-8 if not provided
                 eps_allowed = getattr(self,'RK45_eps', 1e-8)
                 integrator = RK45Integrator(self, X)
-                aborted = integrator.do_integration(0, tmax, eps_allowed=eps_allowed)
+                aborted = integrator.do_integration(tmin, tmax, eps_allowed=eps_allowed)
             else:
                 raise AttributeError('solver_method should be one of RK45, Euler, or Heun')
             
@@ -1493,7 +1495,7 @@ class PDSimCore(object):
         
         hf = h5py.File(fName,'a')
         
-        for k, v in attrs_dict.iteritems():
+        for k, v in attrs_dict.items():
             dataset = hf.get(k)
             if dataset is None:
                 print('bad key',k)
