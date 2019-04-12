@@ -35,6 +35,7 @@ import matplotlib.pyplot as plt
 import subprocess
 import glob
 import os
+import functools
 
 class struct(object):
     pass
@@ -1858,13 +1859,11 @@ class Scroll(PDSimCore, _Scroll):
         self.CVs['ddd'].ForceFcn = symm_scroll_geo.DDD_forces
         for i in range(10):
             try:
-                Fcn = lambda theta, geo: symm_scroll_geo.C1_forces(theta, i+1, geo)
-                self.CVs['c1.' + str(i+1)].ForceFcn = Fcn
+                self.CVs['c1.' + str(i+1)].ForceFcn = functools.partial(symm_scroll_geo.C1_forces, alpha=i+1)
             except:
                 pass
             try:
-                Fcn = lambda theta, geo : symm_scroll_geo.C2_forces(theta, i+1, geo)
-                self.CVs['c2.' + str(i+1)].ForceFcn = Fcn
+                self.CVs['c2.' + str(i+1)].ForceFcn = functools.partial(symm_scroll_geo.C2_forces, alpha=i+1)
             except:
                 pass
         
