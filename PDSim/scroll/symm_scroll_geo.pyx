@@ -1533,9 +1533,9 @@ cpdef dict D1_forces(double theta, geoVals geo, bint poly = False):
     ro=rb*(pi-phi_i0+phi_o0)
     Nc=getNc(theta, geo)
     
-    #This is right before the discharge angle
+    # This is right before the discharge angle
     if abs(theta-theta_d(geo))<1e-8:
-        return C1_forces(theta,Nc,geo,poly)
+        return C1_forces(theta,nC_Max(geo),geo,poly)
     
     phi2=phi_ie-theta-2.0*pi*Nc
     phi1=phi_os+pi
@@ -1665,9 +1665,9 @@ cpdef dict D2_forces(double theta, geoVals geo, bint poly = False):
     ro=rb*(pi-phi_i0+phi_o0)
     Nc=getNc(theta,geo=geo)
     
-    #This is right before the discharge angle
+    # This is right before the discharge angle
     if abs(theta-theta_d(geo))<1e-8:
-        return C2_forces(theta,Nc,geo,poly)
+        return C2_forces(theta,nC_Max(geo),geo,poly)
 
     phi2=phi_ie-theta-2.0*pi*Nc
     phi1=phi_os+pi
