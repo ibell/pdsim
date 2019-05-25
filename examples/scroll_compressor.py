@@ -31,7 +31,7 @@ from CoolProp import CoolProp as CP
 import numpy as np
 
 from matplotlib import pyplot as plt
-import time
+import timeit
 
 def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref = 'R410A', HDF5file='scroll_compressor.h5'):
 
@@ -179,8 +179,8 @@ def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref 
                                  lumps_energy_balance_callback = ScrollComp.lump_energy_balance_callback
                                  )
     
-    from time import clock
-    t1=clock()
+    
+    t1 = timeit.default_timer()
     ScrollComp.RK45_eps = 1e-6
     ScrollComp.eps_cycle = 3e-3
     try:
@@ -196,7 +196,7 @@ def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref 
         print(E)
         raise
 
-    print('time taken', clock()-t1)
+    print('time taken', timeit.default_timer()-t1)
     
     del ScrollComp.FlowStorage
     from PDSim.misc.hdf5 import HDF5Writer

@@ -17,7 +17,7 @@ For illustrative purposes only!
 #Here we import some python packages
 from __future__ import division, print_function
 from math import pi, cos, sin
-from time import clock
+import timeit
 import os, sys
 
 # If the following line is uncommented, python will try to use a local version
@@ -191,14 +191,14 @@ def Compressor(**kwargs):
                             lumps_energy_balance_callback = recip.lump_energy_balance_callback
                             )
     
-    t1=clock()
+    t1 = timeit.default_timer()
     recip.solve(key_inlet='inlet.1',
                 key_outlet='outlet.2',
                 solver_method = kwargs.get('solver_method', 'Euler'),
                 OneCycle = False,
                 UseNR = False
                 )
-    print('time taken',clock()-t1,'s')
+    print('time taken',timeit.default_timer()-t1,'s')
     
     # from PDSim.plot.plots import debug_plots
     # debug_plots(recip)

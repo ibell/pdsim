@@ -11,7 +11,7 @@ Example simulation for a reciprocating piston expander
 #Here we import some python packages
 from __future__ import division, print_function
 from math import pi, cos, sin
-from time import clock
+import timeit
 import os, sys
 
 # If the following line is uncommented, python will try to use a local version
@@ -189,7 +189,7 @@ def Expander(**kwargs):
     expander.add_flow(FlowPath(key1='inlet.2',key2='A',MdotFcn=expander.Suction))
     expander.add_flow(FlowPath(key1='outlet.1',key2='A',MdotFcn=expander.Discharge))
     
-    t1=clock()
+    t1 = timeit.default_timer()
     expander.EulerN = 4000
     expander.RK45_eps = 1e-10
     expander.connect_callbacks(step_callback = expander.step_callback,
@@ -203,7 +203,7 @@ def Expander(**kwargs):
                    UseNR = True,
                    plot_every_cycle = False
                    )
-    print('time taken',clock()-t1,'s')
+    print('time taken',timeit.default_timer()-t1,'s')
     
     # from PDSim.plot.plots import debug_plots
     # debug_plots(expander)

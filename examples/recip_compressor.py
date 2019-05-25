@@ -1,6 +1,6 @@
 from __future__ import division, print_function
 from math import pi
-from time import clock
+import timeit
 import sys, os
 
 from PDSim.flow.flow import FlowPath
@@ -121,14 +121,14 @@ def Compressor():
                             lumps_energy_balance_callback = recip.lump_energy_balance_callback
                             )
     
-    t1=clock()
+    t1 = timeit.default_timer()
     recip.precond_solve(key_inlet='inlet.1',
                         key_outlet='outlet.2',
                         solver_method = 'RK45',
                         OneCycle = False,
                         UseNR = True,
                         )
-    print('time taken', clock()-t1)
+    print('time taken', timeit.default_timer()-t1)
     
     debug_plots(recip)
     
