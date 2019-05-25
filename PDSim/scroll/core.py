@@ -1859,12 +1859,16 @@ class Scroll(PDSimCore, _Scroll):
         self.CVs['ddd'].ForceFcn = symm_scroll_geo.DDD_forces
         for i in range(10):
             try:
-                self.CVs['c1.' + str(i+1)].ForceFcn = functools.partial(symm_scroll_geo.C1_forces, alpha=i+1)
-            except:
+                self.CVs['c1.' + str(i+1)].ForceFcn = functools.partial(
+                    lambda theta, geo, alpha: symm_scroll_geo.C1_forces(theta, alpha, geo), 
+                    alpha=i+1)
+            except BaseException as BE:
                 pass
             try:
-                self.CVs['c2.' + str(i+1)].ForceFcn = functools.partial(symm_scroll_geo.C2_forces, alpha=i+1)
-            except:
+                self.CVs['c2.' + str(i+1)].ForceFcn = functools.partial(
+                    lambda theta, geo, alpha: symm_scroll_geo.C2_forces(theta, alpha, geo), 
+                    alpha=i+1)
+            except BaseException as BE:
                 pass
         
     def guess_lump_temps(self, T0):
