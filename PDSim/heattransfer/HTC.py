@@ -38,7 +38,7 @@ def HTC(HTCat,T_wall,T_inf,P_film,Ref,L,D_pipe=None,PlateNum=None):
     Return
     h [kW/m^2 K]: Heat transfer coefficient
     """
-    g = 9.8 # gravity acceleration [m/s^2]
+    g = 9.81 # gravity acceleration [m/s^2]
 
     # Film temperature, used to calculate thermal propertiers
     T_film = (T_wall + T_inf)/2 # [K]
@@ -47,7 +47,7 @@ def HTC(HTCat,T_wall,T_inf,P_film,Ref,L,D_pipe=None,PlateNum=None):
     beta = 1/T_film # [1/K]
 
     # Transport properties calcualtion film
-    StateFilm=State.State(Ref,dict(T=T_film, P=P_film))   # use the film temperature to find the outer convective coefficient
+    StateFilm = State.State(Ref,dict(T=T_film, P=P_film))   # use the film temperature to find the outer convective coefficient
     
     Pr_film = StateFilm.Prandtl #[-]
     rho_film = StateFilm.rho #[kg/m3]
