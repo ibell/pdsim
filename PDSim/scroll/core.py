@@ -2781,7 +2781,7 @@ class Scroll(PDSimCore, _Scroll):
         F[ICV,:] = ds_D1*self.geo.t/2*(self.p[ICV,_slice]-p_backpressure)
         
         phi2 = self.geo.phi_oie-theta-2*pi*(nC)
-        phi1 = self.geo.phi_ois
+        phi1 = self.geo.phi_oos+pi
         ds_D2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oi0*(phi2-phi1))
         ICV = self.CVs.index('d2')
         F[ICV,:] = ds_D2*self.geo.t/2*(self.p[ICV,_slice]-p_backpressure)
