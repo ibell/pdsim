@@ -2737,8 +2737,9 @@ class Scroll(PDSimCore, _Scroll):
         # Get the number of compression chambers in existence at each crank angle
         nC = np.array([scroll_geo.getNc(t,self.geo) for t in theta])
         
-        F = np.zeros_like(self.p)
-        F = F[:,_slice]
+        # Allocate the matrix, with the same number of rows as the number of CV,
+        # and the length of the angle vector
+        F = np.zeros((self.p.shape[0], len(theta)))
         
         # Parameters for the SA chamber
         phi2 = self.geo.phi_foe
@@ -2773,18 +2774,39 @@ class Scroll(PDSimCore, _Scroll):
             ds_C2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oi0*(phi2-phi1))
             ICV = self.CVs.index('c2.'+str(I))
             F[ICV,:] = ds_C2*self.geo.t/2*(self.p[ICV, _slice]-p_backpressure)
-        
+
+        # Normal calculation for D1 and D2, the default
         phi2 = self.geo.phi_ooe-pi-theta-2*pi*(nC)
         phi1 = self.geo.phi_oos
         ds_D1 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oo0*(phi2-phi1))
         ICV = self.CVs.index('d1')
         F[ICV,:] = ds_D1*self.geo.t/2*(self.p[ICV,_slice]-p_backpressure)
-        
+
         phi2 = self.geo.phi_oie-theta-2*pi*(nC)
         phi1 = self.geo.phi_oos+pi
         ds_D2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oi0*(phi2-phi1))
         ICV = self.CVs.index('d2')
         F[ICV,:] = ds_D2*self.geo.t/2*(self.p[ICV,_slice]-p_backpressure)
+
+        # Now go back through and find funny values....
+        # 
+        # If just to the left of the discharge angle,
+        # treated like the last of the compression chambers
+        for itheta, _theta in enumerate(theta):
+            if abs(_theta-scroll_geo.theta_d(self.geo))<1e-8:
+                I = scroll_geo.nC_Max(self.geo)
+
+                phi2 = self.geo.phi_ooe-pi-_theta-2*pi*(I-1)
+                phi1 = self.geo.phi_ooe-pi-_theta-2*pi*(I)
+                ds_C1 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oo0*(phi2-phi1))
+                ICV = self.CVs.index('d1')
+                F[ICV,itheta] = ds_C1*self.geo.t/2*(self.p[ICV, itheta]-p_backpressure)
+                
+                phi2 = self.geo.phi_oie-_theta-2*pi*(I-1)
+                phi1 = self.geo.phi_oie-_theta-2*pi*(I)
+                ds_C2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oi0*(phi2-phi1))
+                ICV = self.CVs.index('d1')
+                F[ICV,itheta] = ds_C2*self.geo.t/2*(self.p[ICV, itheta]-p_backpressure)
         
         phi2 = self.geo.phi_ois
         phi1 = self.geo.phi_oi0
