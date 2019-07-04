@@ -202,6 +202,8 @@ def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref 
     from PDSim.misc.hdf5 import HDF5Writer
     h5 = HDF5Writer()
     h5.write_to_file(ScrollComp, HDF5file)
+
+    # debug_plots(ScrollComp, family='Scroll Compressor')
     
     return ScrollComp
     

@@ -6,7 +6,7 @@ import matplotlib as mpl
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as Canvas
 from matplotlib.backends.backend_wxagg import NavigationToolbar2WxAgg as Toolbar
 import numpy as np
-from CoolProp.CoolProp import Props
+from CoolProp.CoolProp import PropsSI
 import h5py
 
 import matplotlib.pyplot as plt
@@ -106,10 +106,13 @@ class PlotNotebook(wx.Panel):
             sizer.Add(btn)
             btn.Bind(wx.EVT_BUTTON, callbackfcn)
         
-        if self.family == 'Scroll Compressor':
-            more_plot_buttons = self.scroll_plot_buttons
-        elif self.family == 'Recip Compressor':
-            more_plot_buttons = self.recip_plot_buttons
+        if self.family is not None:
+            if self.family == 'Scroll Compressor':
+                more_plot_buttons = self.scroll_plot_buttons
+            elif self.family == 'Recip Compressor':
+                more_plot_buttons = self.recip_plot_buttons
+            else:
+                raise ValueError("Invalid family; options are 'Scroll Compressor' or 'Recip Compressor'")
         else:
             more_plot_buttons = None
         
@@ -548,11 +551,11 @@ class PlotNotebook(wx.Panel):
                     fancybox=True, shadow=True)
          
     
-def debug_plots(Comp, plotparent=None, plot_names = None):
+def debug_plots(Comp, plotparent=None, plot_names = None, family='Scroll Compressor'):
     # Build a new frame, not embedded
     app = wx.App(False)
     frame = wx.Frame(None, -1,'Plotter')
-    notebook = PlotNotebook(Comp, frame, plot_names=plot_names)
+    notebook = PlotNotebook(Comp, frame, plot_names=plot_names, family=family)
     frame.Show()
     app.MainLoop()
 
