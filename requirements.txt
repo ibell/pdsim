@@ -1,0 +1,3 @@
+CoolProp
+cython
+quantities

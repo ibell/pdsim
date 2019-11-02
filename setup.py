@@ -136,7 +136,7 @@ setup(
   author = "Ian Bell",
   author_email='ian.h.bell@gmail.com',
   url='http://pdsim.sourceforge.net',
-  requires=['CoolProp','cython','quantities'],
+#  requires=['CoolProp','cython','quantities'],
   description = """A flexible open-source framework for the quasi-steady-state simulation of positive displacement machines including compressors and expanders""",
   packages = ['PDSim','PDSim.core','PDSim.flow','PDSim.plot','PDSim.scroll','PDSim.misc','PDSim.recip','PDSim.misc.clipper'],
   cmdclass={'build_ext': build_ext},
