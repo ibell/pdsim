@@ -11,4 +11,5 @@ dependencies:
   - pip
 #  - wxpython
   - pip:
+    - coolprop
     - "git+git://github.com/ibell/pdsim.git"
