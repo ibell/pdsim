@@ -8,6 +8,8 @@ dependencies:
   - pyyaml
   - h5py
   - cython
+  - pip
 #  - wxpython
   - pip:
+    - CoolProp
     - "git+git://github.com/ibell/pdsim.git"
