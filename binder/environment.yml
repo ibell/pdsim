@@ -9,7 +9,7 @@ dependencies:
   - h5py
   - cython
   - pip
+  - coolprop
 #  - wxpython
   - pip:
-    - CoolProp
     - "git+git://github.com/ibell/pdsim.git"
