@@ -65,5 +65,5 @@ deploy_script:
   # upload to pypi for windows
   - set PATH=%BK_PATH%
   - set HOME=%USERPROFILE%
-  - ps: If ($env:APPVEYOR_REPO_TAG -eq "true") { Invoke-Expression "twine upload --verbose dist/*.whl" 2>$null } Else { write-output "Not on a tag, won't deploy to pypi"}
+  - ps: If ($env:APPVEYOR_REPO_TAG -eq "true") { Invoke-Expression "twine upload --verbose --skip-existing dist/*.whl" 2>$null } Else { write-output "Not on a tag, won't deploy to pypi"}
   - echo "Finished Artifact Deployment to PYPI"
