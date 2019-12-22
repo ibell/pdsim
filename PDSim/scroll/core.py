@@ -1131,9 +1131,9 @@ class Scroll(PDSimCore, _Scroll):
         Pereira and Deschamps "A heat transfer correlation for the suction and compression chambers of scroll compressors" International Journal of Refrigeration, 82(2017), 325-334
         """
         
-        if hasattr(self,'HT_corr') == False and hasattr(self,'HTC') == False:
+        if not hasattr(self,'HT_corr') and hasattr(self,'HTC') == False:
             return 0.0
-        elif hasattr(self,'HTC') == True or self.HT_corr == 'HT-const':
+        elif hasattr(self,'HTC'):
             return self.HTC
         else:
             for Tube in self.Tubes:
@@ -1619,7 +1619,7 @@ class Scroll(PDSimCore, _Scroll):
             # Get the mean losses over one cycle
             self.losses.bearings  = np.trapz(self.losses.summed[_slice], theta)/theta_range
             
-            print('mechanical losses [kW]: ', self.losses.bearings)
+            print('mechanical losses: ', self.losses.bearings)
             return self.losses.bearings #[kW]
     
     def post_cycle(self):
