@@ -1131,11 +1131,11 @@ class Scroll(PDSimCore, _Scroll):
         Pereira and Deschamps "A heat transfer correlation for the suction and compression chambers of scroll compressors" International Journal of Refrigeration, 82(2017), 325-334
         """
         
-        if not hasattr(self,'HT_corr') and hasattr(self,'HTC') == False:
+        if not hasattr(self,'HT_corr') and not hasattr(self,'HTC'):
             return 0.0
-        elif hasattr(self,'HTC'):
+        elif hasattr(self,'HTC') and not hasattr(self,'HT_corr'):
             return self.HTC
-        else:
+        elif hasattr(self,'HT_corr'):
             for Tube in self.Tubes:
                 if self.key_inlet in [Tube.key1, Tube.key2]:
                     mdot = Tube.mdot
@@ -1182,7 +1182,9 @@ class Scroll(PDSimCore, _Scroll):
                     ValueError("Cstar,Re,Pr are out fo range in Pereira-Deschamps correlation") 
             else:
                 raise KeyError("keyword argument HT_corr must be one of 'HT-const', 'Dittus-Boelter', 'Kakac-Shah' or 'Jang-Jeong'; received '"+str(self.HT_corr)+"'")
-
+        else:
+            raise KeyError("Provide either keyword argument HTC or HT_corr")
+            
     def wrap_heat_transfer(self, **kwargs):
         """
         This function evaluates the anti-derivative of the differential of wall heat transfer, and returns the amount of scroll-wall heat transfer in kW
