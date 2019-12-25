@@ -1117,22 +1117,74 @@ class Scroll(PDSimCore, _Scroll):
         
         return mtotal, zcm__thrust_surface
 
-    def heat_transfer_coefficient(self, key):
+    def heat_transfer_coefficient(self, key, angles):
+        """
+        This function evaluates the heat transfer coefficient for a selected correlation
         
-#        Pr=Pr_mix(Ref,Liq,T_avg,p_avg,xL_avg); //[-]
-#        Re=4.0*mdot/2.0/(PI*mu_mix(Ref,Liq,T_avg,p_avg,xL_avg)*Dh); //[-]
-#        hc=0.023*k_mix(Ref,Liq,T_avg,p_avg,xL_avg)/Dh*pow(Re,0.8)*pow(Pr,0.4); //[kW/m^2-K]
-#        // Jang and Jeong correction for spiral geometry
-#        f=scroll->States.omega/(2*PI);
-#        Amax=scroll->geo.ro;
-#        Ubar=scroll->massFlow.mdot_tot/(4*scroll->geo.ro*scroll->geo.hs*rho);
-#        St=f*Amax/Ubar;
-#        hc*=1.0+8.48*(1-exp(-5.35*St));
-#        // Tagri and Jayaraman correction for transverse oscillation
-#        r_c=scroll->geo.rb*(0.5*phi_1_i+0.5*phi_2_i-scroll->geo.phi.phi_fi0);
-#        hc*=1.0+1.77*Dh/r_c;
-        return 1.0
-
+        Parameters
+        ----------
+        hc : float
+            Heat transfer coefficient [kW/m2/K]
+            
+        Notes
+        -----
+        Pereira and Deschamps "A heat transfer correlation for the suction and compression chambers of scroll compressors" International Journal of Refrigeration, 82(2017), 325-334
+        """
+        
+        if not hasattr(self,'HT_corr') and not hasattr(self,'HTC'):
+            return 0.0
+        elif hasattr(self,'HTC') and not hasattr(self,'HT_corr'):
+            return self.HTC
+        elif hasattr(self,'HT_corr'):
+            for Tube in self.Tubes:
+                if self.key_inlet in [Tube.key1, Tube.key2]:
+                    mdot = Tube.mdot
+            Pr = self.CVs[key].State.Prandtl #[-]
+            rho = self.CVs[key].State.rho #[kg/m3]
+            mu = self.CVs[key].State.visc #[Pa-s]
+            k = self.CVs[key].State.k #[kW/m-K]
+            f = self.omega/(2*pi)
+            Amax = self.geo.ro
+            Ubar= mdot/(4*self.geo.ro*self.geo.h*rho)
+            St=f*Amax/Ubar #Strouhal number [-]
+            Dh =4.0*self.geo.ro*self.geo.h/(2.0*self.geo.ro+self.geo.h) #could be 4V/A
+            Re = 4.0*mdot /2.0/(pi*mu*Dh) #[-]
+            r_c = self.geo.rb*(0.5*angles.phi_1_i+0.5*angles.phi_2_i-self.geo.phi_oi0)
+            C_star = Dh/r_c #dimensionless curvature of chamber
+    
+            if Pr >= 0.7 and Pr <= 160:
+                if Re > 10000:
+                    n = 0.4 #fluid bein heated
+                    #n = 0.3 #Fluid being cooled  
+                    Nu_DB = 0.023*Re**0.8*Pr**n      
+                else:
+                    raise ValueError('Re < 10000 in Dittus-Boelter correlation')
+            else:
+                raise ValueError('Pr out fo range in Dittus-Boelter correlation')         
+            
+            # Heat Transfer correlation    
+            if self.HT_corr == 'Dittus-Boelter':
+                return Nu_DB*(k/Dh) # kW/m2/K
+            elif self.HT_corr == 'Kakac-Shah':
+                # Correlation for spiral heat exchangers (Kakac and Shah, 1987)
+                return Nu_DB*(1.0 + 1.77*Dh/r_c)*(k/Dh) #kW/m2/K
+            elif self.HT_corr == 'Jang-Jeong':
+                # Tagri and Jayaraman correction for transverse oscillation (Jang and Jeong, 2006)
+                return Nu_DB*(1.0 + 1.77*Dh/r_c)*(1.0+8.48*(1-exp(-5.35*St)))*(k/Dh) # kW/m2/K
+            elif self.HT_corr == 'Pereira-Deschamps':
+                if C_star >=0.2 and C_star<=1.0 and Re >= 1000 and Pr>=0.7:
+                    c0 = 0.4956
+                    c1 = 0.406
+                    c2 = 0.1361
+                    c3 = 3394
+                    return Nu_DB*(c0+c1*C_star+c2*Pr+c3*C_star/Re)*(k/Dh)
+                else:
+                    ValueError("Cstar,Re,Pr are out fo range in Pereira-Deschamps correlation") 
+            else:
+                raise KeyError("keyword argument HT_corr must be one of 'HT-const', 'Dittus-Boelter', 'Kakac-Shah' or 'Jang-Jeong'; received '"+str(self.HT_corr)+"'")
+        else:
+            raise KeyError("Provide either keyword argument HTC or HT_corr")
+            
     def wrap_heat_transfer(self, **kwargs):
         """
         This function evaluates the anti-derivative of the differential of wall heat transfer, and returns the amount of scroll-wall heat transfer in kW
@@ -1210,10 +1262,16 @@ class Scroll(PDSimCore, _Scroll):
         
     def calcHT(self, theta, key, HTC_tune, dT_dphi, phim): 
         
-        #TODO: calculate HTC
-        hc = self.HTC #[kW/m2/K]
+        # Get the bounding angles for the control volume
+        angles = self.HT_angles(theta, self.geo, key)
         
-        ## If HT is turned off, no heat transfer
+        if angles is None:
+            return 0.0
+        
+        # Calculate HTC
+        hc = self.heat_transfer_coefficient(key, angles) #[kW/m2/K]
+        
+        # If HT is turned off, no heat transfer
         if abs(hc) < 1e-10 or HTC_tune <= 0.0 or key.startswith('inj') or key == 'sa' or key == 'dd':
             return 0.0
         elif key == 'ddd':
@@ -1222,15 +1280,7 @@ class Scroll(PDSimCore, _Scroll):
             Q_d1 = self.calcHT(theta,str('d1'),HTC_tune,dT_dphi,phim)
             Q_d2 = self.calcHT(theta,str('d2'),HTC_tune,dT_dphi,phim)
             return Q_d1 + Q_d2
-                
-        
-            
-        #Get the bounding angles for the control volume
-        angles = self.HT_angles(theta, self.geo, key)
-        
-        if angles is None:
-            return 0.0
-        
+
         T_scroll = self.Tlumps[0]
         T_CV = self.CVs[key].State.T
         # The heat transfer rate of the inner involute on 
