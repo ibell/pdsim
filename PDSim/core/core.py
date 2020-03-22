@@ -1131,39 +1131,82 @@ class PDSimCore(object):
                 
             self.solvers.lump_eb_history.append([self.Tlumps, self.lumps_resid])
             
-            if len(self.solvers.lump_eb_history) == 1:
-                
-                T, EB = self.solvers.lump_eb_history[-1]
-                
-                #  T and EB are one-element lists, get floats
-                _T, _EB = T[0], EB[0]
-            
-                # Use the thermal mass to make the step
-                # Here is the logic:
-                # Instantaneous energy balance given by
-                # dU/dt = m*c*(dT/dt) = sum(Qdot)
-                # and if dt = one cycle period (seconds/rev) DeltaT = 2*pi/omega
-                # DELTAT = sum(Qdot)*Deltat/(m*c)
-                thermal_capacitance = 0.49*0.001 # [kJ/K]
-                Deltat = (2*np.pi)/self.omega # [s]
-            
-                #  Update the lump temperatures
-                self.Tlumps = [_T + _EB*Deltat/thermal_capacitance]
-            
+            if len(self.Tlumps) > 1:
+                print("Running multi-lump analysis")
+
+                if self.OEB_solver == 'MDNR':
+                    # Use Multi Dim. Newton Raphson step for multi-lump temperatures
+                    from numpy.linalg import inv
+                    w = 1.0                
+                    dx = 0.5
+                    ytol=1e-3
+                    x = np.array(self.Tlumps,dtype=np.float)
+                    J = np.zeros((len(x),len(x)))
+                    error = 999
+                    # If a float is passed in for dx, convert to a numpy-like list the same shape
+                    # as x
+                    if isinstance(dx,int) or isinstance(dx,float):
+                        dx=dx*np.ones_like(x)
+                                
+                    r0 = np.array(self.lumps_resid)*1000 
+
+                    # Build the Jacobian matrix by columns
+                    for jj in range(len(self.Tlumps)):
+                        delta = np.zeros_like(x)
+                        delta[jj] = dx[jj]
+                        self.Tlumps = self.Tlumps + delta
+                        ri = self.callbacks.lumps_energy_balance_callback()
+                        #print('ri:',ri)
+                        ri = np.array(ri)
+                        J[:,jj] = (ri-r0)/delta[jj]
+
+                    v = np.dot(-inv(J),r0)
+
+                    # Calculate new Tlumps
+                    Tnew = x + w*v
+                    self.Tlumps = Tnew
+
+                elif self.OEB_solver == 'Broyden':
+                    # Use Broyden Method  
+                    raise('Broyden not implemented yet')
+
             else:
+                # Use Relaxed Secant Method for single lump temperature
+                print("Running single-lump analysis")
                 
-                #  Get the values from the history
-                Tn1, EBn1 = self.solvers.lump_eb_history[-1]
-                Tn2, EBn2 = self.solvers.lump_eb_history[-2]
+                if len(self.solvers.lump_eb_history) == 1:
+                    
+                    T, EB = self.solvers.lump_eb_history[-1]
+                    
+                    #  T and EB are one-element lists, get floats
+                    _T, _EB = T[0], EB[0]
                 
-                #  Convert to numpy arrays
-                Tn1, EBn1, Tn2, EBn2 = [np.array(l) for l in [Tn1, EBn1, Tn2, EBn2]]
+                    # Use the thermal mass to make the step
+                    # Here is the logic:
+                    # Instantaneous energy balance given by
+                    # dU/dt = m*c*(dT/dt) = sum(Qdot)
+                    # and if dt = one cycle period (seconds/rev) DeltaT = 2*pi/omega
+                    # DELTAT = sum(Qdot)*Deltat/(m*c)
+                    thermal_capacitance = 0.49*0.001 # [kJ/K]
+                    Deltat = (2*np.pi)/self.omega # [s]
                 
-                #  Use the relaxed secant method to find the solution 
-                Tnew = Tn1 - 0.7*EBn1*(Tn1-Tn2)/(EBn1-EBn2)
-            
-                #  Update the lump temperatures    
-                self.Tlumps = Tnew.tolist()
+                    #  Update the lump temperatures
+                    Tnew = np.array([_T + _EB*Deltat/thermal_capacitance])
+                
+                else:
+                    
+                    #  Get the values from the history
+                    Tn1, EBn1 = self.solvers.lump_eb_history[-1]
+                    Tn2, EBn2 = self.solvers.lump_eb_history[-2]
+                    
+                    #  Convert to numpy arrays
+                    Tn1, EBn1, Tn2, EBn2 = [np.array(l) for l in [Tn1, EBn1, Tn2, EBn2]]
+                    
+                    #  Use the relaxed secant method to find the solution 
+                    Tnew = Tn1 - 0.7*EBn1*(Tn1-Tn2)/(EBn1-EBn2)
+
+            #  Update the lump temperatures    
+            self.Tlumps = Tnew.tolist()
             
             ###  -----------------------------------
             ###        The discharge enthalpy
@@ -1180,7 +1223,7 @@ class PDSimCore(object):
                 key_outtube_inlet = outlet_tube.key1
                 key_outtube_outlet = outlet_tube.key2
                 
-            if error_metric < 0.1*epsilon and abs(self.lumps_resid[0]) < epsilon:
+            if error_metric < 0.1*epsilon and np.max(np.abs(self.lumps_resid)) < epsilon:
 
                 # Each time that we get here and we are significantly below the threshold, store the values
             
@@ -1243,7 +1286,9 @@ class PDSimCore(object):
             print(error_ascii_bar(error_metric, epsilon), 'cycle-cycle    ', error_metric)
             print(error_ascii_bar(abs(mdot_error), 1), 'mdot [%]', mdot_error, '|| in:', mdot_in*1000, 'g/s || out:', mdot_out*1000, 'g/s ')
             
-            worst_error = max(abs(self.lumps_resid[0]), abs(self.resid_Td), np.sqrt(np.sum(np.power(errors, 2))))
+            worst_error = max(np.max(np.abs(self.lumps_resid)), 
+                                    abs(self.resid_Td), 
+                                    np.sqrt(np.sum(np.power(errors, 2))))
             i += 1
         
         #  If the abort function returns true, quit this loop
