@@ -1621,7 +1621,7 @@ class Scroll(PDSimCore, _Scroll):
             # Get the mean losses over one cycle
             self.losses.bearings  = np.trapz(self.losses.summed[_slice], theta)/theta_range
             
-            print('mechanical losses: ', self.losses.bearings)
+            #print('mechanical losses: ', self.losses.bearings)
             return self.losses.bearings #[kW]
     
     def post_cycle(self):
