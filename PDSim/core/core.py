@@ -1281,7 +1281,7 @@ class PDSimCore(object):
             print('===========')
             print('|| # {i:03d} ||'.format(i=i))
             print('===========')
-            print(error_ascii_bar(abs(self.lumps_resid[0]), epsilon), 'energy balance kW ', self.lumps_resid[0], ' Tlumps: ',self.Tlumps,'K')
+            print(error_ascii_bar(abs(self.lumps_resid[0]), epsilon), 'energy balance kW ', self.lumps_resid, ' Tlumps: ',self.Tlumps,'K')
             print(error_ascii_bar(abs(self.resid_Td), epsilon), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg', self.Tubes.Nodes[key_outtube_inlet].h, 'kJ/kg')
             print(error_ascii_bar(error_metric, epsilon), 'cycle-cycle    ', error_metric)
             print(error_ascii_bar(abs(mdot_error), 1), 'mdot [%]', mdot_error, '|| in:', mdot_in*1000, 'g/s || out:', mdot_out*1000, 'g/s ')
