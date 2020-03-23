@@ -29,7 +29,7 @@ def MultiDimNewtRaph(f, x0, dx=1e-6, args=(), ytol=1e-5, w=1.0, JustOneStep=Fals
             epsilon = np.zeros_like(x)
             epsilon[i] = dx[i]
             J[:, i] = (array(f(x + epsilon, *args)) - r0) / epsilon[i]
-        v = np.dot(-inv(J), r0)
+        v = np.linalg.solve(J,-r0)
         x = x + w * v
         # Calculate the residual vector at the new step
         r0 = f(x, *args)
@@ -56,16 +56,16 @@ def Broyden(
 ):
     """
     Broyden's method
-    
+
     If f returns ``None``, then the computation is stopped, and a list the size of x0 is returned with all ``None`` values
-    
+
     Parameters
     ----------
     f : function
         Must have a signature of the form::
-         
+
             (x0,*args) --> array
-            
+
         that returns an array-like object the same shape as ``x0``
     J0 : ndarray
         A square matrix that contains a first guess for the Jacobian
