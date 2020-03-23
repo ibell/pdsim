@@ -1185,7 +1185,7 @@ class PDSimCore(object):
                     # Here is the logic:
                     # Instantaneous energy balance given by
                     # dU/dt = m*c*(dT/dt) = sum(Qdot)
-                    # and if dt = one cycle period (seconds/rev) DeltaT = 2*pi/omega
+                    # and if dt = one cycle period (seconds/rev) Deltat = 2*pi/omega
                     # DELTAT = sum(Qdot)*Deltat/(m*c)
                     thermal_capacitance = 0.49*0.001 # [kJ/K]
                     Deltat = (2*np.pi)/self.omega # [s]
