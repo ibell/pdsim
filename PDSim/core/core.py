@@ -1160,7 +1160,7 @@ class PDSimCore(object):
                         ri = np.array(ri)
                         J[:,jj] = (ri-r0)/delta[jj]
 
-                    v = np.dot(-inv(J),r0)
+                    v = np.linalg.solve(J,-r0)
 
                     # Calculate new Tlumps
                     Tnew = x + w*v
