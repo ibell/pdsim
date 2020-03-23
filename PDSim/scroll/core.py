@@ -1990,7 +1990,6 @@ class Scroll(PDSimCore, _Scroll):
             # and the motor efficiency as a function of the torque [N-m]
             eta, omega = self.motor.apply_map(self.tau_mechanical)
             self.eta_motor = eta
-            self.omega = omega*(1-self.slip_ratio)
         else:
             raise AttributeError('motor.type must be one of "const_eta_motor" or "motor_map"')
         
