@@ -34,10 +34,6 @@ import xlsxwriter as xlsw
 import pylab
 import time
 
-def F2C(T_F):
-    """Convert temperature in Fahrenheit to Celsius"""
-    return 5./9.*(T_F-32.0)
-
 def Compressor(Te = 0,DTsh = 11.1,Tc = 20, Tamb = 25, Nmot = 3600, f = None, OneCycle = False, Ref = 'R134a', HDF5file='scroll_compressor.h5'):
 
     ScrollComp=Scroll()
@@ -225,16 +221,7 @@ def Compressor(Te = 0,DTsh = 11.1,Tc = 20, Tamb = 25, Nmot = 3600, f = None, One
 
     print('time taken', clock()-t1)
 
-    debug_plots(ScrollComp)
-
-    #Calculate cooling capacity
-    Tcond_out = Tcond - DT_sc #K
-    hcond_out = CP.PropsSI('H','T',Tcond_out,'P',pc*1000,Ref) #J/kg
-    hevap_in = hcond_out/1000 #kJ/kg
-    hevap_out = inletState.h
-    Qdot_evap = ScrollComp.mdot*(hevap_out - hevap_in) #kW
-    print('Cooling capacity:',Qdot_evap,'kW')
-    print('Cooling capacity:',Qdot_evap*1000/0.2928104,'Btu/hr')
+    #debug_plots(ScrollComp)
 
     del ScrollComp.FlowStorage
     from PDSim.misc.hdf5 import HDF5Writer
@@ -243,23 +230,18 @@ def Compressor(Te = 0,DTsh = 11.1,Tc = 20, Tamb = 25, Nmot = 3600, f = None, One
 
     return ScrollComp
 
-def Single_Run(Te_F,Tc_F,Ref = 'R134a'):
-
-    Te_C = F2C(Te_F)
-    Tc_C = F2C(Tc_F)
-
-    filename = 'CompressorName_'+Ref+'_'+str(Te_F)+'_'+str(Tc_F)+'.h5'
-
-    Compressor(Te = Te_C,
-                DTsh = 11.1,
-                Tc = Tc_C,
-                Tamb = 25,
-                Nmot = 3600,
-                f = None,
-                OneCycle = False,
-                Ref = Ref,
-                HDF5file=filename)
 
 if __name__=='__main__':
 
-    Single_Run(70,150,Ref = 'R134a')
+    # Example
+    scroll = Compressor(Te = 0,
+                        DTsh = 11.1,
+                        Tc = 20,
+                        Tamb = 25,
+                        Nmot = 3600,
+                        f = None,
+                        OneCycle = False,
+                        Ref = 'R134a',
+                        HDF5file='ScrollCompressor_MultiLump.h5')
+
+
