@@ -26,12 +26,6 @@ from CoolProp import State
 from CoolProp import CoolProp as CP
 
 import numpy as np
-import pandas as pd
-from scipy import interpolate
-from openpyxl import load_workbook
-from matplotlib import pyplot as plt
-import xlsxwriter as xlsw
-import pylab
 import time
 
 def Compressor(Te = 0,DTsh = 11.1,Tc = 20, Tamb = 25, Nmot = 3600, f = None, OneCycle = False, Ref = 'R134a', HDF5file='scroll_compressor.h5'):
