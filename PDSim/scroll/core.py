@@ -1946,6 +1946,91 @@ class Scroll(PDSimCore, _Scroll):
         print(OBJECTIVE(T0+50))
         return optimize.newton(OBJECTIVE, T0)
         
+    def single_lump_OEB(self):
+        """
+        Defines single-lump temperature energy balance 
+        calculations and returns a single redisual
+        
+        Notes
+        -----
+        """
+        #For the single lump
+
+        # Set the heat input to the suction line
+        #self.suction_heating()
+
+        # HT terms are positive if heat transfer is TO the lump
+        Qnet = 0.0
+        Qnet -= sum([Tube.Q for Tube in self.Tubes])
+        
+        self.Qamb = self.ambient_heat_transfer(self.Tlumps[0])
+        
+        self.mech.Wdot_losses = self.mechanical_losses('low:shell') 
+        # Shaft power from forces on the orbiting scroll from the gas in the pockets [kW]
+        self.Wdot_forces = self.omega*self.forces.mean_tau
+#        if self.geo.is_symmetric():
+#            
+#        else:
+#            import warnings
+#            warnings.warn('No ML for asymmetric for now')
+#            self.mech.Wdot_losses = 0.0
+        
+        # Heat transfer with the ambient; Qamb is positive if heat is being removed, thus flip the sign
+        Qnet -= self.Qamb
+        
+        Qnet += self.mech.Wdot_losses
+        # Heat transfer with the gas in the working chambers.  mean_Q is positive
+        # if heat is transfered to the gas in the working chamber, so flip the 
+        # sign for the lump
+        Qnet -= self.HTProcessed.mean_Q
+        
+        return [Qnet]        
+
+    def multi_lump_OEB(self):
+        """
+        Defines multi-lump temperatures energy balance 
+        calculations and returns a list of redisuals
+        
+        Notes:
+        Current example considers two lumps
+            Tlumps[0] : Tshell
+            Tlumps[1] : Toil
+        ----
+        """
+        #For the lumps:
+        Qnet = 0.0
+        Qnet_oil = 0.0
+        
+        # Set the heat input to the suction line
+        #self.suction_heating()
+        
+        # HT terms are positive if heat transfer is TO the lump
+        Qnet -= sum([Tube.Q for Tube in self.Tubes])
+        
+        # HT Shell to ambient
+        self.Qamb = self.ambient_heat_transfer(self.Tlumps[0])
+        
+        # Heat transfer with the ambient; Qamb is positive if heat is being removed, thus flip the sign
+        Qnet -= self.Qamb
+        
+        # Heat transfer with the gas in the working chambers.  mean_Q is positive
+        # if heat is transfered to the gas in the working chamber, so flip the 
+        # sign for the lump
+        Qnet -= self.HTProcessed.mean_Q
+        
+        #HT oil shell
+        self.Rshell_oil = 190 #K/kW  from Chen (2000) - PhD thesis
+        self.Qoil_shell = (self.Tlumps[0] - self.Tlumps[1])/self.Rshell_oil
+        
+        Qnet_oil += self.mech.Wdot_losses
+        Qnet_oil += self.Qoil_shell
+        
+        Qnet -= self.Qoil_shell
+    
+        #Want to return a list
+        return [Qnet,Qnet_oil]
+        
+
     def lump_energy_balance_callback(self):
         """
         The callback where the energy balance is carried out on the lumps
@@ -1966,7 +2051,6 @@ class Scroll(PDSimCore, _Scroll):
         
             \\dot W_{motor} = \\frac{\\dot W_{shaft}}{\\eta _{motor}} - \\dot W_{shaft}
         """
-        
         # Mechanical losses
         self.mech.Wdot_losses = self.mechanical_losses('low:shell')       
 
@@ -1990,6 +2074,7 @@ class Scroll(PDSimCore, _Scroll):
             # and the motor efficiency as a function of the torque [N-m]
             eta, omega = self.motor.apply_map(self.tau_mechanical)
             self.eta_motor = eta
+            self.omega = omega*(1-self.slip_ratio)
         else:
             raise AttributeError('motor.type must be one of "const_eta_motor" or "motor_map"')
         
@@ -2003,9 +2088,6 @@ class Scroll(PDSimCore, _Scroll):
             # Overall isentropic efficiency
             self.eta_oi = self.Wdot_i/self.Wdot_electrical
 
-        # Set the heat input to the suction line
-        #self.suction_heating()
-        
         if self.verbosity > 0:
             print('At this iteration')
             print('    Motor Speed:', self.omega*60/(2*pi),'rpm')
@@ -2022,70 +2104,9 @@ class Scroll(PDSimCore, _Scroll):
                 print('    Volumetric:', self.eta_v,'-')
         
         if not hasattr(self,'OEB_type') or self.OEB_type == 'single-lump':
-    
-            #For the single lump
-            # HT terms are positive if heat transfer is TO the lump
-            Qnet = 0.0
-            Qnet -= sum([Tube.Q for Tube in self.Tubes])
-            
-            self.Qamb = self.ambient_heat_transfer(self.Tlumps[0])
-            
-            self.mech.Wdot_losses = self.mechanical_losses('low:shell') 
-            # Shaft power from forces on the orbiting scroll from the gas in the pockets [kW]
-            self.Wdot_forces = self.omega*self.forces.mean_tau
-    #        if self.geo.is_symmetric():
-    #            
-    #        else:
-    #            import warnings
-    #            warnings.warn('No ML for asymmetric for now')
-    #            self.mech.Wdot_losses = 0.0
-            
-            # Heat transfer with the ambient; Qamb is positive if heat is being removed, thus flip the sign
-            Qnet -= self.Qamb
-            
-            Qnet += self.mech.Wdot_losses
-            # Heat transfer with the gas in the working chambers.  mean_Q is positive
-            # if heat is transfered to the gas in the working chamber, so flip the 
-            # sign for the lump
-            Qnet -= self.HTProcessed.mean_Q       
-        
-            return [Qnet]
-        
+            return self.single_lump_OEB()        
         elif self.OEB_type == 'multi-lump':
-            """
-            Example with two lumps
-            Tlumps[0] : Tshell
-            Tlumps[1] : Toil
-            """
-            #For the lumps:
-            Qnet = 0.0
-            Qnet_oil = 0.0
-            
-            # HT terms are positive if heat transfer is TO the lump
-            Qnet -= sum([Tube.Q for Tube in self.Tubes])
-            
-            # HT Shell to ambient
-            self.Qamb = self.ambient_heat_transfer(self.Tlumps[0])
-            
-            # Heat transfer with the ambient; Qamb is positive if heat is being removed, thus flip the sign
-            Qnet -= self.Qamb
-            
-            # Heat transfer with the gas in the working chambers.  mean_Q is positive
-            # if heat is transfered to the gas in the working chamber, so flip the 
-            # sign for the lump
-            Qnet -= self.HTProcessed.mean_Q
-            
-            #HT oil shell
-            self.Rshell_oil = 190 #K/kW  from Chen (2000) - PhD thesis
-            self.Qoil_shell = (self.Tlumps[0] - self.Tlumps[1])/self.Rshell_oil
-            
-            Qnet_oil += self.mech.Wdot_losses
-            Qnet_oil += self.Qoil_shell
-            
-            Qnet -= self.Qoil_shell
-        
-            #Want to return a list
-            return [Qnet,Qnet_oil]
+            return self.multi_lump_OEB()
 
     def TubeCode(self,Tube,**kwargs):
         Tube.Q = flow_models.IsothermalWallTube(Tube.mdot,
