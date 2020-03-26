@@ -78,6 +78,7 @@ def Compressor(Te = 0,DTsh = 11.1,Tc = 20, Tamb = 25, Nmot = 3600, f = None, One
     # Temperature Lumps
     ScrollComp.OEB_type = 'multi-lump' #'single-lump'
     ScrollComp.OEB_solver = 'MDNR'
+    ScrollComp.Rshell_oil = 190 #K/kW  from Chen (2000) - PhD thesis
 
     # Define motor efficiency
     ScrollComp.motor.set_eta(0.95)

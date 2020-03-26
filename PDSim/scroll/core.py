@@ -2019,7 +2019,6 @@ class Scroll(PDSimCore, _Scroll):
         Qnet -= self.HTProcessed.mean_Q
         
         #HT oil shell
-        self.Rshell_oil = 190 #K/kW  from Chen (2000) - PhD thesis
         self.Qoil_shell = (self.Tlumps[0] - self.Tlumps[1])/self.Rshell_oil
         
         Qnet_oil += self.mech.Wdot_losses
@@ -2074,7 +2073,7 @@ class Scroll(PDSimCore, _Scroll):
             # and the motor efficiency as a function of the torque [N-m]
             eta, omega = self.motor.apply_map(self.tau_mechanical)
             self.eta_motor = eta
-            self.omega = omega*(1-self.slip_ratio)
+            self.omega = omega
         else:
             raise AttributeError('motor.type must be one of "const_eta_motor" or "motor_map"')
         
