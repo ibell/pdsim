@@ -15,7 +15,7 @@ from PDSim.scroll.scroll_geo import set_scroll_geo
 import warnings
 
 from CoolProp import State
-from math import pi
+from math import pi, exp
 import numpy as np
 import copy
 import types
@@ -1621,7 +1621,7 @@ class Scroll(PDSimCore, _Scroll):
             # Get the mean losses over one cycle
             self.losses.bearings  = np.trapz(self.losses.summed[_slice], theta)/theta_range
             
-            print('mechanical losses: ', self.losses.bearings)
+            #print('mechanical losses: ', self.losses.bearings)
             return self.losses.bearings #[kW]
     
     def post_cycle(self):
@@ -1946,28 +1946,19 @@ class Scroll(PDSimCore, _Scroll):
         print(OBJECTIVE(T0+50))
         return optimize.newton(OBJECTIVE, T0)
         
-    def lump_energy_balance_callback(self):
+    def single_lump_OEB(self):
         """
-        The callback where the energy balance is carried out on the lumps
+        Defines single-lump temperature energy balance 
+        calculations and returns a single redisual
         
         Notes
         -----
-        Derivation for electrical power of motor:
-        
-        .. math ::
-            
-            \\eta _{motor} = \\frac{\\dot W_{shaft}}{\\dot W_{shaft} + \\dot W_{motor}}
-            
-        .. math ::
-            
-            {\\eta _{motor}}\\left( \\dot W_{shaft} + \\dot W_{motor} \\right) = \\dot W_{shaft}
-            
-        .. math::
-        
-            \\dot W_{motor} = \\frac{\\dot W_{shaft}}{\\eta _{motor}} - \\dot W_{shaft}
         """
-        
         #For the single lump
+
+        # Set the heat input to the suction line
+        #self.suction_heating()
+
         # HT terms are positive if heat transfer is TO the lump
         Qnet = 0.0
         Qnet -= sum([Tube.Q for Tube in self.Tubes])
@@ -1993,11 +1984,82 @@ class Scroll(PDSimCore, _Scroll):
         # sign for the lump
         Qnet -= self.HTProcessed.mean_Q
         
+        return [Qnet]        
+
+    def multi_lump_OEB(self):
+        """
+        Defines multi-lump temperatures energy balance 
+        calculations and returns a list of redisuals
         
+        Notes:
+        Current example considers two lumps
+            Tlumps[0] : Tshell
+            Tlumps[1] : Toil
+        ----
+        """
+        #For the lumps:
+        Qnet = 0.0
+        Qnet_oil = 0.0
         
+        # Set the heat input to the suction line
+        #self.suction_heating()
+        
+        # HT terms are positive if heat transfer is TO the lump
+        Qnet -= sum([Tube.Q for Tube in self.Tubes])
+        
+        # HT Shell to ambient
+        self.Qamb = self.ambient_heat_transfer(self.Tlumps[0])
+        
+        # Heat transfer with the ambient; Qamb is positive if heat is being removed, thus flip the sign
+        Qnet -= self.Qamb
+        
+        # Heat transfer with the gas in the working chambers.  mean_Q is positive
+        # if heat is transfered to the gas in the working chamber, so flip the 
+        # sign for the lump
+        Qnet -= self.HTProcessed.mean_Q
+        
+        #HT oil shell
+        self.Qoil_shell = (self.Tlumps[0] - self.Tlumps[1])/self.Rshell_oil
+        
+        Qnet_oil += self.mech.Wdot_losses
+        Qnet_oil += self.Qoil_shell
+        
+        Qnet -= self.Qoil_shell
+    
+        #Want to return a list
+        return [Qnet,Qnet_oil]
+        
+
+    def lump_energy_balance_callback(self):
+        """
+        The callback where the energy balance is carried out on the lumps
+        
+        Notes
+        -----
+        Derivation for electrical power of motor:
+        
+        .. math ::
+            
+            \\eta _{motor} = \\frac{\\dot W_{shaft}}{\\dot W_{shaft} + \\dot W_{motor}}
+            
+        .. math ::
+            
+            {\\eta _{motor}}\\left( \\dot W_{shaft} + \\dot W_{motor} \\right) = \\dot W_{shaft}
+            
+        .. math::
+        
+            \\dot W_{motor} = \\frac{\\dot W_{shaft}}{\\eta _{motor}} - \\dot W_{shaft}
+        """
+        # Mechanical losses
+        self.mech.Wdot_losses = self.mechanical_losses('low:shell')       
+
+        # Shaft power from forces on the orbiting scroll from the gas in the pockets [kW]
+        self.Wdot_forces = self.omega*self.forces.mean_tau
+
+        # Shaft power from indicated power
         self.Wdot_mechanical = self.Wdot_pv + self.mech.Wdot_losses
         
-        #The actual torque required to do the compression [N-m]
+        # The actual torque required to do the compression [N-m]
         self.tau_mechanical = self.Wdot_mechanical / self.omega * 1000
         
         # 2 Options for the motor losses:
@@ -2015,21 +2077,24 @@ class Scroll(PDSimCore, _Scroll):
         else:
             raise AttributeError('motor.type must be one of "const_eta_motor" or "motor_map"')
         
-        #Motor losses [kW]
+        # Motor losses [kW]
         self.motor.losses = self.Wdot_mechanical*(1/self.eta_motor-1)
         
-        #Electrical Power
+        # Electrical Power
         self.Wdot_electrical = self.Wdot_mechanical + self.motor.losses
         
         if hasattr(self,'Wdot_i'):
-            #Overall isentropic efficiency
+            # Overall isentropic efficiency
             self.eta_oi = self.Wdot_i/self.Wdot_electrical
-        
-#        #Set the heat input to the suction line
-#        self.suction_heating()
-        
+
         if self.verbosity > 0:
             print('At this iteration')
+            print('    Motor Speed:', self.omega*60/(2*pi),'rpm')
+            print('    Motor Efficiency:', self.eta_motor,'-')
+            print('    Torque (Force Analysis):', self.forces.mean_tau*1000,'Nm')
+            print('    Torque (pV Analysis):', self.tau_mechanical,'Nm')
+            print('    Mechanical losses:', self.mech.Wdot_losses,'kW')
+            print('    Motor losses:', self.motor.losses,'kW')
             print('    Electrical power:', self.Wdot_electrical,'kW')
             print('    Mass flow rate:', self.mdot,'kg/s')
             if hasattr(self,'Wdot_i'):
@@ -2037,8 +2102,10 @@ class Scroll(PDSimCore, _Scroll):
             if hasattr(self,'eta_v'):
                 print('    Volumetric:', self.eta_v,'-')
         
-        #Want to return a list
-        return [Qnet]
+        if not hasattr(self,'OEB_type') or self.OEB_type == 'single-lump':
+            return self.single_lump_OEB()        
+        elif self.OEB_type == 'multi-lump':
+            return self.multi_lump_OEB()
 
     def TubeCode(self,Tube,**kwargs):
         Tube.Q = flow_models.IsothermalWallTube(Tube.mdot,
@@ -2718,7 +2785,7 @@ class Scroll(PDSimCore, _Scroll):
                                   + self.forces.Wdot_thrust)
         
         self.forces.Wdot_total_mean = np.trapz(self.forces.Wdot_total, theta)/(2*pi)
-        print(self.forces.Wdot_total_mean,'average mechanical losses')
+        #print(self.forces.Wdot_total_mean,'average mechanical losses')
             
         import matplotlib.pyplot as plt
             
@@ -2973,7 +3040,7 @@ class Scroll(PDSimCore, _Scroll):
         import h5py
         hf = h5py.File(fName,'a')
         
-        for k, v in attrs_dict.iteritems():
+        for k, v in attrs_dict.items():
             dataset = hf.get(k)
             if dataset is not None:
                 dataset.attrs['note'] = v
