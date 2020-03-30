@@ -218,6 +218,20 @@ class Scroll(PDSimCore, _Scroll):
                 return 0.0
         except ZeroDivisionError:
             return 0.0
+
+    def DischargeValve(self, FlowPath, **kwargs):
+        if FlowPath.key_down in ['ddd','dd'] or self.discharge_valve.xv[0] == 0:
+            # Pressure in discharge pocket lower than the discharge line
+            # or valve is closed, so no flow
+            return 0.0
+        else:
+            try:
+                FlowPath.A=self.discharge_valve.A()
+                mdot=flow_models.IsentropicNozzle(FlowPath.A,FlowPath.State_up,FlowPath.State_down)
+                print(mdot)
+                return mdot
+            except ZeroDivisionError:
+                return 0.0
             
     def calculate_port_areas(self):
         """ 
