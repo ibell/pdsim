@@ -394,8 +394,8 @@ cdef class ValveModel(object):
     #Give Cython type definitions for terms
     @cython.locals(d_valve=cython.double,d_port=cython.double,C_D=cython.double,
                     rho_valve=cython.double,x_stopper=cython.double,
-                    m_eff = cython.double, k_valve = cython.double,x_tr=cython.double,
-                    key_up=cython.bytes,key_down=cython.bytes)
+                    m_eff = cython.double, k_valve = cython.double,x_tr=cython.double)
+    # key_up and key_down are string types
     def __init__(self, d_valve, d_port, C_D, rho_valve, x_stopper,m_eff,k_valve,x_tr,key_up, key_down):
         
         self.rho_valve = rho_valve
@@ -411,7 +411,7 @@ cdef class ValveModel(object):
         self.key_down = key_down
         self.x_tr = x_tr 
         
-        self. xv = empty_arraym(2)
+        self.xv = empty_arraym(2)
         
     cpdef get_States(self, Core):
         """
@@ -456,7 +456,10 @@ cdef class ValveModel(object):
         elif self.xv.get_index(0) > self.x_stopper and self.xv.get_index(1) > 0.0:
             self.xv.set_index(0, self.x_stopper)
             self.xv.set_index(1, 0.0)
-        
+
+    cpdef arraym get_xv(self):
+        """ Return the valve lift and velocity """
+        return self.xv
         
     cpdef double A(self):
         if self.xv is None:
