@@ -5,6 +5,7 @@ import matplotlib
 matplotlib.use('WXAgg')
 
 import sys,os
+sys.path.append(os.path.dirname(__file__))
 
 # The path to the home folder that will hold everything
 home = os.getenv('USERPROFILE') or os.getenv('HOME')
@@ -925,7 +926,7 @@ class MainFrame(wx.Frame):
                 raise TypeError('You can only register lists of AnnotatedGUIObjects. The bad item is:' + str(o))
             if o.key in self.GUI_object_library:
                 raise KeyError('Your key [{k:s}] is already in the parameter library'.format(k = o.key))
-            if o.annotation in [oo.annotation for oo in self.GUI_object_library.itervalues()]:
+            if o.annotation in [oo.annotation for oo in self.GUI_object_library.values()]:
                 raise KeyError('Your annotation [{a:s}] is already in the parameter library for key [{k:s}]'.format(a = o.annotation, k = o.key))
         
             self.GUI_object_library[o.key] = o
@@ -1356,7 +1357,7 @@ class MainFrame(wx.Frame):
         """
         Load any machine families into the GUI that are found in families folder
         """
-        import glob, pkgutil
+        import glob, pkgutil, importlib
         self.plugins_list = []
         
         def load_all_modules_from_dir(dirname, keep_loaded = True):
@@ -1364,8 +1365,16 @@ class MainFrame(wx.Frame):
             for importer, package_name, _ in pkgutil.iter_modules([dirname]):
                 full_package_name = '%s.%s' % (dirname, package_name)
                 if full_package_name not in sys.modules or keep_loaded:
-                    module = importer.find_module(package_name
-                                ).load_module(full_package_name)
+
+                    loader = importlib.machinery.SourceFileLoader(full_package_name, os.path.join(os.path.abspath(dirname),package_name+'.py'))
+                    spec = importlib.util.spec_from_loader(loader.name, loader)
+                    module = importlib.util.module_from_spec(spec)
+                    loader.exec_module(module)
+
+                    # modinfo = importer.find_module(package_name)
+                    # print(modinfo.exec_module.__doc__)
+                    # module = modinfo.create_module(full_package_name)
+                    # modinfo.exec_module(module)
                     mods.append(module)
             return mods
         

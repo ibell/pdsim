@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import absolute_import
 import wx, yaml, os
-from panels import scroll_panels, pdsim_panels
+import panels
 import numpy as np
 
 family_menu_name = 'Scroll Compressor'
@@ -157,7 +156,7 @@ def write_to_xlsx(workbook, runs):
                 if isinstance(buf[r][c],basestring) or not np.isnan(buf[r][c]):
                     ws.write(r, c, buf[r][c])
 
-class InputsToolBook(pdsim_panels.InputsToolBook):
+class InputsToolBook(panels.pdsim_panels.InputsToolBook):
     """
     The toolbook that contains the pages with input values
     """
@@ -182,11 +181,11 @@ class InputsToolBook(pdsim_panels.InputsToolBook):
         
         Main = wx.GetTopLevelParent(self)
         # Make the scroll panels.  
-        self.panels=(scroll_panels.GeometryPanel(self, config['GeometryPanel'],name='GeometryPanel'),
-                     pdsim_panels.StateInputsPanel(self, config['StatePanel'], name='StatePanel'),
-                     scroll_panels.MassFlowPanel(self, config['MassFlowPanel'], name='MassFlowPanel'),
-                     scroll_panels.MechanicalLossesPanel(self, config['MechanicalLossesPanel'], name='MechanicalLossesPanel'),
-                     scroll_panels.VirtualSensorsPanel(self,{}, name='VirtualSensorsPanel')
+        self.panels=(panels.scroll_panels.GeometryPanel(self, config['GeometryPanel'],name='GeometryPanel'),
+                     panels.pdsim_panels.StateInputsPanel(self, config['StatePanel'], name='StatePanel'),
+                     panels.scroll_panels.MassFlowPanel(self, config['MassFlowPanel'], name='MassFlowPanel'),
+                     panels.scroll_panels.MechanicalLossesPanel(self, config['MechanicalLossesPanel'], name='MechanicalLossesPanel'),
+                     panels.scroll_panels.VirtualSensorsPanel(self,{}, name='VirtualSensorsPanel')
                      )
         
         for Name, index, panel in zip(['Geometry','States','Flow','Mechanical','Sensors'],indices,self.panels):
@@ -207,7 +206,7 @@ scroll_yaml=(
 family : Scroll Compressor
 
 GeometryPanel:
-  Vdisp : 104.8e-6 # Displacement volume / revolution [m^3/rev]
+  Vdisp : 104.8e-6 # Displacement volume / revolution [m\u00b3/rev]
   Vratio : 2.2 # Built-in volume ratio [-]
   ro : 0.005 # Orbiting radius [m]
   t : 0.004 # Scroll wrap thickness [m]
@@ -246,8 +245,8 @@ MassFlowPanel:
 
 MechanicalLossesPanel:
   eta_motor : 0.95 # Motor efficiency [-]
-  h_shell : 0.01 # Shell air-side heat transfer coefficient [kW/m^2/K]
-  A_shell : 0.040536 # Shell Area [m^2]
+  h_shell : 0.01 # Shell air-side heat transfer coefficient [kW/m\u00b2/K]
+  A_shell : 0.040536 # Shell Area [m\u00b2]
   Tamb : 298.0 # Ambient temperature [K]
   mu_oil : 0.0086 # Oil viscosity [Pa-s]
   D_upper_bearing : 0.025 # Upper bearing diameter [m]
@@ -272,7 +271,7 @@ StatePanel:
   inletState: 
       Fluid : R410A
       T : 283.15 #[K]
-      rho : 5.75 #[kg/m^3]
+      rho : 5.75 #[kg/m\u00b3]
   discharge:
       pratio : 2.0
 

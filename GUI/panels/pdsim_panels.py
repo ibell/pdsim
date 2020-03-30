@@ -451,7 +451,7 @@ class PDPanel(wx.Panel):
                 raise TypeError('object of type [{t:s}] is not an AnnotatedValue'.format(t = type(o)))
                 
             # Build the GUI objects
-            label=wx.StaticText(parent, -1, o.annotation.decode('latin-1'))
+            label=wx.StaticText(parent, -1, o.annotation)
             
             if sizer is not None:
                 # Add the label to the sizer
@@ -482,7 +482,7 @@ class PDPanel(wx.Panel):
                 
                 # Units are defined for the item
                 if o.units:
-                    unicode_units = unicode(o.units)
+                    unicode_units = o.units
                     textbox.default_units = ''
                     if unicode_units == u'm':
                         textbox.default_units = 'Meter'
@@ -1170,14 +1170,14 @@ class ParametricOption(wx.Panel):
     def __init__(self, parent, GUI_objects):
         wx.Panel.__init__(self, parent)
         
-        labels = [o.annotation for o in GUI_objects.itervalues()]
+        labels = [o.annotation for o in GUI_objects.values()]
         
         # Check that there is no duplication between annotations
         if not len(labels) == len(set(labels)): # Sets do not allow duplication
             raise ValueError('You have duplicated annotations which is not allowed')
         
         # Make a reverse map from annotation to GUI object key
-        self.GUI_map = {o.annotation:o.key for o in GUI_objects.itervalues()} 
+        self.GUI_map = {o.annotation:o.key for o in GUI_objects.values()} 
         
         self.Terms = wx.ComboBox(self)
         self.Terms.AppendItems(sorted(labels))
@@ -1448,7 +1448,7 @@ class ParametricPanel(PDPanel):
         self.ParamListSizer = None
         self.ParaList = None
         
-        self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().itervalues()} 
+        self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().values()} 
         
         # Populate the terms from the configuration dictionary 
         self.populate_terms(configdict)
@@ -1673,7 +1673,7 @@ class ParametricPanel(PDPanel):
         sims = []
 
         # Freshen the GUI_map
-        self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().itervalues()} 
+        self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().values()} 
         
         # Column index 1 is the list of parameters
         for Irow in range(self.ParaList.GetItemCount()):
@@ -1887,7 +1887,7 @@ def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True, toolti
     A convenience function that returns a tuple of StaticText and TextCtrl 
     items with the necessary label and values set
     """
-    label = wx.StaticText(parent,id,label.decode('latin-1'))
+    label = wx.StaticText(parent,id,label)
     thing = wx.TextCtrl(parent,id,value)
     if enabled==False:
         thing.Disable()

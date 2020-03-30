@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import absolute_import
 import wx, yaml, os
-from panels import recip_panels, pdsim_panels
+import panels
 
 family_menu_name = 'Recip Compressor'
 
@@ -11,7 +10,7 @@ import_string = 'from PDSim.recip.core import Recip\n'
 instantiation_string = 'sim = Recip()\n'
 additional_imports_string = 'from PDSim.flow.flow_models import ValveModel\n'
 
-class InputsToolBook(pdsim_panels.InputsToolBook):
+class InputsToolBook(panels.pdsim_panels.InputsToolBook):
     """
     The toolbook that contains the pages with input values
     """
@@ -35,11 +34,11 @@ class InputsToolBook(pdsim_panels.InputsToolBook):
         
         Main = wx.GetTopLevelParent(self)
         
-        # Make the scroll panels.  
-        self.panels=(recip_panels.GeometryPanel(self, config['GeometryPanel'],name='GeometryPanel'),
-                     pdsim_panels.StateInputsPanel(self, config['StatePanel'], name='StatePanel'),
-                     recip_panels.MassFlowPanel(self, config['MassFlowPanel'], name='MassFlowPanel'),
-                     recip_panels.MechanicalLossesPanel(self, config['MechanicalLossesPanel'], name='MechanicalLossesPanel'),
+        # Make the panels.  
+        self.panels=(panels.recip_panels.GeometryPanel(self, config['GeometryPanel'],name='GeometryPanel'),
+                     panels.pdsim_panels.StateInputsPanel(self, config['StatePanel'], name='StatePanel'),
+                     panels.recip_panels.MassFlowPanel(self, config['MassFlowPanel'], name='MassFlowPanel'),
+                     panels.recip_panels.MechanicalLossesPanel(self, config['MechanicalLossesPanel'], name='MechanicalLossesPanel'),
                      )
         
         for Name, index, panel in zip(['Geometry','State Points','Mass Flow - Valves','Mechanical'],indices,self.panels):
@@ -65,7 +64,7 @@ GeometryPanel:
     connecting_rod_length : 0.04 # Connecting rod length [m]
     dead_volume_perc : 4.0 #Dead volume percentage [%]
     x_TDC : 0.005 # Distance to piston at TDC [m]
-    shell_volume : 100e-6 # Shell volume [\uxb3]
+    shell_volume : 100e-6 # Shell volume [\u00b3]
 
 MassFlowPanel:
     d_discharge : 0.0059 # Discharge port diameter [m]
@@ -76,12 +75,12 @@ MassFlowPanel:
     valve_l : 0.018 # Valve length [m]
     valve_a : 0.014 # Valve distance from anchor [m]
     valve_x_stopper : 0.0018 # Valve distance to stopper [m]
-    valve_rho : 8000.0 # Valve metal density [kg/m3]
+    valve_rho : 8000.0 # Valve metal density [kg/m\u00b3]
     valve_C_D : 1.17 # Valve drag coefficient [-]
 
 MechanicalLossesPanel:
     eta_motor : 0.95 # Motor efficiency [-]
-    h_shell : 0.01 # Shell air-side heat transfer coefficient [kW/m2/K]
+    h_shell : 0.01 # Shell air-side heat transfer coefficient [kW/m\u00b2/K]
     A_shell : 0.040536 # Shell Area [m2]
     Tamb : 298.0 # Ambient temperature [K]
     mu_oil : 0.0086 # Oil viscosity [Pa-s]
