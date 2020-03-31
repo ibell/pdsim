@@ -32,7 +32,7 @@ cdef class arraym(object):
     cdef arraym slice(self, int i, int j, int step = *)
     cpdef extend(self, arraym array2)
     cpdef double get_index(self, int i) except *
-    cpdef double set_index(self, int i, double val) except *
+    cpdef set_index(self, int i, double val)
     cpdef fill(self, double fillval)
     cpdef bool all_finite(self)
     

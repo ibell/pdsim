@@ -389,7 +389,7 @@ cdef class arraym(object):
         else:
             raise ValueError('Your index [{i:d}] is out of range [{N:d}]'.format(i=i,N=self.N))
     
-    cpdef set_index(self, int i, double val) except *:
+    cpdef set_index(self, int i, double val):
         """
         Set the value at the given index
         
