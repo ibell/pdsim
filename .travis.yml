@@ -15,7 +15,7 @@ install:
 - conda info -a
 - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy matplotlib
   h5py cython
-- conda activate test-environment
+- source activate test-environment
 #- if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then conda install wxpython; else pip
 #  -vvv install --pre -f https://wxpython.org/Phoenix/snapshot-builds/linux/gtk2/ubuntu-14.04/
 #  --only-binary wxPython wxPython; fi
