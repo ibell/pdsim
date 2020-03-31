@@ -11,6 +11,24 @@ This version uses CoolProp v6.x
 
 ## Documentation/Examples
 
-* Try me on binder (check out the doc/notebooks folder) [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/ibell/pdsim/master?filepath=doc%2Fnotebooks)
+* Try me on binder [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/ibell/pdsim/master?filepath=doc%2Fnotebooks)
+
+* Build status on TravisCI: [![Build Status](https://travis-ci.com/ibell/pdsim.svg?branch=master)](https://travis-ci.com/ibell/pdsim)
 
 * The documention is available on ReadTheDocs: [![Documentation Status](https://readthedocs.org/projects/pdsim/badge/?version=latest)](http://pdsim.readthedocs.io/en/latest/?badge=latest)
+
+## Install
+
+Requirements:
+* numpy
+* cython
+* matplotlib
+
+To setup a conda environment, you can do move into the :
+```
+conda env create
+```
+
+```
+pip -vvv install .
+```
