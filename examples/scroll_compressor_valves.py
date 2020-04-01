@@ -175,10 +175,17 @@ def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref 
               C_D=C_D,
               rho_valve=rho_valve,
               x_stopper=x_stopper,
+<<<<<<< HEAD
               m_eff=m_eff,
               k_valve=k_valve,
               x_tr=x_tr_discharge,
               key_up=['ddd','dd'],
+=======
+              m_eff = m_eff,
+              k_valve = k_valve,
+              x_tr = x_tr_discharge,
+              key_up='ddd',
+>>>>>>> f93e4a229ff88457bbc9a55a511f3015897517b1
               key_down='outlet.1'
               ))
         ScrollComp.add_valve(getattr(ScrollComp, attr))

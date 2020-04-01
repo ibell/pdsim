@@ -415,7 +415,7 @@ cdef class ValveModel(object):
             self.key_down = key_down
         else:
             self.key_down = [key_down]
-        self.x_tr = x_tr 
+        self.x_tr = x_tr
         self.xv = empty_arraym(2)
         
     cpdef get_States(self, Core):
