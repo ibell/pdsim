@@ -407,10 +407,15 @@ cdef class ValveModel(object):
         self.C_D = C_D
         self.k_valve = k_valve
         self.x_stopper = x_stopper
-        self.key_up = key_up
-        self.key_down = key_down
+        if isinstance(key_up, list):
+            self.key_up = key_up
+        else:
+            self.key_up = [key_up]
+        if isinstance(key_down, list):
+            self.key_down = key_down
+        else:
+            self.key_down = [key_down]
         self.x_tr = x_tr 
-        
         self.xv = empty_arraym(2)
         
     cpdef get_States(self, Core):
@@ -418,14 +423,30 @@ cdef class ValveModel(object):
         Core is the main model core, it contains information that 
         is needed for the flow models
         """
-        exists_keys=Core.CVs.exists_keys
-        Tubes_Nodes=Core.Tubes.Nodes
-        for key, Statevar in [(self.key_up,'State_up'),(self.key_down,'State_down')]:
-            # Update the pointers to the states for the ends of the flow path
-            if key in exists_keys:
-                setattr(self,Statevar,Core.CVs[key].State)
-            elif key in Tubes_Nodes:
-                setattr(self,Statevar,Tubes_Nodes[key])              
+        exists_keys = Core.CVs.exists_keys
+        Tubes_Nodes = Core.Tubes.Nodes
+
+        # Reset the pointers to the states
+        self.State_up = None
+        self.State_down = None
+
+        # Iterate over the keys of the nodes and states to be set in parallel
+        for keys, Statevar in [(self.key_up,'State_up'), (self.key_down,'State_down')]:
+            existing_counter = 0
+            for key in keys:
+                if key in exists_keys:
+                    setattr(self,Statevar,Core.CVs[key].State)
+                    existing_counter += 1
+                elif key in Tubes_Nodes:
+                    setattr(self,Statevar,Tubes_Nodes[key])
+                    existing_counter += 1
+            # If somehow more than one or zero of the nodes exist, this is a problem
+            if existing_counter > 1:
+                raise ValueError('Only one of the flow nodes may exist; '+str(existing_counter)+' of these nodes exist:'+str(keys))
+        if self.State_up is None:
+            raise ValueError('Bad valve flow up; '+str(self.key_up)+str(Core.CVs.exists_keys)+str(Tubes_Nodes))
+        if self.State_down is None:
+            raise ValueError('Bad valve flow down; '+str(self.key_down)+str(Core.CVs.exists_keys)+str(Tubes_Nodes))
     
     @cython.cdivision(True)
     cdef _pressure_dominant(self, arraym f, double x, double xdot, double rho, double V, double deltap):

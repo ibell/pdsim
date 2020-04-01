@@ -175,10 +175,10 @@ def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref 
               C_D=C_D,
               rho_valve=rho_valve,
               x_stopper=x_stopper,
-              m_eff = m_eff,
-              k_valve = k_valve,
-              x_tr = x_tr_discharge,
-              key_up='ddd',
+              m_eff=m_eff,
+              k_valve=k_valve,
+              x_tr=x_tr_discharge,
+              key_up=['ddd','dd'],
               key_down='outlet.1'
               ))
         ScrollComp.add_valve(getattr(ScrollComp, attr))
@@ -256,7 +256,7 @@ def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref 
     h5 = HDF5Writer()
     h5.write_to_file(ScrollComp, HDF5file)
 
-    debug_plots(ScrollComp, family='Scroll Compressor')
+    # debug_plots(ScrollComp, family='Scroll Compressor')
     
     return ScrollComp
     

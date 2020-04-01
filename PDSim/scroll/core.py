@@ -228,7 +228,6 @@ class Scroll(PDSimCore, _Scroll):
             try:
                 FlowPath.A=self.discharge_valve.A()
                 mdot=flow_models.IsentropicNozzle(FlowPath.A,FlowPath.State_up,FlowPath.State_down)
-                print(mdot)
                 return mdot
             except ZeroDivisionError:
                 return 0.0
