@@ -451,7 +451,7 @@ class PDPanel(wx.Panel):
                 raise TypeError('object of type [{t:s}] is not an AnnotatedValue'.format(t = type(o)))
                 
             # Build the GUI objects
-            label=wx.StaticText(parent, -1, o.annotation.decode('latin-1'))
+            label=wx.StaticText(parent, -1, o.annotation)#.decode('latin-1'))
             
             if sizer is not None:
                 # Add the label to the sizer
@@ -482,7 +482,10 @@ class PDPanel(wx.Panel):
                 
                 # Units are defined for the item
                 if o.units:
-                    unicode_units = unicode(o.units)
+                    try:
+                        unicode_units = unicode(o.units)
+                    except:
+                        unicode_units = str(o.units)
                     textbox.default_units = ''
                     if unicode_units == u'm':
                         textbox.default_units = 'Meter'
@@ -606,9 +609,9 @@ class OutputTreePanel(wx.Panel):
         
         isz = (16, 16)
         il = wx.ImageList(*isz)
-        fldridx     = il.Add(wx.ArtProvider_GetBitmap(wx.ART_FOLDER,      wx.ART_OTHER, isz))
-        fldropenidx = il.Add(wx.ArtProvider_GetBitmap(wx.ART_FILE_OPEN,   wx.ART_OTHER, isz))
-        fileidx     = il.Add(wx.ArtProvider_GetBitmap(wx.ART_NORMAL_FILE, wx.ART_OTHER, isz))
+        fldridx     = il.Add(wx.ArtProvider.GetBitmap(wx.ART_FOLDER,      wx.ART_OTHER, isz))
+        fldropenidx = il.Add(wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN,   wx.ART_OTHER, isz))
+        fileidx     = il.Add(wx.ArtProvider.GetBitmap(wx.ART_NORMAL_FILE, wx.ART_OTHER, isz))
         
         self.tree.SetImageList(il)
         self.il = il
@@ -992,13 +995,13 @@ class OutputTreePanel(wx.Panel):
     def add_runs(self, runs):
         if isinstance(runs, h5py.File):
             self.runs += [runs]
-        elif isinstance(runs, basestring) and os.path.exists(runs):
+        elif isinstance(runs, str) and os.path.exists(runs):
             self.runs += [h5py.File(runs,'r')]
         else:
             for run in runs:
                 if isinstance(run, h5py.File):
                     self.runs += [run] 
-                elif isinstance(run, basestring) and os.path.exists(run):
+                elif isinstance(run, str) and os.path.exists(run):
                     self.runs += [h5py.File(run,'r')]
                 else:
                     raise ValueError("Can only add instances of h5py.File")
@@ -1448,8 +1451,11 @@ class ParametricPanel(PDPanel):
         self.ParamListSizer = None
         self.ParaList = None
         
-        self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().itervalues()} 
-        
+        try:
+            self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().itervalues()} 
+        except:
+            self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().values()}
+            
         # Populate the terms from the configuration dictionary 
         self.populate_terms(configdict)
         
@@ -1887,15 +1893,15 @@ def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True, toolti
     A convenience function that returns a tuple of StaticText and TextCtrl 
     items with the necessary label and values set
     """
-    label = wx.StaticText(parent,id,label.decode('latin-1'))
+    label = wx.StaticText(parent,id,label)#.decode('latin-1'))
     thing = wx.TextCtrl(parent,id,value)
     if enabled==False:
         thing.Disable()
     if tooltip is not None:
         if enabled:
-            thing.SetToolTipString(tooltip)
+            thing.SetToolTip(tooltip)
         else:
-            label.SetToolTipString(tooltip)
+            label.SetToolTip(tooltip)
     return label,thing
 
 class StateChooser(wx.Dialog):
@@ -2129,7 +2135,7 @@ class StatePanel(wx.Panel):
         self._Fluid_fixed = Fluid_fixed
         
         sizer = wx.FlexGridSizer(cols=2,hgap=4,vgap=4)
-        self.Fluidlabel, self.Fluid = LabeledItem(self,label="Fluid",value=str(CPState.Fluid))
+        self.Fluidlabel, self.Fluid = LabeledItem(self,label="Fluid",value=CPState.Fluid.decode())
         
         self.Tlabel, self.T = LabeledItem(self,label="Temperature [K]",value=str(CPState.T))
         self.plabel, self.p = LabeledItem(self,label="Pressure [kPa]",value=str(CPState.p))
@@ -2144,7 +2150,7 @@ class StatePanel(wx.Panel):
             self.Fluid.SetEditable(False)
             #Bind events tp fire the chooser when text boxes are clicked on
             box.Bind(wx.EVT_LEFT_DOWN,self.UseChooser)
-            box.SetToolTipString('Click on me to select the state')
+            box.SetToolTip('Click on me to select the state')
         
         self.SetSizer(sizer)
         
@@ -2264,7 +2270,7 @@ class StateInputsPanel(PDPanel):
         
         # Construct annotated omega GUI entry
         AGO_omega = self.construct_items(self.annotated_values, sizer_for_omega)
-        AGO_omega.GUI_location.SetToolTipString('If a motor curve is provided, this value will not be used')
+        AGO_omega.GUI_location.SetToolTip('If a motor curve is provided, this value will not be used')
         
         # Construct StatePanel
         self.SuctionStatePanel = StatePanel(self, CPState = inletState)
@@ -2468,19 +2474,19 @@ class StateInputsPanel(PDPanel):
     
         return textwrap.dedent(
             """
-            inletState = State.State("{Ref:s}", {{'T': {Ti:s}, 'P' : {pi:s} }})
+            inletState = State.State("{Ref}", {{'T': {Ti}, 'P' : {pi} }})
             
-            outlet_temperature_guess = {outlet_temperature_guess:s} # [K]
+            outlet_temperature_guess = {outlet_temperature_guess} # [K]
             if outlet_temperature_guess > 0:
                 # Use the specified guess for outlet temperature
                 T2s = outlet_temperature_guess 
             else:
-                T2s = sim.guess_outlet_temp(inletState,{po:s})
-            outletState = State.State("{Ref:s}", {{'T':T2s,'P':{po:s} }})
+                T2s = sim.guess_outlet_temp(inletState,{po})
+            outletState = State.State("{Ref}", {{'T':T2s,'P':{po} }})
             
             # The rotational speed (over-written if motor map provided)
-            sim.omega = {omega:s}
-            """.format(Ref = inletState.Fluid,
+            sim.omega = {omega}
+            """.format(Ref = inletState.Fluid.decode(),
                        Ti = str(inletState.T),
                        pi = str(inletState.p),
                        po = str(discPressure),

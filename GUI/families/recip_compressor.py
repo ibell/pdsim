@@ -55,7 +55,7 @@ class InputsToolBook(pdsim_panels.InputsToolBook):
         return chunks
         
 recip_yaml = (
-"""
+r"""
 family : Recip Compressor
 
 GeometryPanel:
