@@ -1091,7 +1091,7 @@ class PDSimCore(object):
         epsilon_cycle : float
             Cycle-cycle convergence criterion
         epsilon_energy_balance : float
-            Cycle-cycle convergence criterion
+            Energy balance convergence criterion
         cycle_integrator : string, one of 'RK45','Euler','Heun'
             Which solver is to be used to integrate the steps
         OneCycle : boolean
