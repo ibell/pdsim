@@ -37,3 +37,7 @@ doc/PDSim_apidoc
 build
 dist
 PDSim.egg-info
+
+doc/log.txt
+doc/notebooks/*.rst
+doc/notebooks/**/*.png
