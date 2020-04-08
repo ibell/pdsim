@@ -35,18 +35,19 @@ import numpy as np
 from matplotlib import pyplot as plt
 import timeit
 
-def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref = 'R410A', HDF5file='scroll_compressor.h5', discharge_valve=True):
+def Compressor(ScrollClass, Te = 253, Tc = 310, f = None, OneCycle = False, Ref = 'R410A', HDF5file='scroll_compressor.h5', discharge_valve=True):
 
     ScrollComp = ScrollClass()
-    #This runs if the module code is run directly 
     
-    ScrollComp.set_scroll_geo(83e-6, 3.3, 0.005, 0.006) #Set the scroll wrap geometry
+    ScrollComp.set_scroll_geo(83e-6, 2.2, 0.005, 0.006) #Set the scroll wrap geometry
     ScrollComp.set_disc_geo('2Arc',r2 = 0)
     ScrollComp.geo.delta_flank = 10e-6
     ScrollComp.geo.delta_radial = 10e-6
     
     ScrollComp.geo.delta_suction_offset = 0.0e-3
     ScrollComp.geo.phi_ie_offset = 0.0
+
+    # print(ScrollComp.geo); quit()
     
     ScrollComp.omega = 3000/60*2*pi
     ScrollComp.Tamb = 298.0
@@ -70,14 +71,12 @@ def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref 
     
     ScrollComp.h_shell = 0.02
     ScrollComp.A_shell = 0.05
-    ScrollComp.HTC = 0.0
+    ScrollComp.HTC = 0.01
     
     ScrollComp.motor = Motor()
     ScrollComp.motor.set_eta(0.9)
     ScrollComp.motor.suction_fraction = 1.0
     
-    Te = -20 + 273.15
-    Tc = 20 + 273.15
     Tin = Te + 11.1
     DT_sc = 7
     temp = State.State(Ref,{'T':Te,'Q':1})
@@ -151,25 +150,23 @@ def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref 
     else:
 
         E = 1.93e11             # Youngs Modulus, [Pa]
-        h_valve = 0.0001532     # Valve thickness, [m]
-        l_valve = 0.018         # Total length of valve, [m]
-        a_valve = 0.0140        # Distance from anchor to force, [m]
-        rho_valve = 8000        # Density of spring steel, [kg/m^3] 
+        h_valve = 0.0006        # Valve thickness, [m]
+        d_discharge = ScrollComp.geo.ra_arc1*1.9 # Port diameter [m]
+        l_valve = 5*d_discharge # Total length of valve, [m]
+        a_valve = l_valve*1.5   # Distance from anchor to force, [m]
+        rho_valve = 8000        # Density of spring steel, [kg/m^3]
         C_D = 1.17              # Drag coefficient [-]
-        d_valve = 0.007         # Valve Diameter [m]
-        x_stopper = 0.0018      # Stopper location [m]
-        d_suction = 0.003
-        d_discharge = 0.003
+        d_valve = d_discharge*1.5  # Valve Diameter [m]
+        x_stopper = 0.003       # Stopper location [m]
 
         I=(d_valve*h_valve**3)/12  # Moment of Inertia for valve,[m^4]
         k_valve=(6*E*I)/(a_valve**2*(3*l_valve-a_valve))  # Valve stiffness
         m_eff=(1/3)*rho_valve*l_valve*d_valve*h_valve     # Effective mass of valve reeds
-        x_tr_suction = 0.25*(d_suction**2/d_valve)
         x_tr_discharge = 0.25*(d_discharge**2/d_valve)
+        print(k_valve, m_eff, x_tr_discharge)
 
-        attr = 'discharge_valve'
-        # The discharge valve parameters
-        setattr(ScrollComp, attr, ValveModel(
+        # Construct the valve
+        ScrollComp.discharge_valve = ValveModel(
               d_valve=d_valve,
               d_port=d_discharge,
               C_D=C_D,
@@ -180,8 +177,9 @@ def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref 
               x_tr=x_tr_discharge,
               key_up=['ddd','dd'],
               key_down='outlet.1'
-              ))
-        ScrollComp.add_valve(getattr(ScrollComp, attr))
+              )
+        # Inform the model about the valve
+        ScrollComp.add_valve(ScrollComp.discharge_valve)
 
         ScrollComp.add_flow(FlowPath(key1 = 'outlet.1',
                                      key2 = 'dd',
@@ -241,7 +239,7 @@ def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref 
                                  key_outlet='outlet.2',
                                  solver_method='RK45',
                                  OneCycle = OneCycle,
-                                 plot_every_cycle= True,
+                                 plot_every_cycle= False,
                                  #hmin = 1e-3
                                  eps_cycle = 3e-3
                                  )
@@ -256,7 +254,7 @@ def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref 
     h5 = HDF5Writer()
     h5.write_to_file(ScrollComp, HDF5file)
 
-    # debug_plots(ScrollComp, family='Scroll Compressor')
+    debug_plots(ScrollComp, family='Scroll Compressor')
     
     return ScrollComp
     
