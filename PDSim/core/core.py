@@ -1226,7 +1226,7 @@ class PDSimCore(object):
                 key_outtube_inlet = outlet_tube.key1
                 key_outtube_outlet = outlet_tube.key2
                 
-            if error_metric < 0.5*epsilon_cycle and np.max(np.abs(self.lumps_resid)) < epsilon_energy_balance:
+            if error_metric < 0.1*epsilon_cycle and np.max(np.abs(self.lumps_resid)) < epsilon_energy_balance:
 
                 # Each time that we get here and we are significantly below the threshold, store the values
             

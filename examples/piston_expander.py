@@ -71,7 +71,7 @@ class PistonExpander(PDSimCore):
         return mdot
         
     def Discharge(self, FlowPath):
-        if pi <= self.theta <= 7*pi/4:
+        if pi <= self.theta <= 6*pi/4:
             FlowPath.A = pi*0.006**2/4*(1-cos(4*self.theta))/2
             mdot = flow_models.IsentropicNozzle(FlowPath.A,
                                             FlowPath.State_up,
@@ -201,7 +201,9 @@ def Expander(**kwargs):
                    solver_method = kwargs.get('solver_method', 'Euler'),
                    OneCycle = False,
                    UseNR = True,
-                   plot_every_cycle = False
+                   plot_every_cycle = False,
+                   eps_cycle=3e-3,
+                   eps_energy_balance=3e-3
                    )
     print('time taken',timeit.default_timer()-t1,'s')
     
