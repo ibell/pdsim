@@ -1057,6 +1057,9 @@ class PDSimCore(object):
         if hasattr(self, 'additional_inlet_keys'):
             for key in self.additional_inlet_keys:
                 mdot_in += self.FlowsProcessed.mean_mdot[key]
+        if hasattr(self, 'additional_outlet_keys'):
+            for key in self.additional_outlet_keys:
+                mdot_out += self.FlowsProcessed.mean_mdot[key]
         
         # We need to find the key at the inlet to the outlet tube.
         Tube = self.Tubes[self.key_outlet]
@@ -1279,6 +1282,10 @@ class PDSimCore(object):
                 for key in self.additional_inlet_keys:
                     print('Additional inlet flow:', key, self.FlowsProcessed.mean_mdot[key]*1000, 'g/s')
                     mdot_in += self.FlowsProcessed.mean_mdot[key]
+            if hasattr(self, 'additional_outlet_keys'):
+                for key in self.additional_outlet_keys:
+                    print('Additional outlet flow:', key, self.FlowsProcessed.mean_mdot[key]*1000, 'g/s')
+                    mdot_out += self.FlowsProcessed.mean_mdot[key]
             mdot_error = (mdot_out/mdot_in-1)*100
             
             print('===========')
