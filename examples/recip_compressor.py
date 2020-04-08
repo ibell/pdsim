@@ -127,6 +127,8 @@ def Compressor():
                         solver_method = 'RK45',
                         OneCycle = False,
                         UseNR = True,
+                        eps_cycle = 3e-3,
+                        eps_energy_balance=3e-2
                         )
     print('time taken', timeit.default_timer()-t1)
     
