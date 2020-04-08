@@ -1076,7 +1076,7 @@ class PDSimCore(object):
         # We put it in kW by multiplying by flow rate
         self.resid_Td = 0.1*(h_outlet_Tube - self.h_outlet_pump_set)
         
-    def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45', OneCycle = False, cycle_integrator_options = None, plot_every_cycle = False):
+    def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon_cycle = 0.003, epsilon_energy_balance = 0.003, cycle_integrator = 'RK45', OneCycle = False, cycle_integrator_options = None, plot_every_cycle = False):
         """
         The Objective function for the energy balance solver
         
@@ -1087,7 +1087,11 @@ class PDSimCore(object):
         X : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
             Contains the state variables for all the control volumes in existence, as well as any other integration variables
         epsilon : float
-            Convergence criterion applied to all of the solvers
+            Convergence criterion applied to all of the solvers (DEPRECATED!)
+        epsilon_cycle : float
+            Cycle-cycle convergence criterion
+        epsilon_energy_balance : float
+            Cycle-cycle convergence criterion
         cycle_integrator : string, one of 'RK45','Euler','Heun'
             Which solver is to be used to integrate the steps
         OneCycle : boolean
@@ -1109,8 +1113,7 @@ class PDSimCore(object):
             self.exists_CV_init = self.CVs.exists_keys
         
         i = 0
-        worst_error = 1000
-        while worst_error > epsilon:
+        while True:
             
             #  Actually run the cycle, runs post_cycle at the end,
             #  sets the parameter lumps_resid in this class
@@ -1223,7 +1226,7 @@ class PDSimCore(object):
                 key_outtube_inlet = outlet_tube.key1
                 key_outtube_outlet = outlet_tube.key2
                 
-            if error_metric < 0.1*epsilon and np.max(np.abs(self.lumps_resid)) < epsilon:
+            if error_metric < 0.5*epsilon_cycle and np.max(np.abs(self.lumps_resid)) < epsilon_energy_balance:
 
                 # Each time that we get here and we are significantly below the threshold, store the values
             
@@ -1281,14 +1284,21 @@ class PDSimCore(object):
             print('===========')
             print('|| # {i:03d} ||'.format(i=i))
             print('===========')
-            print(error_ascii_bar(abs(self.lumps_resid[0]), epsilon), 'energy balance kW ', self.lumps_resid, ' Tlumps: ',self.Tlumps,'K')
-            print(error_ascii_bar(abs(self.resid_Td), epsilon), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg', self.Tubes.Nodes[key_outtube_inlet].h, 'kJ/kg')
-            print(error_ascii_bar(error_metric, epsilon), 'cycle-cycle    ', error_metric)
+            print(error_ascii_bar(abs(self.lumps_resid[0]), epsilon_energy_balance), 'energy balance kW ', self.lumps_resid, ' Tlumps: ',self.Tlumps,'K')
+            print(error_ascii_bar(abs(self.resid_Td), epsilon_energy_balance), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg', self.Tubes.Nodes[key_outtube_inlet].h, 'kJ/kg')
+            print(error_ascii_bar(error_metric, epsilon_cycle), 'cycle-cycle    ', error_metric)
             print(error_ascii_bar(abs(mdot_error), 1), 'mdot [%]', mdot_error, '|| in:', mdot_in*1000, 'g/s || out:', mdot_out*1000, 'g/s ')
             
-            worst_error = max(np.max(np.abs(self.lumps_resid)), 
-                                    abs(self.resid_Td), 
-                                    np.sqrt(np.sum(np.power(errors, 2))))
+            # Check all the stopping conditions
+            within_tolerance = [
+                np.max(np.abs(self.lumps_resid)) < epsilon_energy_balance, 
+                abs(self.resid_Td) < epsilon_energy_balance, 
+                np.sqrt(np.sum(np.power(errors, 2))) < epsilon_cycle
+            ]
+            # Stop if all conditions are met
+            if all(within_tolerance):
+                break
+            
             i += 1
         
         #  If the abort function returns true, quit this loop
@@ -1451,7 +1461,8 @@ class PDSimCore(object):
         self.OBJECTIVE_CYCLE(x0, self.x_state, 
                              cycle_integrator = solver_method, 
                              OneCycle = OneCycle,
-                             epsilon = eps_energy_balance,
+                             epsilon_energy_balance = eps_energy_balance,
+                             epsilon_cycle = eps_cycle,
                              cycle_integrator_options = cycle_integrator_options,
                              plot_every_cycle = plot_every_cycle
                              ) 
