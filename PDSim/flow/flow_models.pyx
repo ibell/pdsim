@@ -441,8 +441,10 @@ cdef class ValveModel(object):
                     setattr(self,Statevar,Tubes_Nodes[key])
                     existing_counter += 1
             # If somehow more than one or zero of the nodes exist, this is a problem
-            if existing_counter > 1:
-                raise ValueError('Only one of the flow nodes may exist; '+str(existing_counter)+' of these nodes exist:'+str(keys))
+            if existing_counter != 1:
+                raise ValueError('One and only one of the flow nodes may exist; '+str(existing_counter)+' of these nodes exist:'+str(keys))
+
+        # Check that setting worked
         if self.State_up is None:
             raise ValueError('Bad valve flow up; '+str(self.key_up)+str(Core.CVs.exists_keys)+str(Tubes_Nodes))
         if self.State_down is None:
