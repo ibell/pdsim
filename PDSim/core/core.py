@@ -203,17 +203,20 @@ class PDSimCore(object):
         #Initialize the containers to be empty
         
         #: The Valves container class
-        self.Valves=[]
+        self.Valves = []
+
         #: The :class:`ControlVolumeCollection <PDSim.core.containers.ControlVolumeCollection>` instance
         #: that contains all the control volumes in the machine
-        self.CVs=ControlVolumeCollection()
+        self.CVs = ControlVolumeCollection()
+        
         #: The :class:`FlowPathCollection <PDSim.flow.flow.FlowPathCollection>` 
         #: instance
-        self.Flows=FlowPathCollection()
+        self.Flows = FlowPathCollection()
+        
         #: A :class:`list` that contains copies of the 
         #: :class:`FlowPathCollection <PDSim.flow.flow.FlowPathCollection>` 
         #: at each crank angle
-        self.FlowStorage=[]
+        self.FlowStorage = []
         
         self.Tubes = TubeCollection()
         self.Tlumps = np.zeros((1,1))
@@ -982,9 +985,9 @@ class PDSimCore(object):
         
         Parameters
         ----------
-        cycle_integrator : string
+        cycle_integrator : str
             One of 'RK45','Euler','Heun'
-        cycle_integrator_options : dictionary
+        cycle_integrator_options : dict
             options to be passed to the solver function (RK45, Euler, etc.)
         """
         # Make cycle_integrator_options an empty dictionary if not provided
@@ -1346,11 +1349,11 @@ class PDSimCore(object):
         
         Parameters
         ----------
-        key_inlet : string
+        key_inlet : str
             The key for the flow node that represents the upstream quasi-steady point
-        key_outlet : string
+        key_outlet : str
             The key for the flow node that represents the upstream quasi-steady point
-        solver_method : string
+        solver_method : str
         OneCycle : bool
             If ``True``, stop after just one rotation.  Useful primarily for 
             debugging purposes
@@ -1519,7 +1522,7 @@ class PDSimCore(object):
         
         Parameters
         ----------
-        fName : string
+        fName : str
             The file name for the HDF5 file that is to be used
         """ 
         attrs_dict = {
