@@ -1097,11 +1097,11 @@ class PDSimCore(object):
             Energy balance convergence criterion
         cycle_integrator : string, one of 'RK45','Euler','Heun'
             Which solver is to be used to integrate the steps
-        OneCycle : boolean
+        OneCycle : bool
             If ``True``, stop after one cycle
-        plot_every_cycle : boolean
+        plot_every_cycle : bool
             If ``True``, make the debug plots at every cycle
-        cycle_integrator_options : dictionary
+        cycle_integrator_options : dict
             Options to be passed to cycle integrator
         """
         
@@ -1351,22 +1351,22 @@ class PDSimCore(object):
         key_outlet : string
             The key for the flow node that represents the upstream quasi-steady point
         solver_method : string
-        OneCycle : boolean
+        OneCycle : bool
             If ``True``, stop after just one rotation.  Useful primarily for 
             debugging purposes
         Abort : function
             A function that may be called to determine whether to stop running.  
             If calling Abort() returns ``True``, stop running 
         pipe_abort : 
-        UseNR : boolean
+        UseNR : bool
             If ``True``, use a multi-dimensional solver to determine the initial state of the state variables for each control volume
         alpha : float
             Use a range of ``(1-alpha)*dx, (1+alpha)*dx`` for line search if needed
-        plot_every_cycle : boolean
+        plot_every_cycle : bool
             If ``True``, make the plots after every cycle (primarily for debug purposes)
         x0 : arraym
             The starting values for the solver that modifies the discharge temperature and lump temperatures
-        reset_initial_state : boolean
+        reset_initial_state : bool
             If ``True``, use the stored initial state from the previous call to ``solve`` as the starting value for the thermodynamic values for the control volumes
         timeout : float
             Number of seconds before the run times out
@@ -1374,7 +1374,7 @@ class PDSimCore(object):
             Cycle-cycle convergence criterion
         eps_energy_balance : float
             Energy balance convergence criterion
-        cycle_integrator_options : dictionary
+        cycle_integrator_options : dict
             A dictionary of options to be passed to the cycle integrator
         max_number_of_steps : int
             Maximum number of steps allowed per rotation
@@ -1752,7 +1752,7 @@ class PDSimCore(object):
         
         Returns 
         -------
-        redo : boolean
+        redo : bool
             ``True`` if cycle should be run again with updated inputs, ``False`` otherwise.
             A return value of ``True`` means that convergence of the cycle has been achieved
         """

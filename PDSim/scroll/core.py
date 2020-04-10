@@ -45,7 +45,7 @@ class Port(object):
     #: Involute angle of the involute used to locate this port
     phi = 3.14159
     
-    #: The code for the involute used to locate this point: 'i' or 'o'
+    #: The code for the involute used to locate this point -- 'i' or 'o'
     involute = 'i'
     
     #: Distance away from the involute
@@ -282,7 +282,7 @@ class Scroll(PDSimCore, _Scroll):
     def get_discharge_port_blockage_poly(self, theta):
         """
         Get all the polygons associated with the control volumes that could in principle
-        be connected with the discharge port
+        be connected with the discharge a
         """
         xdd, ydd = scroll_geo.CVcoords('dd',self.geo,theta)
         xd1, yd1 = scroll_geo.CVcoords('d1',self.geo,theta)
@@ -752,7 +752,7 @@ class Scroll(PDSimCore, _Scroll):
         ------
         theta : numpy aray
             Crank angle array
-        area_dict : dictionary
+        area_dict : dict
             Dictionary with keys of keys of control volumes that have some 
             intersection, values are areas at each crank angle in ``theta`` 
             
