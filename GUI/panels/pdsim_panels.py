@@ -1,5 +1,6 @@
 # -*- coding: latin-1 -*-
 from __future__ import print_function
+import six
 
 # Python imports
 import warnings, codecs, textwrap,os, itertools, difflib, zipfile, types
@@ -1173,14 +1174,14 @@ class ParametricOption(wx.Panel):
     def __init__(self, parent, GUI_objects):
         wx.Panel.__init__(self, parent)
         
-        labels = [o.annotation for o in GUI_objects.itervalues()]
+        labels = [o.annotation for o in six.itervalues(GUI_objects)]
         
         # Check that there is no duplication between annotations
         if not len(labels) == len(set(labels)): # Sets do not allow duplication
             raise ValueError('You have duplicated annotations which is not allowed')
         
         # Make a reverse map from annotation to GUI object key
-        self.GUI_map = {o.annotation:o.key for o in GUI_objects.itervalues()} 
+        self.GUI_map = {o.annotation:o.key for o in six.itervalues(GUI_objects)} 
         
         self.Terms = wx.ComboBox(self)
         self.Terms.AppendItems(sorted(labels))
@@ -1209,7 +1210,7 @@ class ParametricOption(wx.Panel):
         Update the values when the term is changed if a structured table
         """
         if self.GetParent().Structured.GetValue():
-            annotation = self.Terms.GetStringSelection().encode('latin-1')
+            annotation = self.Terms.GetStringSelection()#.encode('latin-1')
             
             # Get the key of the registered object
             key = self.GUI_map[annotation]
@@ -1316,9 +1317,9 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
         
         #Add the values one row at a time
         for i,row in enumerate(self.data):
-            self.InsertStringItem(i,'')
+            self.InsertItem(i,'')
             for j,val in enumerate(row):
-                self.SetStringItem(i,j+1,str(val))
+                self.SetItem(i,j+1,str(val))
             self.CheckItem(i)
             
         for i in range(len(headers)):
@@ -1679,7 +1680,7 @@ class ParametricPanel(PDPanel):
         sims = []
 
         # Freshen the GUI_map
-        self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().itervalues()} 
+        self.GUI_map = {o.annotation:o.key for o in six.itervalues(self.main.get_GUI_object_dict())} 
         
         # Column index 1 is the list of parameters
         for Irow in range(self.ParaList.GetItemCount()):
@@ -1694,7 +1695,7 @@ class ParametricPanel(PDPanel):
                 # Loop over the columns for this row 
                 for Icol in range(self.ParaList.GetColumnCount()-1):
                     vals.append(self.ParaList.GetFloatCell(Irow, Icol))
-                    names.append(self.ParaList.GetColumn(Icol+1).Text.encode('latin-1'))
+                    names.append(self.ParaList.GetColumn(Icol+1).Text)
                     
                 # The attributes corresponding to the names
                 keys = [self.GUI_map[name] for name in names]
