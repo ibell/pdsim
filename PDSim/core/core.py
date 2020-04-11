@@ -71,9 +71,6 @@ class IntegratorMixin(object):
         # Get the beginning of the cycle configured
         # Put a copy of the values into the matrices
         xold = self.x_state.copy()
-        # Add zeros for the valves as they are assumed to start closed and at rest
-        if self.sim.__hasValves__:
-            xold.extend(empty_arraym(len(self.sim.Valves)*2))
         self.sim._put_to_matrices(xold, 0)
         return xold
         
@@ -1460,9 +1457,7 @@ class PDSimCore(object):
         else:
             # (2) Run a cycle with the given values for the temperatures
             self.pre_cycle()
-            #x_state only includes the values for the chambers, the valves start closed
-            #Since indexed, yields a copy
-            self.x_state = self._get_from_matrices(0)[0:len(self.stateVariables)*self.CVs.Nexist]
+            self.x_state = self._get_from_matrices(0).copy()
         
         if x0 is None:
             x0 = [self.Tubes.Nodes[key_outlet].T, self.Tubes.Nodes[key_outlet].T]
@@ -1839,6 +1834,10 @@ class PDSimCore(object):
                 new_list += new_mass_list
             else:
                 raise KeyError
+
+        # Add values for valves
+        for valve in self.Valves:
+            new_list += list(valve.get_xv())
     
         return arraym(error_list), arraym(new_list)
     
