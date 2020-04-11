@@ -1,6 +1,6 @@
 # PDSim
 
-What is PDSim?
+## What is PDSim?
 
 * A python/cython-based library for *P*ositive-*D*isplacement machine *Sim*ulation
 * Written in a flexible way so that a wide variety of machines can be implemented with the same core. 
@@ -10,15 +10,15 @@ What is PDSim?
 
 This version uses CoolProp v6.x
 
-# Credits/History
+## Credits/History
 
-The core code of PDSim was written by Ian Bell, as part of a collaborative project with the [Ray W. Herrick Lab faculty](https://engineering.purdue.edu/Herrick) while backpacking around the world. It has its origins in the work done on [modeling scroll compressors](https://docs.lib.purdue.edu/cgi/viewcontent.cgi?article=1003&context=herrick), and to this day the most comprehensive analysis is possible for scroll compressors.  Examples are available of:
+The core code of PDSim was written by Ian Bell, as part of a collaborative project with the [Ray W. Herrick Lab faculty](https://engineering.purdue.edu/Herrick) while backpacking around the world. It has its origins in the work done on [modeling scroll compressors](https://docs.lib.purdue.edu/cgi/viewcontent.cgi?article=1003&context=herrick), and to this day the most comprehensive analysis is possible for scroll compressors.  Examples are available of
 
 * [hermetic scroll compressor](examples/scroll_compressor.py)
 * [hermetic scroll compressor w/ vapor injection](examples/scroll_compressor_w_VI.py)
 * [hermetic scroll compressor w/ discharge valve](examples/scroll_compressor_valve.py)
 
-Examples are also available of:
+Examples are also available of
 
 * [reciprocating compressor](examples/recip_compressor.py)
 * [piston expander](examples/piston_expander.py)
