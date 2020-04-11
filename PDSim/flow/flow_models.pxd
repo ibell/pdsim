@@ -38,15 +38,16 @@ cpdef double FrictionCorrectedIsentropicNozzle(double A, State State_up, State S
 
 cdef class ValveModel(object):
     cdef public double A_port,A_valve,d_valve,rho_valve,d_port,m_eff,C_D,k_valve,x_stopper
-    cdef public bytes key_up, key_down
+    cdef public object key_up, key_down
     cdef public State State_up, State_down
     cdef public arraym xv
     cdef public double x_tr
     
     cpdef set_xv(self, arraym xv)
+    cpdef arraym get_xv(self)
     cpdef double A(self)
     
-    @cython.locals(exists_keys = cython.list, key = cython.bytes)
+    @cython.locals(exists_keys = cython.list)
     cpdef get_States(self, Core)
     
     cdef _pressure_dominant(self,arraym f, double x, double xdot, double rho, double V, double deltap)
