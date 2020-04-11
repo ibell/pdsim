@@ -14,14 +14,14 @@ This version uses CoolProp v6.x
 
 The core code of PDSim was written by Ian Bell, as part of a collaborative project with the [Ray W. Herrick Lab faculty](https://engineering.purdue.edu/Herrick) while backpacking around the world. It has its origins in the work done on [modeling scroll compressors](https://docs.lib.purdue.edu/cgi/viewcontent.cgi?article=1003), and to this day the most comprehensive analysis is possible for scroll compressors.  Examples are available of:
 
-	* [hermetic scroll compressor](examples/scroll_compressor.py)
-	* [hermetic scroll compressor w/ vapor injection](examples/scroll_compressor_w_VI.py)
-	* [hermetic scroll compressor w/ discharge valve](examples/scroll_compressor_valve.py)
+* [hermetic scroll compressor](examples/scroll_compressor.py)
+* [hermetic scroll compressor w/ vapor injection](examples/scroll_compressor_w_VI.py)
+* [hermetic scroll compressor w/ discharge valve](examples/scroll_compressor_valve.py)
 
 Examples are also available of:
 
-	* [reciprocating compressor](examples/recip_compressor.py)
-	* [piston expander](examples/piston_expander.py)
+* [reciprocating compressor](examples/recip_compressor.py)
+* [piston expander](examples/piston_expander.py)
 
 ## Documentation/Examples
 
