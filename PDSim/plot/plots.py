@@ -200,7 +200,18 @@ class PlotNotebook(wx.Panel):
         axes = self.add('Pressure').gca()
         theta, p = self.get('t'), self.get('p')
         p[p<0.1] = np.nan
+
+        if isinstance(self.Sim, h5py.File):
+            p_inlet = self.Sim.get('/inlet_state/p').value
+            p_outlet = self.Sim.get('/outlet_state/p').value
+        else:
+            p_inlet = self.Sim.inlet_state.p
+            p_outlet = self.Sim.outlet_state.p
+
         axes.plot(theta, p.T, lw = 1.5)
+        axes.axhline(p_inlet, dashes=[3,1,5,1], color='grey', label='inlet state')
+        axes.axhline(p_outlet, dashes=[3,1,5,1], color='grey', label='outlet state')
+
         axes.set_ylabel('Pressure [kPa]')
         axes.set_xlabel(r'$\theta$ [rad]')
         
