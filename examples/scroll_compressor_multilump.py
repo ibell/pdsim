@@ -81,6 +81,7 @@ def Compressor(Te = 0,DTsh = 11.1,Tc = 20, Tamb = 25, Nmot = 3600, f = None, One
     ScrollComp.Rshell_oil = 190 #K/kW  from Chen (2000) - PhD thesis
 
     # Define motor efficiency
+    ScrollComp.motor = Motor()
     ScrollComp.motor.set_eta(0.95)
     ScrollComp.motor.suction_fraction = 0.5
 
@@ -203,16 +204,16 @@ def Compressor(Te = 0,DTsh = 11.1,Tc = 20, Tamb = 25, Nmot = 3600, f = None, One
     ScrollComp.eps_cycle = 3e-3
     ScrollComp.verbosity = 10
 
-    ScrollComp.precond_solve(key_inlet='inlet.1',
-                                key_outlet='outlet.2',
-                                solver_method='RK45',
-                                OneCycle = OneCycle,
-                                plot_every_cycle= False,
-                                x0 = [330,330,350], #Guesses [Td,Tlump[0],Tlump[1]]
-                                #hmin = 1e-3
-                                eps_cycle = 3e-3,
-                                eps_energy_balance = 0.1 #relaxed multi-lump convergence
-                                )
+    ScrollComp.solve(key_inlet='inlet.1',
+                        key_outlet='outlet.2',
+                        solver_method='RK45',
+                        OneCycle = OneCycle,
+                        plot_every_cycle= False,
+                        x0 = [330,330,350], #Guesses [Td,Tlump[0],Tlump[1]]
+                        #hmin = 1e-3
+                        eps_cycle = 3e-3,
+                        eps_energy_balance = 0.1 #relaxed multi-lump convergence
+                        )
 
     print('time taken', clock()-t1)
 
