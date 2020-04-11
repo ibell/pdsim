@@ -846,14 +846,9 @@ class GeometryPanel(pdsim_panels.PDPanel):
         # Add plugin injected chunks
         allowed = ['ScrollGeometryPanel_After', 'ScrollGeometryPanel_Before']
         if isinstance(plugin_chunks,dict):
-            try:
-                for key,chunk in plugin_chunks.iteritems():
-                    if key in allowed:
-                        core += chunk
-            except:
-                for key,chunk in plugin_chunks.items():
-                    if key in allowed:
-                        core += chunk                        
+            for key,chunk in plugin_chunks.items():
+                if key in allowed:
+                    core += chunk                        
         return core
 
     def get_geo(self):
