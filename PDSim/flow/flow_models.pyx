@@ -547,11 +547,6 @@ cdef class ValveModel(object):
         out_array.set_index(0, f.get_index(0)/omega)
         out_array.set_index(1, f.get_index(1)/omega)
         
-        if abs(x) < 1e-15 and xdot < -1e-12:
-            #print('stationary valve')
-            out_array.set_index(0, 0.0)
-            out_array.set_index(1, 0.0)
-        
         return out_array #[dxdtheta, d(xdot)_dtheta]
     
     cpdef dict __cdict__(self):

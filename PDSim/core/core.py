@@ -71,9 +71,6 @@ class IntegratorMixin(object):
         # Get the beginning of the cycle configured
         # Put a copy of the values into the matrices
         xold = self.x_state.copy()
-        # Add zeros for the valves as they are assumed to start closed and at rest
-        if self.sim.__hasValves__:
-            xold.extend(empty_arraym(len(self.sim.Valves)*2))
         self.sim._put_to_matrices(xold, 0)
         return xold
         
@@ -268,24 +265,23 @@ class PDSimCore(object):
         if self.__hasLiquid__==True:
             raise NotImplementedError
         else:
-            VarList=np.array([])
+            ValList = []
             exists_indices = np.array(self.CVs.exists_indices)
             for s in self.stateVariables:
                 if s=='T':
-                    VarList = np.append(VarList, self.T[exists_indices,i])
+                    ValList += self.T[exists_indices,i].tolist()
                 elif s=='D':
-                    VarList = np.append(VarList, self.rho[exists_indices,i])
+                    ValList += self.rho[exists_indices,i].tolist()
                 elif s=='M':
-                    VarList = np.append(VarList, self.m[exists_indices,i])
+                    ValList += self.m[exists_indices,i].tolist()
                 else:
                     raise KeyError
             
             if self.__hasValves__:
+                # Also store the valve values
+                ValList += self.xValves[:,i].tolist()
 
-                ValveList = list(self.xValves[:,i])
-                VarList = np.append( VarList,ValveList)
-
-            return arraym(VarList)
+            return arraym(ValList)
         
     def _statevars_to_dict(self,x):
         d={}
@@ -306,6 +302,7 @@ class PDSimCore(object):
         exists_indices=self.CVs.exists_indices
         Nexist = self.CVs.Nexist
         Ns = len(self.stateVariables)
+        assert(len(x) == len(self.Valves)*2+Ns*Nexist)
         if self.__hasLiquid__==True:
             raise NotImplementedError
 #             self.T[:,i]=x[0:self.NCV]
@@ -318,9 +315,9 @@ class PDSimCore(object):
                     self.rho[exists_indices, i] = x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)]
                 elif s=='M':
                     self.m[exists_indices, i] = x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)]
-            #Left over terms are for the valves
+            # Left over terms are for the valves
             if self.__hasValves__:
-                self.xValves[list(range(len(self.Valves)*2)), i] = arraym(x[Ns*Nexist:len(x)])
+                self.xValves[0:len(self.Valves)*2, i] = arraym(x[Ns*Nexist:len(x)])
             
             # In the first iteration, self.core has not been filled, so do not 
             # overwrite with the values in self.core.m and self.core.rho
@@ -1460,9 +1457,7 @@ class PDSimCore(object):
         else:
             # (2) Run a cycle with the given values for the temperatures
             self.pre_cycle()
-            #x_state only includes the values for the chambers, the valves start closed
-            #Since indexed, yields a copy
-            self.x_state = self._get_from_matrices(0)[0:len(self.stateVariables)*self.CVs.Nexist]
+            self.x_state = self._get_from_matrices(0).copy()
         
         if x0 is None:
             x0 = [self.Tubes.Nodes[key_outlet].T, self.Tubes.Nodes[key_outlet].T]
@@ -1839,6 +1834,10 @@ class PDSimCore(object):
                 new_list += new_mass_list
             else:
                 raise KeyError
+
+        # Add values for valves
+        for valve in self.Valves:
+            new_list += list(valve.get_xv())
     
         return arraym(error_list), arraym(new_list)
     
