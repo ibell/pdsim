@@ -2,13 +2,14 @@ name: pdsim
 channels:
   - conda-forge
 dependencies:
-  - python=2.7
+  - python=3.7
   - numpy
   - scipy
   - matplotlib
   - pyyaml
   - h5py
   - wxpython
+  - pip
   - pip:
     - CoolProp
     - Cython
