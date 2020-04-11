@@ -1910,7 +1910,7 @@ class StateChooser(wx.Dialog):
     A dialog used to select the state
     """
     def __init__(self,Fluid,T,rho,parent=None,id=-1,Fluid_fixed = False):
-        wx.Dialog.__init__(self,parent,id,"State Chooser",size=(300,250))
+        wx.Dialog.__init__(self,parent,id,"State Chooser",size=(300,310))
         
         class StateChoices(wx.Choicebook):
             def __init__(self, parent, id=-1,):
