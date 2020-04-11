@@ -12,7 +12,7 @@ This version uses CoolProp v6.x
 
 # Credits/History
 
-The core code of PDSim was written by Ian Bell, as part of a collaborative project with the [Ray W. Herrick Lab faculty](https://engineering.purdue.edu/Herrick) while backpacking around the world. It has its origins in the work done on [modeling scroll compressors](https://docs.lib.purdue.edu/cgi/viewcontent.cgi?article=1003), and to this day the most comprehensive analysis is possible for scroll compressors.  Examples are available of:
+The core code of PDSim was written by Ian Bell, as part of a collaborative project with the [Ray W. Herrick Lab faculty](https://engineering.purdue.edu/Herrick) while backpacking around the world. It has its origins in the work done on [modeling scroll compressors](https://docs.lib.purdue.edu/cgi/viewcontent.cgi?article=1003&context=herrick), and to this day the most comprehensive analysis is possible for scroll compressors.  Examples are available of:
 
 * [hermetic scroll compressor](examples/scroll_compressor.py)
 * [hermetic scroll compressor w/ vapor injection](examples/scroll_compressor_w_VI.py)
