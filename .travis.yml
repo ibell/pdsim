@@ -26,9 +26,14 @@ install:
 - conda list
 script:
 - cd examples
+- pyflakes simple_example.py
 - python simple_example.py
+- pyflakes scroll_compressor.py
 - python scroll_compressor.py
+- pyflakes piston_expander.py
 - python piston_expander.py
+- pyflakes recip_compressor.py
+- python recip_compressor.py
 - cd ..
 deploy:
   provider: pypi
