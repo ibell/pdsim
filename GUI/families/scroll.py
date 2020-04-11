@@ -203,7 +203,7 @@ class InputsToolBook(pdsim_panels.InputsToolBook):
         return chunks
         
 scroll_yaml=(
-"""
+r"""
 family : Scroll Compressor
 
 GeometryPanel:
@@ -291,7 +291,7 @@ SolverInputsPanel:
 
 # This block was removed from the default configuration so that injection is not
 # enabled by default.  It can be replaced to enable injection by default
-"""
+r"""
 Plugin:ScrollInjectionPlugin:
     - Length : 1.1
       ID : 0.01

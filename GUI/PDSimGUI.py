@@ -27,7 +27,6 @@ except ImportError:
     from wx.adv import SPLASH_CENTRE_ON_SCREEN as wxSPLASH_CENTRE_ON_SCREEN
     from wx.adv import SPLASH_TIMEOUT as wxSPLASH_TIMEOUT
 
-
 #Provided by python
 import codecs
 try:
@@ -71,7 +70,7 @@ class ConfigurationManager(object):
     def __init__(self):
         # Load the config file for the GUI
         if os.path.exists(os.path.join(pdsim_home_folder,'gui_config.yaml')):
-            self.config = yaml.load(open(os.path.join(pdsim_home_folder,'gui_config.yaml'),'r'))
+            self.config = yaml.load(open(os.path.join(pdsim_home_folder,'gui_config.yaml'),'r'),Loader=yaml.FullLoader)
         else:
             self.config = {}
             
@@ -193,7 +192,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         # Register terms in the GUI database
         self.main.register_GUI_objects(annotated_GUI_objects)
         
-        self.main.get_GUI_object('outlet_temperature_guess').GUI_location.SetToolTipString('Guess for outlet temperature; if <0, adiabatic efficiency will be used to estimate outlet temperature')
+        self.main.get_GUI_object('outlet_temperature_guess').GUI_location.SetToolTip('Guess for outlet temperature; if <0, adiabatic efficiency will be used to estimate outlet temperature')
 
         from multiprocessing import cpu_count
         
@@ -556,7 +555,7 @@ class FileOutputDialog(wx.Dialog):
         
         sizer.AddSpacer(10)
         self.chkPickled = wx.CheckBox(self,label='HDF5 data files (Warning! Can be quite large)')
-        self.chkPickled.SetToolTipString('Hint: You can use ViTables (search Google) to open the HDF5 files')
+        self.chkPickled.SetToolTip('Hint: You can use ViTables (search Google) to open the HDF5 files')
         self.chkPickled.SetValue(True)
         sizer.Add(self.chkPickled)
         
@@ -925,9 +924,12 @@ class MainFrame(wx.Frame):
                 raise TypeError('You can only register lists of AnnotatedGUIObjects. The bad item is:' + str(o))
             if o.key in self.GUI_object_library:
                 raise KeyError('Your key [{k:s}] is already in the parameter library'.format(k = o.key))
-            if o.annotation in [oo.annotation for oo in self.GUI_object_library.itervalues()]:
-                raise KeyError('Your annotation [{a:s}] is already in the parameter library for key [{k:s}]'.format(a = o.annotation, k = o.key))
-        
+            try:
+                if o.annotation in [oo.annotation for oo in self.GUI_object_library.itervalues()]:
+                    raise KeyError('Your annotation [{a:s}] is already in the parameter library for key [{k:s}]'.format(a = o.annotation, k = o.key))
+            except:
+                if o.annotation in [oo.annotation for oo in self.GUI_object_library.values()]:
+                    raise KeyError('Your annotation [{a:s}] is already in the parameter library for key [{k:s}]'.format(a = o.annotation, k = o.key))
             self.GUI_object_library[o.key] = o
     
     def unregister_GUI_objects(self, keys):
@@ -1334,7 +1336,7 @@ class MainFrame(wx.Frame):
                         
                         #  Create a menu item for the plugin
                         menuItem = wx.MenuItem(PluginsMenu, -1, thing.short_description, "", wx.ITEM_CHECK)
-                        PluginsMenu.AppendItem(menuItem)
+                        PluginsMenu.Append(menuItem)
                         #  Bind the event to activate the plugin
                         self.Bind(wx.EVT_MENU, plugin.activate, menuItem)
                                                 
@@ -1356,7 +1358,7 @@ class MainFrame(wx.Frame):
         """
         Load any machine families into the GUI that are found in families folder
         """
-        import glob, pkgutil
+        import glob, pkgutil,importlib
         self.plugins_list = []
         
         def load_all_modules_from_dir(dirname, keep_loaded = True):
@@ -1364,8 +1366,14 @@ class MainFrame(wx.Frame):
             for importer, package_name, _ in pkgutil.iter_modules([dirname]):
                 full_package_name = '%s.%s' % (dirname, package_name)
                 if full_package_name not in sys.modules or keep_loaded:
-                    module = importer.find_module(package_name
-                                ).load_module(full_package_name)
+                    # module = importer.find_module(package_name
+                    #             ).load_module(full_package_name)
+                    module = importlib.import_module(full_package_name)                    
+                    
+                    # path = dirname
+                    # fullname = package_name
+                    # module_find = importlib.abc.MetaPathFinder.find_module(fullname,path)
+                    # module = module_find.module_for_loader(full_package_name)
                     mods.append(module)
             return mods
         
@@ -1381,7 +1389,7 @@ class MainFrame(wx.Frame):
             menuItem = wx.MenuItem(FamiliesMenu, -1, family_menu_name, "", wx.ITEM_CHECK)
             
             # Add the menu item
-            FamiliesMenu.AppendItem(menuItem)
+            FamiliesMenu.Append(menuItem)
             
             # Attach a pointer to the module for this family
             if not hasattr(self,'families_dict'): self.families_dict = {}
@@ -1409,11 +1417,11 @@ class MainFrame(wx.Frame):
         self.menuFileConsole = wx.MenuItem(self.File, -1, "Open a python console", "", wx.ITEM_NORMAL)
         self.menuFileQuit = wx.MenuItem(self.File, -1, "Quit\tCtrl+Q", "", wx.ITEM_NORMAL)
         
-        self.File.AppendItem(self.menuFileOpen)
-        self.File.AppendItem(self.menuFileSave)
-        self.File.AppendItem(self.menuFileFlush)
-        self.File.AppendItem(self.menuFileConsole)
-        self.File.AppendItem(self.menuFileQuit)
+        self.File.Append(self.menuFileOpen)
+        self.File.Append(self.menuFileSave)
+        self.File.Append(self.menuFileFlush)
+        self.File.Append(self.menuFileConsole)
+        self.File.Append(self.menuFileQuit)
         
         self.MenuBar.Append(self.File, "File")
         self.Bind(wx.EVT_MENU,self.OnOpenConsole,self.menuFileConsole)
@@ -1429,13 +1437,13 @@ class MainFrame(wx.Frame):
         #self.load_plugins(self.PluginsMenu)
         self.MenuBar.Append(self.PluginsMenu, "Plugins")
         self.menuPluginsManage = wx.MenuItem(self.File, -1, "Manage plugin folders...", "", wx.ITEM_NORMAL)
-        self.PluginsMenu.AppendItem(self.menuPluginsManage)
+        self.PluginsMenu.Append(self.menuPluginsManage)
         self.Bind(wx.EVT_MENU,self.OnManagePluginFolders,self.menuPluginsManage)
         self.PluginsMenu.AppendSeparator()
         
         self.Solve = wx.Menu()
         self.SolveSolve = wx.MenuItem(self.Solve, -1, "Solve\tF5", "", wx.ITEM_NORMAL)
-        self.Solve.AppendItem(self.SolveSolve)
+        self.Solve.Append(self.SolveSolve)
         self.MenuBar.Append(self.Solve, "Solve")
         self.Bind(wx.EVT_MENU, self.OnStart, self.SolveSolve)
         
@@ -1443,8 +1451,8 @@ class MainFrame(wx.Frame):
         #self.HelpHelp = wx.MenuItem(self.Help, -1, "Help...\tCtrl+H", "", wx.ITEM_NORMAL)
         self.HelpAbout = wx.MenuItem(self.Help, -1, "About", "", wx.ITEM_NORMAL)
         self.HelpScreenShot = wx.MenuItem(self.Help, -1, "Take screenshot", "", wx.ITEM_NORMAL)        
-        self.Help.AppendItem(self.HelpAbout)
-        self.Help.AppendItem(self.HelpScreenShot)
+        self.Help.Append(self.HelpAbout)
+        self.Help.Append(self.HelpScreenShot)
         self.MenuBar.Append(self.Help, "Help")
         self.Bind(wx.EVT_MENU, lambda event: self.OnTakeScreenShot(event = None), self.HelpScreenShot)
         self.Bind(wx.EVT_MENU, self.OnAbout, self.HelpAbout)
@@ -1523,7 +1531,7 @@ class MainFrame(wx.Frame):
                 sizer.Add(wx.StaticText(self, label='Directories to be searched for plugins'))
                 
                 self.List = wx.ListBox(self)
-                self.List.AppendItems(plugin_dirs)
+                self.List.Append(plugin_dirs)
                 self.List.SetMinSize((500,100))
                 sizer.Add(self.List)
                 
@@ -1838,8 +1846,8 @@ class MySplashScreen(wxSplashScreen):
         wxSplashScreen.__init__(self, aBitmap, splashStyle,
                                 splashDuration, parent)
         self.Bind(wx.EVT_CLOSE, self.OnExit)
-
-        wx.Yield()
+        
+        wx.GetApp().Yield()
 
     def OnExit(self, evt):
         self.Hide()
