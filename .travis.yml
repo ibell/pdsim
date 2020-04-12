@@ -23,6 +23,7 @@ install:
 - pip install -vvv --pre --trusted-host www.coolprop.dreamhosters.com --find-links
   http://www.coolprop.dreamhosters.com/binaries/Python/ -U --force-reinstall CoolProp
 - python setup.py install
+- pip install pyflakes
 - conda list
 script:
 - cd examples
