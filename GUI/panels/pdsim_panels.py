@@ -1,5 +1,6 @@
 # -*- coding: latin-1 -*-
 from __future__ import print_function
+import six
 
 # Python imports
 import warnings, codecs, textwrap,os, itertools, difflib, zipfile, types
@@ -451,7 +452,7 @@ class PDPanel(wx.Panel):
                 raise TypeError('object of type [{t:s}] is not an AnnotatedValue'.format(t = type(o)))
                 
             # Build the GUI objects
-            label=wx.StaticText(parent, -1, o.annotation.decode('latin-1'))
+            label=wx.StaticText(parent, -1, o.annotation)#.decode('latin-1'))
             
             if sizer is not None:
                 # Add the label to the sizer
@@ -482,7 +483,10 @@ class PDPanel(wx.Panel):
                 
                 # Units are defined for the item
                 if o.units:
-                    unicode_units = unicode(o.units)
+                    try:
+                        unicode_units = unicode(o.units)
+                    except:
+                        unicode_units = str(o.units)
                     textbox.default_units = ''
                     if unicode_units == u'm':
                         textbox.default_units = 'Meter'
@@ -606,9 +610,9 @@ class OutputTreePanel(wx.Panel):
         
         isz = (16, 16)
         il = wx.ImageList(*isz)
-        fldridx     = il.Add(wx.ArtProvider_GetBitmap(wx.ART_FOLDER,      wx.ART_OTHER, isz))
-        fldropenidx = il.Add(wx.ArtProvider_GetBitmap(wx.ART_FILE_OPEN,   wx.ART_OTHER, isz))
-        fileidx     = il.Add(wx.ArtProvider_GetBitmap(wx.ART_NORMAL_FILE, wx.ART_OTHER, isz))
+        fldridx     = il.Add(wx.ArtProvider.GetBitmap(wx.ART_FOLDER,      wx.ART_OTHER, isz))
+        fldropenidx = il.Add(wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN,   wx.ART_OTHER, isz))
+        fileidx     = il.Add(wx.ArtProvider.GetBitmap(wx.ART_NORMAL_FILE, wx.ART_OTHER, isz))
         
         self.tree.SetImageList(il)
         self.il = il
@@ -992,13 +996,13 @@ class OutputTreePanel(wx.Panel):
     def add_runs(self, runs):
         if isinstance(runs, h5py.File):
             self.runs += [runs]
-        elif isinstance(runs, basestring) and os.path.exists(runs):
+        elif isinstance(runs, str) and os.path.exists(runs):
             self.runs += [h5py.File(runs,'r')]
         else:
             for run in runs:
                 if isinstance(run, h5py.File):
                     self.runs += [run] 
-                elif isinstance(run, basestring) and os.path.exists(run):
+                elif isinstance(run, str) and os.path.exists(run):
                     self.runs += [h5py.File(run,'r')]
                 else:
                     raise ValueError("Can only add instances of h5py.File")
@@ -1170,14 +1174,14 @@ class ParametricOption(wx.Panel):
     def __init__(self, parent, GUI_objects):
         wx.Panel.__init__(self, parent)
         
-        labels = [o.annotation for o in GUI_objects.itervalues()]
+        labels = [o.annotation for o in six.itervalues(GUI_objects)]
         
         # Check that there is no duplication between annotations
         if not len(labels) == len(set(labels)): # Sets do not allow duplication
             raise ValueError('You have duplicated annotations which is not allowed')
         
         # Make a reverse map from annotation to GUI object key
-        self.GUI_map = {o.annotation:o.key for o in GUI_objects.itervalues()} 
+        self.GUI_map = {o.annotation:o.key for o in six.itervalues(GUI_objects)} 
         
         self.Terms = wx.ComboBox(self)
         self.Terms.AppendItems(sorted(labels))
@@ -1206,7 +1210,7 @@ class ParametricOption(wx.Panel):
         Update the values when the term is changed if a structured table
         """
         if self.GetParent().Structured.GetValue():
-            annotation = self.Terms.GetStringSelection().encode('latin-1')
+            annotation = self.Terms.GetStringSelection()#.encode('latin-1')
             
             # Get the key of the registered object
             key = self.GUI_map[annotation]
@@ -1313,9 +1317,9 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
         
         #Add the values one row at a time
         for i,row in enumerate(self.data):
-            self.InsertStringItem(i,'')
+            self.InsertItem(i,'')
             for j,val in enumerate(row):
-                self.SetStringItem(i,j+1,str(val))
+                self.SetItem(i,j+1,str(val))
             self.CheckItem(i)
             
         for i in range(len(headers)):
@@ -1448,8 +1452,11 @@ class ParametricPanel(PDPanel):
         self.ParamListSizer = None
         self.ParaList = None
         
-        self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().itervalues()} 
-        
+        try:
+            self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().itervalues()} 
+        except:
+            self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().values()}
+            
         # Populate the terms from the configuration dictionary 
         self.populate_terms(configdict)
         
@@ -1673,7 +1680,7 @@ class ParametricPanel(PDPanel):
         sims = []
 
         # Freshen the GUI_map
-        self.GUI_map = {o.annotation:o.key for o in self.main.get_GUI_object_dict().itervalues()} 
+        self.GUI_map = {o.annotation:o.key for o in six.itervalues(self.main.get_GUI_object_dict())} 
         
         # Column index 1 is the list of parameters
         for Irow in range(self.ParaList.GetItemCount()):
@@ -1688,7 +1695,7 @@ class ParametricPanel(PDPanel):
                 # Loop over the columns for this row 
                 for Icol in range(self.ParaList.GetColumnCount()-1):
                     vals.append(self.ParaList.GetFloatCell(Irow, Icol))
-                    names.append(self.ParaList.GetColumn(Icol+1).Text.encode('latin-1'))
+                    names.append(self.ParaList.GetColumn(Icol+1).Text)
                     
                 # The attributes corresponding to the names
                 keys = [self.GUI_map[name] for name in names]
@@ -1887,15 +1894,15 @@ def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True, toolti
     A convenience function that returns a tuple of StaticText and TextCtrl 
     items with the necessary label and values set
     """
-    label = wx.StaticText(parent,id,label.decode('latin-1'))
+    label = wx.StaticText(parent,id,label)#.decode('latin-1'))
     thing = wx.TextCtrl(parent,id,value)
     if enabled==False:
         thing.Disable()
     if tooltip is not None:
         if enabled:
-            thing.SetToolTipString(tooltip)
+            thing.SetToolTip(tooltip)
         else:
-            label.SetToolTipString(tooltip)
+            label.SetToolTip(tooltip)
     return label,thing
 
 class StateChooser(wx.Dialog):
@@ -1903,7 +1910,7 @@ class StateChooser(wx.Dialog):
     A dialog used to select the state
     """
     def __init__(self,Fluid,T,rho,parent=None,id=-1,Fluid_fixed = False):
-        wx.Dialog.__init__(self,parent,id,"State Chooser",size=(300,250))
+        wx.Dialog.__init__(self,parent,id,"State Chooser",size=(300,310))
         
         class StateChoices(wx.Choicebook):
             def __init__(self, parent, id=-1,):
@@ -2129,7 +2136,7 @@ class StatePanel(wx.Panel):
         self._Fluid_fixed = Fluid_fixed
         
         sizer = wx.FlexGridSizer(cols=2,hgap=4,vgap=4)
-        self.Fluidlabel, self.Fluid = LabeledItem(self,label="Fluid",value=str(CPState.Fluid))
+        self.Fluidlabel, self.Fluid = LabeledItem(self,label="Fluid",value=CPState.Fluid.decode())
         
         self.Tlabel, self.T = LabeledItem(self,label="Temperature [K]",value=str(CPState.T))
         self.plabel, self.p = LabeledItem(self,label="Pressure [kPa]",value=str(CPState.p))
@@ -2144,7 +2151,7 @@ class StatePanel(wx.Panel):
             self.Fluid.SetEditable(False)
             #Bind events tp fire the chooser when text boxes are clicked on
             box.Bind(wx.EVT_LEFT_DOWN,self.UseChooser)
-            box.SetToolTipString('Click on me to select the state')
+            box.SetToolTip('Click on me to select the state')
         
         self.SetSizer(sizer)
         
@@ -2264,7 +2271,7 @@ class StateInputsPanel(PDPanel):
         
         # Construct annotated omega GUI entry
         AGO_omega = self.construct_items(self.annotated_values, sizer_for_omega)
-        AGO_omega.GUI_location.SetToolTipString('If a motor curve is provided, this value will not be used')
+        AGO_omega.GUI_location.SetToolTip('If a motor curve is provided, this value will not be used')
         
         # Construct StatePanel
         self.SuctionStatePanel = StatePanel(self, CPState = inletState)
@@ -2468,19 +2475,19 @@ class StateInputsPanel(PDPanel):
     
         return textwrap.dedent(
             """
-            inletState = State.State("{Ref:s}", {{'T': {Ti:s}, 'P' : {pi:s} }})
+            inletState = State.State("{Ref}", {{'T': {Ti}, 'P' : {pi} }})
             
-            outlet_temperature_guess = {outlet_temperature_guess:s} # [K]
+            outlet_temperature_guess = {outlet_temperature_guess} # [K]
             if outlet_temperature_guess > 0:
                 # Use the specified guess for outlet temperature
                 T2s = outlet_temperature_guess 
             else:
-                T2s = sim.guess_outlet_temp(inletState,{po:s})
-            outletState = State.State("{Ref:s}", {{'T':T2s,'P':{po:s} }})
+                T2s = sim.guess_outlet_temp(inletState,{po})
+            outletState = State.State("{Ref}", {{'T':T2s,'P':{po} }})
             
             # The rotational speed (over-written if motor map provided)
-            sim.omega = {omega:s}
-            """.format(Ref = inletState.Fluid,
+            sim.omega = {omega}
+            """.format(Ref = inletState.Fluid.decode(),
                        Ti = str(inletState.T),
                        pi = str(inletState.p),
                        po = str(discPressure),

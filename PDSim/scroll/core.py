@@ -15,7 +15,7 @@ from PDSim.scroll.scroll_geo import set_scroll_geo
 import warnings
 
 from CoolProp import State
-from math import pi
+from math import pi, exp
 import numpy as np
 import copy
 import types
@@ -45,7 +45,7 @@ class Port(object):
     #: Involute angle of the involute used to locate this port
     phi = 3.14159
     
-    #: The code for the involute used to locate this point: 'i' or 'o'
+    #: The code for the involute used to locate this point -- 'i' or 'o'
     involute = 'i'
     
     #: Distance away from the involute
@@ -218,6 +218,17 @@ class Scroll(PDSimCore, _Scroll):
                 return 0.0
         except ZeroDivisionError:
             return 0.0
+
+    def DischargeValve(self, FlowPath, **kwargs):
+        if self.discharge_valve.xv[0] == 0:
+            return 0.0
+        else:
+            try:
+                FlowPath.A = self.discharge_valve.A()
+                mdot = flow_models.IsentropicNozzle(FlowPath.A,FlowPath.State_up,FlowPath.State_down)
+                return mdot
+            except ZeroDivisionError:
+                return 0.0
             
     def calculate_port_areas(self):
         """ 
@@ -282,7 +293,7 @@ class Scroll(PDSimCore, _Scroll):
     def get_discharge_port_blockage_poly(self, theta):
         """
         Get all the polygons associated with the control volumes that could in principle
-        be connected with the discharge port
+        be connected with the discharge a
         """
         xdd, ydd = scroll_geo.CVcoords('dd',self.geo,theta)
         xd1, yd1 = scroll_geo.CVcoords('d1',self.geo,theta)
@@ -752,7 +763,7 @@ class Scroll(PDSimCore, _Scroll):
         ------
         theta : numpy aray
             Crank angle array
-        area_dict : dictionary
+        area_dict : dict
             Dictionary with keys of keys of control volumes that have some 
             intersection, values are areas at each crank angle in ``theta`` 
             
@@ -1117,22 +1128,74 @@ class Scroll(PDSimCore, _Scroll):
         
         return mtotal, zcm__thrust_surface
 
-    def heat_transfer_coefficient(self, key):
+    def heat_transfer_coefficient(self, key, angles):
+        """
+        This function evaluates the heat transfer coefficient for a selected correlation
         
-#        Pr=Pr_mix(Ref,Liq,T_avg,p_avg,xL_avg); //[-]
-#        Re=4.0*mdot/2.0/(PI*mu_mix(Ref,Liq,T_avg,p_avg,xL_avg)*Dh); //[-]
-#        hc=0.023*k_mix(Ref,Liq,T_avg,p_avg,xL_avg)/Dh*pow(Re,0.8)*pow(Pr,0.4); //[kW/m^2-K]
-#        // Jang and Jeong correction for spiral geometry
-#        f=scroll->States.omega/(2*PI);
-#        Amax=scroll->geo.ro;
-#        Ubar=scroll->massFlow.mdot_tot/(4*scroll->geo.ro*scroll->geo.hs*rho);
-#        St=f*Amax/Ubar;
-#        hc*=1.0+8.48*(1-exp(-5.35*St));
-#        // Tagri and Jayaraman correction for transverse oscillation
-#        r_c=scroll->geo.rb*(0.5*phi_1_i+0.5*phi_2_i-scroll->geo.phi.phi_fi0);
-#        hc*=1.0+1.77*Dh/r_c;
-        return 1.0
-
+        Parameters
+        ----------
+        hc : float
+            Heat transfer coefficient [kW/m2/K]
+            
+        Notes
+        -----
+        Pereira and Deschamps "A heat transfer correlation for the suction and compression chambers of scroll compressors" International Journal of Refrigeration, 82(2017), 325-334
+        """
+        
+        if not hasattr(self,'HT_corr') and not hasattr(self,'HTC'):
+            return 0.0
+        elif hasattr(self,'HTC') and not hasattr(self,'HT_corr'):
+            return self.HTC
+        elif hasattr(self,'HT_corr'):
+            for Tube in self.Tubes:
+                if self.key_inlet in [Tube.key1, Tube.key2]:
+                    mdot = Tube.mdot
+            Pr = self.CVs[key].State.Prandtl #[-]
+            rho = self.CVs[key].State.rho #[kg/m3]
+            mu = self.CVs[key].State.visc #[Pa-s]
+            k = self.CVs[key].State.k #[kW/m-K]
+            f = self.omega/(2*pi)
+            Amax = self.geo.ro
+            Ubar= mdot/(4*self.geo.ro*self.geo.h*rho)
+            St=f*Amax/Ubar #Strouhal number [-]
+            Dh =4.0*self.geo.ro*self.geo.h/(2.0*self.geo.ro+self.geo.h) #could be 4V/A
+            Re = 4.0*mdot /2.0/(pi*mu*Dh) #[-]
+            r_c = self.geo.rb*(0.5*angles.phi_1_i+0.5*angles.phi_2_i-self.geo.phi_oi0)
+            C_star = Dh/r_c #dimensionless curvature of chamber
+    
+            if Pr >= 0.7 and Pr <= 160:
+                if Re > 10000:
+                    n = 0.4 #fluid bein heated
+                    #n = 0.3 #Fluid being cooled  
+                    Nu_DB = 0.023*Re**0.8*Pr**n      
+                else:
+                    raise ValueError('Re < 10000 in Dittus-Boelter correlation')
+            else:
+                raise ValueError('Pr out fo range in Dittus-Boelter correlation')         
+            
+            # Heat Transfer correlation    
+            if self.HT_corr == 'Dittus-Boelter':
+                return Nu_DB*(k/Dh) # kW/m2/K
+            elif self.HT_corr == 'Kakac-Shah':
+                # Correlation for spiral heat exchangers (Kakac and Shah, 1987)
+                return Nu_DB*(1.0 + 1.77*Dh/r_c)*(k/Dh) #kW/m2/K
+            elif self.HT_corr == 'Jang-Jeong':
+                # Tagri and Jayaraman correction for transverse oscillation (Jang and Jeong, 2006)
+                return Nu_DB*(1.0 + 1.77*Dh/r_c)*(1.0+8.48*(1-exp(-5.35*St)))*(k/Dh) # kW/m2/K
+            elif self.HT_corr == 'Pereira-Deschamps':
+                if C_star >=0.2 and C_star<=1.0 and Re >= 1000 and Pr>=0.7:
+                    c0 = 0.4956
+                    c1 = 0.406
+                    c2 = 0.1361
+                    c3 = 3394
+                    return Nu_DB*(c0+c1*C_star+c2*Pr+c3*C_star/Re)*(k/Dh)
+                else:
+                    ValueError("Cstar,Re,Pr are out fo range in Pereira-Deschamps correlation") 
+            else:
+                raise KeyError("keyword argument HT_corr must be one of 'HT-const', 'Dittus-Boelter', 'Kakac-Shah' or 'Jang-Jeong'; received '"+str(self.HT_corr)+"'")
+        else:
+            raise KeyError("Provide either keyword argument HTC or HT_corr")
+            
     def wrap_heat_transfer(self, **kwargs):
         """
         This function evaluates the anti-derivative of the differential of wall heat transfer, and returns the amount of scroll-wall heat transfer in kW
@@ -1210,10 +1273,16 @@ class Scroll(PDSimCore, _Scroll):
         
     def calcHT(self, theta, key, HTC_tune, dT_dphi, phim): 
         
-        #TODO: calculate HTC
-        hc = self.HTC #[kW/m2/K]
+        # Get the bounding angles for the control volume
+        angles = self.HT_angles(theta, self.geo, key)
         
-        ## If HT is turned off, no heat transfer
+        if angles is None:
+            return 0.0
+        
+        # Calculate HTC
+        hc = self.heat_transfer_coefficient(key, angles) #[kW/m2/K]
+        
+        # If HT is turned off, no heat transfer
         if abs(hc) < 1e-10 or HTC_tune <= 0.0 or key.startswith('inj') or key == 'sa' or key == 'dd':
             return 0.0
         elif key == 'ddd':
@@ -1222,15 +1291,7 @@ class Scroll(PDSimCore, _Scroll):
             Q_d1 = self.calcHT(theta,str('d1'),HTC_tune,dT_dphi,phim)
             Q_d2 = self.calcHT(theta,str('d2'),HTC_tune,dT_dphi,phim)
             return Q_d1 + Q_d2
-                
-        
-            
-        #Get the bounding angles for the control volume
-        angles = self.HT_angles(theta, self.geo, key)
-        
-        if angles is None:
-            return 0.0
-        
+
         T_scroll = self.Tlumps[0]
         T_CV = self.CVs[key].State.T
         # The heat transfer rate of the inner involute on 
@@ -1571,7 +1632,7 @@ class Scroll(PDSimCore, _Scroll):
             # Get the mean losses over one cycle
             self.losses.bearings  = np.trapz(self.losses.summed[_slice], theta)/theta_range
             
-            print('mechanical losses: ', self.losses.bearings)
+            #print('mechanical losses: ', self.losses.bearings)
             return self.losses.bearings #[kW]
     
     def post_cycle(self):
@@ -1896,28 +1957,19 @@ class Scroll(PDSimCore, _Scroll):
         print(OBJECTIVE(T0+50))
         return optimize.newton(OBJECTIVE, T0)
         
-    def lump_energy_balance_callback(self):
+    def single_lump_OEB(self):
         """
-        The callback where the energy balance is carried out on the lumps
+        Defines single-lump temperature energy balance 
+        calculations and returns a single redisual
         
         Notes
         -----
-        Derivation for electrical power of motor:
-        
-        .. math ::
-            
-            \\eta _{motor} = \\frac{\\dot W_{shaft}}{\\dot W_{shaft} + \\dot W_{motor}}
-            
-        .. math ::
-            
-            {\\eta _{motor}}\\left( \\dot W_{shaft} + \\dot W_{motor} \\right) = \\dot W_{shaft}
-            
-        .. math::
-        
-            \\dot W_{motor} = \\frac{\\dot W_{shaft}}{\\eta _{motor}} - \\dot W_{shaft}
         """
-        
         #For the single lump
+
+        # Set the heat input to the suction line
+        #self.suction_heating()
+
         # HT terms are positive if heat transfer is TO the lump
         Qnet = 0.0
         Qnet -= sum([Tube.Q for Tube in self.Tubes])
@@ -1943,11 +1995,82 @@ class Scroll(PDSimCore, _Scroll):
         # sign for the lump
         Qnet -= self.HTProcessed.mean_Q
         
+        return [Qnet]        
+
+    def multi_lump_OEB(self):
+        """
+        Defines multi-lump temperatures energy balance 
+        calculations and returns a list of redisuals
         
+        Notes:
+        Current example considers two lumps
+            Tlumps[0] : Tshell
+            Tlumps[1] : Toil
+        ----
+        """
+        #For the lumps:
+        Qnet = 0.0
+        Qnet_oil = 0.0
         
+        # Set the heat input to the suction line
+        #self.suction_heating()
+        
+        # HT terms are positive if heat transfer is TO the lump
+        Qnet -= sum([Tube.Q for Tube in self.Tubes])
+        
+        # HT Shell to ambient
+        self.Qamb = self.ambient_heat_transfer(self.Tlumps[0])
+        
+        # Heat transfer with the ambient; Qamb is positive if heat is being removed, thus flip the sign
+        Qnet -= self.Qamb
+        
+        # Heat transfer with the gas in the working chambers.  mean_Q is positive
+        # if heat is transfered to the gas in the working chamber, so flip the 
+        # sign for the lump
+        Qnet -= self.HTProcessed.mean_Q
+        
+        #HT oil shell
+        self.Qoil_shell = (self.Tlumps[0] - self.Tlumps[1])/self.Rshell_oil
+        
+        Qnet_oil += self.mech.Wdot_losses
+        Qnet_oil += self.Qoil_shell
+        
+        Qnet -= self.Qoil_shell
+    
+        #Want to return a list
+        return [Qnet,Qnet_oil]
+        
+
+    def lump_energy_balance_callback(self):
+        """
+        The callback where the energy balance is carried out on the lumps
+        
+        Notes
+        -----
+        Derivation for electrical power of motor:
+        
+        .. math ::
+            
+            \\eta _{motor} = \\frac{\\dot W_{shaft}}{\\dot W_{shaft} + \\dot W_{motor}}
+            
+        .. math ::
+            
+            {\\eta _{motor}}\\left( \\dot W_{shaft} + \\dot W_{motor} \\right) = \\dot W_{shaft}
+            
+        .. math::
+        
+            \\dot W_{motor} = \\frac{\\dot W_{shaft}}{\\eta _{motor}} - \\dot W_{shaft}
+        """
+        # Mechanical losses
+        self.mech.Wdot_losses = self.mechanical_losses('low:shell')       
+
+        # Shaft power from forces on the orbiting scroll from the gas in the pockets [kW]
+        self.Wdot_forces = self.omega*self.forces.mean_tau
+
+        # Shaft power from indicated power
         self.Wdot_mechanical = self.Wdot_pv + self.mech.Wdot_losses
         
-        #The actual torque required to do the compression [N-m]
+        # The actual torque required to do the compression [N-m]
         self.tau_mechanical = self.Wdot_mechanical / self.omega * 1000
         
         # 2 Options for the motor losses:
@@ -1965,21 +2088,24 @@ class Scroll(PDSimCore, _Scroll):
         else:
             raise AttributeError('motor.type must be one of "const_eta_motor" or "motor_map"')
         
-        #Motor losses [kW]
+        # Motor losses [kW]
         self.motor.losses = self.Wdot_mechanical*(1/self.eta_motor-1)
         
-        #Electrical Power
+        # Electrical Power
         self.Wdot_electrical = self.Wdot_mechanical + self.motor.losses
         
         if hasattr(self,'Wdot_i'):
-            #Overall isentropic efficiency
+            # Overall isentropic efficiency
             self.eta_oi = self.Wdot_i/self.Wdot_electrical
-        
-#        #Set the heat input to the suction line
-#        self.suction_heating()
-        
+
         if self.verbosity > 0:
             print('At this iteration')
+            print('    Motor Speed:', self.omega*60/(2*pi),'rpm')
+            print('    Motor Efficiency:', self.eta_motor,'-')
+            print('    Torque (Force Analysis):', self.forces.mean_tau*1000,'Nm')
+            print('    Torque (pV Analysis):', self.tau_mechanical,'Nm')
+            print('    Mechanical losses:', self.mech.Wdot_losses,'kW')
+            print('    Motor losses:', self.motor.losses,'kW')
             print('    Electrical power:', self.Wdot_electrical,'kW')
             print('    Mass flow rate:', self.mdot,'kg/s')
             if hasattr(self,'Wdot_i'):
@@ -1987,8 +2113,10 @@ class Scroll(PDSimCore, _Scroll):
             if hasattr(self,'eta_v'):
                 print('    Volumetric:', self.eta_v,'-')
         
-        #Want to return a list
-        return [Qnet]
+        if not hasattr(self,'OEB_type') or self.OEB_type == 'single-lump':
+            return self.single_lump_OEB()        
+        elif self.OEB_type == 'multi-lump':
+            return self.multi_lump_OEB()
 
     def TubeCode(self,Tube,**kwargs):
         Tube.Q = flow_models.IsothermalWallTube(Tube.mdot,
@@ -2668,7 +2796,7 @@ class Scroll(PDSimCore, _Scroll):
                                   + self.forces.Wdot_thrust)
         
         self.forces.Wdot_total_mean = np.trapz(self.forces.Wdot_total, theta)/(2*pi)
-        print(self.forces.Wdot_total_mean,'average mechanical losses')
+        #print(self.forces.Wdot_total_mean,'average mechanical losses')
             
         import matplotlib.pyplot as plt
             
@@ -2912,7 +3040,7 @@ class Scroll(PDSimCore, _Scroll):
         import h5py
         hf = h5py.File(fName,'a')
         
-        for k, v in attrs_dict.iteritems():
+        for k, v in attrs_dict.items():
             dataset = hf.get(k)
             if dataset is not None:
                 dataset.attrs['note'] = v

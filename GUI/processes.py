@@ -65,7 +65,7 @@ class Run1(Process):
         print('About to run the script file', os.path.join(pdsim_home_folder,self.script_name))
 
         #Import the script module
-        script_module = __import__(script_name, globals(), locals(), [], -1)
+        script_module = __import__(script_name, globals(), locals(), [], 0)
         
         #Build the simulation
         self.sim = script_module.build()

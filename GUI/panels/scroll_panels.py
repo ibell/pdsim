@@ -381,7 +381,7 @@ class DiscCurvesPanel(pdsim_panels.PDPanel):
         
         sizer2.Add(wx.StaticText(self,label='Radius of arc 2'))
         self.r2 = wx.TextCtrl(self, value=str(r2))
-        self.r2.SetToolTipString('This can either be the string \"PMP\" for a perfect-meshing profile,\n or alternatively, the second radius r2 in m')
+        self.r2.SetToolTip('This can either be the string \"PMP\" for a perfect-meshing profile,\n or alternatively, the second radius r2 in m')
         
         sizer2.Add(self.r2)
         sizer.AddSpacer(3)        
@@ -846,10 +846,9 @@ class GeometryPanel(pdsim_panels.PDPanel):
         # Add plugin injected chunks
         allowed = ['ScrollGeometryPanel_After', 'ScrollGeometryPanel_Before']
         if isinstance(plugin_chunks,dict):
-            for key,chunk in plugin_chunks.iteritems():
+            for key,chunk in plugin_chunks.items():
                 if key in allowed:
-                    core += chunk
-                    
+                    core += chunk                        
         return core
 
     def get_geo(self):
@@ -1381,7 +1380,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         # Register terms in the GUI database
         self.main.register_GUI_objects(annotated_GUI_objects)
         
-        self.main.get_GUI_object('L_ratio_bearings').GUI_location.SetToolTipString('Ratio of z1/z2, where\n\nz1 : the length from the centerline of the upper bearing to the lower bearing\nz2 : the length from the centerline of the upper bearing to the orbiting scroll bearing')
+        self.main.get_GUI_object('L_ratio_bearings').GUI_location.SetToolTip('Ratio of z1/z2, where\n\nz1 : the length from the centerline of the upper bearing to the lower bearing\nz2 : the length from the centerline of the upper bearing to the orbiting scroll bearing')
         
         self.ViewButton = wx.Button(scrolled_panel, label='View Cross-Section')
         self.ViewButton.Bind(wx.EVT_BUTTON, self.OnViewCrossSection)

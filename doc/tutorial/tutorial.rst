@@ -48,7 +48,7 @@ which should ultimately yield something like
 
 .. image:: page018.png
 
-Make sure that the last line says something like ``Writing C:\Python27\Lib\site-packages\PDSim-0.0.1-py2.7.egg-info``.  This means the files have been installed properly.
+Make sure that the last line says something like ``Writing C:\Python27\Lib\site-packages\PDSim-0.0.1-py3.7.egg-info``.  This means the files have been installed properly.
 
 Checking installed files
 ------------------------
@@ -59,19 +59,19 @@ If you start a command prompt and run the command ``python``, you can try to imp
 
     In [0]: import CoolProp,matplotlib,Cython,PDSim,wx,numpy,scipy
     
-    In [0]: print CoolProp.__file__; print CoolProp.__version__
+    In [0]: print(CoolProp.__file__); print(CoolProp.__version__)
     
-    In [0]: print matplotlib.__file__; print matplotlib.__version__
+    In [0]: print(matplotlib.__file__); print(matplotlib.__version__)
     
-    In [0]: print Cython.__file__; print Cython.__version__
+    In [0]: print(Cython.__file__); print(Cython.__version__)
     
-    In [0]: print PDSim.__file__; print PDSim.__version__
+    In [0]: print(PDSim.__file__); print(PDSim.__version__)
     
-    In [0]: print wx.__file__; print wx.version()
+    In [0]: print(wx.__file__); print(wx.version())
     
-    In [0]: print numpy.__file__; print numpy.__version__
+    In [0]: print(numpy.__file__); print(numpy.__version__)
     
-    In [0]: print scipy.__file__; print scipy.__version__
+    In [0]: print(scipy.__file__); print(scipy.__version__)
     
 Running the sample files
 ------------------------

@@ -71,9 +71,6 @@ class IntegratorMixin(object):
         # Get the beginning of the cycle configured
         # Put a copy of the values into the matrices
         xold = self.x_state.copy()
-        # Add zeros for the valves as they are assumed to start closed and at rest
-        if self.sim.__hasValves__:
-            xold.extend(empty_arraym(len(self.sim.Valves)*2))
         self.sim._put_to_matrices(xold, 0)
         return xold
         
@@ -203,17 +200,20 @@ class PDSimCore(object):
         #Initialize the containers to be empty
         
         #: The Valves container class
-        self.Valves=[]
+        self.Valves = []
+
         #: The :class:`ControlVolumeCollection <PDSim.core.containers.ControlVolumeCollection>` instance
         #: that contains all the control volumes in the machine
-        self.CVs=ControlVolumeCollection()
+        self.CVs = ControlVolumeCollection()
+        
         #: The :class:`FlowPathCollection <PDSim.flow.flow.FlowPathCollection>` 
         #: instance
-        self.Flows=FlowPathCollection()
+        self.Flows = FlowPathCollection()
+        
         #: A :class:`list` that contains copies of the 
         #: :class:`FlowPathCollection <PDSim.flow.flow.FlowPathCollection>` 
         #: at each crank angle
-        self.FlowStorage=[]
+        self.FlowStorage = []
         
         self.Tubes = TubeCollection()
         self.Tlumps = np.zeros((1,1))
@@ -265,24 +265,23 @@ class PDSimCore(object):
         if self.__hasLiquid__==True:
             raise NotImplementedError
         else:
-            VarList=np.array([])
+            ValList = []
             exists_indices = np.array(self.CVs.exists_indices)
             for s in self.stateVariables:
                 if s=='T':
-                    VarList = np.append(VarList, self.T[exists_indices,i])
+                    ValList += self.T[exists_indices,i].tolist()
                 elif s=='D':
-                    VarList = np.append(VarList, self.rho[exists_indices,i])
+                    ValList += self.rho[exists_indices,i].tolist()
                 elif s=='M':
-                    VarList = np.append(VarList, self.m[exists_indices,i])
+                    ValList += self.m[exists_indices,i].tolist()
                 else:
                     raise KeyError
             
             if self.__hasValves__:
+                # Also store the valve values
+                ValList += self.xValves[:,i].tolist()
 
-                ValveList = list(self.xValves[:,i])
-                VarList = np.append( VarList,ValveList)
-
-            return arraym(VarList)
+            return arraym(ValList)
         
     def _statevars_to_dict(self,x):
         d={}
@@ -303,6 +302,7 @@ class PDSimCore(object):
         exists_indices=self.CVs.exists_indices
         Nexist = self.CVs.Nexist
         Ns = len(self.stateVariables)
+        assert(len(x) == len(self.Valves)*2+Ns*Nexist)
         if self.__hasLiquid__==True:
             raise NotImplementedError
 #             self.T[:,i]=x[0:self.NCV]
@@ -315,9 +315,9 @@ class PDSimCore(object):
                     self.rho[exists_indices, i] = x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)]
                 elif s=='M':
                     self.m[exists_indices, i] = x[iS*self.CVs.Nexist:self.CVs.Nexist*(iS+1)]
-            #Left over terms are for the valves
+            # Left over terms are for the valves
             if self.__hasValves__:
-                self.xValves[list(range(len(self.Valves)*2)), i] = arraym(x[Ns*Nexist:len(x)])
+                self.xValves[0:len(self.Valves)*2, i] = arraym(x[Ns*Nexist:len(x)])
             
             # In the first iteration, self.core has not been filled, so do not 
             # overwrite with the values in self.core.m and self.core.rho
@@ -982,9 +982,9 @@ class PDSimCore(object):
         
         Parameters
         ----------
-        cycle_integrator : string
+        cycle_integrator : str
             One of 'RK45','Euler','Heun'
-        cycle_integrator_options : dictionary
+        cycle_integrator_options : dict
             options to be passed to the solver function (RK45, Euler, etc.)
         """
         # Make cycle_integrator_options an empty dictionary if not provided
@@ -1057,6 +1057,9 @@ class PDSimCore(object):
         if hasattr(self, 'additional_inlet_keys'):
             for key in self.additional_inlet_keys:
                 mdot_in += self.FlowsProcessed.mean_mdot[key]
+        if hasattr(self, 'additional_outlet_keys'):
+            for key in self.additional_outlet_keys:
+                mdot_out += self.FlowsProcessed.mean_mdot[key]
         
         # We need to find the key at the inlet to the outlet tube.
         Tube = self.Tubes[self.key_outlet]
@@ -1076,7 +1079,7 @@ class PDSimCore(object):
         # We put it in kW by multiplying by flow rate
         self.resid_Td = 0.1*(h_outlet_Tube - self.h_outlet_pump_set)
         
-    def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon = 0.003, cycle_integrator = 'RK45', OneCycle = False, cycle_integrator_options = None, plot_every_cycle = False):
+    def OBJECTIVE_CYCLE(self, Td_Tlumps0, X, epsilon_cycle = 0.003, epsilon_energy_balance = 0.003, cycle_integrator = 'RK45', OneCycle = False, cycle_integrator_options = None, plot_every_cycle = False):
         """
         The Objective function for the energy balance solver
         
@@ -1087,14 +1090,18 @@ class PDSimCore(object):
         X : :class:`arraym <PDSim.misc.datatypes.arraym>` instance
             Contains the state variables for all the control volumes in existence, as well as any other integration variables
         epsilon : float
-            Convergence criterion applied to all of the solvers
+            Convergence criterion applied to all of the solvers (DEPRECATED!)
+        epsilon_cycle : float
+            Cycle-cycle convergence criterion
+        epsilon_energy_balance : float
+            Energy balance convergence criterion
         cycle_integrator : string, one of 'RK45','Euler','Heun'
             Which solver is to be used to integrate the steps
-        OneCycle : boolean
+        OneCycle : bool
             If ``True``, stop after one cycle
-        plot_every_cycle : boolean
+        plot_every_cycle : bool
             If ``True``, make the debug plots at every cycle
-        cycle_integrator_options : dictionary
+        cycle_integrator_options : dict
             Options to be passed to cycle integrator
         """
         
@@ -1109,8 +1116,7 @@ class PDSimCore(object):
             self.exists_CV_init = self.CVs.exists_keys
         
         i = 0
-        worst_error = 1000
-        while worst_error > epsilon:
+        while True:
             
             #  Actually run the cycle, runs post_cycle at the end,
             #  sets the parameter lumps_resid in this class
@@ -1131,39 +1137,82 @@ class PDSimCore(object):
                 
             self.solvers.lump_eb_history.append([self.Tlumps, self.lumps_resid])
             
-            if len(self.solvers.lump_eb_history) == 1:
-                
-                T, EB = self.solvers.lump_eb_history[-1]
-                
-                #  T and EB are one-element lists, get floats
-                _T, _EB = T[0], EB[0]
-            
-                # Use the thermal mass to make the step
-                # Here is the logic:
-                # Instantaneous energy balance given by
-                # dU/dt = m*c*(dT/dt) = sum(Qdot)
-                # and if dt = one cycle period (seconds/rev) DeltaT = 2*pi/omega
-                # DELTAT = sum(Qdot)*Deltat/(m*c)
-                thermal_capacitance = 0.49*0.001 # [kJ/K]
-                Deltat = (2*np.pi)/self.omega # [s]
-            
-                #  Update the lump temperatures
-                self.Tlumps = [_T + _EB*Deltat/thermal_capacitance]
-            
+            if len(self.Tlumps) > 1:
+                print("Running multi-lump analysis")
+
+                if self.OEB_solver == 'MDNR':
+                    # Use Multi Dim. Newton Raphson step for multi-lump temperatures
+                    from numpy.linalg import inv
+                    w = 1.0                
+                    dx = 0.5
+                    ytol=1e-3
+                    x = np.array(self.Tlumps,dtype=np.float)
+                    J = np.zeros((len(x),len(x)))
+                    error = 999
+                    # If a float is passed in for dx, convert to a numpy-like list the same shape
+                    # as x
+                    if isinstance(dx,int) or isinstance(dx,float):
+                        dx=dx*np.ones_like(x)
+                                
+                    r0 = np.array(self.lumps_resid)*1000 
+
+                    # Build the Jacobian matrix by columns
+                    for jj in range(len(self.Tlumps)):
+                        delta = np.zeros_like(x)
+                        delta[jj] = dx[jj]
+                        self.Tlumps = self.Tlumps + delta
+                        ri = self.callbacks.lumps_energy_balance_callback()
+                        #print('ri:',ri)
+                        ri = np.array(ri)
+                        J[:,jj] = (ri-r0)/delta[jj]
+
+                    v = np.linalg.solve(J,-r0)
+
+                    # Calculate new Tlumps
+                    Tnew = x + w*v
+                    self.Tlumps = Tnew
+
+                elif self.OEB_solver == 'Broyden':
+                    # Use Broyden Method  
+                    raise('Broyden not implemented yet')
+
             else:
+                # Use Relaxed Secant Method for single lump temperature
+                print("Running single-lump analysis")
                 
-                #  Get the values from the history
-                Tn1, EBn1 = self.solvers.lump_eb_history[-1]
-                Tn2, EBn2 = self.solvers.lump_eb_history[-2]
+                if len(self.solvers.lump_eb_history) == 1:
+                    
+                    T, EB = self.solvers.lump_eb_history[-1]
+                    
+                    #  T and EB are one-element lists, get floats
+                    _T, _EB = T[0], EB[0]
                 
-                #  Convert to numpy arrays
-                Tn1, EBn1, Tn2, EBn2 = [np.array(l) for l in [Tn1, EBn1, Tn2, EBn2]]
+                    # Use the thermal mass to make the step
+                    # Here is the logic:
+                    # Instantaneous energy balance given by
+                    # dU/dt = m*c*(dT/dt) = sum(Qdot)
+                    # and if dt = one cycle period (seconds/rev) Deltat = 2*pi/omega
+                    # DELTAT = sum(Qdot)*Deltat/(m*c)
+                    thermal_capacitance = 0.49*0.001 # [kJ/K]
+                    Deltat = (2*np.pi)/self.omega # [s]
                 
-                #  Use the relaxed secant method to find the solution 
-                Tnew = Tn1 - 0.7*EBn1*(Tn1-Tn2)/(EBn1-EBn2)
-            
-                #  Update the lump temperatures    
-                self.Tlumps = Tnew.tolist()
+                    #  Update the lump temperatures
+                    Tnew = np.array([_T + _EB*Deltat/thermal_capacitance])
+                
+                else:
+                    
+                    #  Get the values from the history
+                    Tn1, EBn1 = self.solvers.lump_eb_history[-1]
+                    Tn2, EBn2 = self.solvers.lump_eb_history[-2]
+                    
+                    #  Convert to numpy arrays
+                    Tn1, EBn1, Tn2, EBn2 = [np.array(l) for l in [Tn1, EBn1, Tn2, EBn2]]
+                    
+                    #  Use the relaxed secant method to find the solution 
+                    Tnew = Tn1 - 0.7*EBn1*(Tn1-Tn2)/(EBn1-EBn2)
+
+            #  Update the lump temperatures    
+            self.Tlumps = Tnew.tolist()
             
             ###  -----------------------------------
             ###        The discharge enthalpy
@@ -1180,7 +1229,7 @@ class PDSimCore(object):
                 key_outtube_inlet = outlet_tube.key1
                 key_outtube_outlet = outlet_tube.key2
                 
-            if error_metric < 0.1*epsilon and abs(self.lumps_resid[0]) < epsilon:
+            if error_metric < 0.1*epsilon_cycle and np.max(np.abs(self.lumps_resid)) < epsilon_energy_balance:
 
                 # Each time that we get here and we are significantly below the threshold, store the values
             
@@ -1233,17 +1282,30 @@ class PDSimCore(object):
                 for key in self.additional_inlet_keys:
                     print('Additional inlet flow:', key, self.FlowsProcessed.mean_mdot[key]*1000, 'g/s')
                     mdot_in += self.FlowsProcessed.mean_mdot[key]
+            if hasattr(self, 'additional_outlet_keys'):
+                for key in self.additional_outlet_keys:
+                    print('Additional outlet flow:', key, self.FlowsProcessed.mean_mdot[key]*1000, 'g/s')
+                    mdot_out += self.FlowsProcessed.mean_mdot[key]
             mdot_error = (mdot_out/mdot_in-1)*100
             
             print('===========')
             print('|| # {i:03d} ||'.format(i=i))
             print('===========')
-            print(error_ascii_bar(abs(self.lumps_resid[0]), epsilon), 'energy balance kW ', self.lumps_resid[0], ' Tlumps: ',self.Tlumps,'K')
-            print(error_ascii_bar(abs(self.resid_Td), epsilon), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg', self.Tubes.Nodes[key_outtube_inlet].h, 'kJ/kg')
-            print(error_ascii_bar(error_metric, epsilon), 'cycle-cycle    ', error_metric)
+            print(error_ascii_bar(abs(self.lumps_resid[0]), epsilon_energy_balance), 'energy balance kW ', self.lumps_resid, ' Tlumps: ',self.Tlumps,'K')
+            print(error_ascii_bar(abs(self.resid_Td), epsilon_energy_balance), 'discharge state', self.resid_Td, 'h_pump_set: ', self.h_outlet_pump_set,'kJ/kg', self.Tubes.Nodes[key_outtube_inlet].h, 'kJ/kg')
+            print(error_ascii_bar(error_metric, epsilon_cycle), 'cycle-cycle    ', error_metric)
             print(error_ascii_bar(abs(mdot_error), 1), 'mdot [%]', mdot_error, '|| in:', mdot_in*1000, 'g/s || out:', mdot_out*1000, 'g/s ')
             
-            worst_error = max(abs(self.lumps_resid[0]), abs(self.resid_Td), np.sqrt(np.sum(np.power(errors, 2))))
+            # Check all the stopping conditions
+            within_tolerance = [
+                np.max(np.abs(self.lumps_resid)) < epsilon_energy_balance, 
+                abs(self.resid_Td) < epsilon_energy_balance, 
+                np.sqrt(np.sum(np.power(errors, 2))) < epsilon_cycle
+            ]
+            # Stop if all conditions are met
+            if all(within_tolerance):
+                break
+            
             i += 1
         
         #  If the abort function returns true, quit this loop
@@ -1284,27 +1346,27 @@ class PDSimCore(object):
         
         Parameters
         ----------
-        key_inlet : string
+        key_inlet : str
             The key for the flow node that represents the upstream quasi-steady point
-        key_outlet : string
+        key_outlet : str
             The key for the flow node that represents the upstream quasi-steady point
-        solver_method : string
-        OneCycle : boolean
+        solver_method : str
+        OneCycle : bool
             If ``True``, stop after just one rotation.  Useful primarily for 
             debugging purposes
         Abort : function
             A function that may be called to determine whether to stop running.  
             If calling Abort() returns ``True``, stop running 
         pipe_abort : 
-        UseNR : boolean
+        UseNR : bool
             If ``True``, use a multi-dimensional solver to determine the initial state of the state variables for each control volume
         alpha : float
             Use a range of ``(1-alpha)*dx, (1+alpha)*dx`` for line search if needed
-        plot_every_cycle : boolean
+        plot_every_cycle : bool
             If ``True``, make the plots after every cycle (primarily for debug purposes)
         x0 : arraym
             The starting values for the solver that modifies the discharge temperature and lump temperatures
-        reset_initial_state : boolean
+        reset_initial_state : bool
             If ``True``, use the stored initial state from the previous call to ``solve`` as the starting value for the thermodynamic values for the control volumes
         timeout : float
             Number of seconds before the run times out
@@ -1312,7 +1374,7 @@ class PDSimCore(object):
             Cycle-cycle convergence criterion
         eps_energy_balance : float
             Energy balance convergence criterion
-        cycle_integrator_options : dictionary
+        cycle_integrator_options : dict
             A dictionary of options to be passed to the cycle integrator
         max_number_of_steps : int
             Maximum number of steps allowed per rotation
@@ -1395,9 +1457,7 @@ class PDSimCore(object):
         else:
             # (2) Run a cycle with the given values for the temperatures
             self.pre_cycle()
-            #x_state only includes the values for the chambers, the valves start closed
-            #Since indexed, yields a copy
-            self.x_state = self._get_from_matrices(0)[0:len(self.stateVariables)*self.CVs.Nexist]
+            self.x_state = self._get_from_matrices(0).copy()
         
         if x0 is None:
             x0 = [self.Tubes.Nodes[key_outlet].T, self.Tubes.Nodes[key_outlet].T]
@@ -1406,7 +1466,8 @@ class PDSimCore(object):
         self.OBJECTIVE_CYCLE(x0, self.x_state, 
                              cycle_integrator = solver_method, 
                              OneCycle = OneCycle,
-                             epsilon = eps_energy_balance,
+                             epsilon_energy_balance = eps_energy_balance,
+                             epsilon_cycle = eps_cycle,
                              cycle_integrator_options = cycle_integrator_options,
                              plot_every_cycle = plot_every_cycle
                              ) 
@@ -1456,7 +1517,7 @@ class PDSimCore(object):
         
         Parameters
         ----------
-        fName : string
+        fName : str
             The file name for the HDF5 file that is to be used
         """ 
         attrs_dict = {
@@ -1689,7 +1750,7 @@ class PDSimCore(object):
         
         Returns 
         -------
-        redo : boolean
+        redo : bool
             ``True`` if cycle should be run again with updated inputs, ``False`` otherwise.
             A return value of ``True`` means that convergence of the cycle has been achieved
         """
@@ -1773,6 +1834,10 @@ class PDSimCore(object):
                 new_list += new_mass_list
             else:
                 raise KeyError
+
+        # Add values for valves
+        for valve in self.Valves:
+            new_list += list(valve.get_xv())
     
         return arraym(error_list), arraym(new_list)
     

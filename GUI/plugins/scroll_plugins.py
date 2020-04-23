@@ -36,8 +36,10 @@ class InjectionPortPanel(wx.Panel):
         
         self.AddPort = wx.Button(self, label='+',style = wx.ID_REMOVE)
         self.RemovePort = wx.Button(self,label='-',style = wx.ID_REMOVE)
-        self.AddPort.Bind(wx.EVT_BUTTON,lambda(event):self.Parent.OnAddPort(self))
-        self.RemovePort.Bind(wx.EVT_BUTTON,lambda(event):self.Parent.OnRemovePort(self))
+        #self.AddPort.Bind(wx.EVT_BUTTON,lambda(event):self.Parent.OnAddPort(self))
+        self.AddPort.Bind(wx.EVT_BUTTON,self.Parent.OnAddPort(self))
+        #self.RemovePort.Bind(wx.EVT_BUTTON,lambda(event):self.Parent.OnRemovePort(self))
+        self.RemovePort.Bind(wx.EVT_BUTTON,self.Parent.OnRemovePort(self))
         
         button_sizer = wx.BoxSizer(wx.VERTICAL)
         button_sizer.Add(self.indexText,0,wx.EXPAND| wx.ALIGN_CENTER)

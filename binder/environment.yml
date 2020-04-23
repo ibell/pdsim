@@ -1,15 +1,15 @@
 channels:
   - conda-forge
 dependencies:
-  - python
+  - python=3.7
   - numpy
   - scipy
   - matplotlib
   - pyyaml
   - h5py
   - cython
+  - pip
 #  - wxpython
   - pip:
-    - CoolProp
-    - Cython
+    - coolprop
     - "git+git://github.com/ibell/pdsim.git"

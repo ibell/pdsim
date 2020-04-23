@@ -389,7 +389,7 @@ cdef class arraym(object):
         else:
             raise ValueError('Your index [{i:d}] is out of range [{N:d}]'.format(i=i,N=self.N))
     
-    cpdef double set_index(self, int i, double val) except *:
+    cpdef set_index(self, int i, double val):
         """
         Set the value at the given index
         
@@ -398,7 +398,7 @@ cdef class arraym(object):
         i : int
             The index in the array
         """
-        if i < self.N:
+        if i < self.N and i >= 0:
             self.data[i] = val
         else:
             raise ValueError('Your index [{i:d}] is out of range [{N:d}]'.format(i=i,N=self.N))

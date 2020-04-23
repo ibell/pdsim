@@ -88,6 +88,7 @@ class PlotNotebook(wx.Panel):
                            ('Initial temperature history', self.initial_temperature_history),
                            ('Lump residuals v. lump temps', self.lumps_residual_v_lump_temps),
                            ('Discharge residual history', self.discharge_residual_history),
+                           ('Valve lift v. crank angle',self.valve_theta)
                            ]
         self.recip_plot_buttons = [('Valve lift v. crank angle',self.valve_theta)]
         self.scroll_plot_buttons = [('Pressure profile',self.pressure_profile),
@@ -199,7 +200,18 @@ class PlotNotebook(wx.Panel):
         axes = self.add('Pressure').gca()
         theta, p = self.get('t'), self.get('p')
         p[p<0.1] = np.nan
+
+        if isinstance(self.Sim, h5py.File):
+            p_inlet = self.Sim.get('/inlet_state/p').value
+            p_outlet = self.Sim.get('/outlet_state/p').value
+        else:
+            p_inlet = self.Sim.inlet_state.p
+            p_outlet = self.Sim.outlet_state.p
+
         axes.plot(theta, p.T, lw = 1.5)
+        axes.axhline(p_inlet, dashes=[3,1,5,1], color='grey', label='inlet state')
+        axes.axhline(p_outlet, dashes=[3,1,5,1], color='grey', label='outlet state')
+
         axes.set_ylabel('Pressure [kPa]')
         axes.set_xlabel(r'$\theta$ [rad]')
         
@@ -299,8 +311,8 @@ class PlotNotebook(wx.Panel):
         #valve lift
         if hasattr(self.Sim,'__hasValves__') and self.Sim.__hasValves__:
             axes = self.add('Valves').gca()
-            axes.plot(self.Sim.t,self.Sim.xValves[0,:], lw = 1.5)
-            axes.plot(self.Sim.t,self.Sim.xValves[2,:], lw = 1.5)
+            for ivalve in range(0, self.Sim.xValves.shape[0], 2):
+                axes.plot(self.Sim.t, self.Sim.xValves[ivalve, :], lw = 1.5)
             axes.set_xlabel(r'$\theta$ [rad]')
             axes.set_ylabel(r'Valve lift [m]')
         

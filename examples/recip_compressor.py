@@ -122,15 +122,17 @@ def Compressor():
                             )
     
     t1 = timeit.default_timer()
-    recip.precond_solve(key_inlet='inlet.1',
-                        key_outlet='outlet.2',
-                        solver_method = 'RK45',
-                        OneCycle = False,
-                        UseNR = True,
-                        )
+    recip.solve(key_inlet='inlet.1',
+                key_outlet='outlet.2',
+                solver_method = 'RK45',
+                OneCycle = False,
+                UseNR = True,
+                eps_cycle = 3e-2,
+                eps_energy_balance=3e-2
+                )
     print('time taken', timeit.default_timer()-t1)
     
-    debug_plots(recip)
+    debug_plots(recip, family='Recip Compressor')
     
     del recip.FlowStorage
     from PDSim.misc.hdf5 import HDF5Writer

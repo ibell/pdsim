@@ -48,7 +48,7 @@ def set_scroll_geo(Vdisp,Vratio,Thickness,OrbitingRadius,phi_i0=0.0,phi_os=0.3, 
         r4=ro-ro_goal
         return [r1,r2,r3,r4]
     
-    phi_ie,phi_o0,hs,rb = fsolve(f,[20,1.3,0.03,0.003],args=(phi_i0,phi_os,Vdisp,Vratio,Thickness,OrbitingRadius))
+    phi_ie,phi_o0,hs,rb = fsolve(f,np.array([20,1.3,0.03,0.003]),args=(phi_i0,phi_os,Vdisp,Vratio,Thickness,OrbitingRadius))
     phi_oe=phi_ie
 
     # Return the values

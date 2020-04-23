@@ -269,14 +269,14 @@ def Compressor(ScrollClass, Te=273, Tc=300, f=None, OneCycle=False, Ref='R410A',
     ScrollComp.RK45_eps = 1e-6
     ScrollComp.eps_cycle = 3e-3
     try:
-        ScrollComp.precond_solve(key_inlet='inlet.1',
-                                 key_outlet='outlet.2',
-                                 solver_method='RK45',
-                                 OneCycle=OneCycle,
-                                 plot_every_cycle=False,
-                                 #hmin = 1e-3
-                                 eps_cycle=3e-3
-                                 )
+        ScrollComp.solve(key_inlet='inlet.1',
+                         key_outlet='outlet.2',
+                         solver_method='RK45',
+                         OneCycle=OneCycle,
+                         plot_every_cycle=False,
+                         #hmin = 1e-3
+                         eps_cycle=3e-3
+                         )
     except BaseException as E:
         print(E)
         raise

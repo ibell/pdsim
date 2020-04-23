@@ -1,6 +1,4 @@
-
-
-# Not a .NET project, we build Astropy in the install step instead
+# Not a .NET project, we build PDSim in the install step instead
 build: false
 
 # Taken from SpiceyPy with some modification
@@ -17,6 +15,16 @@ environment:
         ARCH: "64"
         PLAT_NAME: "win-amd64"
         PY_TAG: "cp27"
+      - PYTHON: "C:\\Python36-x64"
+        PYTHON_VERSION: "3.6.x"
+        ARCH: "64"
+        PLAT_NAME: "win-amd64"
+        PY_TAG: "cp36"
+      - PYTHON: "C:\\Python37-x64"
+        PYTHON_VERSION: "3.7.x"
+        ARCH: "64"
+        PLAT_NAME: "win-amd64"
+        PY_TAG: "cp37"
 
 platform:
     -x64
@@ -57,5 +65,5 @@ deploy_script:
   # upload to pypi for windows
   - set PATH=%BK_PATH%
   - set HOME=%USERPROFILE%
-  - ps: If ($env:APPVEYOR_REPO_TAG -eq "true") { Invoke-Expression "twine upload --verbose dist/*.whl" 2>$null } Else { write-output "Not on a tag, won't deploy to pypi"}
+  - ps: If ($env:APPVEYOR_REPO_TAG -eq "true") { Invoke-Expression "twine upload --verbose --skip-existing dist/*.whl" 2>$null } Else { write-output "Not on a tag, won't deploy to pypi"}
   - echo "Finished Artifact Deployment to PYPI"
