@@ -16,7 +16,7 @@ The core code of PDSim was written by Ian Bell, as part of a collaborative proje
 
 * [hermetic scroll compressor](examples/scroll_compressor.py)
 * [hermetic scroll compressor w/ vapor injection](examples/scroll_compressor_w_VI.py)
-* [hermetic scroll compressor w/ discharge valve](examples/scroll_compressor_valve.py)
+* [hermetic scroll compressor w/ discharge valve](examples/scroll_compressor_valves.py)
 
 Examples are also available of
 
