@@ -2889,7 +2889,8 @@ class Scroll(PDSimCore, _Scroll):
         ds_S2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oi0*(phi2-phi1))
         I = self.CVs.index('s2')
         F[I,:] = ds_S2*self.geo.t/2*(self.p[I,_slice]-p_backpressure)
-        
+
+        # Parameters for the C1.I and C2.I chambers
         for I in range(1, scroll_geo.nC_Max(self.geo)+1):
             phi2 = self.geo.phi_ooe-pi-theta-2*pi*(I-1)
             phi1 = self.geo.phi_ooe-pi-theta-2*pi*(I)
@@ -2903,45 +2904,33 @@ class Scroll(PDSimCore, _Scroll):
             ICV = self.CVs.index('c2.'+str(I))
             F[ICV,:] = ds_C2*self.geo.t/2*(self.p[ICV, _slice]-p_backpressure)
 
-        # Normal calculation for D1 and D2, the default
+        # Get the theta near theta_d
+        near_theta_d = (np.abs(theta-scroll_geo.theta_d(self.geo))<1.e-8)
+
+        # Parameters for the D1 chamber
         phi2 = self.geo.phi_ooe-pi-theta-2*pi*(nC)
         phi1 = self.geo.phi_oos
+        phi2[near_theta_d] = self.geo.phi_ooe-pi-theta[near_theta_d]-2*pi*(scroll_geo.nC_Max(self.geo)-1)
         ds_D1 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oo0*(phi2-phi1))
         ICV = self.CVs.index('d1')
         F[ICV,:] = ds_D1*self.geo.t/2*(self.p[ICV,_slice]-p_backpressure)
 
+        # Parameters for the D2 chamber
         phi2 = self.geo.phi_oie-theta-2*pi*(nC)
         phi1 = self.geo.phi_oos+pi
+        phi2[near_theta_d] = self.geo.phi_oie-theta[near_theta_d]-2*pi*(scroll_geo.nC_Max(self.geo)-1)
         ds_D2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oi0*(phi2-phi1))
         ICV = self.CVs.index('d2')
         F[ICV,:] = ds_D2*self.geo.t/2*(self.p[ICV,_slice]-p_backpressure)
 
-        # Now go back through and find funny values....
-        # 
-        # If just to the left of the discharge angle,
-        # treated like the last of the compression chambers
-        for itheta, _theta in enumerate(theta):
-            if abs(_theta-scroll_geo.theta_d(self.geo))<1e-8:
-                I = scroll_geo.nC_Max(self.geo)
-
-                phi2 = self.geo.phi_ooe-pi-_theta-2*pi*(I-1)
-                phi1 = self.geo.phi_ooe-pi-_theta-2*pi*(I)
-                ds_C1 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oo0*(phi2-phi1))
-                ICV = self.CVs.index('d1')
-                F[ICV,itheta] = ds_C1*self.geo.t/2*(self.p[ICV, itheta]-p_backpressure)
-                
-                phi2 = self.geo.phi_oie-_theta-2*pi*(I-1)
-                phi1 = self.geo.phi_oie-_theta-2*pi*(I)
-                ds_C2 = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oi0*(phi2-phi1))
-                ICV = self.CVs.index('d1')
-                F[ICV,itheta] = ds_C2*self.geo.t/2*(self.p[ICV, itheta]-p_backpressure)
-        
+        # Parameters for the DD chamber
         phi2 = self.geo.phi_ois
         phi1 = self.geo.phi_oi0
         ds_DD = self.geo.rb*(0.5*(phi2**2-phi1**2)-self.geo.phi_oi0*(phi2-phi1))
         ICV = self.CVs.index('dd')
         F[ICV,:] = ds_DD*self.geo.t/2*(self.p[ICV,_slice]-p_backpressure)
-        
+
+        # Parameters for the DDD chamber
         ICV = self.CVs.index('ddd')
         F[ICV,:] = (ds_D1+ds_D2+ds_DD)*self.geo.t/2*(self.p[ICV,_slice]-p_backpressure)
         
