@@ -18,18 +18,15 @@ from CoolProp import State
 from math import pi, exp
 import numpy as np
 import copy
-import types
 
 # If scipy is available, use its interpolation and optimization functions, otherwise, 
 # use our implementation (for packaging purposes mostly)
 try:
     import scipy.interpolate as interp
     import scipy.optimize as optimize
-    from scipy.optimize import fsolve
 except ImportError:
     import PDSim.misc.scipylike as interp
     import PDSim.misc.solvers as optimize
-    from PDSim.misc.solvers import MultiDimNewtRaph as fsolve
 
 import matplotlib.pyplot as plt
 import subprocess
@@ -930,16 +927,13 @@ class Scroll(PDSimCore, _Scroll):
             else:
                 #It is not the first CV, more involved analysis
                 #Assume isentropic compression from the inlet state at the end of the suction process
-                T1 = inletState.T
                 s1 = inletState.s
                 rho1 = inletState.rho
-                k = inletState.cp/inletState.cv
                 V1 = self.V_s1(2*pi)[0]
                 V2 = self.V_c1(0,alpha)[0]
                 #Mass is constant, so rho1*V1 = rho2*V2
                 rho2 = rho1 * V1 / V2
                 
-                T2guess = T1*(V1/V2)**(k-1)
                 # Now don't know temperature or pressure, but you can assume
                 # it is isentropic to find the temperature
                 temp = inletState.copy()
@@ -1409,23 +1403,19 @@ class Scroll(PDSimCore, _Scroll):
             
             if self.__hasLiquid__==False:
 
-                #Density
+                # Density
                 rhod1=self.CVs['d1'].State.rho
                 rhod2=self.CVs['d2'].State.rho
                 rhodd=self.CVs['dd'].State.rho
-                #Density
-                pd1=self.CVs['d1'].State.p
-                pd2=self.CVs['d2'].State.p
-                pdd=self.CVs['dd'].State.p
-                #Internal energy
+                # Internal energy
                 ud1=self.CVs['d1'].State.u
                 ud2=self.CVs['d2'].State.u
                 udd=self.CVs['dd'].State.u
-                #Internal energy
+                # Temperature
                 Td1=self.CVs['d1'].State.T
                 Td2=self.CVs['d2'].State.T
                 Tdd=self.CVs['dd'].State.T
-                #Volumes
+                # Volumes
                 Vdict=dict(zip(self.CVs.exists_keys,V))
                 Vd1=Vdict['d1']
                 Vd2=Vdict['d2']
@@ -1437,9 +1427,7 @@ class Scroll(PDSimCore, _Scroll):
                 rhoddd=m/Vddd
                 #guess the mixed temperature as a volume-weighted average
                 T=(Td1*Vd1+Td2*Vd2+Tdd*Vdd)/Vddd
-                p=(pd1*Vd1+pd2*Vd2+pdd*Vdd)/Vddd
                 #Must conserve mass and internal energy (instantaneous mixing process)
-                Fluid = self.CVs['ddd'].State.Fluid
                 
                 temp = self.CVs['ddd'].State.copy()
                 def resid(T):
@@ -2654,13 +2642,11 @@ class Scroll(PDSimCore, _Scroll):
             
         muthrust = self.mech.thrust_friction_coefficient
         beta = self.mech.oldham_rotation_beta
-        mu1 = mu2 = mu3 = mu4 = mu5 = self.mech.oldham_key_friction_coefficient
+        mu1 = mu2 = mu3 = mu4 = self.mech.oldham_key_friction_coefficient
         r1 = r2 = r3 = r4 = self.mech.oldham_ring_radius
         w1 = w2 = w3 = w4 = self.mech.oldham_key_width
         mOR = self.mech.oldham_mass
         mOS = self.mech.orbiting_scroll_mass
-        wOR = self.mech.oldham_thickness
-        hkeyOR = self.mech.oldham_key_height
         
         # Fill in terms if they are not provided for backwards compatability
         for term in ['pin1_ybeta_offset','pin2_ybeta_offset','pin3_xbeta_offset','pin4_xbeta_offset']:
@@ -2672,9 +2658,6 @@ class Scroll(PDSimCore, _Scroll):
         F2_ybeta_offset = self.mech.pin2_ybeta_offset
         F3_xbeta_offset = self.mech.pin3_xbeta_offset
         F4_xbeta_offset = self.mech.pin4_xbeta_offset
-        
-        # Gravitional acceleration
-        g = 9.80665 
         
         _slice = list(range(self.Itheta+1))
         theta = self.t[_slice]
@@ -2797,8 +2780,6 @@ class Scroll(PDSimCore, _Scroll):
         
         self.forces.Wdot_total_mean = np.trapz(self.forces.Wdot_total, theta)/(2*pi)
         #print(self.forces.Wdot_total_mean,'average mechanical losses')
-            
-        import matplotlib.pyplot as plt
             
 #        fig = plt.figure()
 #        fig.add_subplot(111)
