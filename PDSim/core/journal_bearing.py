@@ -36,7 +36,6 @@ def OBJECTIVE(phi_star, epsilon, plot = False, output = False):
     dY = 1/(N-1)
     sinPHI=np.sin(PHI)
     P = 0*PHI
-    Pnew = 0*PHI
     f = 0*PHI
     df = 0*PHI
     _lambda = 1

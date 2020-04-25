@@ -28,8 +28,6 @@ if __name__=='__main__':
     L_over_D = L/D #[-]
     c_R = c/(D/2.0) #[-]
     
-    from PDSim.core.bearings import journal_bearing
-    
     def f(x,F_t,t):
         
         epsilon = x[0]

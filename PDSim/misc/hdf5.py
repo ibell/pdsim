@@ -2,14 +2,11 @@ from __future__ import print_function
 
 import h5py
 import numpy as np
-import types
 import six
-
 
 class StubClass:
     def __init__(self, d):
         self.__dict__.update(d)
-
 
 class HDF5Writer(object):
     """

@@ -1,19 +1,17 @@
 from __future__ import print_function
 
 from math import pi
-import numpy as np
 from PDSim.scroll import scroll_geo
 import PDSim.scroll.core as core
 from PDSim.core.motor import Motor
 from PDSim.flow.flow import FlowPath
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.core.containers import Tube,ControlVolume
-import matplotlib.pyplot as plt
-from CoolProp.CoolProp import Props
 from CoolProp.State import State as CPState
 from PDSim.core.core import PDSimCore
 from PDSim.flow import flow_models
 from PDSim.misc.datatypes import arraym
+from CoolProp.CoolProp import PropsSI
 
 # If scipy is available, use its interpolation and optimization functions, otherwise, 
 # use our implementation (for packaging purposes mostly)
@@ -143,7 +141,6 @@ class ScrollExpander(core.Scroll):
                 T1 = inletState.T
                 s1 = inletState.s
                 rho1 = inletState.rho
-                k = inletState.cp/inletState.cv
                 V1 = self.V_sss(2*pi-self.theta_d-1e-14)[0]
                 V2 = self.V_e1(0, alpha)[0]*2
                 # Mass is constant, so rho1*V1 = rho2*V2

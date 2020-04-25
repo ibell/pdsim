@@ -17,7 +17,7 @@ global geo,setDiscGeo,coords_inv,circle,sortAnglesCCW,Shave,plotScrollSet
 global polyarea,theta_d
 import matplotlib.pyplot as pyplot
 from PDSim.scroll import common_scroll_geo
-from PDSim.scroll.common_scroll_geo import sortAnglesCCW, sortAnglesCW
+from PDSim.scroll.common_scroll_geo import coords_inv, coords_norm
     
 class geoVals:
     """ 
@@ -51,9 +51,9 @@ class geoVals:
         self.phi_os=1.8
         self.phi_oe=15.5
         self.h=0.03289
-        disc_x0=-0.007	
-        disc_y0=-0.0011	
-        disc_R=0.0060198
+        # disc_x0=-0.007	
+        # disc_y0=-0.0011	
+        # disc_R=0.0060198
         self.ro=self.rb*(pi-self.phi_i0+self.phi_o0)
         #Load a default discharge geometry
         setDiscGeo(self)
@@ -660,15 +660,6 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
     xarc2=geo.xa_arc2+geo.ra_arc2*cos(np.linspace(geo.t1_arc2,geo.t2_arc2,100))
     yarc2=geo.ya_arc2+geo.ra_arc2*sin(np.linspace(geo.t1_arc2,geo.t2_arc2,100))
     
-    ro=geo.rb*(pi-geo.phi_fi0+geo.phi_fo0)
-    om=geo.phi_fie-theta+3.0*pi/2.0
-    xarc1_o=-xarc1+ro*cos(om)
-    yarc1_o=-yarc1+ro*sin(om)
-    xline_o=-xline+ro*cos(om)
-    yline_o=-yline+ro*sin(om)
-    xarc2_o=-xarc2+ro*cos(om)
-    yarc2_o=-yarc2+ro*sin(om)
-    
     ##Fixed Scroll
     phi=np.linspace(geo.phi_fis,geo.phi_fie,500)
     (x_fi,y_fi)=scroll_geo.coords_inv(phi,geo,theta,flag="fi")
@@ -765,13 +756,13 @@ def overlay_injection_port(theta, geo, phi, ax, inner_outer, rport = None, offse
     
     if inner_outer == 'o':
         #Involute angle along the outer involute of the scroll wrap
-        x, y = core_scroll_geo.coords_inv(phi, geo, theta, 'fo')
-        nx, ny = core_scroll_geo.coords_norm(phi, geo, theta, 'fo')
+        x, y = common_scroll_geo.coords_inv(phi, geo, theta, 'fo')
+        nx, ny = common_scroll_geo.coords_norm(phi, geo, theta, 'fo')
         xc,yc = x-nx*offset,y-ny*offset
         ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
     elif inner_outer == 'i':
-        x, y = core_scroll_geo.coords_inv(phi, geo, theta, 'fi')
-        nx, ny = core_scroll_geo.coords_norm(phi, geo, theta, 'fi')
+        x, y = common_scroll_geo.coords_inv(phi, geo, theta, 'fi')
+        nx, ny = common_scroll_geo.coords_norm(phi, geo, theta, 'fi')
         xc,yc = x-nx*offset,y-ny*offset
         ax.plot(xc + rport*np.cos(t),yc+rport*np.sin(t),'k')
     else:

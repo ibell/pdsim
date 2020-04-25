@@ -27,33 +27,6 @@ except ImportError:
 
 import h5py
 
-## matplotlib imports
-import matplotlib.pyplot as plt
-import pylab
-
-## CoolProp imports
-from CoolProp.State import State
-
-#def _pickle_method(method):
-    #func_name = method.im_func.__name__
-    #obj = method.im_self
-    #cls = method.im_class
-    #return _unpickle_method, (func_name, obj, cls)
-
-#def _unpickle_method(func_name, obj, cls):
-    #for cls in cls.mro():
-        #try:
-            #func = cls.__dict__[func_name]
-        #except KeyError:
-            #pass
-        #else:
-            #break
-        #return func.__get__(obj, cls)
-
-#import copy_reg
-#import types
-#copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
-
 # An empty class for storage
 class struct(object):
     pass    
@@ -1038,7 +1011,7 @@ class PDSimCore(object):
                 assert self.Ntheta == len(self.FlowStorage)
                 self.post_cycle()
             
-        except ValueError as VE:
+        except ValueError:
             # debug_plots(self)
             raise
         
@@ -1142,10 +1115,8 @@ class PDSimCore(object):
 
                 if self.OEB_solver == 'MDNR':
                     # Use Multi Dim. Newton Raphson step for multi-lump temperatures
-                    from numpy.linalg import inv
                     w = 1.0                
                     dx = 0.5
-                    ytol=1e-3
                     x = np.array(self.Tlumps,dtype=np.float)
                     J = np.zeros((len(x),len(x)))
                     error = 999
@@ -1227,7 +1198,6 @@ class PDSimCore(object):
                 key_outtube_outlet = outlet_tube.key1
             elif outlet_tube.key2 == self.key_outlet:
                 key_outtube_inlet = outlet_tube.key1
-                key_outtube_outlet = outlet_tube.key2
                 
             if error_metric < 0.1*epsilon_cycle and np.max(np.abs(self.lumps_resid)) < epsilon_energy_balance:
 

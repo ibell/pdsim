@@ -180,6 +180,8 @@ def Broyden(
 
 def newton(f, x0, dx=1e-4, args=(), kwargs={}, tol=1e-8, ytol=1e-8):
     iter = 1
+    change = 1e99
+    y2 = 1e99
 
     while iter < 3 or (abs(change) > tol and abs(y2) > ytol):
 

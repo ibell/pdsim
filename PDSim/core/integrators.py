@@ -3,6 +3,7 @@ from __future__ import division, print_function
 import abc, math
 from PDSim.misc.datatypes import arraym
 import numpy as np
+import matplotlib.pyplot as plt
 
 class AbstractODEIntegrator(object):
     __metaclass__ = abc.ABCMeta
@@ -235,12 +236,12 @@ class AbstractRK45ODEIntegrator(AbstractODEIntegrator):
         self.tmax = tmax
         self.h = hmin
         
-        gamma1=16.0/135.0
-        gamma2=0.0
-        gamma3=6656.0/12825.0
-        gamma4=28561.0/56430.0
-        gamma5=-9.0/50.0
-        gamma6=2.0/55.0
+        # gamma1=16.0/135.0
+        # gamma2=0.0
+        # gamma3=6656.0/12825.0
+        # gamma4=28561.0/56430.0
+        # gamma5=-9.0/50.0
+        # gamma6=2.0/55.0
         
         #t is the independent variable here, where t takes on values in the bounded range [tmin,tmax]
         while (self.t0 < self.tmax - 1e-10):
@@ -378,8 +379,6 @@ if __name__ == '__main__':
     class TestRK45Integrator(TestIntegrator, AbstractRK45ODEIntegrator):
         """ Mixin class using the functions defined in TestIntegrator """
         pass
-    
-    import matplotlib.pyplot as plt, numpy as np
     
     for N in [4, 11, 21]:
         TEI = TestEulerIntegrator()
