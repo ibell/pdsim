@@ -10,7 +10,7 @@ from PDSim.recip.core import Recip
 try:
     from PDSim.plot.plots import debug_plots
     plotting = True
-except ImportError as IE:
+except ImportError:
     plotting = False
     
 def Compressor():
