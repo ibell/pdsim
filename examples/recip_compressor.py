@@ -4,10 +4,14 @@ import timeit
 
 from PDSim.flow.flow import FlowPath
 from PDSim.core.containers import Tube, ControlVolume
-from PDSim.plot.plots import debug_plots
 from CoolProp import State
 from PDSim.flow.flow_models import ValveModel
 from PDSim.recip.core import Recip
+try:
+    from PDSim.plot.plots import debug_plots
+    plotting = True
+except ImportError as IE:
+    plotting = False
     
 def Compressor():
     recip=Recip()
@@ -127,7 +131,8 @@ def Compressor():
                 )
     print('time taken', timeit.default_timer()-t1)
     
-    debug_plots(recip, family='Recip Compressor')
+    if plotting:
+      debug_plots(recip, family='Recip Compressor')
     
     del recip.FlowStorage
     from PDSim.misc.hdf5 import HDF5Writer
