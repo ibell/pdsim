@@ -3,22 +3,19 @@
 #
 from __future__ import division, print_function
 
-# If being run from the folder that contains the PDSim source tree, 
-# remove the current location from the python path and use the 
-# site-packages version of PDSim
 from math import pi
+import timeit
 
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
 from PDSim.core.core import struct
 from PDSim.scroll.core import Scroll
-from PDSim.scroll import scroll_geo
 from PDSim.core.containers import Tube
 from PDSim.core.motor import Motor
 from PDSim.scroll.core import Port
 try:
-    from PDSim.scroll.plots import plotScrollSet
-    from PDSim.plot.plots import debug_plots # (Uncomment if you want to do the debug_plots)
+    # from PDSim.scroll.plots import plotScrollSet
+    # from PDSim.plot.plots import debug_plots # (Uncomment if you want to do the debug_plots)
     plotting = True
 except ImportError as IE:
     print(IE)
@@ -26,14 +23,8 @@ except ImportError as IE:
     plotting = False
     
 from CoolProp import State
-from CoolProp import CoolProp as CP
 
 import scipy.interpolate as interp
-
-import numpy as np
-
-from matplotlib import pyplot as plt
-import timeit
 
 def Compressor(ScrollClass, Te=273, Tc=300, f=None, OneCycle=False, Ref='R410A', HDF5file='scroll_compressor.h5'):
 
@@ -79,7 +70,6 @@ def Compressor(ScrollClass, Te=273, Tc=300, f=None, OneCycle=False, Ref='R410A',
     Te = -20 + 273.15
     Tc = 20 + 273.15
     Tin = Te + 11.1
-    DT_sc = 7
     temp = State.State(Ref,{'T':Te,'Q':1})
     pe = temp.p
     temp.update(dict(T=Tc, Q=1))

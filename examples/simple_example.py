@@ -14,29 +14,20 @@ For illustrative purposes only!
 ###          Part 1. Imports           ###
 ##########################################
 
-#Here we import some python packages
+# Here we import some python packages
 from __future__ import division, print_function
 from math import pi, cos, sin
 import timeit
-import os, sys
 
-# If the following line is uncommented, python will try to use a local version
-# of PDSim.  This is handy for debugging purposes.  Generally you want this line 
-# commented out
-# PDSim should also be built using a command like python build_ext --inplace to keep all the extension modules next to the .pyx files
-#sys.path.insert(0, os.path.abspath('..'))
-
-#Here we import the things from PDSim we need
+# Here we import the things from PDSim we need
 from PDSim.flow.flow import FlowPath
 from PDSim.flow import flow_models
 from PDSim.misc.datatypes import arraym
 from PDSim.core.containers import ControlVolume, Tube
 from PDSim.core.core import PDSimCore
 
-
-#Imports from CoolProp (fluid property database)
+# Imports from CoolProp (fluid property database)
 from CoolProp import State
-from CoolProp import CoolProp as CP
     
 ##########################################
 ###   Part 2. Declaration of PURecip   ###

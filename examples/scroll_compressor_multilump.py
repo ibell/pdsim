@@ -2,19 +2,17 @@
 ## work for you.  Caveat emptor!!
 #
 from __future__ import division, print_function
-
-import sys, os
+import sys
 from math import pi
 
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
-from PDSim.scroll import scroll_geo
 from PDSim.core.core import struct
 from PDSim.scroll.core import Scroll
-from PDSim.core.containers import ControlVolume, Tube
+from PDSim.core.containers import Tube
 from PDSim.core.motor import Motor
 try:
-    from PDSim.scroll.plots import plotScrollSet
+    # from PDSim.scroll.plots import plotScrollSet
     from PDSim.plot.plots import debug_plots # (Uncomment if you want to do the debug_plots)
     plotting = True
 except ImportError as IE:
@@ -23,10 +21,6 @@ except ImportError as IE:
     plotting = False
 
 from CoolProp import State
-from CoolProp import CoolProp as CP
-
-import numpy as np
-import time
 
 def Compressor(Te = 0,DTsh = 11.1,Tc = 20, Tamb = 25, Nmot = 3600, f = None, OneCycle = False, Ref = 'R134a', HDF5file='scroll_compressor.h5'):
 
@@ -90,7 +84,6 @@ def Compressor(Te = 0,DTsh = 11.1,Tc = 20, Tamb = 25, Nmot = 3600, f = None, One
     Tcond = Tc + 273.15 #K
 
     Tin = Tevap + DTsh
-    DT_sc = 7 #K
     temp = State.State(Ref,{'T':Tevap,'Q':1})
     pe = temp.p
     temp.update(dict(T=Tcond, Q=1))
@@ -217,7 +210,8 @@ def Compressor(Te = 0,DTsh = 11.1,Tc = 20, Tamb = 25, Nmot = 3600, f = None, One
 
     print('time taken', clock()-t1)
 
-    #debug_plots(ScrollComp)
+    if '--plot' in sys.argv:
+        debug_plots(ScrollComp)
 
     del ScrollComp.FlowStorage
     from PDSim.misc.hdf5 import HDF5Writer

@@ -2,24 +2,19 @@
 ## work for you.  Caveat emptor!!
 #
 from __future__ import division, print_function
-
-# If being run from the folder that contains the PDSim source tree, 
-# remove the current location from the python path and use the 
-# site-packages version of PDSim
-import sys, os
 from math import pi
+import timeit
 
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
 from PDSim.flow.flow import FlowPath
-from PDSim.scroll import scroll_geo
 from PDSim.core.core import struct
 from PDSim.scroll.core import Scroll
-from PDSim.core.containers import ControlVolume, Tube
+from PDSim.core.containers import Tube
 from PDSim.core.motor import Motor
 from PDSim.flow.flow_models import ValveModel
 
 try:
-    from PDSim.scroll.plots import plotScrollSet
+    # from PDSim.scroll.plots import plotScrollSet
     from PDSim.plot.plots import debug_plots # (Uncomment if you want to do the debug_plots)
     plotting = True
 except ImportError as IE:
@@ -28,12 +23,6 @@ except ImportError as IE:
     plotting = False
     
 from CoolProp import State
-from CoolProp import CoolProp as CP
-
-import numpy as np
-
-from matplotlib import pyplot as plt
-import timeit
 
 def Compressor(ScrollClass, Te = 253, Tc = 310, f = None, OneCycle = False, Ref = 'R410A', HDF5file='scroll_compressor.h5', discharge_valve=True):
 
@@ -78,7 +67,6 @@ def Compressor(ScrollClass, Te = 253, Tc = 310, f = None, OneCycle = False, Ref 
     ScrollComp.motor.suction_fraction = 1.0
     
     Tin = Te + 11.1
-    DT_sc = 7
     temp = State.State(Ref,{'T':Te,'Q':1})
     pe = temp.p
     temp.update(dict(T=Tc, Q=1))
