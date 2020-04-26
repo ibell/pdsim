@@ -103,7 +103,7 @@ class Scroll(PDSimCore, _Scroll):
         """
         A function for unpacking class instance for unpickling
         """
-        for k,v in d.iteritems():
+        for k,v in d.items():
             setattr(self,k,v)
         
     def INTERPOLATING_NOZZLE_FLOW(self, 
@@ -227,7 +227,7 @@ class Scroll(PDSimCore, _Scroll):
             except ZeroDivisionError:
                 return 0.0
             
-    def calculate_port_areas(self):
+    def calculate_port_areas(self, plot=False):
         """ 
         Calculate the area between a port on the fixed scroll and all of the 
         control volumes.
@@ -240,7 +240,7 @@ class Scroll(PDSimCore, _Scroll):
         """
         
         # Iterate over the ports
-        for port in self.fixed_scroll_ports:
+        for iport, port in enumerate(self.fixed_scroll_ports):
             
             #  Make sure it is an Port instance
             assert (isinstance(port,Port))
@@ -274,18 +274,18 @@ class Scroll(PDSimCore, _Scroll):
             theta_area, area_dict = self.poly_intersection_with_cvs(xport, yport, 100)
             
             #  Save the values
-            port.area_dict = area_dict
             port.theta = theta_area
-            
-#            #  Plot them
-#            for k, A in area_dict.iteritems():
-#                plt.plot(theta_area, A*1e6, label = k)
-#            
-#            plt.legend()
-#            plt.xlabel('Crank angle [rad]')
-#            plt.ylabel('Area [mm$^2$]')
-#            plt.savefig('Aport.png')
-#            plt.show()  
+            port.area_dict = area_dict
+
+            if plot:
+               for k, A in area_dict.items():
+                   plt.plot(theta_area, A*1e6, label = k)
+               plt.legend()
+               plt.title('Port index: '+str(iport))
+               plt.xlabel('Crank angle [rad]')
+               plt.ylabel('Area [mm$^2$]')
+               plt.savefig('Aport.png')
+               plt.show()  
             
     def get_discharge_port_blockage_poly(self, theta):
         """
