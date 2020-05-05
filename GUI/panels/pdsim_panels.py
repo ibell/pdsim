@@ -536,56 +536,21 @@ class OutputTreePanel(wx.Panel):
         wx.Panel.__init__(self, parent, -1)
         self.Bind(wx.EVT_SIZE, self.OnSize)
         
-        self.tree = wx.gizmos.TreeListCtrl(self, -1, style =
-                                           wx.TR_DEFAULT_STYLE
-                                           #| wx.TR_HAS_BUTTONS
-                                           #| wx.TR_TWIST_BUTTONS
-                                           #| wx.TR_ROW_LINES
-                                           #| wx.TR_COLUMN_LINES
-                                           #| wx.TR_NO_LINES 
-                                           | wx.TR_FULL_ROW_HIGHLIGHT
-                                           )
+        # Note: HyperTreeList does not have GetItemText()
+        self.tree = wx.lib.gizmos.treelistctrl.TreeListCtrl(self, -1, style =
+                                                            wx.TR_DEFAULT_STYLE
+                                                            #| wx.TR_HAS_BUTTONS
+                                                            #| wx.TR_TWIST_BUTTONS
+                                                            #| wx.TR_ROW_LINES
+                                                            #| wx.TR_COLUMN_LINES
+                                                            #| wx.TR_NO_LINES 
+                                                            | wx.TR_FULL_ROW_HIGHLIGHT
+                                                            )
         
-#        # Make a list of list of keys for each HDF5 file
-#        lists_of_keys = []
-#        for run in runs:
-#            keys = []
-#            run.visit(keys.append) #For each thing in HDF5 file, append its name to the keys list
-#            lists_of_keys.append(keys)
-#        
-#        from time import clock
-#        t1 = clock()
-#        
-#        mylist = []
-#        def func(name, obj):
-#            if isinstance(obj, h5py.Dataset):
-#                try:
-#                    mylist.append((name, obj.value))
-#                except ValueError:
-#                    pass
-#            elif isinstance(obj, h5py.Group):
-#                mylist.append((name, None))
-#            else:
-#                return
-#                
-#        run.visititems(func)
-#        
-#        for el in mylist:
-#            r,v = el
-#            
-#            # Always make this level
-#            child = self.tree.AppendItem(self.root, r)
-#            self.tree.SetItemImage(child, fldridx, which = wx.TreeItemIcon_Normal)
-#            self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
-#            self.tree.SetItemText(child, str(v), 1)
-#            
-#        t2 = clock()
-#        print(t2 - t1, 'to get all the items')
-            
         self.runs = runs
         self.Disable()
         self.rebuild()
-        
+
     def rebuild(self):
         
         self.Enable()
@@ -601,7 +566,7 @@ class OutputTreePanel(wx.Panel):
 
         # If all the runs that are being run have the run_index key, sort based on it
         if self.runs and all(['run_index' in run.keys() for run in self.runs]):
-            s = sorted([(run['run_index'].value,run) for run in self.runs])
+            s = sorted([(run['run_index'][()],run) for run in self.runs])
             indices, runs = zip(*s)
             self.runs = list(runs)
         
@@ -614,6 +579,10 @@ class OutputTreePanel(wx.Panel):
         fldropenidx = il.Add(wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN,   wx.ART_OTHER, isz))
         fileidx     = il.Add(wx.ArtProvider.GetBitmap(wx.ART_NORMAL_FILE, wx.ART_OTHER, isz))
         
+        ico = 'dataset.png'
+        ico_path = os.path.join('ico',ico)
+        datasetidx = il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap())
+        
         self.tree.SetImageList(il)
         self.il = il
         self.tree.AddColumn("Main column")
@@ -622,7 +591,7 @@ class OutputTreePanel(wx.Panel):
         
         # Build the columns
         for i, run in enumerate(self.runs):
-            self.tree.AddColumn("Run {i:d}".format(i = i))  
+            self.tree.AddColumn("Run {i:d}".format(i = i))
 
         # Create the root column
         self.root = self.tree.AddRoot("The Root Item")
@@ -630,35 +599,53 @@ class OutputTreePanel(wx.Panel):
         self.tree.SetItemImage(self.root, fldridx, which = wx.TreeItemIcon_Normal)
         self.tree.SetItemImage(self.root, fldropenidx, which = wx.TreeItemIcon_Expanded)
         
+        def to_str(var):
+            return str(list(np.reshape(np.asarray(var), (1, np.size(var)))[0]))[1:-1]
+        
         def _recursive_hdf5_add(root, objects):
             for thing in objects[0]:
-                # Always make this level
-                child = self.tree.AppendItem(root, str(thing))
-                
+     
                 # If it is a dataset, write the dataset contents to the tree
                 if isinstance(objects[0][thing], h5py.Dataset):
+                    
+                    # Always make this level
+                    child = self.tree.AppendItem(root, str(thing))                        
+                    self.tree.SetItemImage(child, datasetidx)
+                    
                     for i, o in enumerate(objects):
+
                         if hasattr(o[thing], 'shape') and o[thing].shape == tuple(): 
                             # It's a single element, perhaps a number or a string.  
                             # shape will be an empty tuple, hence not () is True
-                            self.tree.SetItemText(child, str(o[thing].value), i+1)
+                            value = to_str(o[thing][()])
+                            idx_column = i+1
+
                         else:
                             # A place holder for now - will develop a frame to display the matrix
-                            self.tree.SetItemText(child, str(o[thing]), i+1)
+                            #self.tree.SetItemText(root, str(o[thing]), i+1)
+                            value = to_str(o[thing])
+                            idx_column = i+1
                         
                         if o[thing].attrs and 'note' in o[thing].attrs: #If it has any annotations
-                            self.tree.SetItemPyData(child, dict(annotation = o[thing].attrs['note']))
-                            self.tree.SetItemBackgroundColour(child,(255,0,0)) #Color the cell
+                            self.tree.SetItemPyData(root, dict(annotation = o[thing].attrs['note']))
+                            #self.tree.SetItemBackgroundColour(root,(255,0,0)) #Color the cell
+                         
+                        # Assign data value to column
+                        self.tree.SetItemText(child, value, idx_column)
                 
                 # Otherwise if it is a group, change the icon and recurse into the group
                 elif isinstance(objects[0][thing], h5py.Group):
+                    
+                    # Always make this level
+                    child = self.tree.AppendItem(root, str(thing))
+                    
                     self.tree.SetItemImage(child, fldridx, which = wx.TreeItemIcon_Normal)
                     self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
                     try:
                         _recursive_hdf5_add(child, [o[thing] for o in objects])
                     except KeyError as KE:
                         print(KE)
-        
+
         t1 = clock()
         _recursive_hdf5_add(self.root, self.runs)
         t2 = clock()
@@ -669,9 +656,9 @@ class OutputTreePanel(wx.Panel):
 
         self.tree.GetMainWindow().Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
         self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnActivate)
+        #self.tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.OnActivate)
         
     def OnSaveXLSX(self, event = None):
-        
         
         FD = wx.FileDialog(None,
                            "Save XLSX file",
@@ -682,7 +669,6 @@ class OutputTreePanel(wx.Panel):
         if wx.ID_OK == FD.ShowModal():
             #Get the file path
             fName = FD.GetPath()
-
             FD.Destroy()
         else:
             FD.Destroy()
@@ -767,16 +753,16 @@ class OutputTreePanel(wx.Panel):
             col_idx = 1
             
             # 3 is the number of empty columns between runs
-            offset = 3 + self.runs[0].get(key).value.T.shape[1]
+            offset = 3 + self.runs[0].get(key)[()].T.shape[1]
             
             # Header 
             my_col_idx = col_idx
             for run in self.runs:
-                run_index = run.get('run_index').value
+                run_index = run.get('run_index')[()]
                 ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index))
                 
                 if run.get('description'):
-                    description = run.get('description').value
+                    description = run.get('description')[()]
                     ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index)+': '+description)
                     
                 my_col_idx += offset
@@ -786,8 +772,8 @@ class OutputTreePanel(wx.Panel):
             maxlen = 0
             for run in self.runs:
                 # Each are stored as 1D array, convert to 2D column matrix
-                theta = np.array(run.get('t').value, ndmin = 2).T
-                mat = np.array(run.get(key).value, ndmin = 2).T
+                theta = np.array(run.get('t')[()], ndmin = 2).T
+                mat = np.array(run.get(key)[()], ndmin = 2).T
             
                 datas.append(np.c_[theta, mat])
                 if np.prod(theta.shape) > maxlen:
@@ -798,7 +784,7 @@ class OutputTreePanel(wx.Panel):
             for run in self.runs:
                 ws.write(row_idx-2, my_col_idx - 1, 'theta')
                 for c in range(0, datas[0].shape[1]-1):
-                    CVkey = run.get('CVs/keys/%s' %(c,)).value
+                    CVkey = run.get('CVs/keys/%s' %(c,))[()] 
                     ws.write(row_idx - 2, my_col_idx+c,CVkey)
                         
                 my_col_idx += offset
@@ -829,7 +815,6 @@ class OutputTreePanel(wx.Panel):
             family_module.write_to_xlsx(workbook, self.runs)
             
         # Let the plugins do things to the opened worksheet if they are activated
-        
         workbook.close()
         
         os.startfile(fName)
@@ -844,7 +829,6 @@ class OutputTreePanel(wx.Panel):
         else:
             self.GetParent().AnnotationTarget.SetLabel('Annotation: None' )
         
-        
     def OnRightUp(self, evt):
         pos = evt.GetPosition()
         item, flags, col = self.tree.HitTest(pos) #col is 1-based for the runs; first run has col index of 1
@@ -857,11 +841,11 @@ class OutputTreePanel(wx.Panel):
         if col > 0: # col == 0 for the name column
             menuitem1 = wx.MenuItem(menu, -1, 'Remove this column')
             self.Bind(wx.EVT_MENU, lambda event: self.OnRemoveCol(event, col), menuitem1)
-            menu.AppendItem(menuitem1)
+            menu.Append(menuitem1)
             
             menuitem = wx.MenuItem(menu, -1, 'Plot this simulation')
             self.Bind(wx.EVT_MENU, lambda event: self.OnPlotSimulation(event, col), menuitem)
-            menu.AppendItem(menuitem)
+            menu.Append(menuitem)
         
         # If 
         if self.tree.GetItemText(item,col).startswith('<HDF5 dataset'):
@@ -877,22 +861,22 @@ class OutputTreePanel(wx.Panel):
         if _isHDF5array:
             menuitem = wx.MenuItem(menu, -1, 'Display this parameter')
             self.Bind(wx.EVT_MENU, lambda event: self.OnArrayDisplay(event, item, col), menuitem)
-            menu.AppendItem(menuitem)
+            menu.Append(menuitem)
             menuitem = wx.MenuItem(menu, -1, 'Save to Excel-format csv file')
             self.Bind(wx.EVT_MENU, lambda event: self.OnArray2CSV(event, item, col), menuitem)
-            menu.AppendItem(menuitem)
+            menu.Append(menuitem)
             
         if _isScript:
             menuitem = wx.MenuItem(menu, -1, 'View Script')
             self.Bind(wx.EVT_MENU, lambda event: self.OnScriptDisplay(event, item, col), menuitem)
-            menu.AppendItem(menuitem)
+            menu.Append(menuitem)
              
         # If you are in a dataset row, allow you to sort based on it
-        values = [self.tree.GetItemText(item, c) for c in range(1, self.tree.ColumnCount)]
+        values = [self.tree.GetItemText(item, c) for c in range(1, self.tree.GetColumnCount())]
         if any(values):
             menuitem = wx.MenuItem(menu, -1, 'Sort by this parameter')
             self.Bind(wx.EVT_MENU, lambda event: self.OnSortByRow(event, item), menuitem)
-            menu.AppendItem(menuitem)
+            menu.Append(menuitem)
         
         
         if menu.GetMenuItems():
@@ -910,7 +894,7 @@ class OutputTreePanel(wx.Panel):
             path = '/' +  self.tree.GetItemText(item, 0) + path
             item = self.tree.GetItemParent(item)
             
-        val = self.runs[col-1].get(path).value
+        val = self.runs[col-1].get(path)[()]
         
         FD = wx.FileDialog(None,
                            "Save HDF5 array to file",
@@ -958,7 +942,7 @@ class OutputTreePanel(wx.Panel):
             path = '/' +  self.tree.GetItemText(item, 0) + path
             item = self.tree.GetItemParent(item)
             
-        val = self.runs[col-1].get(path).value
+        val = self.runs[col-1].get(path)[()]
         
         frm = ArrayDisplay(val, title = title)
         frm.Show()
