@@ -490,8 +490,8 @@ class GeometryPanel(pdsim_panels.PDPanel):
         self.ConvertGeometryButton.Bind(wx.EVT_BUTTON,self.OnConvertGeometry)
 
         geosizer = wx.BoxSizer(wx.HORIZONTAL)
-        geosizer.Add(self.ScrollWrapAnglesButton, 1, wx.ALIGN_CENTER_HORIZONTAL)
-        geosizer.Add(self.ConvertGeometryButton, 1, wx.ALIGN_CENTER_HORIZONTAL)
+        geosizer.Add(self.ScrollWrapAnglesButton, 1)# wx.ALIGN_CENTER_HORIZONTAL)
+        geosizer.Add(self.ConvertGeometryButton, 1)#, wx.ALIGN_CENTER_HORIZONTAL)
 
         
         # Build the items and return the list of annotated GUI objects
@@ -515,9 +515,9 @@ class GeometryPanel(pdsim_panels.PDPanel):
         discbut_sizer = wx.BoxSizer(wx.HORIZONTAL)
         
         sizer_for_discharge_inputs.Add(self.disc_curves)
-        discbut_sizer.Add(self.DiscCoordsButton, 0, wx.ALIGN_CENTER_HORIZONTAL)
-        discbut_sizer.Add(self.ClearDiscCoordsButton, 0, wx.ALIGN_CENTER_HORIZONTAL)
-        sizer_for_discharge_inputs.Add(discbut_sizer, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        discbut_sizer.Add(self.DiscCoordsButton, 0)#, wx.ALIGN_CENTER_HORIZONTAL)
+        discbut_sizer.Add(self.ClearDiscCoordsButton, 0)#, wx.ALIGN_CENTER_HORIZONTAL)
+        sizer_for_discharge_inputs.Add(discbut_sizer, 0)#, wx.ALIGN_CENTER_HORIZONTAL)
         
         sizer = wx.BoxSizer(wx.HORIZONTAL)
         # Loop over the tube inputs
@@ -848,7 +848,7 @@ class GeometryPanel(pdsim_panels.PDPanel):
         if isinstance(plugin_chunks,dict):
             for key,chunk in plugin_chunks.items():
                 if key in allowed:
-                    core += chunk                        
+                    core += chunk                         
         return core
 
     def get_geo(self):
@@ -1433,7 +1433,7 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         sizer.Add(self.mechanical_model_choices,0,wx.ALIGN_CENTER_HORIZONTAL)
         sizer.AddSpacer(20)
         scrolled_panel.SetSizer(sizer)
-        main_sizer.Add(scrolled_panel, 1, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL)
+        main_sizer.Add(scrolled_panel, 1, wx.EXPAND)#|wx.ALIGN_CENTER_HORIZONTAL)
         self.SetSizer(main_sizer)
         sizer.Layout()
                     
@@ -1756,7 +1756,7 @@ class VirtualSensorsPanel(pdsim_panels.PDPanel):
         sizer.Add(self.sensor_sizer,0, wx.ALIGN_CENTER_HORIZONTAL)
         
         scrolled_panel.SetSizer(sizer)
-        main_sizer.Add(scrolled_panel, 1, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL)
+        main_sizer.Add(scrolled_panel, 1, wx.EXPAND)#|wx.ALIGN_CENTER_HORIZONTAL)
         self.SetSizer(main_sizer)
         
         sizer.Layout()
