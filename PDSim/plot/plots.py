@@ -130,15 +130,15 @@ class PlotNotebook(wx.Panel):
     
     def get_keys(self):
         if isinstance(self.Sim,h5py.File):
-            NCV = self.Sim.get('/CVs/N').value
-            keys = [self.Sim.get('/CVs/keys/'+str(i)).value for i in range(NCV)]
+            NCV = self.Sim.get('/CVs/N')[()]
+            keys = [self.Sim.get('/CVs/keys/'+str(i))[()] for i in range(NCV)]
         else:
             keys = self.Sim.CVs.keys
         return keys
 
     def get(self, key):
         if isinstance(self.Sim, h5py.File):
-            out = self.Sim.get('/' + key).value
+            out = self.Sim.get('/' + key)[()]
         else:
             out=getattr(self.Sim, key)
         return out
@@ -202,8 +202,8 @@ class PlotNotebook(wx.Panel):
         p[p<0.1] = np.nan
 
         if isinstance(self.Sim, h5py.File):
-            p_inlet = self.Sim.get('/inlet_state/p').value
-            p_outlet = self.Sim.get('/outlet_state/p').value
+            p_inlet = self.Sim.get('/inlet_state/p')[()]
+            p_outlet = self.Sim.get('/outlet_state/p')[()]
         else:
             p_inlet = self.Sim.inlet_state.p
             p_outlet = self.Sim.outlet_state.p
@@ -273,7 +273,7 @@ class PlotNotebook(wx.Panel):
     def initial_temperature_history(self, event = None):
         axes = self.add('Initial Temperature History').gca()
         if isinstance(self.Sim, h5py.File):
-            TTT = self.Sim.get('/solvers/initial_states_history').value
+            TTT = self.Sim.get('/solvers/initial_states_history')[()]
         else:
             TTTT = self.Sim.solvers.initial_states_history
         xx = np.array(list(range(TTT.shape[0])))
@@ -285,8 +285,8 @@ class PlotNotebook(wx.Panel):
     def lumps_residual_v_lump_temps(self, event = None):
         axes = self.add('Lump Error History').gca()
         if isinstance(self.Sim, h5py.File):
-            Tlumps = self.Sim.get('/solvers/lump_eb_history/Tlumps').value
-            lump_eb_error = self.Sim.get('/solvers/lump_eb_history/lump_eb_error').value
+            Tlumps = self.Sim.get('/solvers/lump_eb_history/Tlumps')[()]
+            lump_eb_error = self.Sim.get('/solvers/lump_eb_history/lump_eb_error')[()]
         else:
             Tlumps = self.solvers.lump_eb_history.Tlumps
             lump_eb_error = self.solvers.lump_eb_history.lump_eb_error
@@ -298,8 +298,8 @@ class PlotNotebook(wx.Panel):
     def discharge_residual_history(self, event = None):
         axes = self.add('Discharge Residual History').gca()
         if isinstance(self.Sim, h5py.File):
-            hd = self.Sim.get('/solvers/hdisc_history/hd').value
-            hd_error = self.Sim.get('/solvers/hdisc_history/hd_error').value
+            hd = self.Sim.get('/solvers/hdisc_history/hd')[()]
+            hd_error = self.Sim.get('/solvers/hdisc_history/hd_error')[()]
         else:
             hd = self.solvers.hdisc_history.hd
             hd_error = self.solvers.hdisc_history.hd_error
@@ -320,9 +320,9 @@ class PlotNotebook(wx.Panel):
         #Fluid T-p plot
         axes = self.add('T-P phase').gca()
         if isinstance(self.Sim,h5py.File):
-            Fluid = self.Sim.get('/Tubes/0/State1/Fluid').value
-            T = self.Sim.get('/T').value.T
-            p = self.Sim.get('/p').value.T
+            Fluid = self.Sim.get('/Tubes/0/State1/Fluid')[()]
+            T = self.Sim.get('/T')[()].T
+            p = self.Sim.get('/p')[()].T
         else:
             Fluid = self.Sim.CVs.exists_CV[0].State.Fluid
             T = self.Sim.T
@@ -355,9 +355,9 @@ class PlotNotebook(wx.Panel):
             
         axes = self.add('Axial Force').gca()
         if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-            Fz = self.Sim.get('/forces/Fz').value.T
-            summed_Fz = self.Sim.get('/forces/summed_Fz').value.T
+            theta = self.Sim.get('/t')[()]
+            Fz = self.Sim.get('/forces/Fz')[()].T
+            summed_Fz = self.Sim.get('/forces/summed_Fz')[()].T
         else:
             theta = self.Sim.t
             Fz = self.Sim.forces.Fz.T
@@ -380,8 +380,8 @@ class PlotNotebook(wx.Panel):
         axes = self.add('X Force').gca()
         
         if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-            Fx = self.Sim.get('/forces/Fx').value.T
+            theta = self.Sim.get('/t')[()]
+            Fx = self.Sim.get('/forces/Fx')[()].T
         else:
             theta = self.Sim.t
             Fx = self.Sim.forces.Fx.T
@@ -401,8 +401,8 @@ class PlotNotebook(wx.Panel):
 
         axes = self.add('Y Force').gca()
         if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-            Fy = self.Sim.get('/forces/Fy').value.T
+            theta = self.Sim.get('/t')[()]
+            Fy = self.Sim.get('/forces/Fy')[()].T
         else:
             theta = self.Sim.t
             Fy = self.Sim.forces.Fy.T
@@ -422,8 +422,8 @@ class PlotNotebook(wx.Panel):
             
         axes = self.add('Force trace').gca()
         if isinstance(self.Sim,h5py.File):
-            Fx = self.Sim.get('/forces/Fx').value.T
-            Fy = self.Sim.get('/forces/Fy').value.T
+            Fx = self.Sim.get('/forces/Fx')[()].T
+            Fy = self.Sim.get('/forces/Fy')[()].T
         else:
             Fx = self.Sim.forces.Fx.T
             Fy = self.Sim.forces.Fy.T
@@ -437,8 +437,8 @@ class PlotNotebook(wx.Panel):
         axes = self.add('Force trace').gca()
 
         if isinstance(self.Sim,h5py.File):
-            Fx = self.Sim.get('/forces/summed_Fx').value.T
-            Fy = self.Sim.get('/forces/summed_Fy').value.T
+            Fx = self.Sim.get('/forces/summed_Fx')[()].T
+            Fy = self.Sim.get('/forces/summed_Fy')[()].T
         else:
             Fx = self.Sim.forces.summed_Fx.T
             Fy = self.Sim.forces.summed_Fy.T
@@ -455,8 +455,8 @@ class PlotNotebook(wx.Panel):
             
         axes = self.add('Shaft force magnitude').gca()
         if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-            Fm = self.Sim.get('/forces/Fm').value.T
+            theta = self.Sim.get('/t')[()]
+            Fm = self.Sim.get('/forces/Fm')[()].T
         else:
             theta = self.Sim.t
             Fm = self.Sim.forces.Fm.T
@@ -471,10 +471,10 @@ class PlotNotebook(wx.Panel):
             
         axes = self.add('Radial force magnitude').gca()
         if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-            Fr = self.Sim.get('/forces/Fr').value.T
-            mean_Fr = self.Sim.get('/forces/mean_Fr').value
-            summed_Fr = self.Sim.get('/forces/summed_Fr').value
+            theta = self.Sim.get('/t')[()]
+            Fr = self.Sim.get('/forces/Fr')[()].T
+            mean_Fr = self.Sim.get('/forces/mean_Fr')[()]
+            summed_Fr = self.Sim.get('/forces/summed_Fr')[()]
         else:
             theta = self.Sim.t
             Fr = self.Sim.forces.Fr.T
@@ -498,10 +498,10 @@ class PlotNotebook(wx.Panel):
             
         axes = self.add('Tangential force magnitude').gca()
         if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-            Ft = self.Sim.get('/forces/Ft').value.T
-            mean_Ft = self.Sim.get('/forces/mean_Ft').value
-            summed_Ft = self.Sim.get('/forces/summed_Ft').value
+            theta = self.Sim.get('/t')[()]
+            Ft = self.Sim.get('/forces/Ft')[()].T
+            mean_Ft = self.Sim.get('/forces/mean_Ft')[()]
+            summed_Ft = self.Sim.get('/forces/summed_Ft')[()]
         else:
             theta = self.Sim.t
             Ft = self.Sim.forces.Ft.T
@@ -525,9 +525,9 @@ class PlotNotebook(wx.Panel):
         #Torque
         axes = self.add('Torque').gca()
         if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('/t').value
-            tau = self.Sim.get('/forces/tau').value.T
-            mean_tau = self.Sim.get('/forces/mean_tau').value
+            theta = self.Sim.get('/t')[()]
+            tau = self.Sim.get('/forces/tau')[()].T
+            mean_tau = self.Sim.get('/forces/mean_tau')[()]
         else:
             theta = self.Sim.t
             tau = self.Sim.forces.tau.T
@@ -544,9 +544,9 @@ class PlotNotebook(wx.Panel):
             
         axes = self.add('Pressure profiles').gca()
         if isinstance(self.Sim,h5py.File):
-            theta = self.Sim.get('summary/theta_profile').value
-            p1 = self.Sim.get('summary/p1_profile').value.T
-            p2 = self.Sim.get('summary/p2_profile').value.T
+            theta = self.Sim.get('summary/theta_profile')[()]
+            p1 = self.Sim.get('summary/p1_profile')[()].T
+            p2 = self.Sim.get('summary/p2_profile')[()].T
         else:
             theta = self.Sim.t
             p1 = self.Sim.summary.p1_profile

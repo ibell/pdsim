@@ -903,7 +903,7 @@ class MainFrame(wx.Frame):
         self.timer.Start(1000) #1000 ms between checking the queue
         
         self.Bind(wx.EVT_CLOSE, self.OnClose)
-        
+
         if not os.path.exists(pdsim_home_folder):
             os.makedirs(pdsim_home_folder)
     
@@ -1630,7 +1630,7 @@ class MainFrame(wx.Frame):
         if wx.ID_OK==FD.ShowModal():
             
             file_path = FD.GetPath()
-            configdict = yaml.load(open(file_path,'r'))
+            configdict = yaml.load(open(file_path,'r'),Loader=yaml.FullLoader)
             
             #Now rebuild the GUI using the desired configuration file
             self.rebuild(configdict)
@@ -1674,7 +1674,8 @@ class MainFrame(wx.Frame):
                          family = self.machinefamily)
             header_string = header_string_template.format(**terms)
 
-            string_list.append(unicode(header_string,'utf-8'))
+            #string_list.append(str(header_string,'utf-8'))
+            string_list.append(header_string)
             
             #Do all the "conventional" panels
             for TB in self.MTB.Children:
@@ -1691,14 +1692,17 @@ class MainFrame(wx.Frame):
                     if hasattr(plugin, 'get_config_chunk'):
                         string_list.append(yaml.dump(plugin.get_config_chunk()))
                     
-            fp = codecs.open(file_path,'w',encoding = 'latin-1')
-            fp.write(u'\n'.join(string_list))
+            fp = codecs.open(file_path,'w')#encoding = 'latin-1')
+            fp.write('\n'.join(string_list))
             fp.close()
             
             # Recreate this frame using the config file to make sure it is 100% the same
-            configdict = yaml.load(open(file_path,'r'))
+            configdict = yaml.load(open(file_path,'r'),Loader=yaml.FullLoader)
+            print('here 1')
             check_frame = MainFrame(configdict)
+
             check_dict = check_frame.get_GUI_object_dict()
+
             my_dict = self.get_GUI_object_dict()
             
             if not sorted(check_dict.keys()) == sorted(my_dict.keys()):
@@ -1710,6 +1714,8 @@ class MainFrame(wx.Frame):
             # Write current location to config
             current_path,fname = os.path.split(file_path)
             GUIconfig.set('config_path',current_path)
+            
+        print('save config completed')
             
         FD.Destroy()
         
