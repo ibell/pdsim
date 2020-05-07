@@ -32,28 +32,28 @@ class InputsToolBook(pdsim_panels.InputsToolBook):
             ico_path = os.path.join('ico',imgfile)
             indices.append(il.Add(wx.Image(ico_path,wx.BITMAP_TYPE_PNG).ConvertToBitmap()))
         self.AssignImageList(il)
-        
+
         Main = wx.GetTopLevelParent(self)
-        
-        # Make the scroll panels.  
+
+        # Make the scroll panels.
         self.panels=(recip_panels.GeometryPanel(self, config['GeometryPanel'],name='GeometryPanel'),
                      pdsim_panels.StateInputsPanel(self, config['StatePanel'], name='StatePanel'),
                      recip_panels.MassFlowPanel(self, config['MassFlowPanel'], name='MassFlowPanel'),
                      recip_panels.MechanicalLossesPanel(self, config['MechanicalLossesPanel'], name='MechanicalLossesPanel'),
                      )
-        
+
         for Name, index, panel in zip(['Geometry','State Points','Mass Flow - Valves','Mechanical'],indices,self.panels):
             self.AddPage(panel,Name,imageId=index)
-            
-        #: A dictionary that maps name to panel 
+
+        #: A dictionary that maps name to panel
         self.panels_dict = {panel.Name:panel for panel in self.panels}
-    
+
     def get_config_chunks(self):
         chunks = {}
         for panel in self.panels:
             chunks[panel.name] = panel.get_config_chunk()
         return chunks
-        
+
 recip_yaml = (
 r"""
 family : Recip Compressor
@@ -89,7 +89,7 @@ MechanicalLossesPanel:
 
 StatePanel:
   omega : 377.0 # Rotational speed [rad/s]
-  inletState: 
+  inletState:
       Fluid : R410A
       T : 283.15 #[K]
       rho : 5.75 #[kg/m^3]
@@ -108,4 +108,4 @@ SolverInputsPanel:
 )
 
 def get_defaults():
-    return yaml.load(recip_yaml)
+    return yaml.load(recip_yaml, Loader=yaml.FullLoader)

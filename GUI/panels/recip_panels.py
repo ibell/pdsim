@@ -61,12 +61,12 @@ class GeometryPanel(pdsim_panels.PDPanel):
         sizer.Add(sizer_for_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
         
         scrolled_panel.SetSizer(sizer)
-        main_sizer.Add(scrolled_panel, 1, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL)
+        main_sizer.Add(scrolled_panel, 1, wx.EXPAND)#|wx.ALIGN_CENTER_HORIZONTAL)
         self.SetSizer(main_sizer)
         
         sizer.Layout()
         
-    def get_script_chunks(self):
+    def get_script_chunks(self, plugin_chunks = None):
         chunk = ''
         
         for term in ['piston_diameter','piston_length','crank_length','connecting_rod_length','x_TDC','shell_volume']:
@@ -139,12 +139,12 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         sizer.Add(sizer_for_valve_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
         
         scrolled_panel.SetSizer(sizer)
-        main_sizer.Add(scrolled_panel, 1, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL)
+        main_sizer.Add(scrolled_panel, 1, wx.EXPAND)#|wx.ALIGN_CENTER_HORIZONTAL)
         self.SetSizer(main_sizer)
         
         sizer.Layout()
         
-    def get_script_chunks(self):
+    def get_script_chunks(self, plugin_chunks = None):
         chunk = ''
         
         def get(key):
@@ -155,12 +155,14 @@ class MassFlowPanel(pdsim_panels.PDPanel):
                 'valve_x_stopper','valve_E', 'inlet_tube_length','inlet_tube_ID',
                 'outlet_tube_length','outlet_tube_ID']
         
-        strparams = {k:str(get(k)) for k in keys}
+        for term in keys:
+            val = self.main.get_GUI_object_value(term)
+            chunk += 'sim.{name:s} = {value:s}\n'.format(name = term, value = str(val))        
         
         for term in ['d_discharge','d_suction']:
             val = self.main.get_GUI_object_value(term)
             chunk += 'sim.{name:s} = {value:s}\n'.format(name = term, value = str(val))
-            
+
         chunk += textwrap.dedent(
         """
         
@@ -181,39 +183,46 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         
         # Calculate Vdisp
         sim.pre_solve()
+        sim.Vdisp = sim.Vdisp()
     
         # Get the guess for the mass flow rate
-        mdot_guess = inletState.rho*sim.Vdisp()*sim.omega/(2*pi)
+        mdot_guess = inletState.rho*sim.Vdisp*sim.omega/(2*pi)
 
         # Add both the inlet and outlet tubes
         sim.add_tube(Tube(key1 = 'inlet.1',
                           key2 = 'inlet.2',
-                          L = {inlet_tube_length:s},
-                          ID = {inlet_tube_ID:s},
+                          L = sim.inlet_tube_length,
+                          ID = sim.inlet_tube_ID,
                           mdot = mdot_guess, 
                           State1 = inletState.copy(),
                           fixed = 1,
                           TubeFcn = sim.TubeCode))
         sim.add_tube(Tube(key1 = 'outlet.1',
                           key2 = 'outlet.2',
-                          L = {outlet_tube_length:s},
-                          ID = {outlet_tube_ID:s},
+                          L = sim.outlet_tube_length,
+                          ID = sim.outlet_tube_ID,
                           mdot = mdot_guess, 
                           State2 = outletState.copy(),
                           fixed = 2,
                           TubeFcn = sim.TubeCode))
                               
+        E = sim.valve_E
+        I = (sim.valve_d*sim.valve_h**3)/12                   #Moment of Intertia for valve,[m^4]
+        k_valve = (6*E*I)/(sim.valve_a**2*(3*sim.valve_l-sim.valve_a))   #Valve stiffness
+        m_eff = (1/3)*sim.valve_rho*sim.valve_l*sim.valve_d*sim.valve_h      #Effective mass of valve reeds
+        x_tr_suction = 0.25*(sim.d_suction**2/sim.valve_d)
+        x_tr_discharge = 0.25*(sim.d_discharge**2/sim.valve_d)
+        
         #  The suction valve parameters
         sim.suction_valve = ValveModel(
-              d_valve = {valve_d:s},
+              d_valve = sim.valve_d,
               d_port = sim.d_suction,
-              C_D = {valve_C_D:s},
-              h_valve = {valve_h:s},
-              a_valve = {valve_a:s},
-              l_valve = {valve_l:s},
-              rho_valve = {valve_rho:s},
-              E = {valve_E:s},
-              x_stopper = {valve_x_stopper:s},
+              C_D = sim.valve_C_D,
+              rho_valve = sim.valve_rho,
+              x_stopper = sim.valve_x_stopper,
+              m_eff = m_eff,
+              k_valve = k_valve,
+              x_tr = x_tr_suction,
               key_up = 'inlet.2',
               key_down = 'A'
               )
@@ -221,20 +230,19 @@ class MassFlowPanel(pdsim_panels.PDPanel):
         
         #  The discharge valve parameters
         sim.discharge_valve=ValveModel(
-              d_valve = {valve_d:s},
+              d_valve = sim.valve_d,
               d_port = sim.d_discharge,
-              C_D = {valve_C_D:s},
-              h_valve = {valve_h:s},
-              a_valve = {valve_a:s},
-              l_valve = {valve_l:s},
-              rho_valve = {valve_rho:s},
-              E = {valve_E:s},
-              x_stopper = {valve_x_stopper:s},
+              C_D = sim.valve_C_D,
+              rho_valve = sim.valve_rho,
+              x_stopper = sim.valve_x_stopper,
+              m_eff = m_eff,
+              k_valve = k_valve,
+              x_tr = x_tr_discharge,
               key_up='A',
               key_down='outlet.1'
               )
         sim.add_valve(sim.discharge_valve)
-        """).format(**strparams)
+        """).format()
         
         return chunk
         
@@ -285,12 +293,12 @@ class MechanicalLossesPanel(pdsim_panels.PDPanel):
         sizer.Add(sizer_for_inputs, 0, wx.ALIGN_CENTER_HORIZONTAL)
         
         scrolled_panel.SetSizer(sizer)
-        main_sizer.Add(scrolled_panel, 1, wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL)
+        main_sizer.Add(scrolled_panel, 1, wx.EXPAND)#|wx.ALIGN_CENTER_HORIZONTAL)
         self.SetSizer(main_sizer)
         
         sizer.Layout()
         
-    def get_script_chunks(self):
+    def get_script_chunks(self, plugin_chunks = None):
         chunk = ''
         for term in ['eta_motor','h_shell','A_shell','Tamb','mu_oil','delta_gap']:
             val = self.main.get_GUI_object_value(term)
