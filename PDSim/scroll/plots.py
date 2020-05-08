@@ -1239,10 +1239,15 @@ class ScrollAnimForm(wx.Frame):
 
 if __name__== "__main__":
     
-    geo = geoVals()
-    geo.phi_ie_offset = 0
-    app = wx.PySimpleApp()
-    frame = ScrollAnimForm(geo)
+    from PDSim.scroll.core import Scroll
+    
+    ScrollComp = Scroll()
+    ScrollComp.set_scroll_geo(83e-6, 3.3, 0.005, 0.006) #Set the scroll wrap geometry
+    ScrollComp.set_disc_geo('2Arc',r2 = 0)
+    ScrollComp.geo.phi_ie_offset = 0
+    
+    app = wx.App()
+    frame = ScrollAnimForm(ScrollComp.geo)
     frame.Show()
     app.MainLoop()
     
