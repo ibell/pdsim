@@ -141,27 +141,27 @@ def Compressor(ScrollClass, Te = 253, Tc = 310, f = None, OneCycle = False, Ref 
         h_valve = 0.0006        # Valve thickness, [m]
         d_discharge = ScrollComp.geo.ra_arc1*1.9 # Port diameter [m]
         l_valve = 5*d_discharge # Total length of valve, [m]
-        a_valve = l_valve*1.5   # Distance from anchor to force, [m]
+        a_valve = l_valve/1.5   # Distance from anchor to force, [m]
+        assert(a_valve < l_valve)
         rho_valve = 8000        # Density of spring steel, [kg/m^3]
         C_D = 1.17              # Drag coefficient [-]
         d_valve = d_discharge*1.5  # Valve Diameter [m]
-        x_stopper = 0.003       # Stopper location [m]
+        x_stopper = 0.006       # Stopper location [m]
 
         I=(d_valve*h_valve**3)/12  # Moment of Inertia for valve,[m^4]
         k_valve=(6*E*I)/(a_valve**2*(3*l_valve-a_valve))  # Valve stiffness
         m_eff=(1/3)*rho_valve*l_valve*d_valve*h_valve     # Effective mass of valve reeds
         x_tr_discharge = 0.25*(d_discharge**2/d_valve)
-        print(k_valve, m_eff, x_tr_discharge)
 
         # Construct the valve
         ScrollComp.discharge_valve = ValveModel(
               d_valve=d_valve,
               d_port=d_discharge,
               C_D=C_D,
-              rho_valve=rho_valve,
-              x_stopper=x_stopper,
               m_eff=m_eff,
               k_valve=k_valve,
+              rho_valve=rho_valve, # Not used directly
+              x_stopper=x_stopper,
               x_tr=x_tr_discharge,
               key_up=['ddd','dd'],
               key_down='outlet.1'
