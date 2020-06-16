@@ -452,30 +452,27 @@ cdef class ValveModel(object):
     
     @cython.cdivision(True)
     cdef _pressure_dominant(self, arraym f, double x, double xdot, double rho, double V, double deltap):
-        f.set_index(0, xdot) #dxdt
+        f.set_index(0, xdot) # dx/dt
         if abs(V-xdot) > 0:
-            f.set_index(1, ((V-xdot)/abs(V-xdot)*0.5*self.C_D*rho*(V)**2*self.A_valve+deltap*self.A_valve-self.k_valve*x)/(self.m_eff)) #d(xdot)dt
+            f.set_index(1, ((V-xdot)/abs(V-xdot)*0.5*self.C_D*rho*(V)**2*self.A_valve+deltap*self.A_valve-self.k_valve*x)/(self.m_eff)) #d(xdot)/dt
         else:
-            f.set_index(1, (deltap*self.A_valve-self.k_valve*x)/(self.m_eff)) #d(xdot)dt
-        return
+            f.set_index(1, (deltap*self.A_valve-self.k_valve*x)/(self.m_eff)) #d(xdot)/dt
         
     @cython.cdivision(True)
     cdef _flux_dominant(self, arraym f, double x, double xdot, double rho, double V):
-        f.set_index(0, xdot) #dxdt
+        f.set_index(0, xdot) # dx/dt
         if abs(V-xdot) > 0:
-            f.set_index(1, ((V-xdot)/abs(V-xdot)*0.5*self.C_D*rho*(V)**2*self.A_valve+(V-xdot)/abs(V-xdot)*rho*(V-xdot)**2*self.A_port-self.k_valve*x)/(self.m_eff)) #d(xdot)dt
+            f.set_index(1, ((V-xdot)/abs(V-xdot)*0.5*self.C_D*rho*(V)**2*self.A_valve+(V-xdot)/abs(V-xdot)*rho*(V-xdot)**2*self.A_port-self.k_valve*x)/(self.m_eff)) #d(xdot)/dt
         else:
             f.set_index(1, (-self.k_valve*x)/(self.m_eff)) #d(xdot)dt
-        return
     
     cpdef set_xv(self, arraym xv):
         self.xv = xv.copy()
-        #If valve opening is less than zero, just use zero (the valve is closed)
+        # If valve opening is less than zero, just use zero (the valve is closed)
         if self.xv.get_index(0) < 0.0 and self.xv.get_index(1) < 1e-15:
-
             self.xv.set_index(0, 0.0)
             self.xv.set_index(1, 0.0)
-        #If it predicts a valve opening greater than max opening, just use the max opening
+        # If valve opening is greater than stopper opening, just use the max opening
         elif self.xv.get_index(0) > self.x_stopper and self.xv.get_index(1) > 0.0:
             self.xv.set_index(0, self.x_stopper)
             self.xv.set_index(1, 0.0)
@@ -529,9 +526,9 @@ cdef class ValveModel(object):
         self.get_States(Core)
         
         rho = self.State_up.get_rho()
-        p_high = self.State_up.get_p()
-        p_low = self.State_down.get_p()
-        deltap = (p_high - p_low)*1000
+        p_high = self.State_up.get_p() # [kPa]
+        p_low = self.State_down.get_p() # [kPa]
+        deltap = (p_high - p_low)*1000 # [Pa]
         
         if deltap > 0:
             V = self.flow_velocity(self.State_up, self.State_down)
