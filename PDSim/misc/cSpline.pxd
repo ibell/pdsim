@@ -11,4 +11,4 @@ cdef extern from "spline.h":
         vector[V] interpolate_vec(vector[T] x)
         
         ## Interpolate function
-        V interpolate(T x) except +ValueError
+        V interpolate(T x) except
