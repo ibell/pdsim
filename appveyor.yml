@@ -10,11 +10,6 @@ environment:
   TWINE_USERNAME: belli
 
   matrix:
-      - PYTHON: "C:\\Python27-x64"
-        PYTHON_VERSION: "2.7.x"
-        ARCH: "64"
-        PLAT_NAME: "win-amd64"
-        PY_TAG: "cp27"
       - PYTHON: "C:\\Python36-x64"
         PYTHON_VERSION: "3.6.x"
         ARCH: "64"
@@ -25,6 +20,11 @@ environment:
         ARCH: "64"
         PLAT_NAME: "win-amd64"
         PY_TAG: "cp37"
+      - PYTHON: "C:\\Python38-x64"
+        PYTHON_VERSION: "3.8.x"
+        ARCH: "64"
+        PLAT_NAME: "win-amd64"
+        PY_TAG: "cp38"
 
 platform:
     -x64
