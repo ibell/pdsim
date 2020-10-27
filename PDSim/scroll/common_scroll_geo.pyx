@@ -323,15 +323,15 @@ cpdef bytes involute_index_to_key(int index):
     """
     
     if index == INVOLUTE_FI:
-        return bytes('fi')
+        return 'fi'.encode('ascii')
     elif index == INVOLUTE_FO:
-        return bytes('fo')
+        return 'fo'.encode('ascii')
     elif index == INVOLUTE_OI:
-        return bytes('oi')
+        return 'oi'.encode('ascii')
     elif index == INVOLUTE_OO:
-        return bytes('oo')
+        return 'oo'.encode('ascii')
     else:
-        return bytes('')
+        return ''.encode('ascii')
     
 cpdef double Gr(double phi, geoVals geo, double theta, int inv):
     """
@@ -659,16 +659,22 @@ cpdef tuple _coords_inv_np(np.ndarray[np.float_t] phi, geoVals geo,double theta,
     ro = rb*(pi - geo.phi_fi0 + geo.phi_oo0)
     om = geo.phi_fie - theta + 3.0*pi/2.0
 
-    if flag=="fi":
+    cdef bytes key
+    try:
+        key = flag.encode('utf8')
+    except AttributeError:
+        key = flag
+
+    if key == b"fi":
         x = rb*np.cos(phi)+rb*(phi-geo.phi_fi0)*np.sin(phi)
         y = rb*np.sin(phi)-rb*(phi-geo.phi_fi0)*np.cos(phi)
-    elif flag=="fo":
+    elif key == b"fo":
         x = rb*np.cos(phi)+rb*(phi-geo.phi_fo0)*np.sin(phi)
         y = rb*np.sin(phi)-rb*(phi-geo.phi_fo0)*np.cos(phi)
-    elif flag=="oi":
+    elif key == b"oi":
         x = -rb*np.cos(phi)-rb*(phi-geo.phi_oi0)*np.sin(phi)+ro*np.cos(om)
         y = -rb*np.sin(phi)+rb*(phi-geo.phi_oi0)*np.cos(phi)+ro*np.sin(om)
-    elif flag=="oo":
+    elif key == b"oo":
         x = -rb*np.cos(phi)-rb*(phi-geo.phi_oo0)*np.sin(phi)+ro*np.cos(om)
         y = -rb*np.sin(phi)+rb*(phi-geo.phi_oo0)*np.cos(phi)+ro*np.sin(om)
     else:
@@ -730,16 +736,22 @@ cpdef tuple _coords_inv_d(double phi, geoVals geo,double theta, flag=""):
     ro = rb*(pi - geo.phi_fi0 + geo.phi_oo0)
     om = geo.phi_fie - theta + 3.0*pi/2.0
 
-    if flag=="fi":
+    cdef bytes key
+    try:
+        key = flag.encode('utf8')
+    except AttributeError:
+        key = flag
+
+    if key == b"fi":
         x = rb*cos(phi)+rb*(phi-geo.phi_fi0)*sin(phi)
         y = rb*sin(phi)-rb*(phi-geo.phi_fi0)*cos(phi)
-    elif flag=="fo":
+    elif key == b"fo":
         x = rb*cos(phi)+rb*(phi-geo.phi_fo0)*sin(phi)
         y = rb*sin(phi)-rb*(phi-geo.phi_fo0)*cos(phi)
-    elif flag=="oi":
+    elif key == b"oi":
         x = -rb*cos(phi)-rb*(phi-geo.phi_oi0)*sin(phi)+ro*cos(om)
         y = -rb*sin(phi)+rb*(phi-geo.phi_oi0)*cos(phi)+ro*sin(om)
-    elif flag=="oo":
+    elif key == b"oo":
         x = -rb*cos(phi)-rb*(phi-geo.phi_oo0)*sin(phi)+ro*cos(om)
         y = -rb*sin(phi)+rb*(phi-geo.phi_oo0)*cos(phi)+ro*sin(om)
     else:
