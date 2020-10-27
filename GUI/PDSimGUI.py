@@ -255,7 +255,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
         
         return textwrap.dedent(
             """
-            t1=time.clock()
+            t1=timeit.default_timer()
             sim.connect_callbacks(step_callback = sim.step_callback, 
                                   endcycle_callback = sim.endcycle_callback,
                                   heat_transfer_callback = sim.heat_transfer_callback,
@@ -273,7 +273,7 @@ class SolverInputsPanel(pdsim_panels.PDPanel):
                               eps_cycle = {eps_cycle:s},
                               max_number_of_steps = {max_number_of_steps:s}
                               )
-            print('time taken',time.clock()-t1)
+            print('time taken',timeit.default_timer()-t1)
             """.format(RK_eps = self.IC.RK45_eps.GetValue(),
                        eps_cycle = str(eps_cycle),
                        max_number_of_steps = str(max_number_of_steps),
@@ -1077,7 +1077,7 @@ class MainFrame(wx.Frame):
         s = textwrap.dedent(
             """
             # General python imports
-            import time, sys, os
+            import time, sys, os, timeit
             
             # Plotting and numeric things
             from math import pi
