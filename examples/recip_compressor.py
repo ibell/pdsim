@@ -70,18 +70,18 @@ def Compressor():
     recip.add_flow(FlowPath(key1='outlet.1', key2='A', MdotFcn=recip.Discharge))
     recip.add_flow(FlowPath(key1='shell', key2='A', MdotFcn=recip.PistonLeakage))
 
-    E = 1.93e11             #Youngs Modulus, [Pa]
-    h_valve = 0.0001532     #Valve thickness, [m]
-    l_valve = 0.018         #Total length of valve, [m]
-    a_valve = 0.0140        #Distance from anchor to force, [m]
-    rho_valve = 8000        #Density of spring steel, [kg/m^3] 
-    C_D = 1.17              #Drag coefficient [-]
-    d_valve = 0.007         #Valve Diameter [m]
-    x_stopper = 0.0018      #Stopper location [m]
+    E = 1.93e11             # Youngs Modulus, [Pa]
+    h_valve = 0.0001532     # Valve thickness, [m]
+    l_valve = 0.018         # Total length of valve, [m]
+    a_valve = 0.0140        # Distance from anchor to force, [m]
+    rho_valve = 8000        # Density of spring steel, [kg/m^3] 
+    C_D = 1.17              # Drag coefficient [-]
+    d_valve = 0.007         # Valve Diameter [m]
+    x_stopper = 0.0018      # Stopper location [m]
 
-    I=(d_valve*h_valve**3)/12  #Moment of Intertia for valve,[m^4]
-    k_valve=(6*E*I)/(a_valve**2*(3*l_valve-a_valve))    #Valve stiffness
-    m_eff=(1/3)*rho_valve*l_valve*d_valve*h_valve      #Effective mass of valve reeds
+    I = (d_valve*h_valve**3)/12  # Moment of Inertia for valve, [m^4]
+    k_valve = (6*E*I)/(a_valve**2*(3*l_valve-a_valve))  # Valve stiffness
+    m_eff = (1/3)*rho_valve*l_valve*d_valve*h_valve     # Effective mass of valve reeds, [kg]
     x_tr_suction = 0.25*(recip.d_suction**2/d_valve)
     x_tr_discharge = 0.25*(recip.d_discharge**2/d_valve)
 
