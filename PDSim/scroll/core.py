@@ -796,7 +796,7 @@ class Scroll(PDSimCore, _Scroll):
                 
                 #  Calculate the free area between the polygon and the chamber
                 try:
-                    xcv, ycv = scroll_geo.CVcoords(CVkey, self.geo, theta)
+                    xcv, ycv = CVcoords(CVkey, self.geo, theta)
                 except ValueError:
                     Av[i] = 0
                     continue
