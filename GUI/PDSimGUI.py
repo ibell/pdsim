@@ -371,7 +371,7 @@ class WriteOutputsPanel(wx.Panel):
         Write the selected data to files in the folder given by dir_path
         """
         if self.Simulation is None:
-            raise ValueError('Simulation data must be provied to WriteOutputsPanel')
+            raise ValueError('Simulation data must be provided to WriteOutputsPanel')
         
         outputlist = self.file_list.GetCheckedStrings()
         #List of files that will be over-written
