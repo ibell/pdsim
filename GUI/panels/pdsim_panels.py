@@ -956,8 +956,9 @@ class OutputTreePanel(wx.Panel):
         
     def OnScriptDisplay(self, event, item, col):
         path = ''
-        script = self.tree.GetItemText(item, col)
-        
+        script = self.tree.GetItemText(item, col).replace('\\n','\n').replace("\\'","'")
+        if script[0] == "'" and script[-1] == "'":
+            script = script[1:-1].strip()
         frm = ScriptDisplay(script)
         frm.Show()
         
@@ -1956,7 +1957,7 @@ class StateChooser(wx.Dialog):
         fgs= wx.FlexGridSizer(cols=2,hgap=3,vgap=3)
         self.Tlabel, self.T = LabeledItem(self,label="Temperature [K]",value='300',enabled=False)
         self.plabel, self.p = LabeledItem(self,label="Pressure [kPa]",value='300',enabled=False)
-        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/m³]",value='1',enabled=False)
+        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/mï¿½]",value='1',enabled=False)
         fgs.AddMany([self.Tlabel,self.T,self.plabel,self.p,self.rholabel,self.rho])
         sizer.Add(fgs)
         
@@ -2124,7 +2125,7 @@ class StatePanel(wx.Panel):
         
         self.Tlabel, self.T = LabeledItem(self,label="Temperature [K]",value=str(CPState.T))
         self.plabel, self.p = LabeledItem(self,label="Pressure [kPa]",value=str(CPState.p))
-        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/m³]",value=str(CPState.rho))
+        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/mï¿½]",value=str(CPState.rho))
         sizer.AddMany([self.Fluidlabel, self.Fluid,
                        self.Tlabel, self.T,
                        self.plabel, self.p,
