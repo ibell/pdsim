@@ -3,7 +3,7 @@ from __future__ import print_function
 import six
 
 # Python imports
-import warnings, codecs, textwrap,os, itertools, difflib, zipfile, types
+import warnings, codecs, textwrap,os, itertools, difflib, zipfile, types, timeit
 from multiprocessing import Process
 
 # wxPython imports
@@ -29,7 +29,6 @@ import PDSimGUI
 
 import h5py
 import quantities as pq
-from time import clock
 
 length_units = {
                 'Meter': pq.length.m,
@@ -646,9 +645,9 @@ class OutputTreePanel(wx.Panel):
                     except KeyError as KE:
                         print(KE)
 
-        t1 = clock()
+        t1 = timeit.default_timer()
         _recursive_hdf5_add(self.root, self.runs)
-        t2 = clock()
+        t2 = timeit.default_timer()
         
         print(t2-t1,'secs elapsed to load output tree')
         
@@ -696,7 +695,7 @@ class OutputTreePanel(wx.Panel):
                     raise ValueError('get_path died by hitting recursion limit')
             
         import time
-        t1 = time.clock()
+        t1 = timeit.default_timer()
 
         import xlsxwriter
         workbook = xlsxwriter.Workbook(fName, {'constant_memory': True})
@@ -819,7 +818,7 @@ class OutputTreePanel(wx.Panel):
         
         os.startfile(fName)
         
-        print('summary sheet', time.clock() - t1)      
+        print('summary sheet', timeit.default_timer() - t1)
         
     def OnActivate(self, evt):
         
