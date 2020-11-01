@@ -1777,10 +1777,10 @@ class MainFrame(wx.Frame):
         else:
             wx_unicode = '\nwx Unicode support: False\n'
         import CoolProp
-        info = wx.AboutDialogInfo()
+        info = wx.adv.AboutDialogInfo()
         info.Name = "PDSim GUI"
         info.Version = PDSim.__version__
-        info.Copyright = "(C) 2012 Ian Bell"
+        info.Copyright = "(C) 2012-20XX Ian Bell"
         info.Description = wordwrap(
             "A graphical user interface for the PDSim model\n\n"+
             "wx version: "+wx.__version__+
@@ -1789,10 +1789,10 @@ class MainFrame(wx.Frame):
             "CoolProp revision: "+CoolProp.__gitrevision__,
             500, wx.ClientDC(self))
         info.WebSite = ("http://pdsim.sourceforge.net", "PDSim home page")
-        info.Developers = [ "Ian Bell", "Craig Bradshaw"]
+        info.Developers = [ "Ian Bell", "Davide Ziviani", "Craig Bradshaw"]
 
         # Then we call wx.AboutBox giving it that info object
-        wx.AboutBox(info)
+        wx.adv.AboutBox(info)
         
     def OnChangeSimFamily(self, event):
         """
