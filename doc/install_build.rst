@@ -11,7 +11,7 @@ git
 
 #. Install the most recent version for windows from `git for windows <https://git-scm.com/download>`_.  Accept all the defaults.
 
-#. (optional, but strongly recommended) Install TortoiseGit from `TortoiseGit installs <http://code.google.com/p/tortoisegit/wiki/Download>`_ (pick the right version for your operating system)
+#. (optional, but recommended) Install TortoiseGit from `TortoiseGit installs <http://code.google.com/p/tortoisegit/wiki/Download>`_ (pick the right version for your operating system).  Other solid graphical git interface options are VSCode or GitKraken
 
 **LINUX/OSX** :
 
@@ -20,7 +20,7 @@ Your operating system should already come with git.  You should not need to do a
 Anaconda/Miniconda
 ------------------
 
-#. Download python using miniconda package: `Download link <http://conda.pydata.org/miniconda.html>`_.  Download the python 2.7 32-bit version of miniconda - the python 2.7 64-bit version should be fine too, but to compile you will require the professional version of Visual Studio.  So just stick with the 32-bit version of miniconda.  Do not use a python 3.x version!!  
+#. Download python using miniconda package: `Download link <http://conda.pydata.org/miniconda.html>`_. Do not use a python 2.7 version!!
 
 #. Run the installer. In the setup, if you are doing a clean install, it is safe to select the option "Add Anaconda to the system PATH environmental variable".  Otherwise, selecting this option will make this the default conda installation on your computer, which may or may not be what you want.  If you want Miniconda to live peaceably with an existing miniconda (64-bit?), make sure this option is unselected.
 
@@ -29,7 +29,9 @@ Compiler
 
 **WINDOWS** :
 
-Run the installer for `Microsoft Visual C++ Compiler for Python 2.7 <https://www.microsoft.com/en-us/download/details.aspx?id=44266>`_  (or install Visual Studio 9 2008 professional if you have access to it).
+Install the version of Visual Studio that matches your version of Python you would like to use, or install `the build tools <https://www.visualstudio.com/downloads/#build-tools-for-visual-studio-2019>`_
+
+`More information here <https://wiki.python.org/moin/WindowsCompilers#Which_Microsoft_Visual_C.2B-.2B-_compiler_to_use_with_a_specific_Python_version_.3F>`_
 
 **LINUX/OSX** :
 
@@ -46,16 +48,16 @@ Windows
 
     conda install matplotlib numpy scipy h5py cython pip wxpython pyyaml
   
-   If you installed Miniconda somewhere else (and/or Miniconda/Scripts is not on the PATH), you might need to give the full path to ``conda``, which would be something like ``c:\Miniconda32bit\Scripts\conda`` on my machine
+   If you installed Miniconda somewhere else (and/or Miniconda/Scripts is not on the PATH), you might need to give the full path to ``conda``, which would be something like ``c:\Miniconda3\Scripts\conda`` on my machine
 
 #. Check that when you go to a command prompt, you get output something like::
 
-    C:\Users\Belli>python
-    Python 2.7.2 (default, Jun 12 2011, 15:08:59) [MSC v.1500 32 bit (Intel)] on win32
+    C:\Users\ian>python
+    Python 3.7.6 | packaged by conda-forge | (default, Mar 23 2020, 22:22:21) [MSC v.1916 64 bit (AMD64)] on win32
     Type "help", "copyright", "credits" or "license" for more information.
     >>> import scipy
     >>> scipy.__version__
-    '0.11.0'
+    '1.3.1'
 
 #. Ok, python has been successfully installed.
     
@@ -103,7 +105,7 @@ Windows
 
 #. Ok good, PDSim is working!
     
-#. Go to the GUI folder from the root of the source.  Double-click on PDSimGUI.py to start
+#. Go to the GUI folder from the root of the source. In the file system explorer, double-click on PDSimGUI.py to start, or at the command prompt, move to the GUI folder, and type: ``python PDSimGUI.py``
 
 #. Press F5 to run the default scroll compressor
 
