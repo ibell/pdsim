@@ -1,6 +1,10 @@
 Installation and Configuration
 ******************************
 
+.. warning::
+
+	Having trouble with installation? Open an issue here and we'll get you going: https://github.com/ibell/pdsim/issues/new
+
 Prerequisites
 =============
 
