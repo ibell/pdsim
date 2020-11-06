@@ -839,6 +839,29 @@ cpdef dict SA_forces(double theta, geoVals geo, bint poly = False, bint use_offs
     fx_p=rb*h*(cos(phi_ie)*phi_o0+sin(phi_ie)-phi_ie*cos(phi_ie) - sin(phi_ie-pi+B)-(phi_o0-phi_ie+pi-B)*cos(phi_ie-pi+B) )
     fy_p=-rb*h*((phi_ie-phi_o0)*sin(phi_ie)+cos(phi_ie) - cos(phi_ie-pi+B) - (phi_ie-pi-phi_o0+B)*sin(phi_ie-pi+B))
     M_O_p=-h*rb**2*(B-2*phi_o0+2*phi_ie-2*pi)*(B-pi)/2
+
+    # Add contribution from the end of the scroll, connecting the inner and outer involutes
+    x1, y1 = coords_inv(geo.phi_ooe, geo, theta, 'oo')
+    x2, y2 = coords_inv(geo.phi_oie, geo, theta, 'oi')
+    xmid = (x1+x2)/2; ymid = (y1+y2)/2
+    nx1, ny1 = coords_norm(geo.phi_ooe, geo, theta, 'oo')
+    ny1, nx1 = -nx1[0], ny1[0]
+    # Make sure you get the normal pointing towards the orbiting scroll!
+    # The cross product of line going from inner to outer scroll wrap ends 
+    # with normal should be negative
+    if np.cross([x1-x2,y1-y2,0],[nx1, ny1, 0])[2] > 0:
+        nx1 *= -1
+        ny1 *= -1
+
+    # Length is the thickness of scroll, height is scroll height
+    A_line = geo.t*geo.h
+    fx_p += A_line*nx1
+    fy_p += A_line*ny1
+    fO_p_line = [A_line*nx1, A_line*ny1, 0.0]
+    THETA = geo.phi_fie-theta-pi/2
+    r_line = [xmid - geo.ro*cos(THETA), ymid - geo.ro*sin(THETA), 0.0]
+    cross = np.cross(r_line, fO_p_line)
+    M_O_p += cross[2]
     
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
