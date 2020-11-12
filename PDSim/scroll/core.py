@@ -940,7 +940,8 @@ class Scroll(PDSimCore, _Scroll):
                 def resid(T):
                     temp.update(dict(T=T, D=rho2))
                     return temp.s-s1
-                # temp has now been updated
+                optimize.newton(resid, inletState.T)
+                # Temp has now been updated
                 initState=temp.copy()
             if alpha<nCmax:
                 # Does not change definition at discharge angle
