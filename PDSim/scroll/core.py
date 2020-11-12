@@ -925,13 +925,13 @@ class Scroll(PDSimCore, _Scroll):
                                         )
                 
             else:
-                #It is not the first CV, more involved analysis
-                #Assume isentropic compression from the inlet state at the end of the suction process
+                # It is not the first CV, more involved analysis
+                # Assume isentropic compression from the inlet state at the end of the suction process
                 s1 = inletState.s
                 rho1 = inletState.rho
                 V1 = self.V_s1(2*pi)[0]
                 V2 = self.V_c1(0,alpha)[0]
-                #Mass is constant, so rho1*V1 = rho2*V2
+                # Mass is constant, so rho1*V1 = rho2*V2
                 rho2 = rho1 * V1 / V2
                 
                 # Now don't know temperature or pressure, but you can assume
