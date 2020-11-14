@@ -32,11 +32,11 @@ cdef class CVInvolutes:
         
     def __repr__(self):
         s = ''
-        s += "Outer.involute = {i:s}\n".format(i=involute_index_to_key(self.Outer.involute))
+        s += "Outer.involute = {i:s}\n".format(i=involute_index_to_key(self.Outer.involute).decode('ascii'))
         s += "Outer.phi_0 = {i:g}\n".format(i=self.Outer.phi_0)
         s += "Outer.phi_max = {i:g}\n".format(i=self.Outer.phi_max)
         s += "Outer.phi_min = {i:g}\n".format(i=self.Outer.phi_min)
-        s += "Inner.involute = {i:s}\n".format(i=involute_index_to_key(self.Inner.involute))
+        s += "Inner.involute = {i:s}\n".format(i=involute_index_to_key(self.Inner.involute).decode('ascii'))
         s += "Inner.phi_0 = {i:g}\n".format(i=self.Inner.phi_0)
         s += "Inner.phi_max = {i:g}\n".format(i=self.Inner.phi_max)
         s += "Inner.phi_min = {i:g}\n".format(i=self.Inner.phi_min)
