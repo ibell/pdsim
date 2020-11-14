@@ -2,7 +2,7 @@ from __future__ import division, absolute_import, print_function
 
 import math
 from math import pi
-from time import clock
+from timeit import default_timer
 import inspect
 import six
 
@@ -804,7 +804,7 @@ class PDSimCore(object):
             self._want_abort = True
         
         #  If the run has timed out, quit
-        if clock() - self.start_time > self.timeout:
+        if default_timer() - self.start_time > self.timeout:
             print('run timed out')
             self._want_abort = True
             
@@ -979,7 +979,7 @@ class PDSimCore(object):
         self.update_existence()
         
         try:
-            t1 = clock()
+            t1 = default_timer()
             # Run the pre-cycle code
             self.pre_cycle()
 
@@ -1022,7 +1022,7 @@ class PDSimCore(object):
         if aborted == 'abort':
             return None
         
-        t2 = clock()
+        t2 = default_timer()
         print('Elapsed time for cycle is {0:g} s'.format(t2-t1))
         
         mdot_out = self.FlowsProcessed.mean_mdot[self.key_outlet]
@@ -1368,9 +1368,7 @@ class PDSimCore(object):
         # Carry out some pre-run checks
         self._check()
         
-        from time import clock
-        
-        self.start_time = clock()
+        self.start_time = default_timer()
         self.timeout = timeout
         
         #Connect functions that have been serialized by saving the function name as a string
@@ -1386,8 +1384,7 @@ class PDSimCore(object):
         self.key_inlet = key_inlet
         self.key_outlet = key_outlet
         
-        from time import clock
-        t1=clock()
+        t1=default_timer()
         
         # Set up a pipe for accepting a value of True which will abort the run
         # Used from the GUI to kill process from the top-level thread
@@ -1449,7 +1446,7 @@ class PDSimCore(object):
             del self.resid_Td
             
         #  Save the elapsed time for simulation
-        self.elapsed_time = clock() - t1
+        self.elapsed_time = default_timer() - t1
         
     def get_prune_keys(self):
         """
