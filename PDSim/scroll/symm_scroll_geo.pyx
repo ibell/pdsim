@@ -474,9 +474,10 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
                     phi_max = max2(geo.phi_fie - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0 )
                     phi_min = min2(geo.phi_fie - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0 )
         elif matchpair(key1,key2,get_compression_chamber_index(2,1),comm.keyIs1) or matchpair(key1,key2,get_compression_chamber_index(1,1),comm.keyIs2):
-                #TODO: this could be improved to take into account the non-perfect separation between s-sa and phi_ie
-                phi_max = geo.phi_fie - theta #this is where the change needs to be made
-                phi_min = geo.phi_fie - theta - pi
+            angle1 = phi_s_sa(theta,geo) + geo.phi_oo0 - geo.phi_fi0
+            angle2 = geo.phi_fie - pi - theta
+            phi_max = max2(angle1, angle2)
+            phi_min = min2(angle1, angle2)
         elif matchpair(key1,key2,get_compression_chamber_index(1,1),get_compression_chamber_index(2,1)):
                 phi_max = geo.phi_fie - theta - pi
                 phi_min = geo.phi_fie - theta - 2*pi
