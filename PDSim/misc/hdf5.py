@@ -47,8 +47,7 @@ class HDF5Writer(object):
                     f.create_dataset(thing, data=value, compression="gzip")
                 continue
             elif isinstance(value, six.string_types):
-                str_type = h5py.new_vlen(str)
-                f.create_dataset(thing, dtype=str_type, data=value)
+                f[thing] = value
                 continue
 
             import inspect
