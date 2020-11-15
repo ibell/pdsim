@@ -36,6 +36,9 @@ cdef class _Scroll(object):
     cpdef double Inlet_sa(self, FlowPath FP):
         FP.A=pi*0.03**2/4.0
         return flow_models.IsentropicNozzle(FP.A,FP.State_up,FP.State_down)
+
+    cpdef double radial_leakage_area(self, double theta, long key1Index, long key2Index):
+        return symm_scroll_geo.radial_leakage_area(theta, self.geo, key1Index, key2Index)
         
     cpdef double RadialLeakage(self, FlowPath FP, double t = -1):
         """
@@ -52,10 +55,7 @@ cdef class _Scroll(object):
         #Calculate the area
         #Arc length of the upstream part of the flow path
         
-        FP.A = symm_scroll_geo.radial_leakage_area(self.theta,
-                                                   self.geo,
-                                                   FP.key1Index,
-                                                   FP.key2Index)
+        FP.A = self.radial_leakage_area(self.theta, FP.key1Index, FP.key2Index)
         
         if FP.A == 0.0:
             return 0.0
