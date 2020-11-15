@@ -480,8 +480,11 @@ cdef _radial_leakage_angles(double theta, geoVals geo, long key1, long key2, dou
                 phi_max = geo.phi_fie - theta - pi
                 phi_min = geo.phi_fie - theta - 2*pi
         elif Nc == 1 and (matchpair(key1,key2,get_compression_chamber_index(2,1),comm.keyId1) or matchpair(key1,key2,get_compression_chamber_index(1,1),comm.keyId2)):
-                phi_max = geo.phi_fie - theta - 2*pi
-                phi_min = geo.phi_fis
+            phi_max = -1; phi_min = -1
+            alpha = 1
+            overlap(geo.phi_oos + pi, geo.phi_fie - theta - 2*pi*Nc, # for d1 chamber
+                    geo.phi_oie - pi - theta - 2*pi*alpha, geo.phi_oie - pi - theta - 2*pi*(alpha-1), # for c2.Nc chamber
+                    &phi_min, &phi_max)
         elif Nc == 1 and theta > theta_d(geo):
             print('Nc: {Nc:d} key1: {k1:s} key2: {k2:s} theta: {theta:f} theta_d: {theta_d:f}'.format(Nc=Nc,k1=key1,k2=key2,theta = theta,theta_d = theta_d(geo)))
             raise KeyError
@@ -501,7 +504,9 @@ cdef _radial_leakage_angles(double theta, geoVals geo, long key1, long key2, dou
         if phi_max > 1e90:
             if matchpair(key1,key2,get_compression_chamber_index(2,Nc),comm.keyId1) or matchpair(key1,key2,get_compression_chamber_index(1,Nc),comm.keyId2):
                 phi_max = -1; phi_min = -1
-                overlap(geo.phi_fis, geo.phi_fie - theta - 2*pi*Nc, geo.phi_fie - theta - pi - 2*pi*Nc, geo.phi_fie - theta - pi - 2*pi*(Nc-1), &phi_min, &phi_max)
+                overlap(geo.phi_oos + pi, geo.phi_fie - theta - 2*pi*Nc, # for d1 chamber
+                        geo.phi_oie - pi - theta - 2*pi*Nc, geo.phi_oie - pi - theta - 2*pi*(Nc-1), # for c2.Nc chamber
+                        &phi_min, &phi_max)
 
     if phi_min > phi_max:
         raise ValueError ('For the keys ('+str(key1)+','+str(key2)+') @theta = '+str(theta)+' max < min (error because phi_max('+str(phi_max)+') < phi_min('+str(phi_min)+')')
@@ -584,7 +589,9 @@ def radial_leakage_pairs(geo):
                           ]
             pairs += [
                       ('d2','c1.'+str(Nc)),
+                      ('d2','c1.'+str(Nc-1)),
                       ('d1','c2.'+str(Nc)),
+                      ('d1','c2.'+str(Nc-1)),
                       ]
     
     keepers = []
