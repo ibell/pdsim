@@ -2449,12 +2449,19 @@ class Scroll(PDSimCore, _Scroll):
         # All functions in this map use the same call signature and are "boring"
         # Each function returns a dictionary of terms
 
+        fail_dict = {k: 0.0 for k in ['fx_p', 'fy_p', 'cx', 'cy', 'M_O_p']}
+
         for CVkey in self.CVs.keys:
-            try:
-                geo_components = [self.CVs[CVkey].ForceFcn(theta, self.geo) for theta in self.t[_slice]]
-            except BaseException as BE:
-                print('no forces for', CVkey, 'with error:', BE)             
-                geo_components = []
+            geo_components = []
+            error_messages = []
+            for theta in self.t[_slice]:
+                try:
+                    geo_components.append(self.CVs[CVkey].ForceFcn(theta, self.geo))
+                except BaseException as BE:
+                    error_messages.append(str(BE))
+                    geo_components.append(fail_dict)
+                if len(error_messages) == sum(_slice):
+                    print(set(error_messages))
                 
             if geo_components:
                 I = self.CVs.index(CVkey)
