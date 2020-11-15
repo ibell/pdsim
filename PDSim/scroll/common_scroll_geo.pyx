@@ -900,3 +900,18 @@ cpdef double involute_heat_transfer(double hc, double hs, double  rb,
         term2=hc*hs*rb*( (phi2*phi2/2.0-phi0*phi2)*(T_scroll-T_CV)
             +dT_dphi*(phi2*phi2*phi2/3.0-(phi0+phim)*phi2*phi2/2.0+phi0*phim*phi2))
         return term1-term2;
+
+cdef bint overlap(double minv1, double maxv1, double minv2, double maxv2, double *min, double *max):
+    """
+    Returns True if the ranges overlap, with the pointers to the overlap range
+    """
+    cdef double e = 1e-14 #epsilon to deal with floating point accuracy
+    cdef double _min = max2(minv1, minv2)
+    cdef double _max = min2(maxv1, maxv2)
+
+    if minv1-e <= _max <= maxv1+e and minv2-e <= _max <= maxv2+e and minv1-e <= _min <= maxv2+e and minv2-e <= _min <= maxv2+e:
+        min[0] = _min
+        max[0] = _max
+        return True
+    else:
+        return False

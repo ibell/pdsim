@@ -165,3 +165,5 @@ cpdef double involute_heat_transfer(double hc, double hs, double  rb,
                                   double phi1, double phi2, double phi0, 
                                   double T_scroll, double T_CV, double dT_dphi, 
                                   double phim)
+
+cdef bint overlap(double min1, double max1, double min2, double max2, double *min, double *max)

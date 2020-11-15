@@ -39,6 +39,15 @@ cdef class _Scroll(object):
 
     cpdef double radial_leakage_area(self, double theta, long key1Index, long key2Index):
         return symm_scroll_geo.radial_leakage_area(theta, self.geo, key1Index, key2Index)
+
+    cpdef tuple radial_leakage_angles(self, double theta, long key1Index, long key2Index):
+        """
+        Get the bounding angles for a pair of control volumes at a give crank angle
+        """
+        cdef double phi_min, phi_max
+        # Get the bounding angles
+        symm_scroll_geo._radial_leakage_angles(theta, self.geo, key1Index, key2Index, &phi_min, &phi_max)
+        return phi_min, phi_max
         
     cpdef double RadialLeakage(self, FlowPath FP, double t = -1):
         """

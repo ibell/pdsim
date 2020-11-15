@@ -15,7 +15,7 @@ cpdef double fyA(double rb, double phi, double phi0)
 cpdef double theta_d(geoVals geo) except *
 
 cpdef double radial_leakage_area(double theta, geoVals geo, long key1, long key2, int location = *) except *
-cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, double *angle_min, double *angle_max)
+cdef _radial_leakage_angles(double theta, geoVals geo, long key1, long key2, double *angle_min, double *angle_max)
 
 cpdef int getNc(double theta, geoVals geo) except *
 
