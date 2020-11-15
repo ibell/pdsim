@@ -6,7 +6,7 @@ import cython
 import matplotlib.pyplot as plt
 
 cimport PDSim.scroll.common_scroll_geo as comm
-from .common_scroll_geo cimport sides, compressor_CV_indices, get_compression_chamber_index, geoVals, coords_inv, coords_norm, matchpair, min2, max2
+from .common_scroll_geo cimport sides, compressor_CV_indices, get_compression_chamber_index, geoVals, coords_inv, coords_norm, matchpair, min2, max2, get_compressor_CV_index, overlap
 from .common_scroll_geo import polycentroid, polyarea
         
 cpdef CVcoords(CVkey, geoVals geo, double theta):
@@ -378,7 +378,7 @@ def setDiscGeo(geo,Type='Sanden',r2=0.001,**kwargs):
     else:
         raise AttributeError('Type not understood, should be one of 2Arc or ArcLineArc')
         
-cpdef double radial_leakage_area(double theta, geoVals geo, long key1Index, long key2Index, int location = comm.UP) except *:
+cpdef double radial_leakage_area(double theta, geoVals geo, long key1Index, long key2Index, int location = comm.MID) except *:
     """
     Get the flow area of the flow path for a given radial flow pair
     
@@ -399,7 +399,7 @@ cpdef double radial_leakage_area(double theta, geoVals geo, long key1Index, long
     """
     cdef double phi_min, phi_max
     # Get the bounding angles
-    radial_leakage_angles(theta, geo, key1Index, key2Index, &phi_min, &phi_max)
+    _radial_leakage_angles(theta, geo, key1Index, key2Index, &phi_min, &phi_max)
     if location == comm.UP:
         phi_0 = geo.phi_fi0
     elif location == comm.DOWN:
@@ -411,7 +411,7 @@ cpdef double radial_leakage_area(double theta, geoVals geo, long key1Index, long
     A = geo.delta_radial*geo.rb*((phi_max**2-phi_min**2)/2-phi_0*(phi_max-phi_min))
     return A
  
-cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, double *angle_min, double *angle_max):
+cdef _radial_leakage_angles(double theta, geoVals geo, long key1, long key2, double *angle_min, double *angle_max):
     """
     Get the angles for a given radial flow pair
     
@@ -474,10 +474,8 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
                     phi_max = max2(geo.phi_fie - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0 )
                     phi_min = min2(geo.phi_fie - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0 )
         elif matchpair(key1,key2,get_compression_chamber_index(2,1),comm.keyIs1) or matchpair(key1,key2,get_compression_chamber_index(1,1),comm.keyIs2):
-            angle1 = phi_s_sa(theta,geo) + geo.phi_oo0 - geo.phi_fi0
-            angle2 = geo.phi_fie - pi - theta
-            phi_max = max2(angle1, angle2)
-            phi_min = min2(angle1, angle2)
+            phi_max = -1; phi_min = -1
+            overlap(geo.phi_fie - pi - theta, phi_s_sa(theta,geo)+geo.phi_oo0-geo.phi_fi0, geo.phi_fie-theta-2*pi, geo.phi_fie-theta, &phi_min, &phi_max)
         elif matchpair(key1,key2,get_compression_chamber_index(1,1),get_compression_chamber_index(2,1)):
                 phi_max = geo.phi_fie - theta - pi
                 phi_min = geo.phi_fie - theta - 2*pi
@@ -502,8 +500,8 @@ cdef radial_leakage_angles(double theta, geoVals geo, long key1, long key2, doub
                 break
         if phi_max > 1e90:
             if matchpair(key1,key2,get_compression_chamber_index(2,Nc),comm.keyId1) or matchpair(key1,key2,get_compression_chamber_index(1,Nc),comm.keyId2):
-                phi_max = geo.phi_fie - theta - 2*pi*Nc
-                phi_min = geo.phi_fis
+                phi_max = -1; phi_min = -1
+                overlap(geo.phi_fis, geo.phi_fie - theta - 2*pi*Nc, geo.phi_fie - theta - pi - 2*pi*Nc, geo.phi_fie - theta - pi - 2*pi*(Nc-1), &phi_min, &phi_max)
 
     if phi_min > phi_max:
         raise ValueError ('For the keys ('+str(key1)+','+str(key2)+') @theta = '+str(theta)+' max < min (error because phi_max('+str(phi_max)+') < phi_min('+str(phi_min)+')')
@@ -589,8 +587,19 @@ def radial_leakage_pairs(geo):
                       ('d1','c2.'+str(Nc)),
                       ]
     
-    return remove_duplicates(pairs)
-    
+    keepers = []
+    for pair in remove_duplicates(pairs):
+        ikey1 = get_compressor_CV_index(pair[0])
+        ikey2 = get_compressor_CV_index(pair[1])
+        for theta in np.linspace(0, 2*np.pi, 10000):
+            try:
+                A = radial_leakage_area(theta, geo, ikey1, ikey2)
+                if A > 0:
+                    keepers.append(pair)
+                    break
+            except:
+                pass
+    return keepers
 
 cpdef HTAnglesClass HT_angles(double theta, geoVals geo, key):
     """
