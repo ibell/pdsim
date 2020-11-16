@@ -2,7 +2,7 @@
 ## work for you.  Caveat emptor!!
 #
 from __future__ import division, print_function
-import sys
+import sys, timeit
 from math import pi
 
 from PDSim.flow.flow_models import IsentropicNozzleWrapper
@@ -191,8 +191,7 @@ def Compressor(Te = 0,DTsh = 11.1,Tc = 20, Tamb = 25, Nmot = 3600, f = None, One
                                  lumps_energy_balance_callback = ScrollComp.lump_energy_balance_callback
                                  )
 
-    from time import clock
-    t1=clock()
+    t1=default_timer()
     ScrollComp.RK45_eps = 1e-6
     ScrollComp.eps_cycle = 3e-3
     ScrollComp.verbosity = 10
@@ -208,7 +207,7 @@ def Compressor(Te = 0,DTsh = 11.1,Tc = 20, Tamb = 25, Nmot = 3600, f = None, One
                         eps_energy_balance = 0.1 #relaxed multi-lump convergence
                         )
 
-    print('time taken', clock()-t1)
+    print('time taken', default_timer()-t1)
 
     if '--plot' in sys.argv:
         debug_plots(ScrollComp)
