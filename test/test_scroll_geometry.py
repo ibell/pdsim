@@ -4,7 +4,7 @@ import PDSim.scroll.symm_scroll_geo as symm
 
 import numpy as np
 
-def check_fxp_fyp_MOp_sums(theta, merge_DDD, print_values=False):
+def check_fxp_fyp_MOp_sums(theta, merge_DDD, disc_type, disc_r2, print_values=False):
     """ 
     All the active chambers conntributing to the forces 
     on the orbiting scroll should sum up to zero because of
@@ -33,7 +33,7 @@ def check_fxp_fyp_MOp_sums(theta, merge_DDD, print_values=False):
                    phi_os = phi_os, # [rad]
                    phi_is = phi_is, # [rad]
                    geo=geo)
-    symm.setDiscGeo(geo, Type='2Arc', r2=0.0)
+    symm.setDiscGeo(geo, Type=disc_type, r2=disc_r2)
 
     Nc = symm.getNc(theta, geo)
     fxp, fyp, MOp = 0, 0, 0
@@ -63,7 +63,8 @@ def check_fxp_fyp_MOp_sums(theta, merge_DDD, print_values=False):
 def test_fxp_fyp_MOpsums():
     for merge_DDD in [True, False]:
         for theta in np.linspace(0, 2*np.pi, 100):
-            yield check_fxp_fyp_MOp_sums, theta, merge_DDD
+            for disc_type, disc_r2 in [('2Arc',0.0), ('2Arc', 0.0001), ('ArcLineArc', 0.001)]:
+                yield check_fxp_fyp_MOp_sums, theta, merge_DDD, disc_type, disc_r2
 
 if __name__ == '__main__':
     # print(check_fxp_fyp_MOp_sums(0.4, False, print_values=True))
