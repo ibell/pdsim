@@ -157,7 +157,7 @@ cpdef int nC_Max(geo) except *:
     else:
         raise ValueError('nC_max not supported for asymmetric')
         
-cpdef int getNc(double theta, geoVals geo) except *:
+cpdef int getNc(double theta, geoVals geo, int path = 1) except *:
     """ 
     The number of pairs of compression chambers in existence at a given 
     crank angle 
@@ -166,6 +166,8 @@ cpdef int getNc(double theta, geoVals geo) except *:
         theta : float
             The crank angle in radians.
         geo : geoVals instance
+        path : int
+            Which path to calculate the number of chambers for; 1: s1, c1.1... 2: s2, c2.1, ...
 
     Returns:
         Nc : int

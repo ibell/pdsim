@@ -17,7 +17,7 @@ cpdef double theta_d(geoVals geo) except *
 cpdef double radial_leakage_area(double theta, geoVals geo, long key1, long key2, int location = *) except *
 cdef _radial_leakage_angles(double theta, geoVals geo, long key1, long key2, double *angle_min, double *angle_max)
 
-cpdef int getNc(double theta, geoVals geo) except *
+cpdef int getNc(double theta, geoVals geo, int path = *) except *
 
 cpdef HTAnglesClass HT_angles(double theta, geoVals geo, key)
 
