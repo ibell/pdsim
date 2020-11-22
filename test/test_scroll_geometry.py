@@ -4,7 +4,12 @@ import PDSim.scroll.symm_scroll_geo as symm
 
 import numpy as np
 
-def check_fxp_fyp_MOp_sums(theta, merge_DDD, disc_type, disc_r2, print_values=False):
+import pytest
+
+@pytest.mark.parametrize('theta', np.linspace(0, 2*np.pi, 100))
+@pytest.mark.parametrize('merge_DDD', [True, False])
+@pytest.mark.parametrize('disc', [('2Arc',0.0), ('2Arc', 0.0001), ('ArcLineArc', 0.001)])
+def test_fxp_fyp_MOp_sums(theta, merge_DDD, disc, print_values=False):
     """ 
     All the active chambers conntributing to the forces 
     on the orbiting scroll should sum up to zero because of
@@ -12,6 +17,8 @@ def check_fxp_fyp_MOp_sums(theta, merge_DDD, disc_type, disc_r2, print_values=Fa
     all sides of the scroll, if the forces and moments
     do not sum to zero, the scroll would spontaneously fly away
     """
+
+    disc_type, disc_r2 = disc
 
     geo = geoVals()
     # set_scroll_geo(100e-6, 2.5, 0.003, 0.005, geo=geo)
@@ -60,12 +67,6 @@ def check_fxp_fyp_MOp_sums(theta, merge_DDD, disc_type, disc_r2, print_values=Fa
         assert(abs(fyp) < 1e-16)
         assert(abs(MOp) < 1e-16)
 
-def test_fxp_fyp_MOpsums():
-    for merge_DDD in [True, False]:
-        for theta in np.linspace(0, 2*np.pi, 100):
-            for disc_type, disc_r2 in [('2Arc',0.0), ('2Arc', 0.0001), ('ArcLineArc', 0.001)]:
-                yield check_fxp_fyp_MOp_sums, theta, merge_DDD, disc_type, disc_r2
-
 if __name__ == '__main__':
     # print(check_fxp_fyp_MOp_sums(0.4, False, print_values=True))
-    import nose; nose.runmodule()
+    pytest.main()
