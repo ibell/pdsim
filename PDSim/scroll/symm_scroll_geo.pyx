@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 cimport PDSim.scroll.common_scroll_geo as comm
 from .common_scroll_geo cimport sides, compressor_CV_indices, get_compression_chamber_index, geoVals, coords_inv, coords_norm, matchpair, min2, max2, get_compressor_CV_index, overlap
 from .common_scroll_geo import polycentroid, polyarea
+from PDSim.scroll.common_scroll_geo cimport fFx_p,fFy_p,fMO_p,INVOLUTE_OO
         
 cpdef CVcoords(CVkey, geoVals geo, double theta):
     """ 
@@ -855,7 +856,7 @@ cpdef dict SA_forces(double theta, geoVals geo, bint poly = False, bint use_offs
         
     fx_p=rb*h*(cos(phi_ie)*phi_o0+sin(phi_ie)-phi_ie*cos(phi_ie) - sin(phi_ie-pi+B)-(phi_o0-phi_ie+pi-B)*cos(phi_ie-pi+B) )
     fy_p=-rb*h*((phi_ie-phi_o0)*sin(phi_ie)+cos(phi_ie) - cos(phi_ie-pi+B) - (phi_ie-pi-phi_o0+B)*sin(phi_ie-pi+B))
-    M_O_p=-h*rb**2*(B-2*phi_o0+2*phi_ie-2*pi)*(B-pi)/2
+    M_O_p = fMO_p(geo.phi_ooe, geo, theta, INVOLUTE_OO) - fMO_p(geo.phi_ooe-np.pi+B, geo, theta, INVOLUTE_OO)
 
     # Add contribution from the end of the scroll, connecting the inner and outer involutes
     x1, y1 = coords_inv(geo.phi_ooe, geo, theta, 'oo')
