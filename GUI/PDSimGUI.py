@@ -840,14 +840,14 @@ class MainFrame(wx.Frame):
                 i = sys.argv.index('--config')
                 _configfile = sys.argv[i+1]
                 if os.path.exists(_configfile):
-                    self.config = yaml.load(open(_configfile, 'rb'))
+                    self.config = yaml.load(open(_configfile, 'rb'), Loader=yaml.FullLoader)
                 else:
                     warnings.warn('Sorry but your --config file "'+_configfile+'" is not found, loading the default configuration')
-                    self.config = yaml.load(open(configfile, 'rb'))
+                    self.config = yaml.load(open(configfile, 'rb'), Loader=yaml.FullLoader)
                 
             #Then see if there is a file at configs/default.pdc
             elif os.path.exists(defaultconfig):
-                self.config = yaml.load(open(defaultconfig,'rb'))
+                self.config = yaml.load(open(defaultconfig,'rb'), Loader=yaml.FullLoader)
                 
             # Then use the internal default scroll
             else:
