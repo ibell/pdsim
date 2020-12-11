@@ -1956,7 +1956,7 @@ class StateChooser(wx.Dialog):
         fgs= wx.FlexGridSizer(cols=2,hgap=3,vgap=3)
         self.Tlabel, self.T = LabeledItem(self,label="Temperature [K]",value='300',enabled=False)
         self.plabel, self.p = LabeledItem(self,label="Pressure [kPa]",value='300',enabled=False)
-        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/m�]",value='1',enabled=False)
+        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/m\xb3]",value='1',enabled=False)
         fgs.AddMany([self.Tlabel,self.T,self.plabel,self.p,self.rholabel,self.rho])
         sizer.Add(fgs)
         
@@ -2124,7 +2124,7 @@ class StatePanel(wx.Panel):
         
         self.Tlabel, self.T = LabeledItem(self,label="Temperature [K]",value=str(CPState.T))
         self.plabel, self.p = LabeledItem(self,label="Pressure [kPa]",value=str(CPState.p))
-        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/m�]",value=str(CPState.rho))
+        self.rholabel, self.rho = LabeledItem(self,label="Density [kg/m\xb3]",value=str(CPState.rho))
         sizer.AddMany([self.Fluidlabel, self.Fluid,
                        self.Tlabel, self.T,
                        self.plabel, self.p,
