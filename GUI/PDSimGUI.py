@@ -1709,7 +1709,7 @@ class MainFrame(wx.Frame):
             if not sorted(check_dict.keys()) == sorted(my_dict.keys()):
                 print('Not all the keys are the same')
             else:
-                for k in check_dict.iterkeys():
+                for k in check_dict.keys():
                     print('Different key: ',check_dict[k].GetValue(),my_dict[k].GetValue())
                     
             # Write current location to config
