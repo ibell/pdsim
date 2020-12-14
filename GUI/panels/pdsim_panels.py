@@ -2180,6 +2180,20 @@ class StatePanel(wx.Panel):
         self.T.SetValue(str(S.T))
         self.rho.SetValue(str(S.rho))
         self.p.SetValue(str(S.p))
+
+    def SetState(self, state):
+        """
+        """
+        if self._Fluid_fixed and not self.Fluid.GetValue().encode('ascii') == state.Fluid:
+            import warnings
+            warnings.warn('Could not set state since fluid is fixed')
+            return
+
+        # Load up the textboxes
+        self.Fluid.SetValue(state.Fluid)
+        self.T.SetValue(str(state.T))
+        self.rho.SetValue(str(state.rho))
+        self.p.SetValue(str(state.p))
     
     def UseChooser(self,event=None):
         """
