@@ -40,6 +40,7 @@ length_units = {
 
 area_units = {
                 'Square Meter': pq.length.m**2,
+                'Square Millimeter' : pq.length.mm**2,
                 'Square Micrometer' : pq.length.um**2,
                 'Square Centimeter' : pq.length.cm**2,
                 'Square Inch' : pq.length.inch**2,
@@ -47,6 +48,7 @@ area_units = {
 
 volume_units = {
                 'Cubic Meter': pq.length.m**3,
+                'Cubic Millimeter': pq.length.mm**3,
                 'Cubic Micrometer' : pq.length.um**3,
                 'Cubic Centimeter' : pq.length.cm**3,
                 'Cubic Inch' : pq.length.inch**3,
@@ -54,6 +56,7 @@ volume_units = {
 
 pressure_units = {
                   'kPa' : pq.kPa,
+                  'MPa' : pq.MPa,
                   'psia' : pq.psi,
                   'torr' : pq.torr
                   }
