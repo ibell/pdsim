@@ -882,9 +882,10 @@ class MainFrame(wx.Frame):
             def flush(self):
                 return None
                 
-        redir=RedirectText(self.MTB.RunTB.main_log_ctrl)
-        sys.stdout=redir
-        sys.stderr=redir
+        if '--no-redirect-output' not in sys.argv:
+            redir = RedirectText(self.MTB.RunTB.main_log_ctrl)
+            sys.stdout = redir
+            sys.stderr = redir
         
         self.SetPosition(position)
         self.SetSize(size)
