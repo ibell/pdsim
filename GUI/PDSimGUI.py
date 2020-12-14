@@ -1699,7 +1699,6 @@ class MainFrame(wx.Frame):
             
             # Recreate this frame using the config file to make sure it is 100% the same
             configdict = yaml.load(open(file_path,'r'),Loader=yaml.FullLoader)
-            print('here 1')
             check_frame = MainFrame(configdict)
 
             check_dict = check_frame.get_GUI_object_dict()
