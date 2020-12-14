@@ -1038,8 +1038,8 @@ class MainFrame(wx.Frame):
         except:
             raise
         else:
-            # Destroy the current MainFrame
-            self.Destroy()
+            # Destroy (but really hide, since Destroy crashes) the current MainFrame
+            self.Hide()
             
         self.family_module = self.families_dict[configfile['family']]
         
