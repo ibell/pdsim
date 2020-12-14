@@ -1297,7 +1297,7 @@ class MainFrame(wx.Frame):
             root, ext = os.path.splitext(fname)
             
             # Hack the path to include the directory
-            sys.path = [path]
+            sys.path = [path] + old_sys_path
             
             # Do not try to import files that do not have a "if __name__ == '__main__': " - this helps to avoid (but not completely) 
             # issues with scripts being run that should not be when they are attempted to be imported
