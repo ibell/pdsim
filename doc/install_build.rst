@@ -19,7 +19,7 @@ git
 
 **LINUX/OSX** :
 
-Your operating system should already come with git.  You should not need to do anything extra
+Your operating system should already come with git.  You should not need to do anything extra.  You might need to install g++ via your package manager (e.g., on debian-based distros: ``sudo apt-get install g++``)
 
 Anaconda/Miniconda
 ------------------
@@ -48,34 +48,40 @@ On OSX, install Xcode, or install ``gcc`` via homebrew.
 Windows
 =======
 
-#. Populate the root conda environment installation the with necessary packages (or see below about using conda environments).  At the command prompt, do::
+Conda environments are useful to ensure that all the dependencies needed for a particular task (here to run code with PDSim).  They are recommended for most use cases with PDSim.
 
-    conda install matplotlib numpy scipy h5py cython pip wxpython pyyaml
-  
-   If you installed Miniconda somewhere else (and/or Miniconda/Scripts is not on the PATH), you might need to give the full path to ``conda``, which would be something like ``c:\Miniconda3\Scripts\conda`` on my machine
+#. If you have multiple versions of python or PDSim floating around, it can be useful to use conda to create conda environments that encapsulate the desired versions of each of the pieces.  This can be easily carried out at the command line.  For instance, we might create an environment (named ``pdsim_stable``) with the most up to date version of PDSim and its dependencies.  There is a file called ``conda_environment.yml`` in the root of the repository.  This file can be used to create a conda environment with::
+    
+    conda env create --name pdsim_stable --file conda_environment.yml
+
+To activate this new environment on windows, you do::
+
+    activate pdsim_stable
+
+If on linux/OSX, you need to do::
+
+    source activate pdsim_stable
+
+To remove the environment you created without confirmation (thanks to ``-y``), do::
+
+    conda env remove -y -n pdsim_stable
 
 #. Check that when you go to a command prompt, you get output something like::
 
     C:\Users\ian>python
     Python 3.7.6 | packaged by conda-forge | (default, Mar 23 2020, 22:22:21) [MSC v.1916 64 bit (AMD64)] on win32
     Type "help", "copyright", "credits" or "license" for more information.
-    >>> import scipy
-    >>> scipy.__version__
-    '1.3.1'
+    >>> quit()
 
 #. Ok, python has been successfully installed.
     
-#. Now we are going to collect the source code for PDSim.  In Windows Explorer, go to a folder where you want to put the source code for PDSim.  Right-click and select "Git Clone..."
+#. Now we are going to collect the source code for PDSim.  
 
-#. Use the URL ``https://github.com/ibell/pdsim``.
-
-#. To install coolprop, at the command prompt execute::
-
-    pip install coolprop
-
-   If you want to install the most recent version of coolprop (the above command will install the latest *STABLE* release), see `the instructions here <http://www.coolprop.org/coolprop/wrappers/Python/index.html#automatic-installation>`_
+    Option A: If you installed TortoiseGit, In Windows Explorer, go to a folder where you want to put the source code for PDSim.  Right-click and select "Git Clone...". Use the URL ``https://github.com/ibell/pdsim``.
+    Option B: At a command prompt, do: ``git clone --recursive https://github.com/ibell/pdsim``
+    Option C: Use your git client of choice to clone pdsim following its instructions with the url ``https://github.com/ibell/pdsim``
     
-#. Install PDSim using::
+#. Move into the pdsim folder, then install PDSim using::
 
     python setup.py install
     
@@ -101,11 +107,11 @@ Windows
     
     In [0]: yaml.__version__, yaml.__file__
 
-#. Now go into the doc folder, start IPython, the below code should yield output something like::
+#. As an alternative to the previous step, you can do: ``conda list`` which will list all the installed packages and their versions. The list can be rather long....
 
-.. ipython::
+#. Now go into the examples folder and you you shold be able to run::
 
-    In [0]: %run '../examples/simple_example.py'
+    python simple_example.py
 
 #. Ok good, PDSim is working!
     
@@ -114,11 +120,6 @@ Windows
 #. Press F5 to run the default scroll compressor
 
 #. Wait about 80 seconds for it to finish
-
-Linux and OSX
-=============
-
-The procedure is nearly identical on linux and OSX, apart from the fact that you do not need to install git or Microsoft Visual Studio.  Use the anaconda installer to get python 2.7 64-bit, follow the windows instructions otherwise
 
 Update source code
 ==================
@@ -134,7 +135,7 @@ Press Ok button.
 
 Alternatively, you can do the update from the command line::
 
-    git.exe submodule update --init --merge --remote "externals/coolprop"
+    git submodule update --init --merge --remote "externals/coolprop"
     
 See also `StackOverflow question <http://stackoverflow.com/questions/16058917/pulling-git-submodules-with-tortoisegit>`_
 
@@ -154,24 +155,16 @@ Uninstallation
 
 To uninstall PDSim, go to the site-packages folder corresponding to the installation of python (probably c:\\Python27\\Lib\\site-packages), delete the folder PDSim.  You might want to also delete any files like ``PDSim-x.x.x-py2.7.egg-info`` where ``x`` are numbers.  For a thorough uninstallation, you might also want to remove the ``build`` folder in the directory where you cloned the git files
 
-Using conda environments
+Manual installation without conda environment
 ========================
 
-If you have multiple versions of python or PDSim floating around, it can be useful to use conda to create conda environments that encapsulate the desired versions of each of the pieces.  This can be easily carried out at the command line.  For instance, we might create an environment (named ``pdsim_stable``) with the most up to date version of PDSim and its dependencies.  There is a file called ``RTDenvironment.yml`` in the root of the repository.  This file can be used to create a conda environment with::
-    
-    conda env create --name pdsim_stable --file RTDenvironment.yml
+!! This approach is not recommended.  Better to use the environment file. !!
 
-To activate this new environment on windows, you do::
+Populate the root conda environment installation the with necessary packages (or see below about using conda environments).  At the command prompt, do::
 
-    activate pdsim_stable
-
-If on linux/OSX, you need to do::
-
-    source activate pdsim_stable
-
-To remove the environment you created without confirmation (thanks to ``-y``), do::
-
-    conda env remove -y -n pdsim_stable
+    conda install matplotlib numpy scipy h5py cython pip wxpython pyyaml
+  
+If you installed Miniconda somewhere else (and/or Miniconda/Scripts is not on the PATH), you might need to give the full path to ``conda``, which would be something like ``c:\Miniconda3\Scripts\conda`` on my machine
 
 .. _Use-PDSim:
 
