@@ -28,6 +28,8 @@ Anaconda/Miniconda
 
 #. Run the installer. In the setup, if you are doing a clean install, it is safe to select the option "Add Anaconda to the system PATH environmental variable".  Otherwise, selecting this option will make this the default conda installation on your computer, which may or may not be what you want.  If you want Miniconda to live peaceably with an existing miniconda (64-bit?), make sure this option is unselected.
 
+#. If your shell doesn't understand the command ``conda``, you might want to supercharge your shell by doing ``conda init`` to enable the direct use of the conda command without supplying the complete path.
+
 Compiler
 --------
 
