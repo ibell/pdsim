@@ -158,7 +158,7 @@ Uninstallation
 To uninstall PDSim, go to the site-packages folder corresponding to the installation of python (probably c:\\Python27\\Lib\\site-packages), delete the folder PDSim.  You might want to also delete any files like ``PDSim-x.x.x-py2.7.egg-info`` where ``x`` are numbers.  For a thorough uninstallation, you might also want to remove the ``build`` folder in the directory where you cloned the git files
 
 Manual installation without conda environment
-========================
+=============================================
 
 !! This approach is not recommended.  Better to use the environment file. !!
 
