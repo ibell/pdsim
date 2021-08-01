@@ -1948,7 +1948,7 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
         fx_p+=hs*nx*L
         fy_p+=hs*ny*L
         rx=(x1t+x2t)/2-ro*cos(om)
-        ry=(y2t+y2t)/2-ro*sin(om)
+        ry=(y1t+y2t)/2-ro*sin(om)
         M_O_p+=rx*hs*ny*L-ry*hs*nx*L
     
     #Involute portion
@@ -2059,7 +2059,7 @@ cpdef dict DD_forces(double theta, geoVals geo, bint poly=False):
             fxp_poly+=hs*nx*L
             fyp_poly+=hs*ny*L
             rx=(x1t+x2t)/2-ro*cos(om)
-            ry=(y2t+y2t)/2-ro*sin(om)
+            ry=(y1t+y2t)/2-ro*sin(om)
             MO_poly+=rx*hs*ny*L-ry*hs*nx*L
             print('Line',hs*nx*L,hs*ny*L)
             
