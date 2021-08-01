@@ -106,5 +106,5 @@ def test_DD_forces_always_same(theta, key, print_values=True):
     # assert(size(set(o))==1)
 
 if __name__ == '__main__':
-    # print(check_fxp_fyp_MOp_sums(0.4, False, print_values=True))
+    # print(check_fxp_fyp_MOp_sums(0.4, False, print_values=True)) 
     pytest.main()
