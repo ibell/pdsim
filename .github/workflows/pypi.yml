@@ -9,12 +9,17 @@ jobs:
     env:
       TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
       TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+      CXX: clang++
     steps:
       - uses: actions/checkout@v2
       - name: checkout submodules
         run: git submodule update --init --recursive
       - name: build and upload manylinux wheels
-        uses: Niraj-Kamdar/manylinux-wheel-builder@master
+        uses: RalfG/python-wheels-manylinux-build@v0.3.4-ibellbelli/manylinuxclang
+        with:
+          python-versions: 'cp37-cp37m cp38-cp38m cp39-cp39m'
+          build-requirements: 'cython numpy'
+          pip-wheel-args: '-w ./dist --no-deps'
   Matrix-build:
     runs-on: ${{ matrix.os }}
     env:
