@@ -17,10 +17,12 @@ from Cython.Distutils import build_ext
 from Cython.Distutils.extension import Extension
 import sys, shutil, os, glob, subprocess
 
+here = os.path.dirname(__file__)
+
 # Get the hash of the git revision
 git_hash = '????'
 try:
-    git_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip().decode('ascii')
+    git_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=here).strip().decode('ascii')
 except BaseException as BE:
     print('Error:',)
     print('Unable to extract the git revision, set to placeholder')
@@ -28,7 +30,7 @@ except BaseException as BE:
 # Get the branch of the git revision
 git_branch = '????'
 try:
-    git_branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).strip().decode('ascii')
+    git_branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=here).strip().decode('ascii')
 except BaseException as BE:
     print('Error:', BE)
     print('Unable to extract the git branch, set to placeholder')
