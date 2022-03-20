@@ -26,8 +26,7 @@ jobs:
         # to supply options, put them in 'env', like:
         env:
           CIBW_ARCHS: auto64
-          MACOSX_DEPLOYMENT_TARGET: 10.15
-          CIBW_SKIP: "*musllinux*"
+          CIBW_SKIP: "*musllinux*" "*cp39*" "*cp310*"
 
       - uses: actions/upload-artifact@v2
         with:
