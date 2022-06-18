@@ -14,3 +14,4 @@ dependencies:
   - pip:
     - CoolProp
     - glob2
+    - ipython_genutils
