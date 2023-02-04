@@ -17,3 +17,4 @@ dependencies:
     - ipython_genutils
     - jinja2
     - nbsphinx
+    - PDSim

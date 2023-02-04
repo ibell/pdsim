@@ -43,16 +43,6 @@ def run_prebuild(_):
             for file in files:
                 if file.endswith('.ipynb') and '.ipynb_checkpoints' not in path:
                     subprocess.check_output(f'jupyter nbconvert  --to notebook --output {file} --execute {file}', shell=True, cwd=path)
-                    # --ExecutePreprocessor.allow_errors=True      (this allows you to allow errors globally, but a raises-exception cell tag is better)
-
-    # # Convert the notebooks to RST
-    # nb_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'notebooks')
-    # nb_index_fname = os.path.join(nb_dir, 'index.rst')
-    # if not os.path.exists(nb_index_fname):
-    #   print('converting jupyter notebooks to RST')
-    #   sys.path.append(nb_dir)
-    #   import compile_notebooks
-    #   compile_notebooks.convert_notebooks()
 
 def setup(app):
     app.connect('builder-inited', run_prebuild)
