@@ -11,7 +11,7 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys, os
+import sys, os, subprocess
 
 on_rtd = os.getenv('READTHEDOCS') == 'True'
 
