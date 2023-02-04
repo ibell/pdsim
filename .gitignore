@@ -38,6 +38,7 @@ build
 dist
 PDSim.egg-info
 
+/**/.DS_Store
 doc/log.txt
 doc/notebooks/*.rst
 doc/notebooks/**/*.png
