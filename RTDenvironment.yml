@@ -16,3 +16,4 @@ dependencies:
     - glob2
     - ipython_genutils
     - jinja2
+    - nbsphinx
