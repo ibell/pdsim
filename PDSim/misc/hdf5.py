@@ -46,6 +46,9 @@ class HDF5Writer(object):
                     # Save it with compression, go to next thing
                     f.create_dataset(thing, data=value, compression="gzip")
                 continue
+            elif isinstance(value, bytes):
+                f[thing] = str(value.decode('ascii'))
+                continue
             elif isinstance(value, six.string_types):
                 f[thing] = value
                 continue
