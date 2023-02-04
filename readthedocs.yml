@@ -1,6 +1,9 @@
+version: 2
+
 conda:
    file: RTDenvironment.yml
+
 python:
    os: ubuntu-22.04
-   version: 3.10
-   setup_py_install: true
+   # version: 3.10
+   # setup_py_install: true
