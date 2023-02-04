@@ -1,7 +1,7 @@
 version: 2
 
 conda:
-   file: RTDenvironment.yml
+  environment: RTDenvironment.yml
 
 build:
   os: ubuntu-22.04
