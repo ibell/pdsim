@@ -18,3 +18,4 @@ dependencies:
     - jinja2
     - nbsphinx
     - PDSim
+    - ipykernel
