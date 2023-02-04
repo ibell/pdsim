@@ -13,6 +13,8 @@
 
 import sys, os
 
+on_rtd = os.getenv('READTHEDOCS') == 'True'
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -35,19 +37,28 @@ def run_prebuild(_):
     output_path = os.path.join(cur_dir, 'PDSim_apidoc')
     main(argv=['-e', '-o', output_path, os.path.dirname(PDSim.__file__), '--force'])
 
-    # Convert the notebooks to RST
-    nb_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'notebooks')
-    nb_index_fname = os.path.join(nb_dir, 'index.rst')
-    if not os.path.exists(nb_index_fname):
-      print('converting jupyter notebooks to RST')
-      sys.path.append(nb_dir)
-      import compile_notebooks
-      compile_notebooks.convert_notebooks()
+    # -- Execute all notebooks --------------------------------------------------
+    if on_rtd:
+        for path, dirs, files in os.walk('.'):
+            for file in files:
+                if file.endswith('.ipynb') and '.ipynb_checkpoints' not in path:
+                    subprocess.check_output(f'jupyter nbconvert  --to notebook --output {file} --execute {file}', shell=True, cwd=path)
+                    # --ExecutePreprocessor.allow_errors=True      (this allows you to allow errors globally, but a raises-exception cell tag is better)
+
+    # # Convert the notebooks to RST
+    # nb_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'notebooks')
+    # nb_index_fname = os.path.join(nb_dir, 'index.rst')
+    # if not os.path.exists(nb_index_fname):
+    #   print('converting jupyter notebooks to RST')
+    #   sys.path.append(nb_dir)
+    #   import compile_notebooks
+    #   compile_notebooks.convert_notebooks()
 
 def setup(app):
     app.connect('builder-inited', run_prebuild)
               
-extensions = ['sphinx.ext.autodoc', 
+extensions = ['nbsphinx',
+              'sphinx.ext.autodoc', 
               'sphinx.ext.napoleon',
               'sphinx.ext.intersphinx', 
               #~ 'sphinx.ext.coverage',
