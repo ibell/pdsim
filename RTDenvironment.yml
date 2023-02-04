@@ -1,6 +1,6 @@
 name: pdsim_doc_build
 dependencies:
-  - python=3.10
+  - python=3.8
   - numpy
   - scipy
   - matplotlib
@@ -15,3 +15,4 @@ dependencies:
     - CoolProp
     - glob2
     - ipython_genutils
+    - jinja2
