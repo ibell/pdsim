@@ -122,11 +122,17 @@ for pyx_file in pyx_list:
     else:
         package_pxd_files[name] = [pxd]
 
+    # On Mac, need to explicitly specify that you want C++11 support
+    extra_compile_args = []
+    if sys.platform == 'darwin':
+        extra_compile_args=["-std=c++11"]
+
     ext_module_list.append(Extension(ext_name,
                                      sources,
                                      language='c++',
                                      define_macros = [('SWIG',None)], # Workaround to remove dependency on rapidjson in Configuration.h
-                                     cython_c_in_temp=True
+                                     cython_c_in_temp=True,
+                                     extra_compile_args=extra_compile_args
                                      )
                            )
 
