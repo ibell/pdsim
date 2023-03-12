@@ -28,6 +28,13 @@ except ImportError:
     import PDSim.misc.scipylike as interp
     import PDSim.misc.solvers as optimize
 
+# In python 2.x, RuntimeWarning needed to be imported from warnings package,
+# but in python 3.x it doesn't require an import
+try:
+    from warnings import RuntimeWarning
+except ImportError:
+    pass
+
 import matplotlib.pyplot as plt
 import subprocess
 import glob
@@ -818,7 +825,7 @@ class Scroll(PDSimCore, _Scroll):
                         raise ValueError('More than one intersection region obtained in poly_intersection_with_cvs')
                     else:
                         msg = 'More than one intersection region obtained in poly_intersection_with_cvs'
-                        warnings.warn(msg, warnings.RuntimeWarning)
+                        warnings.warn(msg, RuntimeWarning)
                 
                 #  Sum up the solution regions
                 A = 0
