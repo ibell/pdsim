@@ -1844,7 +1844,7 @@ class MySplashScreen(wxSplashScreen):
         width, height = img.GetWidth(), img.GetHeight()
         width *= 0.5
         height *= 0.5
-        aBitmap = img.Rescale(width,height).ConvertToBitmap()
+        aBitmap = img.Rescale(int(width), int(height)).ConvertToBitmap()
         splashStyle = wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT
         splashDuration = 2000 # milliseconds
         # Call the constructor with the above arguments in exactly the
