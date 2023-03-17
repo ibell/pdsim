@@ -212,14 +212,15 @@ class UnitConvertor(wx.Dialog):
         
 def mathtext_to_wxbitmap(s):
     #The magic from http://matplotlib.org/examples/user_interfaces/mathtext_wx.html?highlight=button
-    from matplotlib.mathtext import MathTextParser
-    
-    mathtext_parser = MathTextParser("Bitmap")
-    ftimage, depth = mathtext_parser.parse(s, 100)
-    return wx.BitmapFromBufferRGBA(ftimage.get_width(), 
-                                   ftimage.get_height(),
-                                   ftimage.as_rgba_str()
-                                   )
+
+    from matplotlib import mathtext
+    from io import BytesIO
+    buf = BytesIO()
+    mathtext.math_to_image(s, buf, format="png")
+    buf.seek(0)
+    bmp = wx.Bitmap.FromPNGData(buf.read())
+    # bmp.SaveFile('xx.png', type=wx.BITMAP_TYPE_PNG)
+    return bmp
         
 def EquationButtonMaker(LaTeX, parent, **kwargs):
     """
