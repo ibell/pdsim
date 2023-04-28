@@ -765,7 +765,7 @@ class OutputTreePanel(wx.Panel):
                 ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index))
                 
                 if run.get('description'):
-                    description = run.get('description')[()]
+                    description = run.get('description')[()].decode('utf-8')
                     ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index)+': '+description)
                     
                 my_col_idx += offset
@@ -787,7 +787,7 @@ class OutputTreePanel(wx.Panel):
             for run in self.runs:
                 ws.write(row_idx-2, my_col_idx - 1, 'theta')
                 for c in range(0, datas[0].shape[1]-1):
-                    CVkey = run.get('CVs/keys/%s' %(c,))[()] 
+                    CVkey = run.get('CVs/keys/%s' %(c,))[()].decode('utf-8')
                     ws.write(row_idx - 2, my_col_idx+c,CVkey)
                         
                 my_col_idx += offset

@@ -43,11 +43,11 @@ def write_to_xlsx(workbook, runs):
     # Header 
     my_col_idx = col_idx
     for run in runs:
-        run_index = run.get('run_index').value
+        run_index = run.get('run_index')[()]
         ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index))
         
         if run.get('description'):
-            description = run.get('description').value
+            description = run.get('description')[()].decode('utf-8')
             ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index)+': '+description)
             
         my_col_idx += offset
@@ -65,9 +65,9 @@ def write_to_xlsx(workbook, runs):
     maxlen = 0
     for run in runs:
         # Each are stored as 1D array, convert to 2D column matrix
-        theta = np.array(run.get('summary/theta_profile').value, ndmin = 2)
-        p1 = np.array(run.get('summary/p1_profile').value, ndmin = 2)
-        p2 = np.array(run.get('summary/p2_profile').value, ndmin = 2)
+        theta = np.array(run.get('summary/theta_profile')[()], ndmin = 2)
+        p1 = np.array(run.get('summary/p1_profile')[()], ndmin = 2)
+        p2 = np.array(run.get('summary/p2_profile')[()], ndmin = 2)
     
         datas.append(np.r_[theta, p1, p2].T)
         if np.prod(theta.shape) > maxlen:
@@ -101,7 +101,7 @@ def write_to_xlsx(workbook, runs):
         ws = workbook.add_worksheet('Virtual Sensors')
         
         ## Build a sensor structure, which includes a header and the data
-        theta = run.get('t').value
+        theta = run.get('t')[()]
         
         run_sensors = []
         nrow = 0
@@ -110,11 +110,11 @@ def write_to_xlsx(workbook, runs):
             vals = []
             sensors_grp = run.get('sensors')
             for i in range(len(sensors_grp.get('T'))):
-                x = sensors_grp.get('coords/{i:d}/0'.format(i=i)).value
-                y = sensors_grp.get('coords/{i:d}/1'.format(i=i)).value
-                T = sensors_grp.get('T/{i:d}'.format(i=i)).value
-                p = sensors_grp.get('p/{i:d}'.format(i=i)).value
-                rho = sensors_grp.get('rho/{i:d}'.format(i=i)).value
+                x = sensors_grp.get('coords/{i:d}/0'.format(i=i))[()]
+                y = sensors_grp.get('coords/{i:d}/1'.format(i=i))[()]
+                T = sensors_grp.get('T/{i:d}'.format(i=i))[()]
+                p = sensors_grp.get('p/{i:d}'.format(i=i))[()]
+                rho = sensors_grp.get('rho/{i:d}'.format(i=i))[()]
                 if len(p) > nrow:
                     nrow = len(p)
                 ncol += 6
@@ -134,7 +134,7 @@ def write_to_xlsx(workbook, runs):
             s = 'Run index #'+str(run_index)
             
             if run.get('description'):
-                description = run.get('description').value
+                description = run.get('description').decode('utf-8')
                 s = 'Run index #'+str(run_index)+': '+description
             
             buf[row_offset-2][0 + col_offset] = s
