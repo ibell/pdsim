@@ -1,5 +1,15 @@
 import json, os, glob, sys
 
+notes = """
+To use this script, call python setup.py, which will internally call: python setup.py build_exe --build-exe=PDSimGUI
+
+You want to use the package_environment.yml provided to make a conda environment that doesn't include MKL-linked numpy, otherwise the built exe will be enormous (1 GB)
+
+InnoSetup is needed on windows to make an installer
+"""
+
+print(notes)
+
 def get_defaults():
     this_folder = os.path.dirname(__file__)
     file_path = os.path.join(this_folder, 'cx_freeze_defaults.json')
@@ -95,8 +105,8 @@ def pack(options, argv = None):
     if sys.platform.startswith('win'):
         if not os.path.exists(os.path.join('PDSimGUI','configs')):
             os.mkdir(os.path.join('PDSimGUI','configs'))
-        # Compress the dll with upx
-        subprocess.call('upx PDSimGUI/*.*', stdout = sys.stdout, stderr = sys.stderr)
+        # # Compress the dll with upx
+        # subprocess.call('upx PDSimGUI/*.*', stdout = sys.stdout, stderr = sys.stderr)
         # Make an installer using InnoSetup
         subprocess.call(['C:\Program Files (x86)\Inno Setup 6\Compil32.exe','/cc','package_gui.iss'])
         # Rename the installer to include the PDSim version
