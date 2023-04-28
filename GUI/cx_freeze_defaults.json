@@ -1,7 +1,7 @@
 {
     "include_files" : [],
     "includes" : [],
-    "excludes" : ["_gtkagg", "_tkagg", "bsddb", "curses", "email", "PyQt4",
+    "excludes" : ["_gtkagg", "_tkagg", "bsddb", "curses", "email", "PyQt4", "PyQt5",
             "pywin.debugger", "pywin.debugger.dbgcon", "pywin.dialogs",
             "tcl", "Tkconstants", "Tkinter","sympy","IPython","h5py.api_gen",
             "PySide","scipy","sphinx","Cython"],

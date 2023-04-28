@@ -10,7 +10,7 @@ def pack(options, argv = None):
     import os, sys, shutil
 
     if len(sys.argv) == 1 and argv is None:
-        sys.argv += ['build','--build-exe=PDSimGUI']
+        sys.argv += ['build_exe','--build-exe=PDSimGUI']
     else:
         if '--more_options' in sys.argv:
             i = sys.argv.index('--more_options')
@@ -24,10 +24,10 @@ def pack(options, argv = None):
     
     includes = options['includes']
 
-    this_folder = os.path.dirname(os.path.abspath(__file__))
+    this_folder = os.path.abspath(os.path.dirname(__file__))
     
     include_files = options['include_files']
-    for path, search in [('plugins','*.py'),('ico','*.png'), ('imgs','*.png'), ('configs','*.cfg'), ('families','*.py')]:
+    for path, search in [('plugins','*.py'),('panels','*.py'),('ico','*.png'), ('imgs','*.png'), ('configs','*.cfg'), ('families','*.py')]:
         for f in glob.glob(os.path.join(this_folder, path, search)):
             prior_abs_path = os.path.join(this_folder, f) # Abs path to the file to be included
             new_rel_path = f.replace(this_folder+os.path.sep, '') # Strip off the common path, leaving only the relative path to the file (relative to this file)
@@ -43,25 +43,25 @@ def pack(options, argv = None):
     GUI2Exe_Target_1 = Executable(
         # what to build
         script = os.path.join(this_folder, "PDSimGUI.py"),
-        initScript = None,
+        init_script = None,
         base = base,
-        targetName = "PDSimGUI.exe",
+        target_name = "PDSimGUI.exe",
         icon = None
         )
 
     import os, glob2, numpy, PDSim
-    explore_dirs = [os.path.dirname(numpy.__file__), os.path.dirname(PDSim.__file__)]
+    # explore_dirs = [os.path.dirname(numpy.__file__), os.path.dirname(PDSim.__file__)]
 
-    for directory in explore_dirs:
-        # Recursively find all .pyd files
-        files = glob2.glob( os.path.join(directory, '**', '*.pyd') )
+    # for directory in explore_dirs:
+    #     # Recursively find all .pyd files
+    #     files = glob2.glob( os.path.join(directory, '**', '*.pyd') )
 
-        # Now we have a list of .pyd files; iterate to build a list of tuples into 
-        # include files containing the source path and the basename
-        for f in files:
-            packages_folder = os.path.normpath(os.path.join(directory,'..')) + os.sep
-            fn = f.split(packages_folder, 1)[1].replace('\\', '.').split('.pyd', 1)[0]
-            includes.append(fn)
+    #     # Now we have a list of .pyd files; iterate to build a list of tuples into 
+    #     # include files containing the source path and the basename
+    #     for f in files:
+    #         packages_folder = os.path.normpath(os.path.join(directory,'..')) + os.sep
+    #         fn = f.split(packages_folder, 1)[1].replace('\\', '.').split('.pyd', 1)[0]
+    #         includes.append(fn)
 
     # That's serious now: we have all (or almost all) the options cx_Freeze
     # supports. I put them all even if some of them are usually defaulted
@@ -98,7 +98,7 @@ def pack(options, argv = None):
         # Compress the dll with upx
         subprocess.call('upx PDSimGUI/*.*', stdout = sys.stdout, stderr = sys.stderr)
         # Make an installer using InnoSetup
-        subprocess.call(['C:\Program Files (x86)\Inno Setup 5\Compil32.exe','/cc','package_gui.iss'])
+        subprocess.call(['C:\Program Files (x86)\Inno Setup 6\Compil32.exe','/cc','package_gui.iss'])
         # Rename the installer to include the PDSim version
         old_name = os.path.join('Output','SetupPDSimGUI.exe')
         import PDSim

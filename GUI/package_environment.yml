@@ -1,0 +1,15 @@
+name: PDSim_packaging
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+    - pyyaml
+    - numpy
+    - matplotlib
+    - scipy
+    - glob2 
+    - quantities
+    - wxpython
+    - CoolProp
+    - h5py
+    - cx_freeze
