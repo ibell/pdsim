@@ -13,3 +13,4 @@ dependencies:
     - CoolProp
     - h5py
     - cx_freeze
+    - xlsxwriter
