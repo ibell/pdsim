@@ -13,7 +13,7 @@ def MultiDimNewtRaph(f, x0, dx=1e-6, args=(), ytol=1e-5, w=1.0, JustOneStep=Fals
     re-using the information as in the fsolve method of scipy.optimize
     """
     # Convert to numpy array, force type conversion to float
-    x = np.array(x0, dtype=np.float)
+    x = np.array(x0, dtype=float)
     error = 999
     J = np.zeros((len(x), len(x)))
 
@@ -32,7 +32,7 @@ def MultiDimNewtRaph(f, x0, dx=1e-6, args=(), ytol=1e-5, w=1.0, JustOneStep=Fals
         v = np.linalg.solve(J,-r0)
         x = x + w * v
         # Calculate the residual vector at the new step
-        r0 = f(x, *args)
+        r0 = array(f(x, *args))
         error = np.max(np.abs(r0))
         # Just do one step and stop
         if JustOneStep == True:
