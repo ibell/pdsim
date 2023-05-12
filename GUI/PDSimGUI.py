@@ -752,9 +752,7 @@ class OutputDataPanel(pdsim_panels.PDPanel):
                            style=wx.FD_OPEN|wx.FD_MULTIPLE|wx.FD_FILE_MUST_EXIST)
         if wx.ID_OK == FD.ShowModal():
             file_paths = FD.GetPaths()
-            for file in file_paths:
-                self.OutputTree.add_runs(h5py.File(file,'r'))
-                print('added',file)
+            self.OutputTree.add_runs(file_paths)
         FD.Destroy()
 
     def OnRefresh(self, event):
