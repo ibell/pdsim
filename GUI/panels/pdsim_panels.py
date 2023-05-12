@@ -8,6 +8,7 @@ from multiprocessing import Process
 
 # wxPython imports
 import wx, wx.grid, wx.stc
+from wx.lib.scrolledpanel import ScrolledPanel
 from wx.lib.mixins.listctrl import CheckListCtrlMixin,TextEditMixin,ListCtrlAutoWidthMixin
 
 import CoolProp
@@ -536,6 +537,87 @@ class OutputVariableEntry:
     key: str
     annotation: str
     POD: bool
+    
+SPACER = ((20, 20), 0, wx.EXPAND)
+
+class UserOutputSelectionRow(wx.Panel):
+    def __init__(self, parent, entries):
+        wx.Panel.__init__(self, parent)
+        self.entries = entries
+        
+        self.MinusOne = wx.Button(self)
+        bmp = wx.ArtProvider.GetBitmap(wx.ART_MINUS, wx.ART_TOOLBAR, (16,16))
+        if bmp.IsOk():
+            self.MinusOne.SetBitmap(bmp)
+        self.Options = wx.ComboBox(self, choices = [e.annotation for e in self.entries])
+        self.key = wx.StaticText(self, label='??????')
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.AddMany([self.MinusOne, self.Options, self.key])
+        self.Bind(wx.EVT_BUTTON, self.Remove, self.MinusOne)
+        self.SetSizer(sizer)
+        self.parent = parent
+        self.Bind(wx.EVT_COMBOBOX, self.OnChange, self.Options)
+        self.OnChange()
+        
+    def Remove(self, evt=None):
+        self.Destroy()
+        self.parent.Layout()
+    
+    def get_key(self):
+        return self.key.GetLabel()
+    
+    def OnChange(self, evt=None):
+        index = self.Options.GetSelection()
+        self.key.SetLabel(self.entries[index].key)
+
+class UserOutputSelectionDialog(wx.Dialog):
+    def __init__(self, *args, parent, entries, **kwargs):
+        wx.Dialog.__init__(self, *args)
+        self.parent = parent
+        self.entries = entries
+    
+        self.panel = ScrolledPanel(self)
+        self.panel.SetScrollbars(1, 1, 1, 1)
+    
+        self.AddOne = wx.Button(self.panel, label = "Add")
+        bmp = wx.ArtProvider.GetBitmap(wx.ART_PLUS, wx.ART_TOOLBAR, (16,16))
+        if bmp.IsOk():
+            self.AddOne.SetBitmap(bmp)
+        self.ToClipboard = wx.Button(self.panel, label = "To Clipboard")
+            
+        bottomsizer = wx.BoxSizer(wx.HORIZONTAL)
+        bottomsizer.Add(self.AddOne)
+        bottomsizer.Add(self.ToClipboard)
+        
+        self.entrysizer = wx.BoxSizer(wx.VERTICAL)
+        self.mainsizer = wx.BoxSizer(wx.VERTICAL)
+        self.mainsizer.AddMany([bottomsizer, SPACER, self.entrysizer])
+        self.panel.SetSizer(self.mainsizer)
+        
+        scroll_sizer = wx.BoxSizer(wx.VERTICAL)
+        scroll_sizer.Add(self.panel, 1, wx.EXPAND)
+        self.SetSizer(scroll_sizer)
+        
+        self.Bind(wx.EVT_BUTTON, self.OnAddOne, self.AddOne)
+        self.Bind(wx.EVT_BUTTON, self.OnToClipboard, self.ToClipboard)
+        
+    def OnAddOne(self, evt=None):
+        row = UserOutputSelectionRow(parent=self.panel, entries=self.entries)
+        self.entrysizer.Add(row)
+        self.Layout()
+        
+    def OnToClipboard(self, evt=None):
+        """ Prepare a pandas DataFrame with the outputs and send to clipboard """
+        df, badkeys = self.parent.prepare_useroutput(keys=self.get_keys())
+        df.to_clipboard()
+        
+        if badkeys:
+            dlg = wx.MessageDialog(None, 'Could not output all desired keys. These failed:' + str(badkeys))
+            dlg.ShowModal()
+            dlg.Destroy()
+        
+    def get_keys(self):
+        return [self.entrysizer.GetItem(i).GetWindow().get_key() for i in range(self.entrysizer.GetItemCount())]
         
 class OutputTreePanel(wx.Panel):
     
@@ -613,7 +695,7 @@ class OutputTreePanel(wx.Panel):
         
         # Collect pointers to various output parameters that can be queried later on
         # Inspiration from https://json.nlohmann.me/features/json_pointer/#json-pointer-creation
-        pointers = []
+        entries = []
         
         def to_str(var):
             return str(list(np.reshape(np.asarray(var), (1, np.size(var)))[0]))[1:-1]
@@ -650,7 +732,7 @@ class OutputTreePanel(wx.Panel):
                             self.tree.SetItemPyData(root, dict(annotation = o[thing].attrs['note']))
                             #self.tree.SetItemBackgroundColour(root,(255,0,0)) #Color the cell
                             # POD: plain ole' data (int, double, etc., no arrays)
-                            pointers.append(OutputVariableEntry(
+                            entries.append(OutputVariableEntry(
                                 key=f'{root_pointer}/{thing}', annotation=o[thing].attrs['note'], POD=POD 
                             ))
                          
@@ -673,10 +755,7 @@ class OutputTreePanel(wx.Panel):
         t1 = timeit.default_timer()
         _recursive_hdf5_add(self.root, self.runs, root_pointer='')
         t2 = timeit.default_timer()
-        self.pointers = set(pointers)
-        for ptr in sorted(self.pointers,key=lambda ptr: ptr.annotation):
-            if ptr.POD:
-                print(ptr)
+        self.entries = list(set(entries))
         
         print(t2-t1,'secs elapsed to load output tree')
         
@@ -689,16 +768,21 @@ class OutputTreePanel(wx.Panel):
     def prepare_useroutput(self, keys):
         """ Build a pandas DataFrame of output requested by the user """
         o = []
+        badkeys = []
         for run in self.runs:
-            o.append({key: run[key][()] for key in keys})
-        return pandas.DataFrame(o)
+            entries = {}
+            for key in keys:
+                try:
+                    entries[key] = run[key][()]
+                except KeyError:
+                    badkeys.append(key)
+            o.append(entries)
+        return pandas.DataFrame(o), badkeys
         
     def OnUserOutputButton(self, evt=None):
-        dlg = wx.MessageDialog(None, "Copying some dummy data to clipboard...", style = wx.OK)
+        dlg = UserOutputSelectionDialog(None, parent=self, entries=self.entries)
         dlg.ShowModal()
         dlg.Destroy()
-        df = self.prepare_useroutput(keys=['/eta_a','/eta_oi'])
-        df.to_clipboard()
         
     def OnSaveXLSX(self, event = None):
         
