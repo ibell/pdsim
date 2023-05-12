@@ -15,6 +15,7 @@ from CoolProp.State import State
 from CoolProp import CoolProp as CP
 
 import numpy as np
+import pandas
 
 import matplotlib as mpl
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as WXCanvas
@@ -528,6 +529,14 @@ class PDPanel(wx.Panel):
         TextCtrl.SetValue(dlg.get_value())
         dlg.Destroy()
         
+from dataclasses import dataclass
+
+@dataclass(unsafe_hash=True) 
+class OutputVariableEntry:
+    key: str
+    annotation: str
+    POD: bool
+        
 class OutputTreePanel(wx.Panel):
     
     def __init__(self, parent, runs):
@@ -602,14 +611,20 @@ class OutputTreePanel(wx.Panel):
         self.tree.SetItemImage(self.root, fldridx, which = wx.TreeItemIcon_Normal)
         self.tree.SetItemImage(self.root, fldropenidx, which = wx.TreeItemIcon_Expanded)
         
+        # Collect pointers to various output parameters that can be queried later on
+        # Inspiration from https://json.nlohmann.me/features/json_pointer/#json-pointer-creation
+        pointers = []
+        
         def to_str(var):
             return str(list(np.reshape(np.asarray(var), (1, np.size(var)))[0]))[1:-1]
         
-        def _recursive_hdf5_add(root, objects):
+        def _recursive_hdf5_add(root, objects, root_pointer):
             for thing in objects[0]:
      
                 # If it is a dataset, write the dataset contents to the tree
                 if isinstance(objects[0][thing], h5py.Dataset):
+                    
+                    # A terminal in the tree, so some sort of data
                     
                     # Always make this level
                     child = self.tree.AppendItem(root, str(thing))                        
@@ -622,16 +637,22 @@ class OutputTreePanel(wx.Panel):
                             # shape will be an empty tuple, hence not () is True
                             value = to_str(o[thing][()])
                             idx_column = i+1
+                            POD = True
 
                         else:
                             # A place holder for now - will develop a frame to display the matrix
                             #self.tree.SetItemText(root, str(o[thing]), i+1)
                             value = to_str(o[thing])
                             idx_column = i+1
+                            POD = False
                         
                         if o[thing].attrs and 'note' in o[thing].attrs: #If it has any annotations
                             self.tree.SetItemPyData(root, dict(annotation = o[thing].attrs['note']))
                             #self.tree.SetItemBackgroundColour(root,(255,0,0)) #Color the cell
+                            # POD: plain ole' data (int, double, etc., no arrays)
+                            pointers.append(OutputVariableEntry(
+                                key=f'{root_pointer}/{thing}', annotation=o[thing].attrs['note'], POD=POD 
+                            ))
                          
                         # Assign data value to column
                         self.tree.SetItemText(child, value, idx_column)
@@ -645,13 +666,17 @@ class OutputTreePanel(wx.Panel):
                     self.tree.SetItemImage(child, fldridx, which = wx.TreeItemIcon_Normal)
                     self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
                     try:
-                        _recursive_hdf5_add(child, [o[thing] for o in objects])
+                        _recursive_hdf5_add(child, [o[thing] for o in objects], f'{root_pointer}/{thing}')
                     except KeyError as KE:
                         print(KE)
 
         t1 = timeit.default_timer()
-        _recursive_hdf5_add(self.root, self.runs)
+        _recursive_hdf5_add(self.root, self.runs, root_pointer='')
         t2 = timeit.default_timer()
+        self.pointers = set(pointers)
+        for ptr in sorted(self.pointers,key=lambda ptr: ptr.annotation):
+            if ptr.POD:
+                print(ptr)
         
         print(t2-t1,'secs elapsed to load output tree')
         
@@ -660,6 +685,20 @@ class OutputTreePanel(wx.Panel):
         self.tree.GetMainWindow().Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
         self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnActivate)
         #self.tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.OnActivate)
+        
+    def prepare_useroutput(self, keys):
+        """ Build a pandas DataFrame of output requested by the user """
+        o = []
+        for run in self.runs:
+            o.append({key: run[key][()] for key in keys})
+        return pandas.DataFrame(o)
+        
+    def OnUserOutputButton(self, evt=None):
+        dlg = wx.MessageDialog(None, "Copying some dummy data to clipboard...", style = wx.OK)
+        dlg.ShowModal()
+        dlg.Destroy()
+        df = self.prepare_useroutput(keys=['/eta_a','/eta_oi'])
+        df.to_clipboard()
         
     def OnSaveXLSX(self, event = None):
         
