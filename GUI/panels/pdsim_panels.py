@@ -7,7 +7,7 @@ import warnings, codecs, textwrap,os, itertools, difflib, zipfile, types, timeit
 from multiprocessing import Process
 
 # wxPython imports
-import wx, wx.grid, wx.stc
+import wx, wx.grid, wx.stc, wx.adv
 from wx.lib.scrolledpanel import ScrolledPanel
 from wx.lib.mixins.listctrl import CheckListCtrlMixin,TextEditMixin,ListCtrlAutoWidthMixin
 
@@ -536,6 +536,7 @@ from dataclasses import dataclass
 class OutputVariableEntry:
     key: str
     annotation: str
+    string: str
     POD: bool
     
 SPACER = ((20, 20), 0, wx.EXPAND)
@@ -545,19 +546,20 @@ class UserOutputSelectionRow(wx.Panel):
         wx.Panel.__init__(self, parent)
         self.entries = entries
         
-        self.MinusOne = wx.Button(self)
+        self.MinusOne = wx.Button(self, size=(20,-1))
         bmp = wx.ArtProvider.GetBitmap(wx.ART_MINUS, wx.ART_TOOLBAR, (16,16))
         if bmp.IsOk():
             self.MinusOne.SetBitmap(bmp)
-        self.Options = wx.ComboBox(self, choices = [e.annotation for e in self.entries])
-        self.key = wx.StaticText(self, label='??????')
+        self.Options = wx.ComboBox(self, choices = [e.string for e in self.entries], size=(300,-1))
+        self.key = wx.TextCtrl(self, value='??????', size=(180,-1), style=wx.TE_READONLY)
         sizer = wx.BoxSizer(wx.HORIZONTAL)
-        sizer.AddMany([self.MinusOne, self.Options, self.key])
+        sizer.Add(self.MinusOne)
+        sizer.Add(self.Options, 1, wx.EXPAND)
+        sizer.Add(self.key)
         self.Bind(wx.EVT_BUTTON, self.Remove, self.MinusOne)
         self.SetSizer(sizer)
         self.parent = parent
         self.Bind(wx.EVT_COMBOBOX, self.OnChange, self.Options)
-        self.OnChange()
         
     def Remove(self, evt=None):
         self.Destroy()
@@ -572,9 +574,10 @@ class UserOutputSelectionRow(wx.Panel):
 
 class UserOutputSelectionDialog(wx.Dialog):
     def __init__(self, *args, parent, entries, **kwargs):
-        wx.Dialog.__init__(self, *args)
+        wx.Dialog.__init__(self, *args, title='User-Selection of Outputs', size=(500, 500))
         self.parent = parent
         self.entries = entries
+        
     
         self.panel = ScrolledPanel(self)
         self.panel.SetScrollbars(1, 1, 1, 1)
@@ -584,10 +587,12 @@ class UserOutputSelectionDialog(wx.Dialog):
         if bmp.IsOk():
             self.AddOne.SetBitmap(bmp)
         self.ToClipboard = wx.Button(self.panel, label = "To Clipboard")
+        self.ToExcel = wx.Button(self.panel, label = "To Excel")
             
         bottomsizer = wx.BoxSizer(wx.HORIZONTAL)
         bottomsizer.Add(self.AddOne)
         bottomsizer.Add(self.ToClipboard)
+        bottomsizer.Add(self.ToExcel)
         
         self.entrysizer = wx.BoxSizer(wx.VERTICAL)
         self.mainsizer = wx.BoxSizer(wx.VERTICAL)
@@ -600,6 +605,7 @@ class UserOutputSelectionDialog(wx.Dialog):
         
         self.Bind(wx.EVT_BUTTON, self.OnAddOne, self.AddOne)
         self.Bind(wx.EVT_BUTTON, self.OnToClipboard, self.ToClipboard)
+        self.Bind(wx.EVT_BUTTON, self.OnToExcel, self.ToExcel)
         
     def OnAddOne(self, evt=None):
         row = UserOutputSelectionRow(parent=self.panel, entries=self.entries)
@@ -609,12 +615,40 @@ class UserOutputSelectionDialog(wx.Dialog):
     def OnToClipboard(self, evt=None):
         """ Prepare a pandas DataFrame with the outputs and send to clipboard """
         df, badkeys = self.parent.prepare_useroutput(keys=self.get_keys())
-        df.to_clipboard()
         
         if badkeys:
             dlg = wx.MessageDialog(None, 'Could not output all desired keys. These failed:' + str(badkeys))
             dlg.ShowModal()
             dlg.Destroy()
+        else:
+            df.to_clipboard()
+            notify = wx.adv.NotificationMessage(
+                title="",
+                message="User-selected output has been copied to clipboard",
+                parent=None, flags=wx.ICON_INFORMATION)
+            notify.Show(timeout=3) # seconds
+            
+    def OnToExcel(self, evt=None):
+        """ Prepare a pandas DataFrame with the outputs and write in Excel format """
+        df, badkeys = self.parent.prepare_useroutput(keys=self.get_keys())
+        if badkeys:
+            dlg = wx.MessageDialog(None, 'Could not output all desired keys. These failed:' + str(badkeys))
+            dlg.ShowModal()
+            dlg.Destroy()
+        else:
+            FD = wx.FileDialog(None,
+                           "Save XLSX file",
+                           defaultDir='.',
+                           wildcard = 'Excel xlsx files (*.xlsx)|*.xlsx',
+                           style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
+            if wx.ID_OK == FD.ShowModal():
+                # Get the file path
+                filepath = FD.GetPath()
+                FD.Destroy()
+            else:
+                FD.Destroy()
+                return
+            df.to_excel(filepath)
         
     def get_keys(self):
         return [self.entrysizer.GetItem(i).GetWindow().get_key() for i in range(self.entrysizer.GetItemCount())]
@@ -733,7 +767,7 @@ class OutputTreePanel(wx.Panel):
                             #self.tree.SetItemBackgroundColour(root,(255,0,0)) #Color the cell
                             # POD: plain ole' data (int, double, etc., no arrays)
                             entries.append(OutputVariableEntry(
-                                key=f'{root_pointer}/{thing}', annotation=o[thing].attrs['note'], POD=POD 
+                                key=f'{root_pointer}/{thing}', annotation=o[thing].attrs['note'], POD=POD, string = o[thing].attrs['note'] if o[thing].attrs['note'] else thing
                             ))
                          
                         # Assign data value to column
@@ -755,7 +789,7 @@ class OutputTreePanel(wx.Panel):
         t1 = timeit.default_timer()
         _recursive_hdf5_add(self.root, self.runs, root_pointer='')
         t2 = timeit.default_timer()
-        self.entries = list(set(entries))
+        self.entries = sorted(list(set(entries)), key=lambda x: x.string)
         
         print(t2-t1,'secs elapsed to load output tree')
         
