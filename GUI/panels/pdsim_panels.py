@@ -1332,7 +1332,10 @@ class ParametricOption(wx.Panel):
         self.Terms.AppendItems(sorted(labels))
         self.Terms.SetSelection(0)
         self.Terms.SetEditable(False)
-        self.RemoveButton = wx.Button(self, label = '-', style = wx.ID_REMOVE)
+        self.RemoveButton = wx.Button(self, size=(17,-1))
+        bmp = wx.ArtProvider.GetBitmap(wx.ART_MINUS, wx.ART_TOOLBAR, (16,16))
+        if bmp.IsOk():
+            self.RemoveButton.SetBitmap(bmp)
         
         self.Values = wx.TextCtrl(self, value = '')
         self.Select = wx.Button(self, label = 'Select...')
@@ -1423,7 +1426,7 @@ class ParametricOption(wx.Panel):
             self.Refresh()
             self.OnChangeTerm()
         
-class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixin, TextEditMixin):
+class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, TextEditMixin):
     """
     The checklist that stores all the possible runs
     """
@@ -1441,11 +1444,9 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
         """
         wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT)
         ListCtrlAutoWidthMixin.__init__(self)
-        CheckListCtrlMixin.__init__(self)
         TextEditMixin.__init__(self)
         
-        
-        #Build the headers
+        # Build the headers
         self.InsertColumn(0, '')
         self.SetColumnWidth(0, wx.LIST_AUTOSIZE)
         for i, header in enumerate(headers):
@@ -1459,6 +1460,8 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
             self.data = [list(row) for row in self.data]
         else:
             self.data = [list(row) for row in itertools.product(*values)]
+        
+        self.EnableCheckBoxes(enable=True)
         
         #Add the values one row at a time
         for i,row in enumerate(self.data):
@@ -1474,13 +1477,13 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
         self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.OnCellEdited)
 
     def OnItemActivated(self, event):
-        self.ToggleItem(event.m_itemIndex)
+        self.ToggleItem(event.Index)
     
     def PreCellEdit(self, event):
         """
         Before the cell is edited, only allow edits on columns after the first one
         """
-        row_index = event.m_itemIndex
+        row_index = event.Index
         col_index = event.Column
         if col_index == 0:
             event.Veto()
@@ -1493,7 +1496,7 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, CheckListCtrlMixi
         """
         Once the cell is edited, write its value back into the data matrix
         """
-        row_index = event.m_itemIndex
+        row_index = event.Index
         col_index = event.Column
         val = float(event.Text)
         self.data[row_index][col_index-1] = val
@@ -1830,7 +1833,7 @@ class ParametricPanel(PDPanel):
         # Column index 1 is the list of parameters
         for Irow in range(self.ParaList.GetItemCount()):
             # Loop over all the rows that are checked
-            if self.ParaList.IsChecked(Irow):
+            if self.ParaList.IsItemChecked(item=Irow):
                 
                 # Empty lists for this run
                 vals, names = [], []
