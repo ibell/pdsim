@@ -700,6 +700,9 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         self.OutputRunsButton = pdsim_panels.HackedButton(self._mb, label = 'Output Runs')
         self._mb.AddControl(self.OutputRunsButton)
         
+        self.UserOutputButton = pdsim_panels.HackedButton(self._mb, label = 'User Selected Outputs')
+        self._mb.AddControl(self.UserOutputButton)
+        
         self.HelpButton = pdsim_panels.HackedButton(self._mb, label = 'Help!!!')
         self._mb.AddControl(self.HelpButton)
         self.HelpButton.Bind(wx.EVT_BUTTON, self.OnOutputHelp)
@@ -709,6 +712,7 @@ class OutputDataPanel(pdsim_panels.PDPanel):
 
         #  Bind events        
         self.OutputRunsButton.Bind(wx.EVT_BUTTON, self.OutputTree.OnSaveXLSX)
+        self.UserOutputButton.Bind(wx.EVT_BUTTON, self.OutputTree.OnUserOutputButton)
         
         #Layout of the panel
         sizer = wx.BoxSizer(wx.VERTICAL)

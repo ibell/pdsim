@@ -7,7 +7,8 @@ import warnings, codecs, textwrap,os, itertools, difflib, zipfile, types, timeit
 from multiprocessing import Process
 
 # wxPython imports
-import wx, wx.grid, wx.stc
+import wx, wx.grid, wx.stc, wx.adv
+from wx.lib.scrolledpanel import ScrolledPanel
 from wx.lib.mixins.listctrl import CheckListCtrlMixin,TextEditMixin,ListCtrlAutoWidthMixin
 
 import CoolProp
@@ -15,6 +16,7 @@ from CoolProp.State import State
 from CoolProp import CoolProp as CP
 
 import numpy as np
+import pandas
 
 import matplotlib as mpl
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as WXCanvas
@@ -528,6 +530,129 @@ class PDPanel(wx.Panel):
         TextCtrl.SetValue(dlg.get_value())
         dlg.Destroy()
         
+from dataclasses import dataclass
+
+@dataclass(unsafe_hash=True) 
+class OutputVariableEntry:
+    key: str
+    annotation: str
+    string: str
+    POD: bool
+    
+SPACER = ((20, 20), 0, wx.EXPAND)
+
+class UserOutputSelectionRow(wx.Panel):
+    def __init__(self, parent, entries):
+        wx.Panel.__init__(self, parent)
+        self.entries = entries
+        
+        self.MinusOne = wx.Button(self, size=(20,-1))
+        bmp = wx.ArtProvider.GetBitmap(wx.ART_MINUS, wx.ART_TOOLBAR, (16,16))
+        if bmp.IsOk():
+            self.MinusOne.SetBitmap(bmp)
+        self.Options = wx.ComboBox(self, choices = [e.string for e in self.entries], size=(300,-1))
+        self.key = wx.TextCtrl(self, value='??????', size=(180,-1), style=wx.TE_READONLY)
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.Add(self.MinusOne)
+        sizer.Add(self.Options, 1, wx.EXPAND)
+        sizer.Add(self.key)
+        self.Bind(wx.EVT_BUTTON, self.Remove, self.MinusOne)
+        self.SetSizer(sizer)
+        self.parent = parent
+        self.Bind(wx.EVT_COMBOBOX, self.OnChange, self.Options)
+        
+    def Remove(self, evt=None):
+        self.Destroy()
+        self.parent.Layout()
+    
+    def get_key(self):
+        return self.key.GetLabel()
+    
+    def OnChange(self, evt=None):
+        index = self.Options.GetSelection()
+        self.key.SetLabel(self.entries[index].key)
+
+class UserOutputSelectionDialog(wx.Dialog):
+    def __init__(self, *args, parent, entries, **kwargs):
+        wx.Dialog.__init__(self, *args, title='User-Selection of Outputs', size=(500, 500))
+        self.parent = parent
+        self.entries = entries
+        
+    
+        self.panel = ScrolledPanel(self)
+        self.panel.SetScrollbars(1, 1, 1, 1)
+    
+        self.AddOne = wx.Button(self.panel, label = "Add")
+        bmp = wx.ArtProvider.GetBitmap(wx.ART_PLUS, wx.ART_TOOLBAR, (16,16))
+        if bmp.IsOk():
+            self.AddOne.SetBitmap(bmp)
+        self.ToClipboard = wx.Button(self.panel, label = "To Clipboard")
+        self.ToExcel = wx.Button(self.panel, label = "To Excel")
+            
+        bottomsizer = wx.BoxSizer(wx.HORIZONTAL)
+        bottomsizer.Add(self.AddOne)
+        bottomsizer.Add(self.ToClipboard)
+        bottomsizer.Add(self.ToExcel)
+        
+        self.entrysizer = wx.BoxSizer(wx.VERTICAL)
+        self.mainsizer = wx.BoxSizer(wx.VERTICAL)
+        self.mainsizer.AddMany([bottomsizer, SPACER, self.entrysizer])
+        self.panel.SetSizer(self.mainsizer)
+        
+        scroll_sizer = wx.BoxSizer(wx.VERTICAL)
+        scroll_sizer.Add(self.panel, 1, wx.EXPAND)
+        self.SetSizer(scroll_sizer)
+        
+        self.Bind(wx.EVT_BUTTON, self.OnAddOne, self.AddOne)
+        self.Bind(wx.EVT_BUTTON, self.OnToClipboard, self.ToClipboard)
+        self.Bind(wx.EVT_BUTTON, self.OnToExcel, self.ToExcel)
+        
+    def OnAddOne(self, evt=None):
+        row = UserOutputSelectionRow(parent=self.panel, entries=self.entries)
+        self.entrysizer.Add(row)
+        self.Layout()
+        
+    def OnToClipboard(self, evt=None):
+        """ Prepare a pandas DataFrame with the outputs and send to clipboard """
+        df, badkeys = self.parent.prepare_useroutput(keys=self.get_keys())
+        
+        if badkeys:
+            dlg = wx.MessageDialog(None, 'Could not output all desired keys. These failed:' + str(badkeys))
+            dlg.ShowModal()
+            dlg.Destroy()
+        else:
+            df.to_clipboard()
+            notify = wx.adv.NotificationMessage(
+                title="",
+                message="User-selected output has been copied to clipboard",
+                parent=None, flags=wx.ICON_INFORMATION)
+            notify.Show(timeout=3) # seconds
+            
+    def OnToExcel(self, evt=None):
+        """ Prepare a pandas DataFrame with the outputs and write in Excel format """
+        df, badkeys = self.parent.prepare_useroutput(keys=self.get_keys())
+        if badkeys:
+            dlg = wx.MessageDialog(None, 'Could not output all desired keys. These failed:' + str(badkeys))
+            dlg.ShowModal()
+            dlg.Destroy()
+        else:
+            FD = wx.FileDialog(None,
+                           "Save XLSX file",
+                           defaultDir='.',
+                           wildcard = 'Excel xlsx files (*.xlsx)|*.xlsx',
+                           style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
+            if wx.ID_OK == FD.ShowModal():
+                # Get the file path
+                filepath = FD.GetPath()
+                FD.Destroy()
+            else:
+                FD.Destroy()
+                return
+            df.to_excel(filepath)
+        
+    def get_keys(self):
+        return [self.entrysizer.GetItem(i).GetWindow().get_key() for i in range(self.entrysizer.GetItemCount())]
+        
 class OutputTreePanel(wx.Panel):
     
     def __init__(self, parent, runs):
@@ -602,14 +727,20 @@ class OutputTreePanel(wx.Panel):
         self.tree.SetItemImage(self.root, fldridx, which = wx.TreeItemIcon_Normal)
         self.tree.SetItemImage(self.root, fldropenidx, which = wx.TreeItemIcon_Expanded)
         
+        # Collect pointers to various output parameters that can be queried later on
+        # Inspiration from https://json.nlohmann.me/features/json_pointer/#json-pointer-creation
+        entries = []
+        
         def to_str(var):
             return str(list(np.reshape(np.asarray(var), (1, np.size(var)))[0]))[1:-1]
         
-        def _recursive_hdf5_add(root, objects):
+        def _recursive_hdf5_add(root, objects, root_pointer):
             for thing in objects[0]:
      
                 # If it is a dataset, write the dataset contents to the tree
                 if isinstance(objects[0][thing], h5py.Dataset):
+                    
+                    # A terminal in the tree, so some sort of data
                     
                     # Always make this level
                     child = self.tree.AppendItem(root, str(thing))                        
@@ -622,16 +753,22 @@ class OutputTreePanel(wx.Panel):
                             # shape will be an empty tuple, hence not () is True
                             value = to_str(o[thing][()])
                             idx_column = i+1
+                            POD = True
 
                         else:
                             # A place holder for now - will develop a frame to display the matrix
                             #self.tree.SetItemText(root, str(o[thing]), i+1)
                             value = to_str(o[thing])
                             idx_column = i+1
+                            POD = False
                         
                         if o[thing].attrs and 'note' in o[thing].attrs: #If it has any annotations
                             self.tree.SetItemPyData(root, dict(annotation = o[thing].attrs['note']))
                             #self.tree.SetItemBackgroundColour(root,(255,0,0)) #Color the cell
+                            # POD: plain ole' data (int, double, etc., no arrays)
+                            entries.append(OutputVariableEntry(
+                                key=f'{root_pointer}/{thing}', annotation=o[thing].attrs['note'], POD=POD, string = o[thing].attrs['note'] if o[thing].attrs['note'] else thing
+                            ))
                          
                         # Assign data value to column
                         self.tree.SetItemText(child, value, idx_column)
@@ -645,13 +782,14 @@ class OutputTreePanel(wx.Panel):
                     self.tree.SetItemImage(child, fldridx, which = wx.TreeItemIcon_Normal)
                     self.tree.SetItemImage(child, fldropenidx, which = wx.TreeItemIcon_Expanded)
                     try:
-                        _recursive_hdf5_add(child, [o[thing] for o in objects])
+                        _recursive_hdf5_add(child, [o[thing] for o in objects], f'{root_pointer}/{thing}')
                     except KeyError as KE:
                         print(KE)
 
         t1 = timeit.default_timer()
-        _recursive_hdf5_add(self.root, self.runs)
+        _recursive_hdf5_add(self.root, self.runs, root_pointer='')
         t2 = timeit.default_timer()
+        self.entries = sorted(list(set(entries)), key=lambda x: x.string)
         
         print(t2-t1,'secs elapsed to load output tree')
         
@@ -660,6 +798,25 @@ class OutputTreePanel(wx.Panel):
         self.tree.GetMainWindow().Bind(wx.EVT_RIGHT_UP, self.OnRightUp)
         self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnActivate)
         #self.tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.OnActivate)
+        
+    def prepare_useroutput(self, keys):
+        """ Build a pandas DataFrame of output requested by the user """
+        o = []
+        badkeys = []
+        for run in self.runs:
+            entries = {}
+            for key in keys:
+                try:
+                    entries[key] = run[key][()]
+                except KeyError:
+                    badkeys.append(key)
+            o.append(entries)
+        return pandas.DataFrame(o), badkeys
+        
+    def OnUserOutputButton(self, evt=None):
+        dlg = UserOutputSelectionDialog(None, parent=self, entries=self.entries)
+        dlg.ShowModal()
+        dlg.Destroy()
         
     def OnSaveXLSX(self, event = None):
         
