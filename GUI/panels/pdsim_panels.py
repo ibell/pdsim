@@ -1865,9 +1865,9 @@ class ParametricPanel(PDPanel):
                     # If they are, handle them differently
                     for o in coupled_objects:
                         # Check the partners exist
-                        for o in o.required_partners:
-                            if o not in coupled_objects:
-                                raise KeyError("Coupled object [{o:s}] not found".format(o = o))
+                        for partner in o.required_partners:
+                            if partner not in coupled_objects:
+                                raise KeyError("The partner [{partner:s}] of coupled object [{o:s}] was not found".format(o = o.annotation, partner=partner.annotation))
                     
                     # Pass all the coupled objects to the handler
                     o.handler(coupled_objects,keys,vals)
