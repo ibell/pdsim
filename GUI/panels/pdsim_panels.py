@@ -1442,9 +1442,9 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, TextEditMixin):
         structured : bool
             If ``True``, use a structured parametric table to do the calcs
         """
-        wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT)
-        ListCtrlAutoWidthMixin.__init__(self)
+        wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT|wx.LC_EDIT_LABELS)
         TextEditMixin.__init__(self)
+        ListCtrlAutoWidthMixin.__init__(self)
         
         # Build the headers
         self.InsertColumn(0, '')
@@ -1472,24 +1472,30 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, TextEditMixin):
             
         for i in range(len(headers)):
             self.SetColumnWidth(i+1,wx.LIST_AUTOSIZE_USEHEADER)
-        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnItemActivated)
+        self.Bind(wx.EVT_LEFT_DOWN, self.OnLeftDown)
         self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.PreCellEdit)
         self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.OnCellEdited)
-
-    def OnItemActivated(self, event):
-        self.ToggleItem(event.Index)
+        
+    def OnLeftDown(self, evt):
+        """ Bind the event handler for the click event to handle toggling 
+        of the check box. There is a bug in wxpython where if a row is selected, 
+        it doesn't process the check box properly
+        """
+        x, y = evt.GetPosition()
+        row, flags = self.HitTest((x,y))
+        if flags == wx.LIST_HITTEST_ONITEMSTATEICON:
+            self.CheckItem(row, not self.IsItemChecked(row))
+        else:
+            TextEditMixin.OnLeftDown(self, evt)
     
     def PreCellEdit(self, event):
         """
         Before the cell is edited, only allow edits on columns after the first one
         """
-        row_index = event.Index
         col_index = event.Column
         if col_index == 0:
             event.Veto()
         else:
-            val = float(event.Text)
-            self.data[row_index][col_index-1] = val
             event.Skip()
     
     def OnCellEdited(self, event):
@@ -1519,9 +1525,9 @@ class ParametricCheckList(wx.ListCtrl, ListCtrlAutoWidthMixin, TextEditMixin):
         row = [0]*(self.GetColumnCount()-1)
         
         i = len(self.data)
-        self.InsertStringItem(i,'')
+        self.InsertItem(i,'')
         for j,val in enumerate(row):
-            self.SetStringItem(i,j+1,str(val))
+            self.SetItem(i,j+1,str(val))
         self.CheckItem(i)
         
         self.data.append(row)
@@ -1756,8 +1762,8 @@ class ParametricPanel(PDPanel):
         menuitem2 = wx.MenuItem(menu, -1, 'Fill from csv file (future)')
         
         self.Bind(wx.EVT_MENU, self.OnPaste, menuitem1)
-        menu.AppendItem(menuitem1)
-        menu.AppendItem(menuitem2)
+        menu.Append(menuitem1)
+        menu.Append(menuitem2)
         
         # Popup the menu.  If an item is selected then its handler
         # will be called before PopupMenu returns.
@@ -1796,7 +1802,7 @@ class ParametricPanel(PDPanel):
         #Right number of rows, set the values
         for i,row in enumerate(rows): 
             for j,item in enumerate(row): 
-                self.ParaList.SetStringItem(i,j+1,item)
+                self.ParaList.SetItem(i,j+1,item)
                 self.ParaList.data[i][j] = item
         
     def OnSpinDown(self, event = None):
