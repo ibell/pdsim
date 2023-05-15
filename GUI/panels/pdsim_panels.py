@@ -1313,7 +1313,91 @@ class ParaSelectDialog(wx.Dialog):
     def CancelValues(self, event = None):
         self.EndModal(wx.ID_CANCEL)
 
+ARIsubcritinfo = """In the ARI 540 compressor map for subcritical compressor operation, the saturated suction temperature (Ts) and 
+saturated discharge temperatures (Td) are used to define the matrix of inputs. The temperatures
+are in °C and the superheat is in K. For mixtures, the dewpoint temperature is used. This dialog helps to select these
+terms for building a compressor map from results of PDSim
+"""
 
+class ARI540Subcrit(wx.Panel):
+    def __init__(self, *args, **kwargs):
+        wx.Panel.__init__(self, *args, **kwargs)
+
+        info = '\n'.join(textwrap.wrap(ARIsubcritinfo, width=50))
+        note = wx.StaticText(self, label=info)
+
+        # Superheat is always needed
+        [self.superheatlbl, self.superheattxt] = LabeledItem(self, label='Superheat (K)', value='10')
+
+        # Suction side is always defined based on saturated temperature 
+        [self.Tsminlbl, self.Tsmintxt] = LabeledItem(self, label='Minimum Ts (dew) (°C)', value='5')
+        [self.Tsmaxlbl, self.Tsmaxtxt] = LabeledItem(self, label='Maximum Ts (dew) (°C)', value='10')
+        [self.NTslbl, self.NTstxt] = LabeledItem(self, label='# of Ts', value='3')
+        [self.Tcminlbl, self.Tcmintxt] = LabeledItem(self, label='Minimum Td (dew) (°C)', value='25')
+        [self.Tcmaxlbl, self.Tcmaxtxt] = LabeledItem(self, label='Maximum Td (dew) (°C)', value='30')
+        [self.NTclbl, self.NTctxt] = LabeledItem(self, label='# of Tc', value='3')
+
+        sizer = wx.FlexGridSizer(cols=2)
+        sizer.AddMany([
+            self.superheatlbl, self.superheattxt,
+            self.Tsminlbl, self.Tsmintxt, 
+            self.Tsmaxlbl, self.Tsmaxtxt,
+            self.NTslbl, self.NTstxt,
+            self.Tcminlbl, self.Tcmintxt,
+            self.Tcmaxlbl, self.Tcmaxtxt,
+            self.NTclbl, self.NTctxt
+        ])
+
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        main_sizer.Add(note)
+        main_sizer.AddSpacer(20)
+        main_sizer.Add(sizer)
+
+        # TODO: And you can see the points in the grid
+
+        # TODO: And some way to cut off the runs with too high discharge pressure        
+
+        self.SetSizer(main_sizer)
+        main_sizer.Layout()
+
+    def GetTableValues(self):
+        """ Return the values from this input panel in a form ready to be processed in the parametric checklist """
+        Tsvec = np.linspace(float(self.Tsmintxt.GetValue()), float(self.Tsmaxtxt.GetValue()), int(self.NTstxt.GetValue())) + 273.15
+        Tdvec = np.linspace(float(self.Tcmintxt.GetValue()), float(self.Tcmaxtxt.GetValue()), int(self.NTctxt.GetValue())) + 273.15
+        Ts, Td = zip(*itertools.product(Tsvec, Tdvec))
+        return {
+            'Ts': list(Ts),
+            'Td': list(Td),
+            'SH': (float(self.superheattxt.GetValue())*np.ones_like(Ts)).tolist(),
+        }
+
+class CompressorMapWizardDialog(wx.Dialog):
+    """ A dialog for more conveniently generating the inputs needed for compressor map generation """
+    def __init__(self, ):
+        wx.Dialog.__init__(self, None, size=(400, 400))
+
+        self.CB = wx.Choicebook(self)
+
+        self.ARI540subcrit = ARI540Subcrit(self.CB)
+        self.CB.AddPage(self.ARI540subcrit, 'ARI 540 (subcritical)')
+
+        self.OkButton = wx.Button(self, -1, "Ok")
+        self.OkButton.Bind(wx.EVT_BUTTON, self.OnOk)
+        
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        main_sizer.Add(wx.StaticText(self, label='Select your approach:'))
+        main_sizer.Add(self.CB, 1, wx.EXPAND)
+        main_sizer.Add(self.OkButton, 1, wx.EXPAND)
+        self.SetSizer(main_sizer)
+        main_sizer.Layout()
+        self.Fit()
+
+    def OnOk(self, event):
+        self.EndModal(wx.ID_OK)
+
+    def GetTableValues(self):
+        return self.CB.GetCurrentPage().GetTableValues()
+    
 class ParametricOption(wx.Panel):
     
     def __init__(self, parent, GUI_objects):
@@ -1595,6 +1679,10 @@ class ParametricPanel(PDPanel):
         self._mb.AddControl(self.ZipButton)
         self.ZipButton.Bind(wx.EVT_BUTTON, self.OnZipBatch)
         self.ZipButton.Disable()
+
+        self.MapButton = HackedButton(self._mb, label = 'Map Wizard')
+        self._mb.AddControl(self.MapButton)
+        self.MapButton.Bind(wx.EVT_BUTTON, self.OnMap)
         
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self._mb,0,wx.EXPAND)
@@ -1988,6 +2076,13 @@ class ParametricPanel(PDPanel):
                         z.write(fName, arcname = file)
                     
                     z.writestr('run.py',template)
+
+    def OnMap(self, evt=None):
+        dlg = CompressorMapWizardDialog()
+        if wx.ID_OK == dlg.ShowModal():
+            table_values = dlg.GetTableValues()
+            print(table_values)
+        dlg.Destroy()
         
     def populate_terms(self,configdict):
         """
