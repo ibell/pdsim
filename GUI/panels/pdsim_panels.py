@@ -1366,9 +1366,9 @@ class ARI540Subcrit(wx.Panel):
         Tdvec = np.linspace(float(self.Tcmintxt.GetValue()), float(self.Tcmaxtxt.GetValue()), int(self.NTctxt.GetValue())) + 273.15
         Ts, Td = zip(*itertools.product(Tsvec, Tdvec))
         return {
-            'Ts': list(Ts),
-            'Td': list(Td),
-            'SH': (float(self.superheattxt.GetValue())*np.ones_like(Ts)).tolist(),
+            'Suction saturation temperature [K]': list(Ts),
+            'Discharge saturation temperature [K]': list(Td),
+            'Suction superheat [K]': (float(self.superheattxt.GetValue())*np.ones_like(Ts)).tolist(),
         }
 
 class CompressorMapWizardDialog(wx.Dialog):
@@ -1768,21 +1768,37 @@ class ParametricPanel(PDPanel):
         self.GetSizer().Layout()
         self.Refresh()
         
-    def OnBuildTable(self, event=None):
-        names = []
-        values = []
-        #make names a list of strings
-        #make values a list of lists of values
-        for param in self.ParamSizer.GetChildren():
-            name, vals = param.Window.get_values()
-            names.append(name)
-            if self.Structured.GetValue() == True:
-                values.append(vals)
-            else:
-                if hasattr(param.Window,'temporary_values'):
-                    values.append(param.Window.temporary_values.split(';'))
+    def OnBuildTable(self, event=None, names=None, values=None, structured=None):
+        """
+        A handler for building the parametric table
+
+        Args:
+            event: the event that caused this handler to fire
+            names(optional): the list of strings of annotations that will be used to populate the table
+            values(optional): the list of lists of values to be placed in the checklist table
+            structured(bool, optional): if provided, enforces whether to consider as strutured or not
+        """
+
+        if names is None and values is None:
+            names = []
+            values = []
+            #make names a list of strings
+            #make values a list of lists of values
+            for param in self.ParamSizer.GetChildren():
+                name, vals = param.Window.get_values()
+                names.append(name)
+                if self.Structured.GetValue() == True:
+                    values.append(vals)
                 else:
-                    values.append(['0.0'])
+                    if hasattr(param.Window,'temporary_values'):
+                        values.append(param.Window.temporary_values.split(';'))
+                    else:
+                        values.append(['0.0'])
+        else:
+            assert(len(names) == len(values))
+
+        if structured is None:
+            structured = self.Structured.GetValue()
         
         #Build the list of parameters for the parametric study
         if self.ParamListSizer is None:
@@ -1802,7 +1818,7 @@ class ParametricPanel(PDPanel):
             self.RowCountSpinnerText.Destroy(); del self.RowCountSpinnerText
             
         #Build and add a sizer for the para values
-        if self.Structured.GetValue() == False:
+        if not structured:
             self.RowCountLabel = wx.StaticText(self,label='Number of rows')
             self.RowCountSpinnerText = wx.TextCtrl(self, value = "1", size = (40,-1))
             h = self.RowCountSpinnerText.GetSize().height
@@ -1818,8 +1834,8 @@ class ParametricPanel(PDPanel):
             self.GetSizer().Add(sizer)
                     
         self.GetSizer().Add(self.ParamListSizer,1,wx.EXPAND)
-        self.ParaList = ParametricCheckList(self,names,values,
-                                            structured = self.Structured.GetValue())
+        self.ParaList = ParametricCheckList(self, names, values,
+                                            structured=structured)
             
         self.ParamListSizer.Add(self.ParaList,1,wx.EXPAND)
         self.ParaList.SetMinSize((400,-1))
@@ -1831,7 +1847,7 @@ class ParametricPanel(PDPanel):
         self.RunButton.Enable()
         self.ZipButton.Enable()
             
-        if self.Structured.GetValue() == False:
+        if not structured:
             self.RowCountSpinner.SetValue(self.ParaList.GetItemCount())
             self.RowCountSpinnerText.SetValue(str(self.ParaList.GetItemCount()))
             #Bind a right click to opening a popup
@@ -2081,6 +2097,9 @@ class ParametricPanel(PDPanel):
         dlg = CompressorMapWizardDialog()
         if wx.ID_OK == dlg.ShowModal():
             table_values = dlg.GetTableValues()
+            names = table_values.keys()
+            values = table_values.values()
+            self.OnBuildTable(names=names, values=values, structured=False)
             print(table_values)
         dlg.Destroy()
         
@@ -2766,7 +2785,7 @@ class StateInputsPanel(PDPanel):
         
         terms_keys = [t.key for t in terms]
         
-        Fluid = self.SuctionStatePanel.GetState().Fluid
+        Fluid = self.SuctionStatePanel.GetState().Fluid.decode('utf-8')
         
         if 'suctDTsh' in terms_keys and 'suctTsat' in terms_keys:
             Tsat = val_map['suctTsat']
@@ -2786,7 +2805,7 @@ class StateInputsPanel(PDPanel):
             self.OnChangeDischargeValue(changed_parameter = 'pressure')
             
         else:
-            raise NotImplementedException('This combination of coupled inlet state values is not supported')
+            raise NotImplemented('This combination of coupled inlet state values is not supported')
     
 class MotorCoeffsTable(wx.grid.Grid):
     
