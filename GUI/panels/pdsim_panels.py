@@ -1280,9 +1280,9 @@ class ArrayDisplay(wx.Frame):
 class ParaSelectDialog(wx.Dialog):
     def __init__(self):
         wx.Dialog.__init__(self, None, title = "State Chooser",)
-        self.MinLabel, self.Min = LabeledItem(self, label = 'Minimum value', value = '')
-        self.MaxLabel, self.Max = LabeledItem(self, label = 'Maximum value', value = '')
-        self.StepsLabel, self.Steps = LabeledItem(self, label = 'Number of steps', value = '')
+        self.MinLabel, self.Min = LabeledItem(self, label = 'Minimum value', value = '', txtsize=(100,-1))
+        self.MaxLabel, self.Max = LabeledItem(self, label = 'Maximum value', value = '', txtsize=(100,-1))
+        self.StepsLabel, self.Steps = LabeledItem(self, label = 'Number of steps', value = '', txtsize=(100,-1))
         self.Accept = wx.Button(self, label = "Accept")
         sizer = wx.FlexGridSizer(cols = 2, hgap = 4, vgap = 4)
         sizer.AddMany([self.MinLabel, self.Min, self.MaxLabel, 
@@ -1412,16 +1412,16 @@ class ParametricOption(wx.Panel):
         # Make a reverse map from annotation to GUI object key
         self.GUI_map = {o.annotation:o.key for o in six.itervalues(GUI_objects)} 
         
-        self.Terms = wx.ComboBox(self)
+        self.Terms = wx.ComboBox(self, size=(200,-1))
         self.Terms.AppendItems(sorted(labels))
         self.Terms.SetSelection(0)
         self.Terms.SetEditable(False)
-        self.RemoveButton = wx.Button(self, size=(17,-1))
+        self.RemoveButton = wx.Button(self, size=(24,-1))
         bmp = wx.ArtProvider.GetBitmap(wx.ART_MINUS, wx.ART_TOOLBAR, (16,16))
         if bmp.IsOk():
             self.RemoveButton.SetBitmap(bmp)
         
-        self.Values = wx.TextCtrl(self, value = '')
+        self.Values = wx.TextCtrl(self, value = '', size=(100,-1))
         self.Select = wx.Button(self, label = 'Select...')
         
         sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -1740,7 +1740,7 @@ class ParametricPanel(PDPanel):
         else:
             option.make_unstructured()
         
-        self.ParamSizer.Add(option)
+        self.ParamSizer.Add(option, 0, wx.EXPAND)
         self.ParamSizer.Layout()
         self.NTerms += 1
         self.GetSizer().Layout()
@@ -2157,13 +2157,13 @@ class ParametricPanel(PDPanel):
         
         return configdict
 
-def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True, tooltip = None):
+def LabeledItem(parent,id=-1, label='A label', value='0.0', enabled=True, tooltip = None, txtsize=(-1,-1)):
     """
     A convenience function that returns a tuple of StaticText and TextCtrl 
     items with the necessary label and values set
     """
     label = wx.StaticText(parent,id,label)#.decode('latin-1'))
-    thing = wx.TextCtrl(parent,id,value)
+    thing = wx.TextCtrl(parent,id,value,size=txtsize)
     if enabled==False:
         thing.Disable()
     if tooltip is not None:
