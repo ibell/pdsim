@@ -10,6 +10,7 @@ from multiprocessing import Process
 import wx, wx.grid, wx.stc, wx.adv
 from wx.lib.scrolledpanel import ScrolledPanel
 from wx.lib.mixins.listctrl import CheckListCtrlMixin,TextEditMixin,ListCtrlAutoWidthMixin
+import wx.lib.agw.infobar as IB
 
 import CoolProp
 from CoolProp.State import State
@@ -596,6 +597,7 @@ class UserOutputSelectionDialog(wx.Dialog):
         
         self.entrysizer = wx.BoxSizer(wx.VERTICAL)
         self.mainsizer = wx.BoxSizer(wx.VERTICAL)
+        self.mainsizer.Add(self.info, 0, wx.EXPAND)
         self.mainsizer.AddMany([bottomsizer, SPACER, self.entrysizer])
         self.panel.SetSizer(self.mainsizer)
         
@@ -606,6 +608,12 @@ class UserOutputSelectionDialog(wx.Dialog):
         self.Bind(wx.EVT_BUTTON, self.OnAddOne, self.AddOne)
         self.Bind(wx.EVT_BUTTON, self.OnToClipboard, self.ToClipboard)
         self.Bind(wx.EVT_BUTTON, self.OnToExcel, self.ToExcel)
+
+        self.timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.OnDismiss, self.timer)
+
+    def OnDismiss(self, evt=None):
+        self.info.Dismiss()
         
     def OnAddOne(self, evt=None):
         row = UserOutputSelectionRow(parent=self.panel, entries=self.entries)
@@ -622,11 +630,9 @@ class UserOutputSelectionDialog(wx.Dialog):
             dlg.Destroy()
         else:
             df.to_clipboard()
-            notify = wx.adv.NotificationMessage(
-                title="",
-                message="User-selected output has been copied to clipboard",
-                parent=None, flags=wx.ICON_INFORMATION)
-            notify.Show(timeout=3) # seconds
+            msg = "User-selected output has been copied to clipboard"
+            self.info.ShowMessage(msg, wx.ICON_INFORMATION)
+            self.timer.StartOnce(2000)
             
     def OnToExcel(self, evt=None):
         """ Prepare a pandas DataFrame with the outputs and write in Excel format """
