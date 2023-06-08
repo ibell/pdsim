@@ -1348,7 +1348,7 @@ class ARI540Subcrit(wx.Panel):
         [self.NTslbl, self.NTstxt] = LabeledItem(self, label='# of Ts', value='3')
         [self.Tcminlbl, self.Tcmintxt] = LabeledItem(self, label='Minimum Td (dew) (°C)', value='25')
         [self.Tcmaxlbl, self.Tcmaxtxt] = LabeledItem(self, label='Maximum Td (dew) (°C)', value='30')
-        [self.NTclbl, self.NTctxt] = LabeledItem(self, label='# of Tc', value='3')
+        [self.NTclbl, self.NTctxt] = LabeledItem(self, label='# of Td', value='3')
 
         sizer = wx.FlexGridSizer(cols=2)
         sizer.AddMany([
@@ -1400,7 +1400,7 @@ class CompressorMapWizardDialog(wx.Dialog):
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         main_sizer.Add(wx.StaticText(self, label='Select your approach:'))
         main_sizer.Add(self.CB, 1, wx.EXPAND)
-        main_sizer.Add(self.OkButton, 1, wx.EXPAND)
+        main_sizer.Add(self.OkButton, 0, wx.EXPAND)
         self.SetSizer(main_sizer)
         main_sizer.Layout()
         self.Fit()
