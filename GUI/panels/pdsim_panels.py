@@ -541,6 +541,17 @@ class OutputVariableEntry:
     
 SPACER = ((20, 20), 0, wx.EXPAND)
 
+class UserOutputHeaderRow(wx.Panel):
+    def __init__(self, parent):
+        wx.Panel.__init__(self, parent)
+        self.description = wx.StaticText(self, label="description", size=(300,-1))
+        self.key = wx.StaticText(self, label="key", size=(180,-1))
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.AddSpacer(20)
+        sizer.Add(self.description, 1, wx.EXPAND)
+        sizer.Add(self.key)
+        self.SetSizer(sizer)
+        
 class UserOutputSelectionRow(wx.Panel):
     def __init__(self, parent, entries):
         wx.Panel.__init__(self, parent)
@@ -606,6 +617,8 @@ class UserOutputSelectionDialog(wx.Dialog):
         self.Bind(wx.EVT_BUTTON, self.OnAddOne, self.AddOne)
         self.Bind(wx.EVT_BUTTON, self.OnToClipboard, self.ToClipboard)
         self.Bind(wx.EVT_BUTTON, self.OnToExcel, self.ToExcel)
+        
+        self.entrysizer.Add(UserOutputHeaderRow(parent=self.panel))
         
     def OnAddOne(self, evt=None):
         row = UserOutputSelectionRow(parent=self.panel, entries=self.entries)
