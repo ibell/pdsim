@@ -3,6 +3,7 @@ from __future__ import print_function
 
 import matplotlib
 matplotlib.use('WXAgg')
+import pandas
 
 import sys,os
 
@@ -702,6 +703,10 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         
         self.UserOutputButton = pdsim_panels.HackedButton(self._mb, label = 'User Selected Outputs')
         self._mb.AddControl(self.UserOutputButton)
+
+        self.ARI540Button = pdsim_panels.HackedButton(self._mb, label = 'Fit ARI 540 poly.')
+        self._mb.AddControl(self.ARI540Button)
+        self.ARI540Button.Bind(wx.EVT_BUTTON, self.OnFitARI540Map)
         
         self.HelpButton = pdsim_panels.HackedButton(self._mb, label = 'Help!!!')
         self._mb.AddControl(self.HelpButton)
@@ -745,6 +750,77 @@ class OutputDataPanel(pdsim_panels.PDPanel):
         dlg = wx.MessageDialog(None, text)
         dlg.ShowModal()
         dlg.Destroy()
+
+    def OnFitARI540Map(self, evt=None, sep='\t'):
+        # Get the data from the output runs, by selecting output files
+        FD = wx.FileDialog(None,
+                        "Open .h5 files",
+                        defaultDir='.',
+                        wildcard = 'Output files in HDF5 format (*.h5)|*.h5',
+                        style=wx.FD_OPEN|wx.FD_MULTIPLE|wx.FD_FILE_MUST_EXIST)
+        if wx.ID_OK == FD.ShowModal():
+            # Build the pandas DataFrame with the necessary data
+            outputs = []
+            for path in FD.GetPaths():
+                h = h5py.File(path, 'r')
+                outputs.append({
+                    'Tsat_evap / C': h['inlet_state/Tsat'][()],
+                    'Tsat_cond / C': h['outlet_state/Tsat'][()],
+                    'superheat / K': h['inlet_state/superheat'][()],
+                    'mdot / kg/h': h['mdot'][()]*3600,
+                    'Wdot / W': h['Wdot_electrical'][()],
+                })
+        FD.Destroy()
+        df = pandas.DataFrame(outputs)
+        if len(df) < 10:
+            dlg = wx.MessageDialog(None,"Need to select at least 10 data files, please try again","")
+            dlg.ShowModal()
+            dlg.Destroy()
+            return 
+        superheats = df['superheat / K']
+        if np.max(superheats) - np.min(superheats) > 0.1:
+            dlg = wx.MessageDialog(None,"Superheat differ by more than 0.1 K; set of values is: "+str(superheats),"")
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
+
+        Tsat_evap_C = df['Tsat_evap / C']
+        Tsat_cond_C = df['Tsat_cond / C']
+        one = np.ones_like(Tsat_cond_C)
+
+        # The van der Monde matrix is the same for both fitting problems
+        A_ = [one, Tsat_evap_C, Tsat_cond_C, Tsat_evap_C**2, Tsat_evap_C*Tsat_cond_C, Tsat_cond_C**2, Tsat_evap_C**3, Tsat_evap_C**2*Tsat_cond_C, Tsat_evap_C*Tsat_cond_C**2, Tsat_cond_C**3]
+        A = np.array(A_, ndmin=2).T
+        bmdot = np.array(df['mdot / kg/h'])
+        bWdot = np.array(df['Wdot / W'])
+        cmdot = np.linalg.lstsq(A, bmdot, rcond=None)[0]
+        cWdot = np.linalg.lstsq(A, bWdot, rcond=None)[0]
+
+        # Header
+        recalc_mdot = A@cmdot
+        recalc_Wdot = A@cWdot
+        AAD_mdot = np.mean(np.abs(recalc_mdot/bmdot-1))*100
+        AAD_Wdot = np.mean(np.abs(recalc_Wdot/bWdot-1))*100
+        header = ('## INFO ##\n'
+        '# form: P[1] + P[2]*Tsat_evap_C + P[3]*Tsat_cond_C + P[4]*Tsat_evap_C**2 + P[5]*Tsat_evap_C*Tsat_cond_C + P[6]*Tsat_cond_C**2 + P[7]*Tsat_evap_C**3 + P[8]*Tsat_evap_C**2*Tsat_cond_C + P[9]*Tsat_evap_C*Tsat_cond_C**2 + P[10]*Tsat_cond_C**3\n'
+        '# note: indexing of the coefficient array is 1-based\n'
+        f'\n# AAD_Wdot [%]: {AAD_Wdot}\n# AAD_mdot [%]: {AAD_mdot}\n\n')
+
+        # Data rows
+        indices = sep.join([''] + [str(i) for i in range(1, 11)]) + '\n'
+        smdot = sep.join(['mdot / kg/h'] + [f'{v:20.16g}' for v in cmdot]) + '\n'
+        sWdot = sep.join(['Wdot / W'] + [f'{v:20.16g}' for v in cWdot]) + '\n'
+        o = header + indices + smdot + sWdot
+
+        FD = wx.FileDialog(None,
+                            "Save tsv file with polynomial coefficients",
+                            defaultDir='.',
+                            wildcard =  "Tab-separated values (*.tsv)|*.tsv|All Files|*.*",
+                            style = wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
+        if wx.ID_OK==FD.ShowModal():
+            with open(FD.GetPath(),'w') as fp:
+                fp.write(o)
+        FD.Destroy()
         
     def OnLoadRuns(self, event = None):
         """
