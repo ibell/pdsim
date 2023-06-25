@@ -572,6 +572,7 @@ class UserOutputSelectionRow(wx.Panel):
         self.SetSizer(sizer)
         self.parent = parent
         self.Bind(wx.EVT_COMBOBOX, self.OnChange, self.Options)
+        self.OnChange()
         
     def Remove(self, evt=None):
         self.Destroy()
