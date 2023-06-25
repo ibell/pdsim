@@ -3,7 +3,7 @@ from __future__ import print_function
 import six
 
 # Python imports
-import warnings, codecs, textwrap,os, itertools, difflib, zipfile, types, timeit
+import warnings, codecs, textwrap,os, itertools, difflib, zipfile, types, timeit, io
 from multiprocessing import Process
 
 # wxPython imports
@@ -579,6 +579,9 @@ class UserOutputSelectionRow(wx.Panel):
     
     def get_key(self):
         return self.key.GetLabel()
+
+    def get_string(self):
+        return self.Options.GetStringSelection()
     
     def OnChange(self, evt=None):
         index = self.Options.GetSelection()
@@ -642,7 +645,20 @@ class UserOutputSelectionDialog(wx.Dialog):
             dlg.ShowModal()
             dlg.Destroy()
         else:
-            df.to_clipboard()
+            if wx.TheClipboard.Open():
+                # Build the normal pandas DataFrame and store in buffer
+                buffer = io.StringIO()
+                df.to_csv(buffer, sep='\t')
+                buffer.seek(0)
+                # Build the header row and output string to be copied to 
+                # the clipboard
+                header_row = '\t' + '\t'.join(self.get_strings())
+                contents = header_row + '\n' + buffer.read()
+
+                # And write to clipboard
+                wx.TheClipboard.SetData(wx.TextDataObject(contents))
+                wx.TheClipboard.Close()
+                
             msg = "User-selected output has been copied to clipboard"
             self.info.ShowMessage(msg, wx.ICON_INFORMATION)
             self.timer.StartOnce(2000)
@@ -668,9 +684,16 @@ class UserOutputSelectionDialog(wx.Dialog):
                 FD.Destroy()
                 return
             df.to_excel(filepath)
+
+    def _get_windows(self):
+        """ Get the windows contained in this panel, where a window is a row in the output parameter table """
+        return [self.entrysizer.GetItem(i).GetWindow() for i in range(self.entrysizer.GetItemCount()) if not isinstance(self.entrysizer.GetItem(i).GetWindow(), UserOutputHeaderRow)]
         
     def get_keys(self):
-        return [self.entrysizer.GetItem(i).GetWindow().get_key() for i in range(self.entrysizer.GetItemCount())]
+        return [window.get_key() for window in self._get_windows()]
+    
+    def get_strings(self):
+        return [window.get_string() for window in self._get_windows()]
         
 class OutputTreePanel(wx.Panel):
     
