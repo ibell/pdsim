@@ -590,9 +590,9 @@ class UserOutputSelectionDialog(wx.Dialog):
         self.parent = parent
         self.entries = entries
         
-    
         self.panel = ScrolledPanel(self)
         self.panel.SetScrollbars(1, 1, 1, 1)
+        self.info = IB.InfoBar(self.panel)
     
         self.AddOne = wx.Button(self.panel, label = "Add")
         bmp = wx.ArtProvider.GetBitmap(wx.ART_PLUS, wx.ART_TOOLBAR, (16,16))
@@ -623,10 +623,10 @@ class UserOutputSelectionDialog(wx.Dialog):
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnDismiss, self.timer)
 
+        self.entrysizer.Add(UserOutputHeaderRow(parent=self.panel))
+
     def OnDismiss(self, evt=None):
         self.info.Dismiss()
-        
-        self.entrysizer.Add(UserOutputHeaderRow(parent=self.panel))
         
     def OnAddOne(self, evt=None):
         row = UserOutputSelectionRow(parent=self.panel, entries=self.entries)
