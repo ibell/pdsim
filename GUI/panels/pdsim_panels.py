@@ -683,7 +683,11 @@ class UserOutputSelectionDialog(wx.Dialog):
             else:
                 FD.Destroy()
                 return
-            df.to_excel(filepath)
+            # Write out with the strings on the first row
+            header_contents = {s:[] for s in self.get_strings()}
+            with pandas.ExcelWriter(filepath) as writer:
+                pandas.DataFrame(header_contents).to_excel(writer, sheet_name="Sheet1")
+                df.to_excel(writer, sheet_name="Sheet1", startrow=1)
 
     def _get_windows(self):
         """ Get the windows contained in this panel, where a window is a row in the output parameter table """
