@@ -629,6 +629,7 @@ class UserOutputSelectionDialog(wx.Dialog):
         self.entrysizer.Add(UserOutputHeaderRow(parent=self.panel))
 
     def OnDismiss(self, evt=None):
+        """ Remove the InfoBar """
         self.info.Dismiss()
         
     def OnAddOne(self, evt=None):
