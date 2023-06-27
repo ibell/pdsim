@@ -47,10 +47,10 @@ class struct(object):
 class Port(object):
     
     #: Involute angle of the involute used to locate this port
-    phi = 3.14159
+    phi = None
     
     #: The code for the involute used to locate this point -- 'i' or 'o'
-    involute = 'i'
+    involute = None
     
     #: Distance away from the involute
     offset = 0.001
@@ -234,6 +234,49 @@ class Scroll(PDSimCore, _Scroll):
             except ZeroDivisionError:
                 return 0.0
             
+    def get_port_xy(self, port, Npts=50):
+        """
+        Get the x and y coordinates for a circular port
+
+        Parameters
+        ----------
+            port: the Port instance that is being considered
+            Npts: how many points in [0, 2*pi] are needed for the circle
+        """
+
+        if hasattr(port, 'x') or hasattr(port, 'y'):
+            raise ValueError('Specifying x or y for port is deprecated and you should be setting the fields x0 and y0')
+
+        if port.involute is not None:
+
+            # The location of the port is based upon the involute that
+            # the port is referenced to
+
+            #  Get the reference point on the scroll wrap
+            if port.involute == 'i':
+                #  Point on the scroll involute
+                x, y = scroll_geo.coords_inv(port.phi, self.geo, 0, 'fi')
+                #  Unit normal vector components
+                nx, ny = scroll_geo.coords_norm(port.phi, self.geo, 0, 'fi')
+            elif port.involute == 'o':
+                #  Point on the scroll involute
+                x, y = scroll_geo.coords_inv(port.phi, self.geo, 0, 'fo')
+                #  Unit normal vector components
+                nx, ny = scroll_geo.coords_norm(port.phi, self.geo, 0, 'fo')
+            else:
+                raise ValueError('port involute[{0:s}] must be one of "i" or "o"'.format(port.involute))
+        
+            #  Normal direction points towards the scroll wrap, take the opposite 
+            #  direction to locate the center of the port
+            port.x0 = x - port.offset*nx
+            port.y0 = y - port.offset*ny
+        
+        #  The coordinates for the center of the port
+        t = np.linspace(0, 2*pi, Npts)
+        xport = port.x0 + port.D/2.0*np.cos(t)
+        yport = port.y0 + port.D/2.0*np.sin(t)
+        return xport, yport
+            
     def calculate_port_areas(self, plot=False):
         """ 
         Calculate the area between a port on the fixed scroll and all of the 
@@ -250,31 +293,9 @@ class Scroll(PDSimCore, _Scroll):
         for iport, port in enumerate(self.fixed_scroll_ports):
             
             #  Make sure it is an Port instance
-            assert (isinstance(port,Port))
+            assert (isinstance(port, Port))
               
-            #  Get the reference point on the scroll wrap
-            if port.involute == 'i':
-                #  Point on the scroll involute
-                x, y = scroll_geo.coords_inv(port.phi, self.geo, 0, 'fi')
-                #  Unit normal vector components
-                nx, ny = scroll_geo.coords_norm(port.phi, self.geo, 0, 'fi')
-            elif port.involute == 'o':
-                #  Point on the scroll involute
-                x, y = scroll_geo.coords_inv(port.phi, self.geo, 0, 'fo')
-                #  Unit normal vector components
-                nx, ny = scroll_geo.coords_norm(port.phi, self.geo, 0, 'fo')
-            else:
-                raise ValueError('port involute[{0:s}] must be one of "i" or "o"'.format(port.involute))
-            
-            #  Normal direction points towards the scroll wrap, take the opposite 
-            #  direction to locate the center of the port
-            port.x0 = x - port.offset*nx
-            port.y0 = y - port.offset*ny
-            
-            #  The coordinates for the center of the port
-            t = np.linspace(0, 2*pi)
-            xport = port.x0 + port.D/2.0*np.cos(t)
-            yport = port.y0 + port.D/2.0*np.sin(t)
+            xport, yport = self.get_port_xy(port, Npts=50)
             
             #  Actually use the clipper library to carry out the intersection
             #  of the port with all of the control volumes
@@ -285,14 +306,14 @@ class Scroll(PDSimCore, _Scroll):
             port.area_dict = area_dict
 
             if plot:
-               for k, A in area_dict.items():
-                   plt.plot(theta_area, A*1e6, label = k)
-               plt.legend()
-               plt.title('Port index: '+str(iport))
-               plt.xlabel('Crank angle [rad]')
-               plt.ylabel('Area [mm$^2$]')
-               plt.savefig('Aport.png')
-               plt.show()  
+                for k, A in area_dict.items():
+                    plt.plot(theta_area, A*1e6, label = k)
+                plt.legend()
+                plt.title('Port index: '+str(iport))
+                plt.xlabel('Crank angle [rad]')
+                plt.ylabel('Area [mm$^2$]')
+                plt.savefig('Aport.png')
+                plt.show()
             
     def get_discharge_port_blockage_poly(self, theta):
         """
