@@ -290,9 +290,9 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
                     r = State2.h - h2
                     rprime = State2.pAS.first_partial_deriv(constants_header.iHmass, constants_header.iT, constants_header.iP)/1000 # AbstractState has enthalpy in kJ/kg
                     dT = -r/rprime
-                        T += dT
-                        if abs(r) < 0.02:
-                            break
+                    T += dT
+                    if abs(r) < 0.02:
+                        break
                 else :
                     raise ValueError("unclear what to do here")
             
