@@ -18,6 +18,7 @@ from CoolProp import State
 from math import pi, exp
 import numpy as np
 import copy
+import scipy.optimize
 
 # If scipy is available, use its interpolation and optimization functions, otherwise, 
 # use our implementation (for packaging purposes mostly)
