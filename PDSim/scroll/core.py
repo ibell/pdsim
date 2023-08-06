@@ -950,7 +950,8 @@ class Scroll(PDSimCore, _Scroll):
                 #It is the outermost pair of compression chambers
                 initState = State.State(inletState.Fluid,
                                         dict(T=inletState.T,
-                                             D=inletState.rho)
+                                             D=inletState.rho), 
+                                        phase='gas'
                                         )
                 
             else:
