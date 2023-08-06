@@ -271,25 +271,30 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
             
             h2 = S_star.h + Q_add/mdot/1000.0
             
-            # Special-case mixtures for the calculation of H,P inputs
-            # because CoolProp basically doesn't support H,P inputs
-            # so a local Newton's method approach is used instead
-            # and we cannot use scipy.optimize.newton because Cython
-            # does not support closures. Anyhow this method works fine
-            if len(State2.pAS.fluid_names()) > 1:
-                # Use Newton's method to solve for the 
-                # temperature yielding the outlet enthalpy
-                T = T2_star
+            try:
+                # The normal P, H calculation, will work for REFPROP and pure and
+                # pseudo-pure fluids in CoolProp
+                State2.update({'H':h2, 'P':p+DELTAP/1000})
+            except:
+                # Special-case mixtures for the calculation of H,P inputs
+                # because CoolProp basically doesn't support H,P inputs
+                # so a local Newton's method approach is used instead
+                # and we cannot use scipy.optimize.newton because Cython
+                # does not support closures in cpdef functions.
+                if hasattr(State2,'pAS') and State2.pAS.fluid_names() > 1:
+                    # Use Newton's method to solve for the 
+                    # temperature yielding the outlet enthalpy
+                    T = T2_star
                 for counter in range(30):
                     State2.update(dict(T=T, P=p+DELTAP/1000))
                     r = State2.h - h2
                     rprime = State2.pAS.first_partial_deriv(constants_header.iHmass, constants_header.iT, constants_header.iP)/1000 # AbstractState has enthalpy in kJ/kg
                     dT = -r/rprime
-                    T += dT
-                    if abs(r) < 0.02:
-                        break
-            else:
-                State2.update({'H':h2, 'P':p+DELTAP/1000})
+                        T += dT
+                        if abs(r) < 0.02:
+                            break
+                else :
+                    raise ValueError("unclear what to do here")
             
             # Q is defined to be positive if heat transferred from wall to fluid
             #
