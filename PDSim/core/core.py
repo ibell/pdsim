@@ -784,7 +784,11 @@ class PDSimCore(object):
         # for some conditions and you are better off just calculating the enthalpy
         # directly
         temp = outletState.copy()
-        temp.update(dict(P=outletState.p, S=s1))
+        def objective(T):
+            temp.update(dict(P=outletState.p, T=T))
+            return temp.s - s1
+        scipy.optimize.newton(objective, outletState.T)
+            
         h2s = temp.h
         
         if outletState.p > inletState.p:
