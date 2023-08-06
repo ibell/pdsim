@@ -1251,7 +1251,7 @@ class PDSimCore(object):
 
                 if len(self.solvers.hdisc_history) == 1:
                     # The first time we get here, perturb the discharge enthalpy
-                    self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, h_outlet + 5)
+                    h_target = h_outlet + 5
                 else:
                     #  Get the values from the history
                     hdn1, EBn1 = self.solvers.hdisc_history[-1]
@@ -1262,7 +1262,13 @@ class PDSimCore(object):
                     
                     #  Reset the outlet enthalpy of the outlet tube based on our new
                     #  value for it
-                    self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, hdnew)
+                    h_target = hdnew
+                    
+                # Iterate to solve the H, P flash calculation
+                def objective(T):
+                    self.Tubes.Nodes[self.key_outlet].update(dict(T=T, P=self.Tubes.Nodes[self.key_outlet].p))
+                    return self.Tubes.Nodes[self.key_outlet].h - h_target
+                scipy.optimize.newton(objective, self.Tubes.Nodes[self.key_outlet].T)
 
                 print(self.solvers.hdisc_history)
                 
