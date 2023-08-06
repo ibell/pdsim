@@ -3,6 +3,8 @@ from __future__ import division
 import cython
 cimport cython
 
+from CoolProp cimport constants_header
+
 #Uncomment this line to use the python math functions
 #from math import log,pi,e,pow,sqrt
 
@@ -264,11 +266,30 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
             T2_star = T_wall-(T_wall-T1)*exp(-pi*ID*L*alpha/(mdot*cp))
             
             # Get the actual outlet enthalpy based on the additional heat input
-            S_star = State(Fluid,{'T':T2_star,'P':p + DELTAP/1000.0})
+            S_star = State1.copy()
+            S_star.update({'T':T2_star,'P':p + DELTAP/1000.0})
             
             h2 = S_star.h + Q_add/mdot/1000.0
             
-            State2.update({'H':h2,'P':p+DELTAP/1000})
+            # Special-case mixtures for the calculation of H,P inputs
+            # because CoolProp basically doesn't support H,P inputs
+            # so a local Newton's method approach is used instead
+            # and we cannot use scipy.optimize.newton because Cython
+            # does not support closures. Anyhow this method works fine
+            if len(State2.pAS.fluid_names()) > 1:
+                # Use Newton's method to solve for the 
+                # temperature yielding the outlet enthalpy
+                T = T2_star
+                for counter in range(30):
+                    State2.update(dict(T=T, P=p+DELTAP/1000))
+                    r = State2.h - h2
+                    rprime = State2.pAS.first_partial_deriv(constants_header.iHmass, constants_header.iT, constants_header.iP)/1000 # AbstractState has enthalpy in kJ/kg
+                    dT = -r/rprime
+                    T += dT
+                    if abs(r) < 0.02:
+                        break
+            else:
+                State2.update({'H':h2, 'P':p+DELTAP/1000})
             
             # Q is defined to be positive if heat transferred from wall to fluid
             #
