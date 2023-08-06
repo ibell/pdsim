@@ -281,7 +281,7 @@ cpdef IsothermalWallTube(mdot,State1,State2,fixed,L,ID,OD=None,HTModel='Twall',T
                 # so a local Newton's method approach is used instead
                 # and we cannot use scipy.optimize.newton because Cython
                 # does not support closures in cpdef functions.
-                if hasattr(State2,'pAS') and State2.pAS.fluid_names() > 1:
+                if hasattr(State2,'pAS') and len(State2.pAS.fluid_names()) > 1:
                     # Use Newton's method to solve for the 
                     # temperature yielding the outlet enthalpy
                     T = T2_star
