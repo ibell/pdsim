@@ -68,14 +68,14 @@ def Compressor(ScrollClass, Te = 273, Tc = 300, f = None, OneCycle = False, Ref 
     Te = -20 + 273.15
     Tc = 20 + 273.15
     Tin = Te + 11.1
-    temp = State.State(Ref,{'T':Te,'Q':1})
+    temp = State.State(Ref,{'T':Te,'Q':1}, phase='gas')
     pe = temp.p
     temp.update(dict(T=Tc, Q=1))
     pc = temp.p
-    inletState = State.State(Ref,{'T':Tin,'P':pe})
+    inletState = State.State(Ref,{'T':Tin,'P':pe}, phase='gas')
 
-    T2s = ScrollComp.guess_outlet_temp(inletState,pc)
-    outletState = State.State(Ref,{'T':T2s,'P':pc})
+    T2s = ScrollComp.guess_outlet_temp(inletState, pc)
+    outletState = State.State(Ref,{'T':T2s,'P':pc}, phase='gas')
     
     mdot_guess = inletState.rho*ScrollComp.Vdisp*ScrollComp.omega/(2*pi)
     
