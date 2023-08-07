@@ -24,6 +24,8 @@ try:
     from scipy.integrate import trapz
 except ImportError:
     from PDSim.misc.scipylike import trapz
+    
+import scipy.optimize
 
 import h5py
 
@@ -456,10 +458,44 @@ class PDSimCore(object):
         This function can also be overloaded by the subclass in order to 
         implement a different guess method
         """
-        
-        h1 = inlet_state.h
-        out_state = inlet_state.copy()
-        out_state.update(dict(S = inlet_state.s, P = p_outlet))
+        try:
+            # For an adiabatic process in which the ratio of heat capacities 
+            # gamma is approximately constant, you can calculate the 
+            # relation between T and p along the isentropic path from:
+            # p1^(1-gamma)*T1^gamma = p2^(1-gamma)*T2^gamma
+            
+            h1 = inlet_state.h
+            s1 = inlet_state.s 
+            out_state = inlet_state.copy()
+            
+            # See: https://en.wikipedia.org/wiki/Table_of_thermodynamic_equations#Thermodynamic_processes
+            gamma = inlet_state.cp/inlet_state.cv
+            T2s = (inlet_state.p**(1-gamma)*inlet_state.T**gamma/p_outlet**(1-gamma))**(1/gamma)
+            # Solver to correct for non-constant gamma to get isentropic enthalpy h2s, 
+            # should be a small correction
+            def objective_h2s(T):
+                out_state.update(dict(T=T, P=p_outlet))
+                return out_state.s - s1
+            T2s = scipy.optimize.newton(objective_h2s, T2s)
+            h2s = out_state.h
+            
+            if p_outlet > inlet_state.p:
+                # Compressor Mode
+                h2 = h1 + (h2s-h1)/eta_a
+            else:
+                # Expander Mode
+                h2 = h1 + (h2s-h1)*eta_a
+            # Iterate with Newton's method to get temperature corresponding
+            # to specified h2
+            def objective_h2(T):
+                out_state.update(dict(T=T, P=p_outlet))
+                return out_state.h - h2
+            return scipy.optimize.newton(objective_h2, T2s)
+            
+        except BaseException as be:
+            h1 = inlet_state.h
+            out_state = inlet_state.copy()
+            out_state.update(dict(S = inlet_state.s, P = p_outlet))
         h2s = out_state.h
         if p_outlet > inlet_state.p:
             # Compressor Mode
@@ -748,7 +784,11 @@ class PDSimCore(object):
         # for some conditions and you are better off just calculating the enthalpy
         # directly
         temp = outletState.copy()
-        temp.update(dict(P=outletState.p, S=s1))
+        def objective(T):
+            temp.update(dict(P=outletState.p, T=T))
+            return temp.s - s1
+        scipy.optimize.newton(objective, outletState.T)
+            
         h2s = temp.h
         
         if outletState.p > inletState.p:
@@ -1211,7 +1251,7 @@ class PDSimCore(object):
 
                 if len(self.solvers.hdisc_history) == 1:
                     # The first time we get here, perturb the discharge enthalpy
-                    self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, h_outlet + 5)
+                    h_target = h_outlet + 5
                 else:
                     #  Get the values from the history
                     hdn1, EBn1 = self.solvers.hdisc_history[-1]
@@ -1222,7 +1262,13 @@ class PDSimCore(object):
                     
                     #  Reset the outlet enthalpy of the outlet tube based on our new
                     #  value for it
-                    self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, hdnew)
+                    h_target = hdnew
+                    
+                # Iterate to solve the H, P flash calculation
+                def objective(T):
+                    self.Tubes.Nodes[self.key_outlet].update(dict(T=T, P=self.Tubes.Nodes[self.key_outlet].p))
+                    return self.Tubes.Nodes[self.key_outlet].h - h_target
+                scipy.optimize.newton(objective, self.Tubes.Nodes[self.key_outlet].T)
 
                 print(self.solvers.hdisc_history)
                 

@@ -18,6 +18,7 @@ from CoolProp import State
 from math import pi, exp
 import numpy as np
 import copy
+import scipy.optimize
 
 # If scipy is available, use its interpolation and optimization functions, otherwise, 
 # use our implementation (for packaging purposes mostly)
@@ -949,7 +950,8 @@ class Scroll(PDSimCore, _Scroll):
                 #It is the outermost pair of compression chambers
                 initState = State.State(inletState.Fluid,
                                         dict(T=inletState.T,
-                                             D=inletState.rho)
+                                             D=inletState.rho), 
+                                        phase='gas'
                                         )
                 
             else:
@@ -1866,17 +1868,35 @@ class Scroll(PDSimCore, _Scroll):
                 
         inletState = self.Tubes.Nodes[self.key_inlet]
         outletState = self.Tubes.Nodes[self.key_outlet]
-        s1 = inletState.s
-        h1 = inletState.h
-        temp = inletState.copy()
-        temp.update(dict(S = s1, P = outletState.p))
-        h2s = temp.h
         
+        h1 = inletState.h
+        s1 = inletState.s
+        outletState = inletState.copy()
+        
+        # For an adiabatic process in which the ratio of heat capacities 
+        # gamma is approximately constant, you can calculate the 
+        # relation between T and p along the isentropic path from:
+        # p1^(1-gamma)*T1^gamma = p2^(1-gamma)*T2^gamma
+        
+        # See: https://en.wikipedia.org/wiki/Table_of_thermodynamic_equations#Thermodynamic_processes
+        gamma = inletState.cp/inletState.cv
+        T2s = (inletState.p**(1-gamma)*inletState.T**gamma/outletState.p**(1-gamma))**(1/gamma)
+        
+        # Solver to correct for non-constant gamma to get isentropic enthalpy h2s, 
+        # should be a small correction
+        def objective_h2s(T):
+            outletState.update(dict(T=T, P=outletState.p))
+            return outletState.s - s1
+        T2s = scipy.optimize.newton(objective_h2s, T2s)
+        h2s = outletState.h
+        
+        # And now we iterate to get the given efficiency
+        h1 = inletState.h
         if outletState.p > inletState.p:
-            #Compressor Mode
+            # Compressor Mode
             h2 = h1 + (h2s-h1)/eta_a
         else:
-            #Expander Mode
+            # Expander Mode
             h2 = h1 + (h2s-h1)*eta_a
         
         # A guess for the compressor mechanical power based on 70% efficiency [kW]
