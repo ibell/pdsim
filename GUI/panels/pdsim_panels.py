@@ -2267,6 +2267,15 @@ class StateChooser(wx.Dialog):
         self.Fluidslabel = wx.StaticText(self,-1,'Fluid: ')
         self.Fluids = wx.ComboBox(self,-1)
         self.Fluids.AppendItems(sorted(CoolProp.__fluids__))
+        
+        # Add predefined mixtures from the HEOS backend
+        HEOS_predef_mixtures = sorted(CP.get_global_param_string('predefined_mixtures').split(','))
+        # Filter to the ones with .MIX extension
+        HEOS_predef_mixtures = [m for m in HEOS_predef_mixtures if '.MIX' in m]
+        
+        
+        self.Fluids.AppendItems(HEOS_predef_mixtures)
+        
         self.Fluids.SetEditable(False)
         self.Fluids.SetValue(Fluid)
         self.AddFluid = wx.Button(self, label = '+')
