@@ -2270,9 +2270,8 @@ class StateChooser(wx.Dialog):
         
         # Add predefined mixtures from the HEOS backend
         HEOS_predef_mixtures = sorted(CP.get_global_param_string('predefined_mixtures').split(','))
-        # Filter to the ones with .MIX extension
+        # Filter to the ones with .MIX extension (CoolProp has upper-cased and mixed-cased ones)
         HEOS_predef_mixtures = [m for m in HEOS_predef_mixtures if '.MIX' in m]
-        
         
         self.Fluids.AppendItems(HEOS_predef_mixtures)
         
