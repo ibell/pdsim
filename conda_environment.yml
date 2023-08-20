@@ -9,6 +9,7 @@ dependencies:
   - pyyaml
   - h5py
   - wxpython
+  - pandas
   - pip
   - pip:
     - CoolProp
