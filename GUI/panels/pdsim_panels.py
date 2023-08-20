@@ -2225,7 +2225,7 @@ class StateChooser(wx.Dialog):
     """
     A dialog used to select the state
     """
-    def __init__(self,Fluid,T,rho,parent=None,id=-1,Fluid_fixed = False):
+    def __init__(self,Fluid,T,rho,parent=None,id=-1,Fluid_fixed = False, phase='gas'):
         wx.Dialog.__init__(self,parent,id,"State Chooser",size=(300,310))
         
         class StateChoices(wx.Choicebook):
@@ -2250,8 +2250,9 @@ class StateChooser(wx.Dialog):
                 self.plabel1, self.p1 = LabeledItem(self.pageT_p,label="Pressure [kPa]",value='300')
                 self.p1.default_units = 'kPa'
                 self.p1.Bind(wx.EVT_CONTEXT_MENU,self.OnChangeUnits)
+                self.phaselabel, self.phase = LabeledItem(self.pageT_p,label="Phase",value='gas')
                 sizer=wx.FlexGridSizer(cols=2,hgap=3,vgap=3)
-                sizer.AddMany([self.Tlabel1, self.T1,self.plabel1, self.p1])
+                sizer.AddMany([self.Tlabel1, self.T1,self.plabel1, self.p1, self.phaselabel, self.phase])
                 self.pageT_p.SetSizer(sizer)
             
             def OnChangeUnits(self, event):
@@ -2267,6 +2268,14 @@ class StateChooser(wx.Dialog):
         self.Fluidslabel = wx.StaticText(self,-1,'Fluid: ')
         self.Fluids = wx.ComboBox(self,-1)
         self.Fluids.AppendItems(sorted(CoolProp.__fluids__))
+        
+        # Add predefined mixtures from the HEOS backend
+        HEOS_predef_mixtures = sorted(CP.get_global_param_string('predefined_mixtures').split(','))
+        # Filter to the ones with .MIX extension (CoolProp has upper-cased and mixed-cased ones)
+        HEOS_predef_mixtures = [m for m in HEOS_predef_mixtures if '.MIX' in m]
+        
+        self.Fluids.AppendItems(HEOS_predef_mixtures)
+        
         self.Fluids.SetEditable(False)
         self.Fluids.SetValue(Fluid)
         self.AddFluid = wx.Button(self, label = '+')
@@ -2298,7 +2307,7 @@ class StateChooser(wx.Dialog):
         self.SetSizer(sizer)
         self.Fluids.SetStringSelection(Fluid)
         
-        state = CP.State(Fluid, dict(T=T,D=rho))
+        state = CP.State(Fluid, dict(T=T,D=rho), phase=phase)
         Tt = state.Props(CoolProp.iT_triple)
         Tc = state.Props(CoolProp.iT_critical)
         pt = state.Props(CoolProp.iP_triple)
@@ -2317,7 +2326,7 @@ class StateChooser(wx.Dialog):
             self.SC.SetSelection(0) ## The page of Tsat,DTsh
         else:
             #Pressure from temperature and density
-            state = CP.State(Fluid, dict(T=T,D=rho))
+            state = CP.State(Fluid, dict(T=T,D=rho), phase=phase)
             p = state.p
             self.SC.T1.SetValue(str(T))
             self.SC.p1.SetValue(str(p))
@@ -2428,7 +2437,8 @@ class StateChooser(wx.Dialog):
                 # Temperature and pressure are given
                 T = float(self.SC.T1.GetValue())
                 p = float(self.SC.p1.GetValue())
-                state = CP.State(Fluid, dict(T=T,P=p))
+                phase = self.SC.phase.GetValue()
+                state = CP.State(Fluid, dict(T=T,P=p), phase=phase)
                 rho = state.rho
             else:
                 raise NotImplementedError
@@ -2457,10 +2467,12 @@ class StatePanel(wx.Panel):
         self.Tlabel, self.T = LabeledItem(self,label="Temperature [K]",value=str(CPState.T))
         self.plabel, self.p = LabeledItem(self,label="Pressure [kPa]",value=str(CPState.p))
         self.rholabel, self.rho = LabeledItem(self,label="Density [kg/m\xb3]",value=str(CPState.rho))
+        self.phaselabel, self.phase = LabeledItem(self,label="Imposed phase",value=CPState.phase)
         sizer.AddMany([self.Fluidlabel, self.Fluid,
                        self.Tlabel, self.T,
                        self.plabel, self.p,
-                       self.rholabel, self.rho])
+                       self.rholabel, self.rho,
+                       self.phaselabel, self.phase])
         
         for box in [self.T,self.p,self.rho,self.Fluid]:
             #Make the box not editable
@@ -2484,13 +2496,14 @@ class StatePanel(wx.Panel):
         Fluid = str(self.Fluid.GetValue())
         T = float(self.T.GetValue())
         rho = float(self.rho.GetValue())
-        return State(Fluid,dict(T = T, D = rho))
+        phase = self.phase.GetValue()
+        return State(Fluid,dict(T = T, D = rho), phase=phase)
     
     def GetValue(self):
         return self.GetState()
     
     def SetValue(self, State_val):
-        self.set_state(State_val.Fluid, dict(T = State_val.T, D = State_val.rho))
+        self.set_state(State_val.Fluid, dict(T = State_val.T, D = State_val.rho), phase=State_val.phase)
     
     def set_state(self, Fluid, **kwargs):
         """
@@ -2585,7 +2598,7 @@ class StateInputsPanel(PDPanel):
         PDPanel.__init__(self, parent, **kwargs)
         
         # The CoolProp State instance
-        inletState = State(config['inletState']['Fluid'], dict(T = config['inletState']['T'], D = config['inletState']['rho']))
+        inletState = State(config['inletState']['Fluid'], dict(T = config['inletState']['T'], D = config['inletState']['rho']), phase='gas')
         
         # Create the sizers
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -2805,7 +2818,7 @@ class StateInputsPanel(PDPanel):
     
         return textwrap.dedent(
             """
-            inletState = State.State("{Ref}", {{'T': {Ti}, 'P' : {pi} }})
+            inletState = State.State("{Ref}", {{'T': {Ti}, 'P' : {pi} }}, phase="{phase}")
             
             outlet_temperature_guess = {outlet_temperature_guess} # [K]
             if outlet_temperature_guess > 0:
@@ -2813,7 +2826,7 @@ class StateInputsPanel(PDPanel):
                 T2s = outlet_temperature_guess 
             else:
                 T2s = sim.guess_outlet_temp(inletState,{po})
-            outletState = State.State("{Ref}", {{'T':T2s,'P':{po} }})
+            outletState = State.State("{Ref}", {{'T':T2s,'P':{po} }}, phase="{phase}")
             
             # The rotational speed (over-written if motor map provided)
             sim.omega = {omega}
@@ -2821,6 +2834,7 @@ class StateInputsPanel(PDPanel):
                        Ti = str(inletState.T),
                        pi = str(inletState.p),
                        po = str(discPressure),
+                       phase = inletState.phase.decode(),
                        outlet_temperature_guess = str(outlet_temperature_guess),
                        omega = str(omega)
                        )
