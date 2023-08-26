@@ -32,10 +32,8 @@ sys.path.append(os.path.abspath(os.path.join('..','GUI')))
 def run_prebuild(_):
 
     # Run sphinx.apidoc programmatically to autogenerate documentation for PDSim
-    from sphinx.ext.apidoc import main
     cur_dir = os.path.abspath(os.path.dirname(__file__))
-    output_path = os.path.join(cur_dir, 'PDSim_apidoc')
-    main(argv=['-e', '-o', output_path, os.path.dirname(PDSim.__file__), '--force'])
+    subprocess.check_output(f'sphinx-apidoc -f -o PDSim_apidoc {os.path.dirname(PDSim.__file__)}', shell=True, cwd=cur_dir)
 
     # -- Execute all notebooks --------------------------------------------------
     if on_rtd:
