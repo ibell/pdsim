@@ -908,33 +908,33 @@ class OutputTreePanel(wx.Panel):
 
         import xlsxwriter
         workbook = xlsxwriter.Workbook(fName, {'constant_memory': True})
-        
+
         ws = workbook.add_worksheet('Summary')
-        
+
         r = 0
         item = self.tree.GetRootItem()
         while item:
-               
+
             item = self.tree.GetNext(item)
 
-            # Don't use this item if it got an empty item (at end) 
+            # Don't use this item if it got an empty item (at end)
             if not item: break
-            
+
             row = get_row(item)
-            
+
             # Go to the next item if there is nothing in row
             if not row[1]: continue
-                
+
             # Write the name of the term
             ws.write(r, 0, '::'.join(get_path(item)+[row[0]]))
-            
+
             # Write the annotation to the name cell comment if it has an annotation
             annotation_dict = self.tree.GetItemPyData(item)
             if annotation_dict:
                 ws.write_comment(r,0,annotation_dict['annotation'])
-                
+
             for c in range(1,len(row)):
-                
+
                 # Convert to an int if possible
                 try:
                     val = int(row[c])
@@ -944,10 +944,10 @@ class OutputTreePanel(wx.Panel):
                         val = float(row[c])
                     except ValueError:
                         val = row[c]
-                
+
                 # Write value
                 ws.write(r,c,val)
-            
+
             r += 1
 
         ## Output the matrices
@@ -955,34 +955,34 @@ class OutputTreePanel(wx.Panel):
         for key,name in [('p','Pressure (kPa)'),('T','Temperature (K)'),('rho','Density (kg per m3)'),('V','Volume (m3)')]:
 
             ws = workbook.add_worksheet(name)
-            
+
             # Adjust these to adjust the spacing around each block of data
             row_idx = 4
             col_idx = 1
-            
+
             # 3 is the number of empty columns between runs
             offset = 3 + self.runs[0].get(key)[()].T.shape[1]
-            
-            # Header 
+
+            # Header
             my_col_idx = col_idx
             for run in self.runs:
                 run_index = run.get('run_index')[()]
                 ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index))
-                
+
                 if run.get('description'):
                     description = run.get('description')[()].decode('utf-8')
                     ws.write(row_idx - 3, my_col_idx - 1, 'Run index #'+str(run_index)+': '+description)
-                    
+
                 my_col_idx += offset
-                
-                
+
+
             datas = []
             maxlen = 0
             for run in self.runs:
                 # Each are stored as 1D array, convert to 2D column matrix
                 theta = np.array(run.get('t')[()], ndmin = 2).T
                 mat = np.array(run.get(key)[()], ndmin = 2).T
-            
+
                 datas.append(np.c_[theta, mat])
                 if np.prod(theta.shape) > maxlen:
                     maxlen = np.prod(theta.shape)
@@ -994,26 +994,26 @@ class OutputTreePanel(wx.Panel):
                 for c in range(0, datas[0].shape[1]-1):
                     CVkey = run.get('CVs/keys/%s' %(c,))[()].decode('utf-8')
                     ws.write(row_idx - 2, my_col_idx+c,CVkey)
-                        
+
                 my_col_idx += offset
-                    
+
             # Data
             for r in range(maxlen):
                 my_col_idx = col_idx
                 for data in datas:
-                    
+
                     if r >= data.shape[0]:
                         my_col_idx += offset
                         continue
-                        
-                    # Theta            
+
+                    # Theta
                     ws.write(r+row_idx-1, my_col_idx-1,data[r, 0])
-                    
+
                     # Data
                     for c in range(1,data.shape[1]):
                         if not np.isnan(data[r,c]):
                             ws.write(r+row_idx-1, my_col_idx-1+c, data[r, c])
-                            
+
                     my_col_idx += offset
 
         # Let the family do things to the opened worksheet
