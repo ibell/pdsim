@@ -1,7 +1,7 @@
     # -*- coding: utf-8 -*-
 
 from math import pi, cos, sin
-import textwrap
+import textwrap, io
 
 import wx
 import wx.grid
@@ -267,20 +267,15 @@ class DischargePortCoordinatesTable(wx.grid.Grid):
             success = wx.TheClipboard.GetData(do)
             wx.TheClipboard.Close()
 
-        data = do.GetText()
-        if '\r' in data and '\n' not in data:
-            data = data.replace('\r','\n')
-        elif '\r\n' in data:
-            data = data.replace('\r\n','\n')    
-        rows = data.strip().split('\n')
-        rows = [row.split('\t') for row in rows]
+        rows = io.StringIO(do.GetText()).readlines()
+        rows = [row.split('\t') for row in rows if row.strip()]
         
         try:
             for row in rows:
                 for el in row:
                     float(el)
-            self.update_from_configfile(zip(*rows))
-        except ValueError:
+            self.update_from_configfile(list(zip(*rows)))
+        except (ValueError, TypeError):
             dlg = wx.MessageDialog(None, "Unable to paste from clipboard - bad format")
             dlg.ShowModal()
             dlg.Close()
