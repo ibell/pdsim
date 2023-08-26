@@ -2373,7 +2373,7 @@ class StateChooser(wx.Dialog):
             # Check that you can get the molar mass of this fluid
             Fluid = dlg.GetValue().encode('ascii')
             dlg.Destroy()
-            if 'BICUBIC' in Fluid or 'TTSE' in Fluid:
+            if b'BICUBIC' in Fluid or b'TTSE' in Fluid:
                 dlg3 = wx.MessageDialog(None,"Warning: If tables have not been created already for this fluid, it will take a while to build the tables")
                 dlg3.ShowModal()
                 dlg3.Destroy()
