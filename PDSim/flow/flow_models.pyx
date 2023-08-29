@@ -613,7 +613,7 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, int ot
     """
     
     #some cython type declarations
-    cython.declare(T_up = cython.double, T_down = cython.double, mdot = cython.double)
+    cython.declare(T_up = cython.double, T_down = cython.double, mdot = cython.double, pr=cython.double, pr_crit=cython.double, gamma=cython.double, k=cython.double)
     # Since ideal, R=cp-cv, and k=cp/cv
     cp = State_up.get_cp0()
     R = 8314.472/State_up.get_MM() #[J/kg/K]

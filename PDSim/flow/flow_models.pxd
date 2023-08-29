@@ -21,9 +21,9 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, int ot
 cdef class FlowFunction(object):
     cpdef double call(self, FlowPath FP) except *
     cpdef resize(self, int Nvalues)
-    cpdef public arraym flows
-    cpdef public int Nflows
-    cpdef public __name__, __strf__
+    cdef public arraym flows
+    cdef public int Nflows
+    cdef public __name__, __strf__
     
 cdef class PyFlowFunctionWrapper(FlowFunction):
     cdef public dict kwargs

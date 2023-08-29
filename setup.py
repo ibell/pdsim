@@ -103,8 +103,8 @@ for pyx_file in pyx_list:
     sources = [pyx_file]
     #Try to find a PXD backpack if possible
     pxd_file = pyx_file.rsplit('.',1)[0]+'.pxd'
-    if os.path.exists(pxd_file):
-        sources+=[pxd_file]
+    # if os.path.exists(pxd_file):
+    #     sources+=[pxd_file]
     pxd_files.append(pxd_file)
 
     # Add sources for clipper module

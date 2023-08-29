@@ -28,7 +28,7 @@ cdef class FlowPathCollection(list):
     cpdef calculate(self)
     cpdef get_deepcopy(self)
     cpdef sumterms(self, arraym summerdT, arraym summerdm)
-    cpdef list flow_paths
+    cdef list flow_paths
         
 #Make a stripped down class with the necessary terms included
 cdef class FlowPath(object):
