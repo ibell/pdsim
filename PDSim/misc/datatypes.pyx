@@ -66,7 +66,205 @@ cdef class Collector(object):
             Minimum number of axes
         """
         return np.array(self.vec, ndmin = ndmin)
+
+def ___mul(x, y):
+    cdef int i, N
+    cdef bint isarray_x, isarray_y
+    cdef double *zdata
+    cdef double *ydata
+    cdef double yd
+    cdef arraym z
     
+    isarray_x = isinstance(x, arraym)
+    isarray_y = isinstance(y, arraym)
+
+    if isarray_x & isarray_y:
+        check_dims(x, y)
+        N = (<arraym>x).N
+        z = (<arraym>x).copy()
+        zdata = (<arraym>z).data
+        ydata = (<arraym>y).data
+        for i in range(N):
+            zdata[i] *= ydata[i]
+    elif isarray_x != isarray_y:
+        if isarray_y:
+            x,y = y,x
+        N = (<arraym>x).N
+        z = (<arraym>x).copy()
+        zdata = (<arraym>z).data
+        try:
+            #Try to make an iterator out of y
+            iterator = iter(y)
+        except TypeError:
+            # not iterable - int, float, etc.
+            
+            # Cast to a double
+            yd = (<double>y)
+            # Multiply by the other value
+            for i in range(N):
+                zdata[i] *= yd
+        else:
+            # iterable - list, tuple, numpy array, etc.
+            #No type introspection possible
+            for i in range(N):
+                zdata[i] *= y[i]
+    return z
+
+def ___add(x, y):
+    cdef int i, N
+    cdef bint isarray_x, isarray_y
+    cdef double *zdata
+    cdef double *ydata
+    cdef double yd
+    cdef arraym z
+    
+    isarray_x = isinstance(x, arraym)
+    isarray_y = isinstance(y, arraym)
+
+    if isarray_x & isarray_y:
+        check_dims(x, y)
+        N = (<arraym>x).N
+        z = (<arraym>x).copy()
+        zdata = z.data
+        ydata = (<arraym>y).data
+        # Add on the other array values
+        for i in range(N):
+            zdata[i] += ydata[i]
+    elif isarray_x != isarray_y:
+        if isarray_y:
+            x,y = y,x
+        N = (<arraym>x).N
+        z = (<arraym>x).copy()
+        zdata = (<arraym>z).data
+        try:
+            #Try to make an iterator out of y
+            iterator = iter(y)
+        except TypeError:
+            # not iterable - int, float, etc.
+            
+            # Cast y to a double
+            yd = (<double>y)
+            # Add on the other array values
+            for i in range(N):
+                zdata[i] += yd
+        else:
+            # iterable - list, tuple, numpy array, etc.
+            for i in range(N):
+                zdata[i] += y[i]
+    
+    return z
+
+def ___truediv(x, y):
+    cdef int i, N
+    cdef bint isarray_x, isarray_y
+    cdef double *zdata
+    cdef double *ydata
+    cdef double yd,xd
+    cdef arraym z
+    
+    isarray_x = isinstance(x, arraym)
+    isarray_y = isinstance(y, arraym)
+
+    #Both x and y are arraym instances
+    if isarray_x & isarray_y:
+        check_dims(x, y)
+        N = (<arraym>x).N
+        z = (<arraym>x).copy()
+        zdata = (<arraym>z).data
+        ydata = (<arraym>y).data
+        # Add on the other array values
+        for i in range(N):
+            zdata[i] /= ydata[i]
+            
+    #One of x and y is an arraym
+    elif isarray_x != isarray_y:
+        if isarray_y:
+            N = (<arraym>y).N
+            z = (<arraym>y).copy()
+            zdata = (<arraym>z).data
+            if isinstance(x,(int,float)):
+                # Cast lhs to a double and rhs to a double*
+                xd = (<double>x)
+                ydata = (<arraym>y).data
+                # Add on the other array values
+                for i in range(N):
+                    zdata[i] = xd/ydata[i]
+            else:
+                #Hopefully it is an iterable
+                for i in range(len(x)):
+                    z[i] = x[i]/y[i]                    
+        else:
+            N = (<arraym>x).N
+            z = (<arraym>x).copy()
+            zdata = (<arraym>z).data
+            if isinstance(y,(int,float)):
+                # Cast rhs to a double
+                yd = <double> y
+                # Add on the other array values
+                for i in range(N):
+                    zdata[i] /= yd
+            else:
+                #Hopefully it is an iterable
+                for i in range(len(x)):
+                    z[i] = x[i]/y[i]
+                
+    return z
+
+def ___sub(x, y):
+    cdef int i, N
+    cdef bint isarray_x, isarray_y
+    cdef double *zdata
+    cdef double *ydata
+    cdef double yd,xd
+    cdef arraym z
+    
+    isarray_x = isinstance(x, arraym)
+    isarray_y = isinstance(y, arraym)
+
+    if isarray_x & isarray_y:
+        check_dims(x, y)
+        N = (<arraym>x).N
+        z = (<arraym>x).copy()
+        zdata = (<arraym>z).data
+        ydata = (<arraym>y).data
+        # Add on the other array values
+        for i in range(N):
+            zdata[i] -= ydata[i]
+            
+    #One of x and y is an arraym
+    elif isarray_x != isarray_y:
+        if isarray_y:
+            N = (<arraym>y).N
+            z = (<arraym>y).copy()
+            zdata = (<arraym>z).data
+            if isinstance(x,(int,float)):
+                # Cast lhs to a double and rhs to a double*
+                xd = (<double>x)
+                ydata = (<arraym>y).data
+                # Add on the other array values
+                for i in range(N):
+                    zdata[i] = xd - ydata[i]
+            else:
+                #Hopefully it is an iterable
+                for i in range(len(x)):
+                    z[i] = x[i] - y[i]                    
+        else:
+            N = (<arraym>x).N
+            z = (<arraym>x).copy()
+            zdata = (<arraym>z).data
+            if isinstance(y,(int,float)):
+                # Cast rhs to a double
+                yd = <double> y
+                # Add on the other array values
+                for i in range(N):
+                    zdata[i] -= yd
+            else:
+                #Hopefully it is an iterable
+                for i in range(len(x)):
+                    z[i] = x[i] - y[i]
+        
+    return z
+
 @cython.final
 cdef class arraym(object):
     """
@@ -165,205 +363,38 @@ cdef class arraym(object):
     
     def __dealloc__(self):
         self.dealloc()
-          
-    def __add__(x, y):
-        cdef int i, N
-        cdef bint isarray_x, isarray_y
-        cdef double *zdata
-        cdef double *ydata
-        cdef double yd
-        cdef arraym z
-        
-        isarray_x = isinstance(x, arraym)
-        isarray_y = isinstance(y, arraym)
 
-        if isarray_x & isarray_y:
-            check_dims(x, y)
-            N = (<arraym>x).N
-            z = (<arraym>x).copy()
-            zdata = z.data
-            ydata = (<arraym>y).data
-            # Add on the other array values
-            for i in range(N):
-                zdata[i] += ydata[i]
-        elif isarray_x != isarray_y:
-            if isarray_y:
-                x,y = y,x
-            N = (<arraym>x).N
-            z = (<arraym>x).copy()
-            zdata = (<arraym>z).data
-            try:
-                #Try to make an iterator out of y
-                iterator = iter(y)
-            except TypeError:
-                # not iterable - int, float, etc.
-                
-                # Cast y to a double
-                yd = (<double>y)
-                # Add on the other array values
-                for i in range(N):
-                    zdata[i] += yd
-            else:
-                # iterable - list, tuple, numpy array, etc.
-                for i in range(N):
-                    zdata[i] += y[i]
-        
-        return z
+    def __radd__(self, left):
+        # implement left+self
+        return ___add(left, self)
+
+    def __add__(self, right):
+        # implement self+right
+        return ___add(self, right)
     
-    def __mul__(x, y):
-        cdef int i, N
-        cdef bint isarray_x, isarray_y
-        cdef double *zdata
-        cdef double *ydata
-        cdef double yd
-        cdef arraym z
-        
-        isarray_x = isinstance(x, arraym)
-        isarray_y = isinstance(y, arraym)
+    def __rmul__(self, left):
+        # implement left*self
+        return ___mul(left, self)
 
-        if isarray_x & isarray_y:
-            check_dims(x, y)
-            N = (<arraym>x).N
-            z = (<arraym>x).copy()
-            zdata = (<arraym>z).data
-            ydata = (<arraym>y).data
-            for i in range(N):
-                zdata[i] *= ydata[i]
-        elif isarray_x != isarray_y:
-            if isarray_y:
-                x,y = y,x
-            N = (<arraym>x).N
-            z = (<arraym>x).copy()
-            zdata = (<arraym>z).data
-            try:
-                #Try to make an iterator out of y
-                iterator = iter(y)
-            except TypeError:
-                # not iterable - int, float, etc.
-                
-                # Cast to a double
-                yd = (<double>y)
-                # Multiply by the other value
-                for i in range(N):
-                    zdata[i] *= yd
-            else:
-                # iterable - list, tuple, numpy array, etc.
-                #No type introspection possible
-                for i in range(N):
-                    zdata[i] *= y[i]
-            
-        return z
-    
-    def __truediv__(x, y):
-        cdef int i, N
-        cdef bint isarray_x, isarray_y
-        cdef double *zdata
-        cdef double *ydata
-        cdef double yd,xd
-        cdef arraym z
-        
-        isarray_x = isinstance(x, arraym)
-        isarray_y = isinstance(y, arraym)
+    def __mul__(self, right):
+        # implement self*right
+        return ___mul(self, right)
 
-        #Both x and y are arraym instances
-        if isarray_x & isarray_y:
-            check_dims(x, y)
-            N = (<arraym>x).N
-            z = (<arraym>x).copy()
-            zdata = (<arraym>z).data
-            ydata = (<arraym>y).data
-            # Add on the other array values
-            for i in range(N):
-                zdata[i] /= ydata[i]
-                
-        #One of x and y is an arraym
-        elif isarray_x != isarray_y:
-            if isarray_y:
-                N = (<arraym>y).N
-                z = (<arraym>y).copy()
-                zdata = (<arraym>z).data
-                if isinstance(x,(int,float)):
-                    # Cast lhs to a double and rhs to a double*
-                    xd = (<double>x)
-                    ydata = (<arraym>y).data
-                    # Add on the other array values
-                    for i in range(N):
-                        zdata[i] = xd/ydata[i]
-                else:
-                    #Hopefully it is an iterable
-                    for i in range(len(x)):
-                        z[i] = x[i]/y[i]                    
-            else:
-                N = (<arraym>x).N
-                z = (<arraym>x).copy()
-                zdata = (<arraym>z).data
-                if isinstance(y,(int,float)):
-                    # Cast rhs to a double
-                    yd = <double> y
-                    # Add on the other array values
-                    for i in range(N):
-                        zdata[i] /= yd
-                else:
-                    #Hopefully it is an iterable
-                    for i in range(len(x)):
-                        z[i] = x[i]/y[i]
-                    
-        return z
-    
-    def __sub__(x, y):
-        cdef int i, N
-        cdef bint isarray_x, isarray_y
-        cdef double *zdata
-        cdef double *ydata
-        cdef double yd,xd
-        cdef arraym z
-        
-        isarray_x = isinstance(x, arraym)
-        isarray_y = isinstance(y, arraym)
+    def __rtruediv__(self, left):
+        # implement left/self
+        return ___truediv(left, self)
 
-        if isarray_x & isarray_y:
-            check_dims(x, y)
-            N = (<arraym>x).N
-            z = (<arraym>x).copy()
-            zdata = (<arraym>z).data
-            ydata = (<arraym>y).data
-            # Add on the other array values
-            for i in range(N):
-                zdata[i] -= ydata[i]
-                
-        #One of x and y is an arraym
-        elif isarray_x != isarray_y:
-            if isarray_y:
-                N = (<arraym>y).N
-                z = (<arraym>y).copy()
-                zdata = (<arraym>z).data
-                if isinstance(x,(int,float)):
-                    # Cast lhs to a double and rhs to a double*
-                    xd = (<double>x)
-                    ydata = (<arraym>y).data
-                    # Add on the other array values
-                    for i in range(N):
-                        zdata[i] = xd - ydata[i]
-                else:
-                    #Hopefully it is an iterable
-                    for i in range(len(x)):
-                        z[i] = x[i] - y[i]                    
-            else:
-                N = (<arraym>x).N
-                z = (<arraym>x).copy()
-                zdata = (<arraym>z).data
-                if isinstance(y,(int,float)):
-                    # Cast rhs to a double
-                    yd = <double> y
-                    # Add on the other array values
-                    for i in range(N):
-                        zdata[i] -= yd
-                else:
-                    #Hopefully it is an iterable
-                    for i in range(len(x)):
-                        z[i] = x[i] - y[i]
-            
-        return z
+    def __truediv__(self, right):
+        # implement self/right
+        return ___truediv(self, right)
+
+    def __rsub__(self, left):
+        # implement left-self
+        return ___sub(left, self)
+
+    def __sub__(self, right):
+        # implement self-right
+        return ___sub(self, right)
     
     cpdef arraym copy(self):
         """
