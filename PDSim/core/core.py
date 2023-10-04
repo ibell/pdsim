@@ -1264,11 +1264,16 @@ class PDSimCore(object):
                     #  value for it
                     h_target = hdnew
                     
-                # Iterate to solve the H, P flash calculation
-                def objective(T):
-                    self.Tubes.Nodes[self.key_outlet].update(dict(T=T, P=self.Tubes.Nodes[self.key_outlet].p))
-                    return self.Tubes.Nodes[self.key_outlet].h - h_target
-                scipy.optimize.newton(objective, self.Tubes.Nodes[self.key_outlet].T)
+                if hasattr(self.Tubes.Nodes[self.key_outlet],'pAS') and len(self.Tubes.Nodes[self.key_outlet].pAS.fluid_names()) == 1:
+                    self.Tubes.Nodes[self.key_outlet].update_ph(self.Tubes.Nodes[self.key_outlet].p, h_target)
+                else:
+                    # Iterate to solve the H, P flash calculation
+                    def objective(T):
+                        self.Tubes.Nodes[self.key_outlet].update(dict(T=T, P=self.Tubes.Nodes[self.key_outlet].p))
+                        residual = self.Tubes.Nodes[self.key_outlet].h - h_target
+                        print(T, residual)
+                        return residual
+                    scipy.optimize.newton(objective, self.Tubes.Nodes[self.key_outlet].T)
 
                 print(self.solvers.hdisc_history)
                 
