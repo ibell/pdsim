@@ -1184,7 +1184,7 @@ class Scroll(PDSimCore, _Scroll):
             Ubar= mdot/(4*self.geo.ro*self.geo.h*rho)
             St=f*Amax/Ubar #Strouhal number [-]
             Dh =4.0*self.geo.ro*self.geo.h/(2.0*self.geo.ro+self.geo.h) #could be 4V/A
-            Re = 4.0*mdot /2.0/(pi*mu*Dh) #[-]
+            Re = 4.0*mdot/(pi*mu*Dh) #[-]
             r_c = self.geo.rb*(0.5*angles.phi_1_i+0.5*angles.phi_2_i-self.geo.phi_oi0)
             C_star = Dh/r_c #dimensionless curvature of chamber
     
