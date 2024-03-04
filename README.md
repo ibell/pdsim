@@ -3,7 +3,7 @@
 ## What is PDSim?
 
 * A python/cython-based library for *P*ositive-*D*isplacement machine *Sim*ulation
-* Written in a flexible way so that a wide variety of machines can be implemented with the same core. 
+* Written in a flexible way so that a wide variety of machines can be implemented with the same core code. 
 * Two papers about PDSim are available in *Int. J. Refrig.* in 2020:
     * [PDSim: A general quasi-steady modeling approach for positive displacement compressors and expanders](https://doi.org/10.1016/j.ijrefrig.2019.09.002) preprint: [PaperI](doc/papers/PaperI.pdf)
     * [PDSim: Demonstrating the capabilities of an open-source simulation framework for positive displacement compressors and expanders](https://doi.org/10.1016/j.ijrefrig.2019.10.015) preprint: [PaperII](doc/papers/PaperII.pdf)
