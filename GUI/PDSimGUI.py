@@ -1335,7 +1335,7 @@ class MainFrame(wx.Frame):
                                                      main_stdout = self.MTB.RunTB.main_log_ctrl,
                                                      Ncores = self.MTB.SolverTB.SolverPanel.Ncore_max.GetValue()
                                                      )
-            self.WTM.setDaemon(True)
+            self.WTM.daemon = True
             self.WTM.start()
         else:
             dlg = wx.MessageDialog(None,"Batch has already started.  Wait until completion or kill the batch","")
