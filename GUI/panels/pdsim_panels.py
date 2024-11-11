@@ -1067,15 +1067,13 @@ class OutputTreePanel(wx.Panel):
             menu.Append(menuitem)
         
         # If 
+        _isHDF5array = False
         if self.tree.GetItemText(item,col).startswith('<HDF5 dataset'):
             _isHDF5array = True
-        else:
-            _isHDF5array = False
             
+        _isScript = False
         if len(self.tree.GetItemText(item,col)) > 300:
             _isScript = True
-        else:
-            _isScript = False
         
         if _isHDF5array:
             menuitem = wx.MenuItem(menu, -1, 'Display this parameter')
