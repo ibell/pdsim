@@ -780,7 +780,18 @@ class OutputTreePanel(wx.Panel):
         entries = []
         
         def to_str(var):
-            return str(list(np.reshape(np.asarray(var), (1, np.size(var)))[0]))[1:-1]
+            # Numpy 2.x changed the API, and a cast is needed 
+            # to get a variable that will not print as the float64
+            # datatype
+            if isinstance(var, np.float64):
+                return str(float(var))
+            # Same for int
+            if isinstance(var, np.int64):
+                return str(int(var))
+            # TODO: add the <HDF back to the output so it can be loaded with the right-click menu
+            return str(np.asarray(var).squeeze().tolist())
+            
+            # return str(list(np.reshape(np.asarray(var), (1, np.size(var)))[0]))[1:-1]
         
         def _recursive_hdf5_add(root, objects, root_pointer):
             for thing in objects[0]:
