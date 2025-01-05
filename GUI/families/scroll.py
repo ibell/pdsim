@@ -154,7 +154,7 @@ def write_to_xlsx(workbook, runs):
 
         for r in range(len(buf)):
             for c in range(len(buf[0])):
-                if isinstance(buf[r][c],basestring) or not np.isnan(buf[r][c]):
+                if isinstance(buf[r][c],str) or not np.isnan(buf[r][c]):
                     ws.write(r, c, buf[r][c])
 
 class InputsToolBook(pdsim_panels.InputsToolBook):
