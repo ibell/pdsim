@@ -8,6 +8,7 @@ dependencies:
   - matplotlib
   - pyyaml
   - h5py
+  - xlsxwriter
   - wxpython
   - pandas
   - pip
