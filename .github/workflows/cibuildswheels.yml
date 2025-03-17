@@ -29,6 +29,6 @@ jobs:
           CIBW_ARCHS_MACOS: universal2
           CIBW_SKIP: "*musllinux* pp* *i686* *win32*"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v3
         with:
           path: ./wheelhouse/*.whl
