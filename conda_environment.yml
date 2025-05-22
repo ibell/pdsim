@@ -14,5 +14,5 @@ dependencies:
   - pip
   - pip:
     - CoolProp
-    - Cython<3
+    - Cython
     - quantities

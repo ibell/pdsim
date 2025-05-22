@@ -1,6 +1,7 @@
 import json, os, glob, sys
 
-notes = """
+notes = """ Instructions:
+
 To use this script, call python setup.py, which will internally call: python setup.py build_exe --build-exe=PDSimGUI
 
 You want to use the package_environment.yml provided to make a conda environment that doesn't include MKL-linked numpy, otherwise the built exe will be enormous (1 GB)
