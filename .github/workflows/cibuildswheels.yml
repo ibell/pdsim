@@ -27,7 +27,7 @@ jobs:
         env:
           CIBW_ARCHS: auto64
           CIBW_ARCHS_MACOS: universal2
-          CIBW_SKIP: "*musllinux* pp* *i686* *win32*"
+          CIBW_SKIP: "*musllinux* pp* *i686* *win32* *cp36* *cp37*"
 
       - uses: actions/upload-artifact@v4
         with:
