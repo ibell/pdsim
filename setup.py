@@ -16,6 +16,7 @@ from Cython.Build import cythonize
 from Cython.Distutils import build_ext
 from Cython.Distutils.extension import Extension
 import sys, shutil, os, glob, subprocess
+from packaging.version import Version
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -124,7 +125,14 @@ for pyx_file in pyx_list:
 
     # On Mac, need to explicitly specify that you want C++11 support
     extra_compile_args = []
-    if sys.platform == 'darwin':
+    
+    # CoolProp v6.8.0+ requires c++17 standard be enabled
+    if Version(CoolProp.__version__) >= Version('6.8.0'):
+        extra_compile_args=["-std=c++17"]
+        # And unicode support is also needed
+        extra_compile_args=["/utf-8"]
+    elif sys.platform == 'darwin':
+        # And previous versions need C++11 on mac
         extra_compile_args=["-std=c++11"]
 
     ext_module_list.append(Extension(ext_name,
