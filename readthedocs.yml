@@ -7,3 +7,7 @@ build:
 
 conda:
   environment: RTDenvironment.yml
+
+sphinx:
+  # Path to the Sphinx configuration file.
+  configuration: doc/conf.py
