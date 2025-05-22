@@ -12,7 +12,7 @@ dependencies:
   - pip
   - wxpython
   - pip:
-    - CoolProp
+    - CoolProp=6.6.0
     - glob2
     - ipython_genutils
     - jinja2
