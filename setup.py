@@ -36,7 +36,7 @@ except BaseException as BE:
     print('Error:', BE)
     print('Unable to extract the git branch, set to placeholder')
     
-version = '2.14'
+version = '2.15'
 
 if len(sys.argv) == 1:
     sys.argv += ['clean','develop']
