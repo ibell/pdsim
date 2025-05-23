@@ -31,4 +31,24 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
+          name: wheels-${{ matrix.python-version }}-${{ matrix.platform }}
           path: ./wheelhouse/*.whl
+
+  merge-artifacts:
+    needs: build_wheels 
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./dist
+
+      - name: List downloaded wheels
+        run: ls -R ./dist
+
+      - name: Upload merged wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-merged
+          path: ./dist/**/*.whl
+
