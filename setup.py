@@ -162,8 +162,8 @@ setup(
   description = """A flexible open-source framework for the quasi-steady-state simulation of positive displacement machines including compressors and expanders""",
   packages = ['PDSim','PDSim.core','PDSim.flow','PDSim.plot','PDSim.scroll','PDSim.misc','PDSim.recip','PDSim.misc.clipper'],
   cmdclass={'build_ext': build_ext},
-  ext_modules = cythonize(ext_module_list, 
-                          compiler_directives=dict(profile = True, embedsignature = True, language_level='2'),
+  ext_modules = cythonize(ext_module_list,
+                          compiler_directives=dict(profile = True, embedsignature = True, language_level='3'),
                           annotate=True
                           ),
   package_dir = {'PDSim':'PDSim',},
