@@ -36,7 +36,17 @@ except BaseException as BE:
     print('Error:', BE)
     print('Unable to extract the git branch, set to placeholder')
     
-version = '2.15'
+# Load version from pyproject.toml
+try:
+    # Add to standard library in python 3.11
+    import tomllib
+except ImportError:
+    # For python < 3.11
+    import tomli as tomllib
+
+with open(os.path.join(here, 'pyproject.toml'), 'rb') as f:
+    pyproject = tomllib.load(f)
+    version = pyproject['project']['version']
 
 if len(sys.argv) == 1:
     sys.argv += ['clean','develop']
@@ -45,7 +55,7 @@ if len(sys.argv) == 1:
 # Create the __init__ file with this version string
 fName = os.path.join('PDSim','__init__.py')
 lines = []
-lines.append("__version__ = '" + version + "'")
+lines.append(f'__version__ = "{version}"')
 lines.append("__git_revision__ = '" + git_hash + "'")
 lines.append("__git_branch__ = '" + git_branch + "'")
 with open(fName,'w') as fp:
@@ -123,17 +133,8 @@ for pyx_file in pyx_list:
     else:
         package_pxd_files[name] = [pxd]
 
-    # On Mac, need to explicitly specify that you want C++11 support
-    extra_compile_args = []
-    
-    # CoolProp v6.8.0+ requires c++17 standard be enabled
-    if Version(CoolProp.__version__) >= Version('6.8.0'):
-        extra_compile_args=["-std=c++17"]
-        # And unicode support is also needed
-        extra_compile_args=["/utf-8"]
-    elif sys.platform == 'darwin':
-        # And previous versions need C++11 on mac
-        extra_compile_args=["-std=c++11"]
+    # Explicitly specify that you want C++14 support
+    extra_compile_args = ["-std=c++14"]
 
     ext_module_list.append(Extension(ext_name,
                                      sources,

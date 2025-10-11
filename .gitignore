@@ -42,3 +42,7 @@ PDSim.egg-info
 doc/log.txt
 doc/notebooks/*.rst
 doc/notebooks/**/*.png
+
+# uv
+.venv/
+.python-version
