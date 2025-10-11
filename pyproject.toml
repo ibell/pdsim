@@ -11,7 +11,7 @@ authors = [
     {name = "Ian Bell", email = "ian.h.bell@gmail.com"}
 ]
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
