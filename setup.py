@@ -134,7 +134,12 @@ for pyx_file in pyx_list:
         package_pxd_files[name] = [pxd]
 
     # Explicitly specify that you want C++14 support
-    extra_compile_args = ["-std=c++14"]
+    if sys.platform == 'win32':
+        # MSVC flags: UTF-8 encoding and C++14 standard
+        extra_compile_args = ["/utf-8", "/std:c++14"]
+    else:
+        # GCC/Clang flags: C++14 standard
+        extra_compile_args = ["-std=c++14"]
 
     ext_module_list.append(Extension(ext_name,
                                      sources,
