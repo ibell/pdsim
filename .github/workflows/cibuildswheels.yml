@@ -28,9 +28,8 @@ jobs:
           CIBW_ARCHS_MACOS: universal2
           CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-*"
           CIBW_SKIP: "*musllinux*"
-          # Use uv for faster installs
-          CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
-          CIBW_BEFORE_BUILD: "pip install uv && uv pip install --system numpy cython 'coolprop==7.1.0'"
+          # Use uv for faster builds
+          CIBW_BUILD_FRONTEND: "build[uv]"
 
       - uses: actions/upload-artifact@v4
         with:
