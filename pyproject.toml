@@ -38,8 +38,8 @@ dependencies = [
 [project.urls]
 Homepage = "http://pdsim.sourceforge.net"
 
-[tool.uv]
-dev-dependencies = []
+[dependency-groups]
+dev = []
 
 [tool.setuptools.packages.find]
 where = ["."]
