@@ -182,7 +182,7 @@ class Scroll(PDSimCore, _Scroll):
         """
         A generic flow of liquid with mass flow rate calculated from:
 
-        :math:`\dot m = C_d A \sqrt{2\rho\Delta p}`
+        :math:`\\dot m = C_d A \\sqrt{2\rho\\Delta p}`
         
         Furthermore, the area is determined through the use of the spline
         interpolator.

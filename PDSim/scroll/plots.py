@@ -572,7 +572,7 @@ def CoordsOrbScroll(theta,geo,shaveOn=True, just_involutes = False, Ndict = {}):
     return x,y
 
 def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor = None, show = False, offsetScroll = False, **kwargs):
-    """
+    r"""
     The function that plots the scroll sets
 
     Arguments:
@@ -722,7 +722,7 @@ def plotScrollSet(theta,geo = None,axis = None, fig = None, lw = None, OSColor =
     return OrbScroll
     
 def overlay_injection_port(theta, geo, phi, ax, inner_outer, rport = None, offset = None):
-    """
+    r"""
     Plot the injection ports on an axis - no scroll wrap plot is generated.  Also see
     plot_injection_ports()
     
@@ -769,7 +769,7 @@ def overlay_injection_port(theta, geo, phi, ax, inner_outer, rport = None, offse
         raise KeyError
     
 def plot_injection_ports(theta, geo, phi, ax, inner_outer):
-    """
+    r"""
     Plot the injection ports
     
     Parameters

@@ -27,13 +27,13 @@ delete_temp_folder()
 make_temp_folder()
 
 call_str1 = ['python','setup.py','bdist_msi','--dist-dir=dist_tmp']
-print 'Calling: '+' '.join(call_str1)
-print subprocess.check_output(call_str1)
+print('Calling: '+' '.join(call_str1))
+print(subprocess.check_output(call_str1))
 
 fpath = glob.glob('dist_tmp/*.msi')[0]
 fName = fpath.split(os.sep,1)[1]
 call_str = ['pscp',fpath,'ibell,pdsim@frs.sf.net:/home/pfs/project/p/pd/pdsim/Nightly/'+fName]
-print 'Calling: '+' '.join(call_str)
-print subprocess.call(call_str,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+print('Calling: '+' '.join(call_str))
+print(subprocess.call(call_str,stdout=subprocess.PIPE,stderr=subprocess.PIPE))
 
 delete_temp_folder()

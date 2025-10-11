@@ -109,7 +109,7 @@ def pack(options, argv = None):
         # # Compress the dll with upx
         # subprocess.call('upx PDSimGUI/*.*', stdout = sys.stdout, stderr = sys.stderr)
         # Make an installer using InnoSetup
-        subprocess.call(['C:\Program Files (x86)\Inno Setup 6\Compil32.exe','/cc','package_gui.iss'])
+        subprocess.call([r'C:\Program Files (x86)\Inno Setup 6\Compil32.exe','/cc','package_gui.iss'])
         # Rename the installer to include the PDSim version
         old_name = os.path.join('Output','SetupPDSimGUI.exe')
         import PDSim

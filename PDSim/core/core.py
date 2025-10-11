@@ -447,13 +447,13 @@ class PDSimCore(object):
         
         .. math::
         
-            \eta_a = \\frac{h_{2s}-h_1}{h_2-h_1}
+            \\eta_a = \\frac{h_{2s}-h_1}{h_2-h_1}
             
         and in expander mode it is defined by
         
         .. math::
         
-            \eta_a = \\frac{h_2-h_1}{h_{2s}-h_1}
+            \\eta_a = \\frac{h_2-h_1}{h_{2s}-h_1}
             
         This function can also be overloaded by the subclass in order to 
         implement a different guess method
@@ -697,7 +697,7 @@ class PDSimCore(object):
         
         .. math::
         
-            \\dot W_{pv} = -\int p\\frac{dV}{d\\theta}\\frac{\\omega}{2\\pi} d\\theta
+            \\dot W_{pv} = -\\int p\\frac{dV}{d\\theta}\\frac{\\omega}{2\\pi} d\\theta
             
         for all the control volumes and sets the parameter ``self.Wdot_pv`` with 
         the result.

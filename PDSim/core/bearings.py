@@ -28,23 +28,23 @@ def thrust_bearing(**kwargs):
     
     .. math::
     
-        x = {r_o}\cos \left( {{\phi _{ie}} - \\frac{\pi }{2} - \\theta } \\right)
+        x = {r_o}\\cos \\left( {{\\phi _{ie}} - \\frac{\\pi }{2} - \\theta } \\right)
 
     .. math::
     
-        y = {r_o}\sin \left( {{\phi _{ie}} - \\frac{\pi }{2} - \\theta } \\right)
+        y = {r_o}\\sin \\left( {{\\phi _{ie}} - \\frac{\\pi }{2} - \\theta } \\right)
     
     .. math::
     
-        \\frac{{dx}}{{d\\theta }} = {r_o}\sin \left( {{\phi _{ie}} - \\frac{\pi }{2} - \\theta } \\right)\omega 
+        \\frac{{dx}}{{d\\theta }} = {r_o}\\sin \\left( {{\\phi _{ie}} - \\frac{\\pi }{2} - \\theta } \\right)\\omega 
     
     .. math::
     
-        \\frac{{dy}}{{d\\theta }} =  - {r_o}\cos \left( {{\phi _{ie}} - \\frac{\pi }{2} - \\theta } \\right)\omega
+        \\frac{{dy}}{{d\\theta }} =  - {r_o}\\cos \\left( {{\\phi _{ie}} - \\frac{\\pi }{2} - \\theta } \\right)\\omega
 
     .. math::
     
-        \left| v \\right| = \sqrt {{{\left( {\\frac{{dx}}{{d\\theta }}} \\right)}^2} + {{\left( {\\frac{{dy}}{{d\\theta }}} \\right)}^2}}  = {r_o}\omega
+        \\left| v \\right| = \\sqrt {{{\\left( {\\frac{{dx}}{{d\\theta }}} \\right)}^2} + {{\\left( {\\frac{{dy}}{{d\\theta }}} \\right)}^2}}  = {r_o}\\omega
         
     But it is quite possible that you do not have hydro-dynamic lubrication, and 
     as a result you can get asperity-asperity contact and much higher friction
@@ -101,9 +101,9 @@ def journal_bearing(**kwargs):
     
     Short-bearing analysis is used.  Here we are implementing the equations from 
     the Ph.D. dissertation of Jay Kim (Purdue, 2005).  Knowing :math:`w_r` and 
-    the dimensions we can then obtain :math:`\epsilon` using a 1D secant solver
-    with the initial guess of :math:`\epsilon=0.5`.  Then we obtain 
-    :math:`F_{shear}` for the given value of :math:`\epsilon`. 
+    the dimensions we can then obtain :math:`\\epsilon` using a 1D secant solver
+    with the initial guess of :math:`\\epsilon=0.5`.  Then we obtain 
+    :math:`F_{shear}` for the given value of :math:`\\epsilon`. 
     
     .. math::
     
@@ -111,7 +111,7 @@ def journal_bearing(**kwargs):
 
     .. math::
     
-        \mathbf{F}_{shear} = \\frac{F_{shear}}{\\eta_0\\omega r_b L}\\left(\\frac{c}{r_b}\\right) = \\frac{2\\pi}{(1-\\epsilon^2)^{1/2}}\\left[\\left(\\frac{b}{r_b}\\right)^2\\frac{\\epsilon^2}{16(1-\\epsilon^2)}+1\\right]
+        \\mathbf{F}_{shear} = \\frac{F_{shear}}{\\eta_0\\omega r_b L}\\left(\\frac{c}{r_b}\\right) = \\frac{2\\pi}{(1-\\epsilon^2)^{1/2}}\\left[\\left(\\frac{b}{r_b}\\right)^2\\frac{\\epsilon^2}{16(1-\\epsilon^2)}+1\\right]
         
     .. math::
     

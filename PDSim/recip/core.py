@@ -37,7 +37,7 @@ class Recip(PDSimCore,_Recip):
         return _Recip.V_dV(self, theta)
     
     def Vdisp(self):
-        """
+        r"""
         Returns displacement of compressor in m\ :math:`^3`\ /revolution
         """
         return 2*self.crank_length*self.A_piston
@@ -126,7 +126,7 @@ class Recip(PDSimCore,_Recip):
         
         .. math::
         
-            x = {L_c}\cos \\theta  + \sqrt {L_1^2 - L_c^2{{\\left( {\\sin \\theta } \\right)}^2}}
+            x = {L_c}\\cos \\theta  + \\sqrt {L_1^2 - L_c^2{{\\left( {\\sin \\theta } \\right)}^2}}
             
         .. math::
         
@@ -134,11 +134,11 @@ class Recip(PDSimCore,_Recip):
         
         .. math::
             
-            \\bar \\dot x =  - \\frac{{\\dot \\theta }}{\\pi }\\int_0^\pi  {\\left[ { - {L_c}\\sin \\theta  + \\frac{{ - L_c^2\\sin 2\\theta }}{{2\\sqrt {L_1^2 - L_c^2{{\\left( {\\sin \\theta } \\right)}^2}} }}} \\right]d\\theta }
+            \\bar \\dot x =  - \\frac{{\\dot \\theta }}{\\pi }\\int_0^\\pi  {\\left[ { - {L_c}\\sin \\theta  + \\frac{{ - L_c^2\\sin 2\\theta }}{{2\\sqrt {L_1^2 - L_c^2{{\\left( {\\sin \\theta } \\right)}^2}} }}} \\right]d\\theta }
         
         .. math::
             
-            \\bar \\dot x =  - \\frac{{\\dot \\theta }}{\\pi }\\left[ {{L_c}\\cos \\theta } \\right]_0^\pi  =  - \\frac{{{L_c}\\dot \\theta }}{\\pi }( - 1 - 1) = \\frac{{2{L_c}\\dot \\theta }}{\\pi }
+            \\bar \\dot x =  - \\frac{{\\dot \\theta }}{\\pi }\\left[ {{L_c}\\cos \\theta } \\right]_0^\\pi  =  - \\frac{{{L_c}\\dot \\theta }}{\\pi }( - 1 - 1) = \\frac{{2{L_c}\\dot \\theta }}{\\pi }
         
         """
         #Oil with viscosity of 10 cSt (=10e-6 m^2/s) and density of 860 kg/m^3
@@ -182,9 +182,9 @@ class Recip(PDSimCore,_Recip):
     #Name gets mangled in the core base class, so un-mangle it
     def _PDSimCore__post_solve(self):
         """
-        {\eta _{motor}} = \frac{{{{\dot W}_{shaft}}}}{{{{\dot W}_{shaft}} + {{\dot W}_{motor}}}}
-        {\eta _{motor}}\left( {{{\dot W}_{shaft}} + {{\dot W}_{motor}}} \right) = {{\dot W}_{shaft}}
-        {{\dot W}_{motor}} = \frac{{{{\dot W}_{shaft}}}}{{{\eta _{motor}}}} - {{\dot W}_{shaft}}
+        {\\eta _{motor}} = \frac{{{{\\dot W}_{shaft}}}}{{{{\\dot W}_{shaft}} + {{\\dot W}_{motor}}}}
+        {\\eta _{motor}}\\left( {{{\\dot W}_{shaft}} + {{\\dot W}_{motor}}} \right) = {{\\dot W}_{shaft}}
+        {{\\dot W}_{motor}} = \frac{{{{\\dot W}_{shaft}}}}{{{\\eta _{motor}}}} - {{\\dot W}_{shaft}}
         """
         #Call the base class function
         PDSimCore._PDSimCore__post_solve(self)
