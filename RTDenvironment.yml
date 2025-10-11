@@ -17,5 +17,5 @@ dependencies:
     - ipython_genutils
     - jinja2
     - nbsphinx
-    - PDSim
+    - git+https://github.com/ibell/pdsim.git
     - ipykernel
