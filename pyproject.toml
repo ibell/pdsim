@@ -39,7 +39,16 @@ dependencies = [
 Homepage = "http://pdsim.sourceforge.net"
 
 [dependency-groups]
-dev = []
+dev = [
+    "sphinx>=8.0",
+    "nbsphinx",
+    "sphinx-bootstrap-theme",
+    "ipython",
+    "ipykernel",
+    "wxPython",
+    "PyYAML",
+    "pypandoc",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
