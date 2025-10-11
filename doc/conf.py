@@ -60,11 +60,11 @@ extensions = ['nbsphinx',
 
 #autodoc_default_flags = ['members','no-inherited-members','show-inheritance','private-members']
 
-intersphinx_mapping = {'CoolProp': ('http://coolprop.sourceforge.net', None),
-                       'matplotlib':('https://matplotlib.org', None),
-                       'wx': ('http://wxpython.org/Phoenix/docs/html/', None),
+intersphinx_mapping = {'CoolProp': ('http://www.coolprop.org', None),
+                       'matplotlib':('https://matplotlib.org/stable/', None),
+                       'wx': ('https://wxpython.org/Phoenix/docs/html/', None),
                        'python': ('https://docs.python.org/3/',None),
-                       'numpy':('https://docs.scipy.org/doc/numpy',None)
+                       'numpy':('https://numpy.org/doc/stable/',None)
                        }
 
 # Add any paths that contain templates here, relative to this directory.

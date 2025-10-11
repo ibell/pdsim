@@ -498,10 +498,10 @@ cdef class ControlVolumeCollection(object):
     cpdef add(self, ControlVolume CV):
         """
         Add a control volume to the list of control volumes
-        
+
         Parameters
         ----------
-        CV : :class:`ControlVolume <PDSim.core.containers.ControlVolume>' instance
+        CV : :class:`ControlVolume <PDSim.core.containers.ControlVolume>` instance
         """
         if CV.key in self.keys:
             raise ValueError('Your CV key [{key:s}] is already in use'.format(CV.key))

@@ -172,8 +172,8 @@ class Scroll(PDSimCore, _Scroll):
             return 0.0
 
     def INTERPOLATING_LIQUID_NOZZLE_FLOW(
-        self, 
-        FlowPath, 
+        self,
+        FlowPath,
         X_d = 1.0,
         X_d_backflow = 0.8,
         upstream_key = 'EVICIV',
@@ -182,13 +182,15 @@ class Scroll(PDSimCore, _Scroll):
         """
         A generic flow of liquid with mass flow rate calculated from:
 
-        :math:`\\dot m = C_d A \\sqrt{2\rho\\Delta p}`
-        
+        .. math::
+
+            \\dot m = C_d A \\sqrt{2\\rho\\Delta p}
+
         Furthermore, the area is determined through the use of the spline
         interpolator.
 
         See also: https://en.wikipedia.org/wiki/Discharge_coefficient
-        
+
         Parameters
         ----------
         FlowPath : FlowPath instance
@@ -201,9 +203,9 @@ class Scroll(PDSimCore, _Scroll):
             Key for the side of the flow path that is considered to be "upstream"
         A_interpolator : float
             throat area for isentropic nozzle model [:math:`m^2`]
-        DP_floor: float
+        DP_floor : float
             The minimum pressure drop [kPa]
-            
+
         Returns
         -------
         mdot : float
@@ -1562,25 +1564,19 @@ class Scroll(PDSimCore, _Scroll):
     def mechanical_losses(self, shell_pressure = 'low:shell'):
         """
         Calculate the mechanical losses in the bearings
-        
+
         Parameters
         ----------
-            shell_pressure : string, 'low', 'low:shell', 'mid', or 'high'
-            
+        shell_pressure : string, 'low', 'low:shell', 'mid', or 'high'
             low uses the upstream pressure of the machine,
-            
-            low:shell uses the pressure after the inlet tube
-            
-            mid uses the average of upstream and downstream pressures
-            
-            high uses the pressure downstream of the machine 
-            
+            low:shell uses the pressure after the inlet tube,
+            mid uses the average of upstream and downstream pressures,
+            high uses the pressure downstream of the machine
+
         Returns
         -------
-            Wdot_losses: float
-            
-                The total mechanical losses in kW
-
+        Wdot_losses : float
+            The total mechanical losses in kW
         """
         
         #inlet pressure [kPa]
@@ -2036,14 +2032,15 @@ class Scroll(PDSimCore, _Scroll):
 
     def multi_lump_OEB(self):
         """
-        Defines multi-lump temperatures energy balance 
+        Defines multi-lump temperatures energy balance
         calculations and returns a list of redisuals
-        
-        Notes:
-        Current example considers two lumps
-            Tlumps[0] : Tshell
-            Tlumps[1] : Toil
-        ----
+
+        Notes
+        -----
+        Current example considers two lumps:
+
+        - Tlumps[0] : Tshell
+        - Tlumps[1] : Toil
         """
         #For the lumps:
         Qnet = 0.0
