@@ -1,6 +1,6 @@
 [build-system]
 # Minimum requirements for the build system to execute.
-requires = ["setuptools >= 61", "numpy", "cython", "coolprop==7.1.0"]
+requires = ["setuptools >= 61", "numpy>=2.0", "cython", "coolprop==7.1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -25,7 +25,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "numpy",
+    "numpy>=2.0",
     "cython",
     "coolprop==7.1.0",
     "quantities",

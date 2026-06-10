@@ -807,11 +807,17 @@ cpdef tuple coords_norm(phi_vec, geoVals geo, double theta,flag="fi"):
     """
     
     rb=geo.rb
+    # Mirror coords_inv: a scalar phi yields scalar normals, an array yields
+    # arrays. Without this, a scalar input still returned size-1 arrays, which
+    # then leaked into cdef-double geoVals setters (numpy array->scalar
+    # deprecation) and into scalar coordinate fields elsewhere.
+    scalar_input = False
     if not type(phi_vec) is np.ndarray:
         if type(phi_vec) is list:
             phi_vec=np.array(phi_vec)
         else:
             phi_vec=np.array([phi_vec])
+            scalar_input = True
     nx=np.zeros(np.size(phi_vec))
     ny=np.zeros(np.size(phi_vec))
 
@@ -831,6 +837,8 @@ cpdef tuple coords_norm(phi_vec, geoVals geo, double theta,flag="fi"):
             ny[i] = -cos(phi)
         else:
             print("Uh oh... error in coords_norm")
+    if scalar_input:
+        return (float(nx[0]), float(ny[0]))
     return (nx,ny)
     
 cdef double x_antideriv(double phi, double phi_0):

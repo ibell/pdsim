@@ -1645,7 +1645,7 @@ class Scroll(PDSimCore, _Scroll):
             self.losses.summed = self.losses.crank_bearing + self.losses.upper_bearing + self.losses.lower_bearing + self.losses.thrust_bearing
             
             # Get the mean losses over one cycle
-            self.losses.bearings  = np.trapz(self.losses.summed[_slice], theta)/theta_range
+            self.losses.bearings  = np.trapezoid(self.losses.summed[_slice], theta)/theta_range
             
             #print('mechanical losses: ', self.losses.bearings)
             return self.losses.bearings #[kW]
@@ -2477,7 +2477,7 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.summed_Fz += self.forces.summed_Faxial_involute
         
         # Calculate the mean axial force
-        self.forces.mean_Fz = np.trapz(self.forces.summed_Fz, t)/(2*pi)
+        self.forces.mean_Fz = np.trapezoid(self.forces.summed_Fz, t)/(2*pi)
         
         ####################################################
         #############  "Radial" force components ###########
@@ -2653,11 +2653,11 @@ class Scroll(PDSimCore, _Scroll):
         self.forces.tau = self.forces.xpin*self.forces.summed_Fy-self.forces.ypin*self.forces.summed_Fx
         # Calculate the mean normal force on the crank pin
         # This assumes a quasi-steady bearing where the film is well-behaved
-        self.forces.mean_Fm = np.trapz(self.forces.Fm, self.t[_slice])/(2*pi)
-        self.forces.mean_Fr = np.trapz(self.forces.summed_Fr, self.t[_slice])/(2*pi)
-        self.forces.mean_Ft = np.trapz(self.forces.summed_Ft, self.t[_slice])/(2*pi)
-        self.forces.mean_tau = np.trapz(self.forces.tau, self.t[_slice])/(2*pi)
-        self.forces.mean_Mz = np.trapz(self.forces.summed_Mz, self.t[_slice])/(2*pi)
+        self.forces.mean_Fm = np.trapezoid(self.forces.Fm, self.t[_slice])/(2*pi)
+        self.forces.mean_Fr = np.trapezoid(self.forces.summed_Fr, self.t[_slice])/(2*pi)
+        self.forces.mean_Ft = np.trapezoid(self.forces.summed_Ft, self.t[_slice])/(2*pi)
+        self.forces.mean_tau = np.trapezoid(self.forces.tau, self.t[_slice])/(2*pi)
+        self.forces.mean_Mz = np.trapezoid(self.forces.summed_Mz, self.t[_slice])/(2*pi)
         
     def detailed_mechanical_analysis(self):
         """
@@ -2831,7 +2831,7 @@ class Scroll(PDSimCore, _Scroll):
                                   + self.forces.Wdot_lower_journal 
                                   + self.forces.Wdot_thrust)
         
-        self.forces.Wdot_total_mean = np.trapz(self.forces.Wdot_total, theta)/(2*pi)
+        self.forces.Wdot_total_mean = np.trapezoid(self.forces.Wdot_total, theta)/(2*pi)
         #print(self.forces.Wdot_total_mean,'average mechanical losses')
             
 #        fig = plt.figure()
