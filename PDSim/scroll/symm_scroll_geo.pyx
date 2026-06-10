@@ -865,7 +865,7 @@ cpdef dict SA_forces(double theta, geoVals geo, bint poly = False, bint use_offs
     x2, y2 = coords_inv(geo.phi_oie, geo, theta, 'oi')
     xmid = (x1+x2)/2; ymid = (y1+y2)/2
     nx1, ny1 = coords_norm(geo.phi_ooe, geo, theta, 'oo')
-    ny1, nx1 = -nx1[0], ny1[0]
+    ny1, nx1 = -nx1, ny1
     # Make sure you get the normal pointing towards the orbiting scroll!
     # The cross product of line going from inner to outer scroll wrap ends 
     # with normal should be negative

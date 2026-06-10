@@ -412,8 +412,8 @@ class PDSimCore(object):
                         fcn = Flow.MdotFcn_str,
                         mdot = mdot,
                         edot = edot,
-                        mdot_average = np.trapz(mdot, self.t[0:self.Ntheta])/(self.t[self.Ntheta-1]-self.t[0]),
-                        Edot_average = np.trapz(edot, self.t[0:self.Ntheta])/(self.t[self.Ntheta-1]-self.t[0]) 
+                        mdot_average = np.trapezoid(mdot, self.t[0:self.Ntheta])/(self.t[self.Ntheta-1]-self.t[0]),
+                        Edot_average = np.trapezoid(edot, self.t[0:self.Ntheta])/(self.t[self.Ntheta-1]-self.t[0]) 
                         )
                 
             self.FlowsProcessed.collected_data.append(data)

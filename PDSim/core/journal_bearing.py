@@ -23,9 +23,9 @@ def TwoDGriddedIntegrate(I,N):
 def TwoDGriddedIntegrate2(PHI,Y,I):
     
     #Integrate along phi direction for each y, then do a trapezoidal integration of each of the y
-    plt.plot(Y[1,:],np.trapz(I,PHI,axis = 0))
+    plt.plot(Y[1,:],np.trapezoid(I,PHI,axis = 0))
     plt.show()
-    return np.trapz(np.trapz(I,PHI,axis = 0),Y[1,:])
+    return np.trapezoid(np.trapezoid(I,PHI,axis = 0),Y[1,:])
 
 def OBJECTIVE(phi_star, epsilon, plot = False, output = False):
 
