@@ -624,16 +624,27 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, int ot
     T_up=State_up.get_T()
     p_down=State_down.get_p()
     
-    # Speed of sound
-    c=(k*R*T_up)**0.5
     # Upstream density
     rho_up=p_up*1000.0/(R*T_up)
     pr=p_down/p_up
     pr_crit=(1+(k-1)/2)**(k/(1-k))
-    
-    if pr > pr_crit: 
+
+    if pr > pr_crit:
         # Mass flow rate if not choked [kg/s]
         mdot=A*p_up*1000.0/(R*T_up)**0.5*(2*k/(k-1.0)*pr**(2.0/k)*(1-pr**((k-1.0)/k)))**0.5
+    else:
+        # Mass flow rate if choked
+        mdot=A*rho_up*(k*R*T_up)**0.5*(1.+(k-1.)/2.)**((1+k)/(2*(1-k)))
+
+    # Default path returns mdot; the throat-state / speed-of-sound / Mach work below
+    # is only needed for the (rare) OUTPUT_VELOCITY / OUTPUT_MA requests, so skip it
+    # on the hot mdot path.
+    if other_output < 0:
+        return mdot
+
+    # Speed of sound
+    c=(k*R*T_up)**0.5
+    if pr > pr_crit:
         # Throat temperature [K]
         T_down=T_up*(p_down/p_up)**((k-1.0)/k)
         # Throat density [kg/m3]
@@ -643,17 +654,12 @@ cpdef double IsentropicNozzle(double A, State State_up, State State_down, int ot
         # Mach number
         Ma=v/c
     else:
-        # Mass flow rate if choked
-        mdot=A*rho_up*(k*R*T_up)**0.5*(1.+(k-1.)/2.)**((1+k)/(2*(1-k)))
         # Velocity at throat
         v=c
         # Mach Number
         Ma=1.0
-    
 
-    if other_output < 0:
-        return mdot
-    elif other_output == OUTPUT_VELOCITY:
+    if other_output == OUTPUT_VELOCITY:
         return v
     elif other_output == OUTPUT_MA:
         return Ma

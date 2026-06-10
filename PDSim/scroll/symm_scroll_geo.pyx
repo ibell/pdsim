@@ -869,7 +869,7 @@ cpdef dict SA_forces(double theta, geoVals geo, bint poly = False, bint use_offs
     # Make sure you get the normal pointing towards the orbiting scroll!
     # The cross product of line going from inner to outer scroll wrap ends 
     # with normal should be negative
-    if np.cross([x1-x2,y1-y2,0],[nx1, ny1, 0])[2] > 0:
+    if (x1-x2)*ny1 - (y1-y2)*nx1 > 0:   # z-component of 2D cross product (scalar; avoids np.cross overhead)
         nx1 *= -1
         ny1 *= -1
 
@@ -880,8 +880,8 @@ cpdef dict SA_forces(double theta, geoVals geo, bint poly = False, bint use_offs
     fO_p_line = [A_line*nx1, A_line*ny1, 0.0]
     THETA = geo.phi_fie-theta-pi/2
     r_line = [xmid - geo.ro*cos(THETA), ymid - geo.ro*sin(THETA), 0.0]
-    cross = np.cross(r_line, fO_p_line)
-    M_O_p += cross[2]
+    # z-component of r_line x fO_p_line (scalar; avoids np.cross + normalize_axis_tuple overhead)
+    M_O_p += r_line[0]*fO_p_line[1] - r_line[1]*fO_p_line[0]
     
     exact_dict = dict(fx_p = fx_p,
                       fy_p = fy_p,
