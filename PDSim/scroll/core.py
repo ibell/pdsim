@@ -2496,6 +2496,10 @@ class Scroll(PDSimCore, _Scroll):
 
         fail_dict = {k: 0.0 for k in ['fx_p', 'fy_p', 'cx', 'cy', 'M_O_p']}
 
+        # _slice is invariant over the loops below, so hoist sum(_slice) out of the
+        # inner loop -- it was being recomputed (summing ~Itheta ints) on every
+        # (CV, theta) iteration, ~671k times, ~18% of the solve.  Bit-identical.
+        n_slice_sum = sum(_slice)
         for CVkey in self.CVs.keys:
             geo_components = []
             error_messages = []
@@ -2505,7 +2509,7 @@ class Scroll(PDSimCore, _Scroll):
                 except BaseException as BE:
                     error_messages.append(str(BE))
                     geo_components.append(fail_dict)
-                if len(error_messages) == sum(_slice):
+                if len(error_messages) == n_slice_sum:
                     print(set(error_messages))
                 
             if geo_components:
