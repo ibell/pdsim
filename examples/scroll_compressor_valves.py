@@ -242,8 +242,9 @@ def Compressor(ScrollClass, Te = 253, Tc = 310, f = None, OneCycle = False, Ref 
     h5 = HDF5Writer()
     h5.write_to_file(ScrollComp, HDF5file)
 
-    debug_plots(ScrollComp, family='Scroll Compressor')
-    
+    if plotting:
+        debug_plots(ScrollComp, family='Scroll Compressor')
+
     return ScrollComp
     
 if __name__=='__main__':
