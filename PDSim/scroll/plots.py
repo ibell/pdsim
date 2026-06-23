@@ -9,6 +9,8 @@ from pylab import arange,pi,sin,cos,sqrt,tan
 import threading
 import wx
 
+import warnings
+
 import os
 #import scrollCalcs as Calcs
 from matplotlib.figure import Figure
@@ -1056,7 +1058,7 @@ class ScrollAnimForm(wx.Frame):
             self.orbiting_layers.append(self.ax.plot(xo, yo, 'ko')[0])
     
         beta = self.param_dict.get('beta', pi/6)
-        rring = self.param_dict.get('oldham_ring_radius', 0.04)
+        rring = self.param_dict.get('oldham_ring_radius', 0.06)
         lkey = wkey = self.param_dict.get('oldham_key_width', 0.005)
         
         
@@ -1066,6 +1068,11 @@ class ScrollAnimForm(wx.Frame):
             
             xo = self.geo.ro*cos(om)
             yo = self.geo.ro*sin(om)
+            
+            for term in ['pin1_ybeta_offset','pin2_ybeta_offset','pin3_xbeta_offset','pin4_xbeta_offset']:
+                if not hasattr(self.param_dict, term):
+                    warnings.warn('"param_dict.'+term+'" not found, using 0')
+                    self.param_dict.update({term : 0})
             
             OSkeys = [dict(r = rring, width = wkey, length = lkey, xbeta_offset = self.param_dict['pin3_xbeta_offset']),
                       dict(r = rring, width = wkey, length = lkey, betaplus = pi, xbeta_offset = self.param_dict['pin4_xbeta_offset'])]
