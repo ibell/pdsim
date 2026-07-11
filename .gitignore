@@ -16,6 +16,8 @@ PDSim/flow/flow.html
 PDSim/flow/flow_models.cpp
 PDSim/flow/flow_models.h
 PDSim/flow/flow_models.html
+PDSim/misc/_coolprop_abi.cpp
+PDSim/misc/_coolprop_abi.html
 PDSim/misc/clipper/pyclipper.cpp
 PDSim/misc/clipper/pyclipper.html
 PDSim/misc/datatypes.cpp
