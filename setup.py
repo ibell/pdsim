@@ -58,6 +58,13 @@ lines = []
 lines.append(f'__version__ = "{version}"')
 lines.append("__git_revision__ = '" + git_hash + "'")
 lines.append("__git_branch__ = '" + git_branch + "'")
+# Verify at import that the compiled extensions match the installed CoolProp
+# enum ABI (see PDSim/misc/_coolprop_abi.pyx); raises with rebuild instructions
+# on a mismatch instead of failing cryptically deep inside solve().
+lines.append("")
+lines.append("from PDSim._abi_check import check_coolprop_abi as _check_coolprop_abi")
+lines.append("_check_coolprop_abi()")
+lines.append("del _check_coolprop_abi")
 with open(fName,'w') as fp:
     fp.write('\n'.join(lines)+'\n')
 print('to be written to __init__.py:')
@@ -68,6 +75,7 @@ import numpy
 
 # Each of the Pure-Python or PYX files in this list will be compiled to a python module       
 pyx_list = [
+            "PDSim/misc/_coolprop_abi.pyx",
             "PDSim/core/_bearings.pyx",
             "PDSim/core/containers.pyx",
             "PDSim/core/callbacks.pyx",
